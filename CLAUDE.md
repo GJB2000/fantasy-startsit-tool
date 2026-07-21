@@ -75,10 +75,11 @@ This is the most important section — the "brain" of the tool.
     season-long average
   - Opponent/matchup difficulty for the player's position
   - Recent volume/opportunity (targets for WR/TE, rushing attempts +
-    targets for RB, pass attempts for QB) vs. a per-position reference —
-    the single strongest signal found so far. See "Backtesting & Tuning
-    History" below for the full validation story and why the weights in
-    `lib/recommendation/config.ts` are set where they are.
+    targets for RB, pass attempts for QB), blended against recent/season
+    PPR points at a heavily volume-weighted ratio (`VOLUME_BLEND_WEIGHT`
+    in `config.ts`) — the single strongest signal found so far. See
+    "Backtesting & Tuning History" below for the full validation story
+    and why the weights are set where they are.
   - Injury status (Questionable/Doubtful/Out) — flag prominently, but
     don't treat "Questionable" as an automatic bench
   - [Add more factors here as they're decided]
@@ -184,6 +185,31 @@ durable pattern — re-validate once a second season of data exists.
     test needs. Kept in the harness for reference (same as the other
     baselines) but explicitly not shipped — a documented negative
     result, not silently dropped.
+13. **Retuned the PPR-vs-volume blend properly, without adding any new
+    signal.** The old `VOLUME_REFERENCE`/`PER_UNIT`/`CAP` mechanism
+    (distance from a static per-position reference point, capped) mixed
+    raw volume units with PPR points inconsistently, so "how much weight
+    does volume get" was never a real, interpretable single dial.
+    Replaced it with a genuine weighted blend:
+    `finalScore = (1-w) * blendedScore + w * expectedPointsFromVolume +
+    matchupModifier`, where `expectedPointsFromVolume =
+    recentVolumeAvg * POINTS_PER_VOLUME_UNIT[position]` — a real
+    points-per-target/touch/attempt conversion factor computed
+    empirically from the full 2025 season (QB 0.511 pts/attempt, RB
+    0.808 pts/touch, WR 1.729 pts/target, TE 1.817 pts/target), not
+    guessed. Swept `w` from 0 (pure points) to 1 (pure volume) against
+    the full backtest: 0→50.3%, 0.25→50.7%, 0.5→52.8%, 0.75→53.9%,
+    0.85→54.6%, **0.9→55.4% (peak)**, 0.95→55.1%, 1.0→54.6%. Accuracy
+    climbs steadily as volume gets more weight and stays in a
+    well-behaved 54.6-55.4% plateau across 0.85-1.0 with every position
+    moving consistently (no erratic single-position swings like the old
+    mechanism showed at high scale) — `w=0.9` sits in the middle of that
+    plateau, not an isolated spike. **New result: ~55.4% overall**,
+    narrowing the gap to the standalone volume baseline's 56.6% ceiling
+    from 2.0pp down to 1.2pp. `w=0.9` also means the final formula
+    leans heavily on volume — a notable, honest finding in itself: for
+    this data source and test methodology, recent opportunity predicts
+    next-week production better than recent points do.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that

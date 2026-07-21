@@ -3,13 +3,12 @@ import {
   CLOSE_CALL_RELATIVE_PCT,
   MATCHUP_MODIFIER_CAP,
   MATCHUP_MODIFIER_SCALE,
+  POINTS_PER_VOLUME_UNIT,
   RECENT_WEEK_COUNT,
   RECENT_WEIGHT_BASE,
   RECENT_WEIGHT_MAX,
   RECENT_WEIGHT_PER_GAME,
-  VOLUME_MODIFIER_CAP,
-  VOLUME_MODIFIER_PER_UNIT,
-  VOLUME_REFERENCE,
+  VOLUME_BLEND_WEIGHT,
 } from "./config";
 import type {
   ComparisonResult,
@@ -84,17 +83,18 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
 
   let volumeModifier = 0;
   let recentVolumeAvg: number | null = null;
-  if (position && position in VOLUME_REFERENCE) {
+  if (blendedScore != null && position && position in POINTS_PER_VOLUME_UNIT) {
     const volumeValues = input.recentGames.map(getVolumeStat).filter((v): v is number => v != null);
     if (volumeValues.length > 0) {
       recentVolumeAvg = average(volumeValues);
-      const reference = VOLUME_REFERENCE[position as keyof typeof VOLUME_REFERENCE];
-      const diff = recentVolumeAvg - reference;
-      volumeModifier = clamp(diff * VOLUME_MODIFIER_PER_UNIT, -VOLUME_MODIFIER_CAP, VOLUME_MODIFIER_CAP);
+      const pointsPerUnit = POINTS_PER_VOLUME_UNIT[position as keyof typeof POINTS_PER_VOLUME_UNIT];
+      const expectedPointsFromVolume = recentVolumeAvg * pointsPerUnit;
+      const blendedWithVolume =
+        (1 - VOLUME_BLEND_WEIGHT) * blendedScore + VOLUME_BLEND_WEIGHT * expectedPointsFromVolume;
+      volumeModifier = blendedWithVolume - blendedScore;
       const unitLabel = position === "QB" ? "pass attempts" : position === "RB" ? "touches" : "targets";
-      const direction = diff >= 0 ? "more" : "fewer";
       notes.push(
-        `Averaging ${recentVolumeAvg.toFixed(1)} ${unitLabel}/game over their last ${volumeValues.length} game${volumeValues.length === 1 ? "" : "s"} — ${Math.abs(diff).toFixed(1)} ${direction} than a typical starter's workload.`
+        `Averaging ${recentVolumeAvg.toFixed(1)} ${unitLabel}/game over their last ${volumeValues.length} game${volumeValues.length === 1 ? "" : "s"} — worth roughly ${expectedPointsFromVolume.toFixed(1)} PPR points at this position's typical rate.`
       );
     }
   }

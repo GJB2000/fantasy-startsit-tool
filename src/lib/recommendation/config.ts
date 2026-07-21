@@ -26,37 +26,37 @@ export const CLOSE_CALL_RELATIVE_PCT = 0.08;
 export const RECENT_WEEK_COUNT = 4;
 
 /**
- * Rough "average starter" volume/game per position — the reference point
- * the volume modifier compares each player against. Static v1
- * approximation (not computed from a league table). Backtest-validated:
- * a standalone "higher recent volume wins" baseline hit ~56.6% accuracy
- * on adjacent-rank pairs, vs. the engine's pre-volume ~50.3% and the
- * next-best baseline's ~52.9% — clearly the strongest available signal.
- * Revisit with a dynamic per-week league average if further tuning is
- * warranted.
+ * Empirically-derived PPR points scored per unit of recent volume, by
+ * position (points/game ÷ volume/game across every played game of the
+ * 2025 season) — this is what makes VOLUME_BLEND_WEIGHT below a real,
+ * unit-consistent blend rather than mixing points with raw target/touch
+ * counts. QB: points per pass attempt. RB: points per touch (rushing
+ * attempts + targets). WR/TE: points per target.
  */
-export const VOLUME_REFERENCE: Record<"QB" | "RB" | "WR" | "TE", number> = {
-  QB: 32, // pass attempts/game
-  RB: 14, // rushing attempts + targets ("touches")/game
-  WR: 7, // targets/game
-  TE: 5, // targets/game
+export const POINTS_PER_VOLUME_UNIT: Record<"QB" | "RB" | "WR" | "TE", number> = {
+  QB: 0.511,
+  RB: 0.808,
+  WR: 1.729,
+  TE: 1.817,
 };
 
 /**
- * Points the volume modifier swings per unit of volume above/below
- * VOLUME_REFERENCE for that position. Empirically tuned via backtest,
- * not guessed: an initial conservative value (0.1, capped at 2) barely
- * moved the needle because top-N "startable" players cluster tightly
- * above VOLUME_REFERENCE for every position, leaving little room to
- * differentiate — it actually made overall accuracy slightly worse
- * (49.5%). Scaling up moved accuracy from 50.3% (no modifier) -> 53.4%
- * (0.5/8) -> 54.6% (1.0/15, chosen here) -> 55.1% (2.0/30, but with
- * uneven per-position effects — WR dipped while TE jumped sharply,
- * suggesting overfitting to this one backtest sample rather than a
- * genuine improvement). 1.0/15 was kept as the more conservative,
- * broadly-consistent choice instead of chasing the single-run peak.
+ * How much weight recent volume (converted to points via
+ * POINTS_PER_VOLUME_UNIT) carries against the recent/season PPR blend:
+ * finalScore = (1 - w) * blendedScore + w * expectedPointsFromVolume
+ * + matchupModifier. w=0 is pure points (pre-volume engine behavior),
+ * w=1 is pure volume. Superseded an earlier "distance from a static
+ * reference point" modifier (VOLUME_REFERENCE/PER_UNIT/CAP) that mixed
+ * raw volume units with points inconsistently.
+ *
+ * Swept in 0.05-0.25 steps against the full backtest (overall accuracy):
+ * 0 -> 50.3%, 0.25 -> 50.7%, 0.5 -> 52.8%, 0.75 -> 53.9%, 0.85 -> 54.6%,
+ * 0.9 -> 55.4% (peak), 0.95 -> 55.1%, 1.0 -> 54.6%. Accuracy climbs
+ * steadily as volume gets more weight and stays in a well-behaved
+ * 54.6-55.4% plateau across 0.85-1.0 (every position moves consistently
+ * across that range, unlike the erratic single-position swings seen
+ * when overtuning the old capped-modifier version) — 0.9 sits in the
+ * middle of that plateau rather than being an isolated spike. See
+ * "Backtesting & Tuning History" in CLAUDE.md for the full table.
  */
-export const VOLUME_MODIFIER_PER_UNIT = 1.0;
-
-/** Cap on the volume modifier's swing, so it nudges the score rather than dominating it. */
-export const VOLUME_MODIFIER_CAP = 15;
+export const VOLUME_BLEND_WEIGHT = 0.9;
