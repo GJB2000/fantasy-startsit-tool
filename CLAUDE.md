@@ -76,19 +76,88 @@ This is the most important section — the "brain" of the tool.
   - Opponent/matchup difficulty for the player's position
   - Recent volume/opportunity (targets for WR/TE, rushing attempts +
     targets for RB, pass attempts for QB) vs. a per-position reference —
-    backtest-validated as the single strongest signal available (a
-    standalone "higher recent volume wins" rule hit ~56.6% accuracy on
-    adjacent-rank pairs, vs. the season-average baseline's ~52.9% and the
-    pre-volume engine's ~50.3%); adding it as a scored modifier moved the
-    full engine to ~54.6% on the same test. See `VOLUME_REFERENCE`/
-    `VOLUME_MODIFIER_PER_UNIT`/`CAP` in `lib/recommendation/config.ts`
-    for the tuning history.
+    the single strongest signal found so far. See "Backtesting & Tuning
+    History" below for the full validation story and why the weights in
+    `lib/recommendation/config.ts` are set where they are.
   - Injury status (Questionable/Doubtful/Out) — flag prominently, but
     don't treat "Questionable" as an automatic bench
   - [Add more factors here as they're decided]
 - When it's a close call statistically, say so. Don't force false
   confidence.
 - Every recommendation must include a short, human-readable "why."
+
+## Backtesting & Tuning History
+Narrative record of what was tried, what worked, and why — so this
+reasoning isn't lost if we come back to tune this further. All numbers
+below are from backtesting against the full completed 2025 season
+(weeks 1-18), broad mode, all positions, adjacent-rank pairs (~612
+pair-evaluations) unless noted otherwise. **Caveat that applies to every
+number here**: this is validated against a single season. There's a real
+risk some of this is tuned to 2025-specific dynamics rather than a
+durable pattern — re-validate once a second season of data exists.
+
+1. **Built backtest mode first** (`/backtest`) specifically to check
+   whether the engine's recommendations were actually good, not just
+   plausible-sounding — replaying it week-by-week using only data
+   known before each tested week (see "Recommendation Logic
+   Philosophy" and `lib/backtest/`).
+2. **First real result was humbling**: the engine scored ~50.3%
+   accuracy on adjacent-rank pairs (statistically a coin flip), and was
+   *beaten* by the dead-simple "pick whoever's averaged more points
+   this season" baseline (~52.9%). A "prior week's points" baseline
+   scored ~50.5% — also no better than the engine.
+3. **Added permanent measurement tools to the backtest harness** (not
+   just one-off checks) so this kind of gap gets caught going forward:
+   baseline comparisons graded on identical weeks/matchups
+   (`lib/backtest/baselines.ts`), a by-position accuracy breakdown, and
+   a confidence-calibration check (`summarizeByCloseCall` in
+   `grading.ts`) that splits accuracy by the engine's own "close call"
+   flag.
+4. **Confidence calibration finding**: "confident" picks (49.5%) and
+   "close call" picks (50.5%) were statistically indistinguishable —
+   the close-call flag wasn't predicting anything at this scale. Caveat:
+   broad mode's adjacent-rank pairing methodology already selects for
+   closeness, which compresses how much room the flag has to
+   differentiate — a real finding, but partly an artifact of the test
+   set's construction, not proof the concept is useless everywhere.
+5. **By-position breakdown**: QB/RB/WR clustered near 50-52% (no
+   meaningful difference between them); TE was a clear laggard at
+   ~43.6% — likely a smaller, noisier position pool, not investigated
+   further yet.
+6. **Went looking for a better signal**: noticed the SportsDataIO
+   responses already include `ReceivingTargets`/`RushingAttempts`/
+   `PassingAttempts` per game (volume/opportunity stats), but the app
+   only used `FantasyPoints(PPR)` — raw points are noisy because
+   touchdowns are highly random; volume is a more stable predictor.
+7. **Validated volume as a standalone baseline before touching the
+   engine** (`pickByRecentVolume` in `baselines.ts`): **56.6% accuracy
+   alone** — clearly the strongest signal found, beating every other
+   baseline and the engine itself by a wide margin.
+8. **First engine-integration attempt made things *worse*** (49.5%,
+   down from 50.3%). Root cause: the modifier compared each player's
+   volume against one static per-position reference number
+   (`VOLUME_REFERENCE`), but broad mode's top-N "startable" player pool
+   clusters almost entirely *above* that reference for every position
+   (e.g. real top-24 WRs ranged 7.0-11.7 targets/game against a
+   reference of 7) — so nearly everyone got a small positive nudge with
+   little room to actually differentiate between two specific players.
+   A weak, conservative scale (`VOLUME_MODIFIER_PER_UNIT=0.1`,
+   `CAP=2`) just wasn't enough to matter, and what little effect it had
+   landed slightly negative.
+9. **Empirically tuned the scale against the real backtest** (not
+   guessed) rather than accepting that regression:
+   `PER_UNIT`/`CAP` → overall accuracy: `0.1/2` → 49.5% (worse) → `0.5/8`
+   → 53.4% → `1.0/15` → 54.6% → `2.0/30` → 55.1% but with uneven
+   per-position swings (WR dipped, TE jumped sharply) — a sign of
+   overfitting to this one season's sample rather than genuine signal.
+10. **Settled on `PER_UNIT=1.0`/`CAP=15`** — the more conservative,
+    broadly-consistent point on that curve rather than the single-run
+    peak. Final result: **~54.6% overall, every position (QB/RB/WR/TE)
+    beating chance** — a real, validated improvement over the
+    pre-volume 50.3%, though still short of the standalone 56.6% volume
+    baseline (meaning there's likely still room to improve how volume
+    is weighted relative to the PPR-based blend — flagged here rather
+    than chased further, to avoid over-tuning to a single season).
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
