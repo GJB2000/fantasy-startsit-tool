@@ -34,7 +34,8 @@ section current as real decisions get made.)*
   required)
 - Hosting: Vercel
 - Version control: GitHub
-- Football data source: [footballdata.org] — free tier to start
+- Football data source: SportsDataIO NFL API (Discovery Lab / free
+  tier) — see [sportsdata.io](https://sportsdata.io)
 
 Current state: bare scaffold only (default starter page). No real
 features, no data fetching, no recommendation logic yet — this is
@@ -42,8 +43,13 @@ intentional, to confirm the local dev → build → Vercel deploy pipeline
 works before adding functionality.
 
 ## Data Source Notes
-- Football data comes from [https://www.football-data.org/client/register]. API key is stored as an
-  environment variable, never hard-coded or committed to GitHub.
+- Football data comes from the SportsDataIO NFL API (Discovery Lab /
+  free tier). API key is stored as the `SPORTSDATA_API_KEY` environment
+  variable (`.env.local` locally, Vercel project env vars in
+  production) — never hard-coded or committed to GitHub.
+  (Note: an earlier version of this doc referenced football-data.org,
+  which turned out to be a soccer-only API — not usable for this
+  project.)
 - Cache player/stat data rather than re-fetching on every page load —
   data doesn't need to be second-by-second fresh.
 - Handle missing/edge-case data gracefully: bye weeks, injured players,
