@@ -1,3 +1,4 @@
+import { BASELINE_LABELS } from "@/lib/backtest/baselines";
 import { DEFAULT_BACKTEST_API_SEASON, DEFAULT_BACKTEST_SEASON, MAX_BACKTEST_WEEK } from "@/lib/backtest/config";
 import { parsePositionsParam, parseWeeksParam } from "@/lib/backtest/params";
 import { runBroadBacktest } from "@/lib/backtest/runBacktest";
@@ -17,12 +18,20 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { byWeek, byPosition, overall } = await runBroadBacktest(season, apiSeason, weeks, positions);
+    const { byWeek, byPosition, overall, baselineSummaries, confidenceBreakdown } = await runBroadBacktest(
+      season,
+      apiSeason,
+      weeks,
+      positions
+    );
 
     return Response.json({
       byWeek,
       byPosition,
       overall,
+      baselineSummaries,
+      baselineLabels: BASELINE_LABELS,
+      confidenceBreakdown,
       context: {
         season,
         apiSeason,

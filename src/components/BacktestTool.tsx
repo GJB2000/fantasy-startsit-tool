@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type { BacktestSummary as BacktestSummaryData, WeekGradeResult } from "@/lib/backtest/grading";
+import type { BaselineId } from "@/lib/backtest/baselines";
+import type {
+  BacktestSummary as BacktestSummaryData,
+  ConfidenceBreakdown,
+  WeekGradeResult,
+} from "@/lib/backtest/grading";
 import type { PlayerSummary } from "@/lib/sportsdata/types";
 import { BacktestCaveatNote } from "./BacktestCaveatNote";
 import { BacktestSummaryView } from "./BacktestSummary";
@@ -15,11 +20,17 @@ const WEEK_OPTIONS = Array.from({ length: 18 }, (_, i) => i + 1);
 interface PairResponse {
   weekResults: WeekGradeResult[];
   summary: BacktestSummaryData;
+  baselineSummaries: Record<BaselineId, BacktestSummaryData>;
+  baselineLabels: Record<BaselineId, string>;
+  confidenceBreakdown: ConfidenceBreakdown;
 }
 
 interface BroadResponse {
   byPosition: Record<string, BacktestSummaryData>;
   overall: BacktestSummaryData;
+  baselineSummaries: Record<BaselineId, BacktestSummaryData>;
+  baselineLabels: Record<BaselineId, string>;
+  confidenceBreakdown: ConfidenceBreakdown;
 }
 
 export function BacktestTool() {
@@ -225,14 +236,25 @@ export function BacktestTool() {
 
       {pairResult && (
         <div className="space-y-4">
-          <BacktestSummaryView summary={pairResult.summary} />
+          <BacktestSummaryView
+            summary={pairResult.summary}
+            baselineSummaries={pairResult.baselineSummaries}
+            baselineLabels={pairResult.baselineLabels}
+            confidenceBreakdown={pairResult.confidenceBreakdown}
+          />
           <BacktestWeekTable weekResults={pairResult.weekResults} />
         </div>
       )}
 
       {broadResult && (
         <div className="space-y-4">
-          <BacktestSummaryView summary={broadResult.overall} byPosition={broadResult.byPosition} />
+          <BacktestSummaryView
+            summary={broadResult.overall}
+            byPosition={broadResult.byPosition}
+            baselineSummaries={broadResult.baselineSummaries}
+            baselineLabels={broadResult.baselineLabels}
+            confidenceBreakdown={broadResult.confidenceBreakdown}
+          />
         </div>
       )}
     </div>

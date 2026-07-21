@@ -24,6 +24,8 @@ export interface PlayerScoreBreakdown {
   gamesUsedForRecent: number;
   blendedScore: number | null;
   matchupModifier: number;
+  recentVolumeAvg: number | null;
+  volumeModifier: number;
   finalScore: number | null;
   injuryStatus: string | null;
   isOnByeThisWeek: boolean;

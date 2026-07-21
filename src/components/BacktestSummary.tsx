@@ -1,3 +1,4 @@
+import type { BaselineId } from "@/lib/backtest/baselines";
 import type { BacktestSummary as BacktestSummaryData } from "@/lib/backtest/grading";
 
 interface AccuracyBannerProps {
@@ -21,19 +22,56 @@ function AccuracyBanner({ label, summary }: AccuracyBannerProps) {
   );
 }
 
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
 interface BacktestSummaryViewProps {
   summary: BacktestSummaryData;
   byPosition?: Record<string, BacktestSummaryData>;
+  baselineSummaries?: Record<BaselineId, BacktestSummaryData>;
+  baselineLabels?: Record<BaselineId, string>;
+  confidenceBreakdown?: { confident: BacktestSummaryData; closeCall: BacktestSummaryData };
 }
 
-export function BacktestSummaryView({ summary, byPosition }: BacktestSummaryViewProps) {
+export function BacktestSummaryView({
+  summary,
+  byPosition,
+  baselineSummaries,
+  baselineLabels,
+  confidenceBreakdown,
+}: BacktestSummaryViewProps) {
   return (
-    <div className="space-y-2">
-      <AccuracyBanner label="Overall accuracy" summary={summary} />
-      {byPosition &&
-        Object.entries(byPosition).map(([position, posSummary]) => (
-          <AccuracyBanner key={position} label={position} summary={posSummary} />
-        ))}
+    <div className="space-y-5">
+      <Section title="Engine accuracy">
+        <AccuracyBanner label="Overall" summary={summary} />
+        {byPosition &&
+          Object.entries(byPosition).map(([position, posSummary]) => (
+            <AccuracyBanner key={position} label={position} summary={posSummary} />
+          ))}
+      </Section>
+
+      {baselineSummaries && baselineLabels && (
+        <Section title="vs. naive baselines (same weeks & matchups)">
+          {(Object.entries(baselineSummaries) as [BaselineId, BacktestSummaryData][]).map(
+            ([id, baselineSummary]) => (
+              <AccuracyBanner key={id} label={baselineLabels[id]} summary={baselineSummary} />
+            )
+          )}
+        </Section>
+      )}
+
+      {confidenceBreakdown && (
+        <Section title="By self-reported confidence">
+          <AccuracyBanner label="Confident picks" summary={confidenceBreakdown.confident} />
+          <AccuracyBanner label="Close calls" summary={confidenceBreakdown.closeCall} />
+        </Section>
+      )}
     </div>
   );
 }

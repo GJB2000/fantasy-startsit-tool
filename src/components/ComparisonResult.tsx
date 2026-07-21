@@ -79,6 +79,12 @@ export function ComparisonResult({ result, contextNote }: ComparisonResultProps)
                 <dt className="text-zinc-500">Season avg (PPR)</dt>
                 <dd>{player.seasonPprAvg != null ? player.seasonPprAvg.toFixed(1) : "—"}</dd>
               </div>
+              {player.recentVolumeAvg != null && (
+                <div className="flex justify-between">
+                  <dt className="text-zinc-500">Recent volume/game</dt>
+                  <dd>{player.recentVolumeAvg.toFixed(1)}</dd>
+                </div>
+              )}
               {player.matchupContext && (
                 <div className="flex justify-between">
                   <dt className="text-zinc-500">

@@ -7,6 +7,9 @@ import {
   RECENT_WEIGHT_BASE,
   RECENT_WEIGHT_MAX,
   RECENT_WEIGHT_PER_GAME,
+  VOLUME_MODIFIER_CAP,
+  VOLUME_MODIFIER_PER_UNIT,
+  VOLUME_REFERENCE,
 } from "./config";
 import type {
   ComparisonResult,
@@ -14,6 +17,7 @@ import type {
   PlayerComparisonInput,
   PlayerScoreBreakdown,
 } from "./types";
+import { getVolumeStat } from "./volume";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -78,7 +82,24 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     notes.push("No matchup data available for this player's most recent opponent.");
   }
 
-  const finalScore = blendedScore == null ? null : blendedScore + matchupModifier;
+  let volumeModifier = 0;
+  let recentVolumeAvg: number | null = null;
+  if (position && position in VOLUME_REFERENCE) {
+    const volumeValues = input.recentGames.map(getVolumeStat).filter((v): v is number => v != null);
+    if (volumeValues.length > 0) {
+      recentVolumeAvg = average(volumeValues);
+      const reference = VOLUME_REFERENCE[position as keyof typeof VOLUME_REFERENCE];
+      const diff = recentVolumeAvg - reference;
+      volumeModifier = clamp(diff * VOLUME_MODIFIER_PER_UNIT, -VOLUME_MODIFIER_CAP, VOLUME_MODIFIER_CAP);
+      const unitLabel = position === "QB" ? "pass attempts" : position === "RB" ? "touches" : "targets";
+      const direction = diff >= 0 ? "more" : "fewer";
+      notes.push(
+        `Averaging ${recentVolumeAvg.toFixed(1)} ${unitLabel}/game over their last ${volumeValues.length} game${volumeValues.length === 1 ? "" : "s"} — ${Math.abs(diff).toFixed(1)} ${direction} than a typical starter's workload.`
+      );
+    }
+  }
+
+  const finalScore = blendedScore == null ? null : blendedScore + matchupModifier + volumeModifier;
 
   const injuryStatus = input.player?.InjuryStatus ?? null;
   if (injuryStatus === "Questionable") {
@@ -104,6 +125,8 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     gamesUsedForRecent,
     blendedScore,
     matchupModifier,
+    recentVolumeAvg,
+    volumeModifier,
     finalScore,
     injuryStatus,
     isOnByeThisWeek: input.isOnByeThisWeek,

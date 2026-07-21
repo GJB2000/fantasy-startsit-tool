@@ -74,6 +74,15 @@ This is the most important section — the "brain" of the tool.
   - Recent performance (last 4 weeks) — weighted more heavily than
     season-long average
   - Opponent/matchup difficulty for the player's position
+  - Recent volume/opportunity (targets for WR/TE, rushing attempts +
+    targets for RB, pass attempts for QB) vs. a per-position reference —
+    backtest-validated as the single strongest signal available (a
+    standalone "higher recent volume wins" rule hit ~56.6% accuracy on
+    adjacent-rank pairs, vs. the season-average baseline's ~52.9% and the
+    pre-volume engine's ~50.3%); adding it as a scored modifier moved the
+    full engine to ~54.6% on the same test. See `VOLUME_REFERENCE`/
+    `VOLUME_MODIFIER_PER_UNIT`/`CAP` in `lib/recommendation/config.ts`
+    for the tuning history.
   - Injury status (Questionable/Doubtful/Out) — flag prominently, but
     don't treat "Questionable" as an automatic bench
   - [Add more factors here as they're decided]
@@ -101,22 +110,35 @@ This is the most important section — the "brain" of the tool.
   works for any payload size but resets on cold starts — an accepted
   tradeoff at this app's scale rather than adding real cache infra.
 - `src/lib/recommendation/` — the pure, framework-agnostic scoring
-  engine (`engine.ts`, `config.ts`, `types.ts`) plus two bridging files
-  that are the only impure pieces: `buildInput.ts` (live mode) and
-  `buildBacktestInput.ts` (backtest mode, fully synchronous — reads
-  from a pre-fetched batch instead of making its own calls). Both feed
-  the *same* unmodified `scorePlayer`/`comparePlayers`. Tunable weights
-  live in `config.ts` — adjust there as the logic gets tuned, per the
-  Recommendation Logic Philosophy section above.
+  engine (`engine.ts`, `config.ts`, `types.ts`, `volume.ts`) plus two
+  bridging files that are the only impure pieces: `buildInput.ts` (live
+  mode) and `buildBacktestInput.ts` (backtest mode, fully synchronous —
+  reads from a pre-fetched batch instead of making its own calls). Both
+  feed the *same* unmodified `scorePlayer`/`comparePlayers`. Tunable
+  weights live in `config.ts` — adjust there as the logic gets tuned,
+  per the Recommendation Logic Philosophy section above. `volume.ts`'s
+  `getVolumeStat()` reads `ReceivingTargets`/`RushingAttempts`/
+  `PassingAttempts` off `PlayerGameStat` — these fields were already
+  present in every SportsDataIO response but unused until the volume
+  signal was added; `sportsDataFetch()` casts the raw JSON rather than
+  whitelisting fields, so extending `PlayerGameStat` in
+  `sportsdata/types.ts` needed zero fetch/mapping changes anywhere.
 - `src/lib/backtest/` — the backtesting feature: `loadRun.ts` (the only
   network I/O — fetches every needed week once per request), `weekData.ts`
   (pure per-week slicing/aggregation from that batch), `grading.ts`
-  (correct/incorrect/push/no_pick outcomes + accuracy summary),
-  `pairing.ts` (broad-mode adjacent-rank pairing methodology),
-  `runBacktest.ts` (orchestration), `config.ts`/`params.ts` (tunables,
-  query parsing). Historical injury status is always treated as unknown
-  in this mode — the archived data can't distinguish "Questionable but
-  played" from a healthy player (see Data Source Notes).
+  (correct/incorrect/push/no_pick outcomes + accuracy summary, plus
+  `summarizeByCloseCall` for confidence-calibration checks), `baselines.ts`
+  (naive strategies — prior-week points, season-to-date average — graded
+  by the identical `gradeOutcome` rules as the engine, over the same
+  weeks/matchups, so accuracy is directly comparable), `pairing.ts`
+  (broad-mode adjacent-rank pairing methodology), `runBacktest.ts`
+  (orchestration), `config.ts`/`params.ts` (tunables, query parsing).
+  Historical injury status is always treated as unknown in this mode —
+  the archived data can't distinguish "Questionable but played" from a
+  healthy player (see Data Source Notes). Both API routes return
+  `baselineSummaries` and `confidenceBreakdown` alongside the engine's
+  own accuracy so results are never reported in isolation from a
+  baseline/calibration check.
 - `src/app/api/players`, `src/app/api/compare`, `src/app/api/backtest/pair`,
   `src/app/api/backtest/broad` — Route Handlers that orchestrate the
   lib layers above and return trimmed JSON (never proxy raw upstream

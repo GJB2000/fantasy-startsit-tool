@@ -61,6 +61,9 @@ export interface PlayerGameStat {
   FantasyPoints: number;
   FantasyPointsPPR: number;
   InjuryStatus: string | null;
+  ReceivingTargets: number;
+  RushingAttempts: number;
+  PassingAttempts: number;
 }
 
 export interface Timeframe {
