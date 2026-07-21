@@ -22,6 +22,23 @@ export class SportsDataError extends Error {
   }
 }
 
+interface CacheEntry {
+  data: unknown;
+  expiresAt: number;
+}
+
+/**
+ * Next.js's built-in fetch Data Cache rejects entries over 2MB, and several
+ * SportsDataIO endpoints (Players, PlayerSeasonStats, PlayerGameStatsByWeek)
+ * routinely return 4-6MB payloads — it silently never caches them, so every
+ * call was re-hitting the live API regardless of `revalidate`. This simple
+ * in-process TTL cache replaces that for all endpoints (works for small and
+ * large payloads alike) rather than relying on Next's Data Cache here.
+ * It resets on cold starts, which is an acceptable tradeoff at this app's
+ * scale rather than adding real cache infrastructure.
+ */
+const memoryCache = new Map<string, CacheEntry>();
+
 export async function sportsDataFetch<T>(
   path: string,
   opts: { revalidate: number }
@@ -31,12 +48,17 @@ export async function sportsDataFetch<T>(
     throw new SportsDataError("Missing SPORTSDATA_API_KEY environment variable", undefined, path);
   }
 
+  const cached = memoryCache.get(path);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data as T;
+  }
+
   const url = `${FANTASY_BASE}${path}`;
   let res: Response;
   try {
     res = await fetch(url, {
       headers: { "Ocp-Apim-Subscription-Key": key },
-      next: { revalidate: opts.revalidate },
+      cache: "no-store",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -47,5 +69,7 @@ export async function sportsDataFetch<T>(
     throw new SportsDataError(`SportsDataIO returned ${res.status} for ${path}`, res.status, path);
   }
 
-  return res.json() as Promise<T>;
+  const data = (await res.json()) as T;
+  memoryCache.set(path, { data, expiresAt: Date.now() + opts.revalidate * 1000 });
+  return data;
 }

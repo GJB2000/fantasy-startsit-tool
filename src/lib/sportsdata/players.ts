@@ -1,10 +1,15 @@
 import { REVALIDATE, sportsDataFetch } from "./client";
 import { isSkillPosition, type Player } from "./types";
 
-export async function getActivePlayers(): Promise<Player[]> {
-  const all = await sportsDataFetch<Player[]>("/Players", {
+/** Unfiltered — includes historical/retired/inactive players. */
+export async function getAllPlayers(): Promise<Player[]> {
+  return sportsDataFetch<Player[]>("/Players", {
     revalidate: REVALIDATE.players,
   });
+}
+
+export async function getActivePlayers(): Promise<Player[]> {
+  const all = await getAllPlayers();
   return all.filter((p) => p.Status === "Active" && isSkillPosition(p.Position));
 }
 
@@ -28,8 +33,6 @@ export async function getActivePlayerById(id: number): Promise<Player | null> {
  * message with a real name instead of a bare "Unknown" placeholder.
  */
 export async function getAnyPlayerById(id: number): Promise<Player | null> {
-  const all = await sportsDataFetch<Player[]>("/Players", {
-    revalidate: REVALIDATE.players,
-  });
+  const all = await getAllPlayers();
   return all.find((p) => p.PlayerID === id) ?? null;
 }

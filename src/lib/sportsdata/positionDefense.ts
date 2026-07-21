@@ -1,5 +1,5 @@
 import { getPlayerGameStatsByWeek } from "./weeklyStats";
-import { SKILL_POSITIONS, isSkillPosition, type SkillPosition } from "./types";
+import { SKILL_POSITIONS, isSkillPosition, type PlayerGameStat, type SkillPosition } from "./types";
 
 type TeamPositionTotals = Record<string, Record<SkillPosition, number>>;
 
@@ -14,18 +14,14 @@ function emptyPositionRecord(): Record<SkillPosition, number> {
 }
 
 /**
- * Builds a league-wide "PPR fantasy points allowed per game, by position"
- * table by aggregating every completed week's box scores for the season.
- * Reuses the same per-week fetch (and its cache) as recent-form lookups —
- * no separate endpoint or cache layer needed.
+ * Pure aggregation over already-fetched weekly rows — used by both the
+ * live fetch-based getPositionDefenseTable below and the backtest layer,
+ * which pre-fetches all weeks once and slices from memory to avoid
+ * redundant network calls across many weeks/pairs.
  */
-export async function getPositionDefenseTable(
-  apiSeason: string,
-  throughWeek: number
-): Promise<PositionDefenseTable> {
-  const weeks = Array.from({ length: throughWeek }, (_, i) => i + 1);
-  const weeklyRows = await Promise.all(weeks.map((week) => getPlayerGameStatsByWeek(apiSeason, week)));
-
+export function buildPositionDefenseTableFromRows(
+  weeklyRows: PlayerGameStat[][]
+): PositionDefenseTable {
   const totalAllowed: TeamPositionTotals = {};
   const gamesPlayed: Record<string, number> = {};
 
@@ -73,6 +69,21 @@ export async function getPositionDefenseTable(
   }
 
   return { perGameAllowed, leagueAverage, rank };
+}
+
+/**
+ * Builds a league-wide "PPR fantasy points allowed per game, by position"
+ * table by fetching and aggregating every completed week's box scores for
+ * the season. Reuses the same per-week fetch (and its cache) as recent-form
+ * lookups — no separate endpoint or cache layer needed.
+ */
+export async function getPositionDefenseTable(
+  apiSeason: string,
+  throughWeek: number
+): Promise<PositionDefenseTable> {
+  const weeks = Array.from({ length: throughWeek }, (_, i) => i + 1);
+  const weeklyRows = await Promise.all(weeks.map((week) => getPlayerGameStatsByWeek(apiSeason, week)));
+  return buildPositionDefenseTableFromRows(weeklyRows);
 }
 
 export interface MatchupContext {
