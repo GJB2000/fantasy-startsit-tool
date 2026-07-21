@@ -1,6 +1,9 @@
 import "server-only";
 
-const FANTASY_BASE = "https://api.sportsdata.io/api/nfl/fantasy/json";
+const API_BASES = {
+  fantasy: "https://api.sportsdata.io/api/nfl/fantasy/json",
+  odds: "https://api.sportsdata.io/api/nfl/odds/json",
+} as const;
 
 export const REVALIDATE = {
   players: 60 * 60,
@@ -8,6 +11,7 @@ export const REVALIDATE = {
   seasonStats: 6 * 60 * 60,
   weeklyStats: 24 * 60 * 60,
   byes: 24 * 60 * 60,
+  teamStats: 24 * 60 * 60,
 } as const;
 
 export class SportsDataError extends Error {
@@ -41,19 +45,22 @@ const memoryCache = new Map<string, CacheEntry>();
 
 export async function sportsDataFetch<T>(
   path: string,
-  opts: { revalidate: number }
+  opts: { revalidate: number; base?: keyof typeof API_BASES }
 ): Promise<T> {
   const key = process.env.SPORTSDATA_API_KEY;
   if (!key) {
     throw new SportsDataError("Missing SPORTSDATA_API_KEY environment variable", undefined, path);
   }
 
-  const cached = memoryCache.get(path);
+  const base = opts.base ?? "fantasy";
+  const cacheKey = `${base}:${path}`;
+
+  const cached = memoryCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.data as T;
   }
 
-  const url = `${FANTASY_BASE}${path}`;
+  const url = `${API_BASES[base]}${path}`;
   let res: Response;
   try {
     res = await fetch(url, {
@@ -70,6 +77,6 @@ export async function sportsDataFetch<T>(
   }
 
   const data = (await res.json()) as T;
-  memoryCache.set(path, { data, expiresAt: Date.now() + opts.revalidate * 1000 });
+  memoryCache.set(cacheKey, { data, expiresAt: Date.now() + opts.revalidate * 1000 });
   return data;
 }

@@ -82,3 +82,13 @@ export interface ByeWeek {
   Team: string;
   Week: number;
 }
+
+export interface TeamGameStat {
+  Season: number;
+  Week: number;
+  Team: string;
+  Opponent: string;
+  OffensivePlays: number;
+  PassingAttempts: number;
+  RushingAttempts: number;
+}

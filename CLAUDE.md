@@ -157,7 +157,33 @@ durable pattern — re-validate once a second season of data exists.
     pre-volume 50.3%, though still short of the standalone 56.6% volume
     baseline (meaning there's likely still room to improve how volume
     is weighted relative to the PPR-based blend — flagged here rather
-    than chased further, to avoid over-tuning to a single season).
+    than chased further, to avoid over-tuning to a single season). Post-
+    volume by-position breakdown: RB 56.7%, QB 55.9%, WR 53.9%, TE
+    50.5% — RB/QB benefited most (touches/attempts are a very clean
+    signal there), TE remains the weakest, still just above chance.
+11. **Audited the API response for other unused-but-available fields**
+    (per the same "volume was sitting there unused" logic): nothing
+    else at the player level looked promising (remaining fields are
+    mostly noisy efficiency/rate stats already implicitly captured by
+    PPR points, or defensive stats irrelevant to skill positions). Found
+    a separate `TeamGameStats` endpoint (team-level, `odds` API host —
+    see `client.ts`'s `API_BASES`) with `OffensivePlays`,
+    `PassingAttempts`/`RushingAttempts` at the team level — a
+    theoretically legitimate, non-leaky proxy for "game script" (teams
+    that pass more give their pass-catchers more opportunity).
+12. **Tested team pace/pass-rate as a standalone baseline before
+    touching the engine** (`pickByGameScript` in `baselines.ts`,
+    `lib/sportsdata/teamGameStats.ts` for the point-in-time team
+    aggregation) — **result: 47.5% accuracy, actually worse than
+    chance.** Not integrated into the engine. Best guess why: broad
+    mode already pairs players by season-average rank, which reflects
+    each player's individual role/target-share within their own
+    offense — but team-level pace/pass-rate is blind to that (a WR3 on
+    a fast, pass-heavy team doesn't necessarily outproduce a WR1 on a
+    slower one), so it doesn't add the kind of differentiation this
+    test needs. Kept in the harness for reference (same as the other
+    baselines) but explicitly not shipped — a documented negative
+    result, not silently dropped.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
@@ -169,15 +195,20 @@ durable pattern — re-validate once a second season of data exists.
 - `src/lib/sportsdata/` — low-level SportsDataIO fetch client and typed
   data-access functions (`client.ts`, `players.ts`, `seasonStats.ts`,
   `weeklyStats.ts`, `byes.ts`, `timeframes.ts`, `positionDefense.ts`,
-  `seasonToDatePlayerStats.ts`). Server-only (guarded via the
-  `server-only` package) — never import this from a `"use client"` file.
-  **Caching**: `client.ts` uses a simple in-process TTL `Map`, not Next's
-  `fetch` Data Cache — several SportsDataIO endpoints (`/Players`,
-  `/PlayerSeasonStats`, `/PlayerGameStatsByWeek`) return 4-6MB payloads,
-  and Next's Data Cache silently refuses to cache anything over 2MB (it
-  logs a warning and just re-fetches every time). The in-process cache
-  works for any payload size but resets on cold starts — an accepted
-  tradeoff at this app's scale rather than adding real cache infra.
+  `seasonToDatePlayerStats.ts`, `teamGameStats.ts`). Server-only
+  (guarded via the `server-only` package) — never import this from a
+  `"use client"` file. `client.ts`'s `sportsDataFetch()` supports two
+  API hosts via `opts.base` (`API_BASES`): `"fantasy"` (default, most
+  endpoints) and `"odds"` (`TeamGameStats` lives there) — the
+  in-process cache keys on `${base}:${path}` so there's no collision
+  risk between hosts. **Caching**: a simple in-process TTL `Map`, not
+  Next's `fetch` Data Cache — several SportsDataIO endpoints
+  (`/Players`, `/PlayerSeasonStats`, `/PlayerGameStatsByWeek`) return
+  4-6MB payloads, and Next's Data Cache silently refuses to cache
+  anything over 2MB (it logs a warning and just re-fetches every time).
+  The in-process cache works for any payload size but resets on cold
+  starts — an accepted tradeoff at this app's scale rather than adding
+  real cache infra.
 - `src/lib/recommendation/` — the pure, framework-agnostic scoring
   engine (`engine.ts`, `config.ts`, `types.ts`, `volume.ts`) plus two
   bridging files that are the only impure pieces: `buildInput.ts` (live
@@ -193,13 +224,19 @@ durable pattern — re-validate once a second season of data exists.
   whitelisting fields, so extending `PlayerGameStat` in
   `sportsdata/types.ts` needed zero fetch/mapping changes anywhere.
 - `src/lib/backtest/` — the backtesting feature: `loadRun.ts` (the only
-  network I/O — fetches every needed week once per request), `weekData.ts`
-  (pure per-week slicing/aggregation from that batch), `grading.ts`
+  network I/O — fetches every needed week once per request, both
+  player-level and team-level rows), `weekData.ts` (pure per-week
+  slicing/aggregation from that batch — team pace uses the same
+  *recent*-weeks window as player recent-form, not full season-to-date,
+  since team tendencies can shift within a season), `grading.ts`
   (correct/incorrect/push/no_pick outcomes + accuracy summary, plus
   `summarizeByCloseCall` for confidence-calibration checks), `baselines.ts`
-  (naive strategies — prior-week points, season-to-date average — graded
-  by the identical `gradeOutcome` rules as the engine, over the same
-  weeks/matchups, so accuracy is directly comparable), `pairing.ts`
+  (naive strategies graded by the identical `gradeOutcome` rules as the
+  engine, over the same weeks/matchups, so accuracy is directly
+  comparable: prior-week points, season-to-date average, recent volume
+  — all shipped in the engine or kept as reference — plus `gameScript`
+  (team pace/pass-rate), tested and **not** shipped after backtesting
+  worse than chance; see "Backtesting & Tuning History"), `pairing.ts`
   (broad-mode adjacent-rank pairing methodology), `runBacktest.ts`
   (orchestration), `config.ts`/`params.ts` (tunables, query parsing).
   Historical injury status is always treated as unknown in this mode —

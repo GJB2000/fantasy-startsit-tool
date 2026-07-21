@@ -1,12 +1,13 @@
 import { getVolumeStat } from "@/lib/recommendation/volume";
 import type { BacktestWeekSlice } from "./weekData";
 
-export type BaselineId = "priorWeek" | "seasonAvg" | "recentVolume";
+export type BaselineId = "priorWeek" | "seasonAvg" | "recentVolume" | "gameScript";
 
 export const BASELINE_LABELS: Record<BaselineId, string> = {
   priorWeek: "Prior week's points",
   seasonAvg: "Season-to-date average",
   recentVolume: "Recent volume (targets/touches/attempts)",
+  gameScript: "Team pace/game script (recent pass or rush rate)",
 };
 
 function average(values: number[]): number {
@@ -59,6 +60,30 @@ export function pickByRecentVolume(weekSlice: BacktestWeekSlice, playerIds: [num
   return avgs[0] > avgs[1] ? playerIds[0] : playerIds[1];
 }
 
+/**
+ * Naive baseline: pick whoever's team offers more of the play type
+ * relevant to their position — recent pass plays/game (playsPerGame *
+ * passRate) for QB/WR/TE, recent rush plays/game (playsPerGame *
+ * (1 - passRate)) for RB. Team/position are read from the player's own
+ * most recent game row (schedule/roster facts, not stat leakage), pace
+ * is computed only from prior weeks (see weekData.ts). Tests the
+ * hypothesis that a team's play-calling tendency/pace is a legitimate,
+ * non-leaky proxy for opportunity independent of any one player's
+ * individual usage.
+ */
+export function pickByGameScript(weekSlice: BacktestWeekSlice, playerIds: [number, number]): number | null {
+  const scores = playerIds.map((id) => {
+    const lastGame = weekSlice.recentGamesByPlayer(id).at(-1);
+    if (!lastGame) return null;
+    const pace = weekSlice.teamPaceTable.get(lastGame.Team);
+    if (!pace) return null;
+    const relevantRate = lastGame.Position === "RB" ? 1 - pace.passRate : pace.passRate;
+    return pace.playsPerGame * relevantRate;
+  });
+  if (scores[0] == null || scores[1] == null || scores[0] === scores[1]) return null;
+  return scores[0] > scores[1] ? playerIds[0] : playerIds[1];
+}
+
 export const BASELINE_PICKERS: Record<
   BaselineId,
   (weekSlice: BacktestWeekSlice, playerIds: [number, number]) => number | null
@@ -66,4 +91,5 @@ export const BASELINE_PICKERS: Record<
   priorWeek: pickPriorWeek,
   seasonAvg: pickSeasonAvg,
   recentVolume: pickByRecentVolume,
+  gameScript: pickByGameScript,
 };

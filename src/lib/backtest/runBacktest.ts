@@ -70,7 +70,7 @@ export async function runPairBacktest(
   const baselineOutcomes = emptyBaselineOutcomes();
 
   const weekResults = weeks.map((week) => {
-    const weekSlice = sliceWeekData(runData.allWeeklyRows, week, RECENT_WEEK_COUNT);
+    const weekSlice = sliceWeekData(runData.allWeeklyRows, week, RECENT_WEEK_COUNT, runData.allTeamWeeklyRows);
     const inputs = playerIds.map((id) =>
       buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
     );
@@ -115,7 +115,7 @@ export async function runBroadBacktest(
   const baselineOutcomes = emptyBaselineOutcomes();
 
   for (const week of weeks) {
-    const weekSlice = sliceWeekData(runData.allWeeklyRows, week, RECENT_WEEK_COUNT);
+    const weekSlice = sliceWeekData(runData.allWeeklyRows, week, RECENT_WEEK_COUNT, runData.allTeamWeeklyRows);
     const pairs = buildAllPairsForWeek(weekSlice, positions);
 
     const weekResults: WeekGradeResult[] = [];
