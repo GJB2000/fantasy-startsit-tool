@@ -37,10 +37,13 @@ section current as real decisions get made.)*
 - Football data source: SportsDataIO NFL API (Discovery Lab / free
   tier) — see [sportsdata.io](https://sportsdata.io)
 
-Current state: bare scaffold only (default starter page). No real
-features, no data fetching, no recommendation logic yet — this is
-intentional, to confirm the local dev → build → Vercel deploy pipeline
-works before adding functionality.
+Current state: v1 of the core start/sit comparison tool is live — real
+player search, real SportsDataIO data, a rules-based recommendation
+engine, and a working UI (see Conventions below for the actual file
+layout). Out of scope so far: database/persistence, auth, K/DEF
+positions, upcoming-schedule/next-opponent lookup (matchup difficulty
+is computed against each player's most recent completed opponent, not
+a hypothetical future one), multi-season history.
 
 ## Data Source Notes
 - Football data comes from the SportsDataIO NFL API (Discovery Lab /
@@ -78,8 +81,29 @@ This is the most important section — the "brain" of the tool.
   not a generic dashboard or a wall of stats.
 
 ## Conventions
-*(Claude Code: keep this updated as real patterns emerge in the code)*
-- [e.g., component naming conventions, file structure, etc.]
+- `src/lib/sportsdata/` — low-level SportsDataIO fetch client and typed
+  data-access functions (`client.ts`, `players.ts`, `seasonStats.ts`,
+  `weeklyStats.ts`, `byes.ts`, `timeframes.ts`, `positionDefense.ts`).
+  Server-only (guarded via the `server-only` package) — never import
+  this from a `"use client"` file. Each function owns its own Next.js
+  `fetch` cache `revalidate` window; no separate cache layer or DB.
+- `src/lib/recommendation/` — the pure, framework-agnostic scoring
+  engine (`engine.ts`, `config.ts`, `types.ts`) plus one bridging file
+  (`buildInput.ts`) that's the only impure piece, wiring `sportsdata`
+  fetches into engine inputs. Tunable weights live in `config.ts` —
+  adjust there as the logic gets tuned, per the Recommendation Logic
+  Philosophy section above.
+- `src/app/api/players` and `src/app/api/compare` — Route Handlers
+  that orchestrate the two lib layers above and return trimmed JSON
+  (never proxy raw upstream payloads, never leak the API key).
+- `src/components/` — `StartSitTool.tsx` (client, owns state),
+  `PlayerSearchInput.tsx` (client, debounced search), `ComparisonResult.tsx`
+  (presentational). Reuses the existing `bg-background`/`text-foreground`/
+  `font-sans` Tailwind tokens and `prefers-color-scheme` dark mode from
+  `globals.css` — no new theme tokens or Tailwind config added.
+- Season/week resolution is always computed live via `getSeasonContext()`
+  (never hardcoded) — it correctly falls back to the last completed
+  season during the NFL offseason.
 
 ## Commands
 - `npm run dev` — start local dev server (http://localhost:3000)
