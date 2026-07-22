@@ -65,6 +65,15 @@ opponent, not a hypothetical future one), multi-season history.
   and `Out` correlates 1:1 with `Played===0`. Pregame injury uncertainty
   isn't reconstructable from this data source, which is why backtest
   mode always treats injury status as unknown rather than reading it.
+- **2024 (and presumably earlier) season data is NOT accessible on this
+  plan** — confirmed directly: any 2024 request (e.g.
+  `PlayerSeasonStats/2024`, `PlayerGameStatsByWeek/2024REG/1`) returns a
+  clean `401 Unauthorized Season` with "contact sales@sportsdata.io" to
+  unlock it. This means every "re-validate once a second season of data
+  exists" caveat elsewhere in this doc refers to *waiting for the 2026
+  season to complete under the current plan* — it is not a "just query
+  an already-completed prior season" fix; that would require a paid
+  tier upgrade.
 
 ## Recommendation Logic Philosophy
 This is the most important section — the "brain" of the tool.
@@ -95,7 +104,10 @@ below are from backtesting against the full completed 2025 season
 pair-evaluations) unless noted otherwise. **Caveat that applies to every
 number here**: this is validated against a single season. There's a real
 risk some of this is tuned to 2025-specific dynamics rather than a
-durable pattern — re-validate once a second season of data exists.
+durable pattern — re-validate once a second season of data exists. Note:
+that's the 2026 season completing under the *current* SportsDataIO
+plan, not 2024 — confirmed that season is locked behind a paid tier
+(see Data Source Notes).
 
 1. **Built backtest mode first** (`/backtest`) specifically to check
    whether the engine's recommendations were actually good, not just
