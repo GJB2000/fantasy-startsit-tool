@@ -871,6 +871,38 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       showing all no-pick), switched back — all matching the numbers
       already established in items 24-27.
 
+### Open items (as of item 28 — pick up here)
+Everything through item 28 above is committed (`git log` — "Add nflverse
+data source, wire three signals into the engine, and validate against
+2024"). Nothing below is started or fixed yet:
+
+1. **The QB volume signal still doesn't generalize to 2024** (42.2%,
+   worse than chance) — the single biggest open problem from this whole
+   investigation. Two fix attempts both failed: blending rushing
+   attempts into the existing pass-attempts signal regressed 2025 at
+   every weight tried (item 25, reverted); testing rushing attempts as
+   its own standalone signal flipped from 46.8% (2025) to 63% (2024) —
+   too unstable across two seasons to trust (item 26). `volume.ts`/
+   `config.ts` are back to pass-attempts-only, unchanged from before
+   this was discovered. No safe fix identified yet.
+2. **RB's 2024 drop (58.6%→52.4%) was never decomposed** — confirmed
+   real (red-zone data joins and the modifier fires correctly on 2024
+   data), but *why* it dropped wasn't isolated the way the original
+   weight sweep decomposed 2025's numbers (item 24).
+3. **`rushYoe` and `qbRushingAttempts` both swing hard between seasons**
+   (44.6%→59.8% and 46.8%→63% respectively) — both are NextGen-Stats-
+   derived rushing efficiency metrics, which may not be a coincidence,
+   but this was never investigated (item 26).
+4. **FTN charting** (play-level pressure/blitz/play-action/drops data)
+   was flagged early as a third candidate signal family, deliberately
+   deprioritized behind red-zone touches, and never picked back up
+   (item 14). No code exists for it.
+5. **`/api/backtest/broad-nflverse` has no single-pair equivalent** —
+   only Broad mode works for 2024 (see item 24's design constraint);
+   the Backtest page's "Single pair" mode is SportsDataIO/2025-only and
+   the season toggle is correctly hidden outside Broad mode. Not a bug,
+   just a scope boundary worth knowing about before assuming it's a gap.
+
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
