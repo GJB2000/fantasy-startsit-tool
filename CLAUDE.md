@@ -870,11 +870,75 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       only," correct caveat swapped in, `gameScript` baseline correctly
       showing all no-pick), switched back — all matching the numbers
       already established in items 24-27.
+29. **Investigated *why* `hasLimitedData` (59.5%, n=351) beats
+    `confident` (54.2%, n=212) — item 21/22 flagged this as worth a
+    dedicated pass but never ran it.** Two hypotheses were on the table:
+    (a) "asymmetry" — adjacent-rank pairing still nets a real talent gap
+    for these pairs (one clearly-lesser option, not a genuine toss-up),
+    or (b) "role-player variance" — limited-data pairs skew toward
+    lower/replacement-tier players whose small stat edges are more
+    decisive than a star's noisier week-to-week output. Tested both with
+    a temporary diagnostic (duplicated `runBroadBacktest`'s loop rather
+    than modifying it, per the item-22 precedent; used once, then
+    deleted — no lasting code artifact, same as item 22).
+    - **Neither hypothesis survived.** The gap in season-to-date PPR
+      average between the two paired players (the closeness of the
+      "adjacent rank" pairing itself) is nearly identical across every
+      bucket — confident 0.69, closeCall 0.55, hasLimitedData 0.68 — so
+      hasLimitedData pairs aren't secretly less close in talent (kills
+      hypothesis a). The two players' average season PPR level (a tier
+      proxy: star vs. replacement-level) is also nearly identical —
+      confident 16.08, hasLimitedData 16.30 — so hasLimitedData isn't
+      disproportionately backup/role players either (kills hypothesis
+      b). The actual real-world PPR margin between the two players that
+      week (how lopsided the outcome really was) is likewise flat across
+      buckets (~8-9 points everywhere) — hasLimitedData games weren't
+      secretly blowouts in disguise.
+    - **A third candidate — "the model deviates from naive season-rank
+      more often when data is limited, and that deviation is what's
+      smart" — also didn't hold up.** hasLimitedData picks do agree with
+      raw season-rank order less often than confident picks (50.1% vs.
+      58.5%), but cross-tabbing accuracy by agreement shows *agreeing*
+      with season rank is still more accurate than disagreeing within
+      every bucket, hasLimitedData included (61.9% vs. 57.1%) — so the
+      edge isn't coming from the model smartly overriding a stale season
+      average either.
+    - **By position, the gap is directionally consistent (hasLimitedData
+      ≥ confident in all four: QB +11.8pp, RB +5.3pp, WR +2.1pp, TE
+      +13.2pp) but not statistically significant anywhere** — the
+      largest position gaps (QB, TE) ride on confident samples of just
+      n=19 and n=20, each within roughly half a standard error of pure
+      chance on their own (i.e. QB confident's 47.4% and TE confident's
+      45% aren't distinguishable from a coin flip at this sample size).
+      RB and WR have healthier samples (n=52/n=121 confident) and show
+      much smaller gaps (5.3pp, 2.1pp). Pooling all positions, the
+      headline 54.2% vs. 59.5% gap comes out to z≈1.23 — real and
+      consistently-directioned, but short of conventional significance
+      (would need z≈1.96), and not obviously explained by either
+      proposed mechanism.
+    - **Resolution: most likely a moderate-sample artifact, not a
+      structural property of "limited data."** The 2025-only backtest
+      (~612 pairs total, and confident/hasLimitedData splits that thin
+      further to as few as n=19 per position) doesn't have the power to
+      distinguish this reliably, and QB/TE's unusually bad `confident`
+      luck is doing a lot of the work in the pooled number. This doesn't
+      overturn the item 22-23 decision to split the flag (that fix was
+      about correct labeling of two behaviorally-different triggers, not
+      about the size of the gap between them) — but the *specific*
+      "limited data is more trustworthy than confident" framing should
+      be treated as a soft, unconfirmed lean rather than a validated
+      finding. Worth re-checking once 2026 season data is available as a
+      second sample (see the "single-season" caveat at the top of this
+      section) rather than chasing further on 2025 alone.
 
-### Open items (as of item 28 — pick up here)
-Everything through item 28 above is committed (`git log` — "Add nflverse
-data source, wire three signals into the engine, and validate against
-2024"). Nothing below is started or fixed yet:
+### Open items (as of item 29 — pick up here)
+Everything through item 28 is committed (`git log` — "Add nflverse data
+source, wire three signals into the engine, and validate against 2024").
+Item 29 (the `hasLimitedData`-vs-`confident` investigation immediately
+above) is analysis only — it used a temporary diagnostic route that was
+deleted after producing its findings, so there is no code change to
+commit for it, just this write-up. Nothing below is started or fixed
+yet:
 
 1. **The QB volume signal still doesn't generalize to 2024** (42.2%,
    worse than chance) — the single biggest open problem from this whole
