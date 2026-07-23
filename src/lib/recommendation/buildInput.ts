@@ -9,7 +9,7 @@ import {
   averageTargetShare,
 } from "@/lib/nflverse/aggregate";
 import { getByeWeekForTeam } from "@/lib/sportsdata/byes";
-import { getActivePlayerById, getAnyPlayerById } from "@/lib/sportsdata/players";
+import { getActivePlayerById, getAllPlayers, getAnyPlayerById } from "@/lib/sportsdata/players";
 import { getMatchupContext, type PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getPlayerSeasonStat } from "@/lib/sportsdata/seasonStats";
 import { isSkillPosition } from "@/lib/sportsdata/types";
@@ -17,6 +17,8 @@ import { getRecentGameStatsForPlayer } from "@/lib/sportsdata/weeklyStats";
 import type { SeasonContext } from "@/lib/sportsdata/timeframes";
 import type { NflversePlayerWeekTable } from "./nflverseLive";
 import { EMPTY_NFLVERSE_SIGNALS, type PlayerComparisonInput } from "./types";
+
+const LIMITED_INJURY_STATUSES = new Set(["Out", "Doubtful"]);
 
 export async function buildComparisonInput(
   playerId: number,
@@ -39,10 +41,11 @@ export async function buildComparisonInput(
       isOnByeThisWeek: false,
       matchupContext: null,
       nflverse: EMPTY_NFLVERSE_SIGNALS,
+      hasLimitedTeammate: false,
     };
   }
 
-  const [seasonStat, recentGames, byeWeek] = await Promise.all([
+  const [seasonStat, recentGames, byeWeek, allPlayers] = await Promise.all([
     getPlayerSeasonStat(context.lastCompletedSeason, playerId).catch(() => null),
     getRecentGameStatsForPlayer(context.lastCompletedApiSeason, context.recentWeeks, playerId).catch(
       () => []
@@ -50,7 +53,17 @@ export async function buildComparisonInput(
     player.Team
       ? getByeWeekForTeam(context.lastCompletedSeason, player.Team).catch(() => null)
       : Promise.resolve(null),
+    getAllPlayers().catch(() => []),
   ]);
+
+  const hasLimitedTeammate = allPlayers.some(
+    (p) =>
+      p.PlayerID !== playerId &&
+      p.Team === player.Team &&
+      p.Position === player.Position &&
+      p.InjuryStatus != null &&
+      LIMITED_INJURY_STATUSES.has(p.InjuryStatus)
+  );
 
   const isOnByeThisWeek = byeWeek !== null && byeWeek === context.lastCompletedWeek;
 
@@ -85,5 +98,6 @@ export async function buildComparisonInput(
     isOnByeThisWeek,
     matchupContext,
     nflverse,
+    hasLimitedTeammate,
   };
 }

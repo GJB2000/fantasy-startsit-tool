@@ -14,7 +14,19 @@ export interface BacktestWeekSlice {
   recentNflverseByPlayer: (playerId: number) => NflverseWeekStat[];
   /** Direct (non-averaged) lookup for a specific week — for facts like injury status that are current-week, not a trailing usage tendency to average over. */
   nflverseStatForWeek: (playerId: number, week: number) => NflverseWeekStat | undefined;
+  /**
+   * Whether any OTHER player at this team+position (drawn from the
+   * "who's ever recorded a stat here" roster set, built from weeks
+   * strictly BEFORE targetWeek — same no-hindsight discipline as
+   * positionDefenseTable/seasonToDateTable) has an Out/Doubtful
+   * injury-report status for `week` (a current-week, pregame-knowable
+   * fact — see nflverseStatForWeek). Backs the "handcuff" candidate
+   * signal — see CLAUDE.md's unused-data-audit follow-up.
+   */
+  hasLimitedTeammate: (team: string, position: string, playerId: number, week: number) => boolean;
 }
+
+const LIMITED_INJURY_STATUSES = new Set(["Out", "Doubtful"]);
 
 /**
  * Pure, synchronous per-target-week slice of a full-season batch
@@ -66,6 +78,28 @@ export function sliceWeekData(
     return nflversePlayerWeekTable.get(playerId)?.get(week);
   }
 
+  const rosterCandidatesByTeamPosition = new Map<string, Set<number>>();
+  for (const weekRows of priorRows) {
+    for (const row of weekRows) {
+      if (row.Played !== 1) continue;
+      const key = `${row.Team}/${row.Position}`;
+      const set = rosterCandidatesByTeamPosition.get(key) ?? new Set<number>();
+      set.add(row.PlayerID);
+      rosterCandidatesByTeamPosition.set(key, set);
+    }
+  }
+
+  function hasLimitedTeammate(team: string, position: string, playerId: number, week: number): boolean {
+    const candidates = rosterCandidatesByTeamPosition.get(`${team}/${position}`);
+    if (!candidates) return false;
+    for (const teammateId of candidates) {
+      if (teammateId === playerId) continue;
+      const status = nflverseStatForWeek(teammateId, week)?.injuryStatus;
+      if (status && LIMITED_INJURY_STATUSES.has(status)) return true;
+    }
+    return false;
+  }
+
   return {
     targetWeek,
     targetWeekRows,
@@ -75,5 +109,6 @@ export function sliceWeekData(
     recentGamesByPlayer,
     recentNflverseByPlayer,
     nflverseStatForWeek,
+    hasLimitedTeammate,
   };
 }

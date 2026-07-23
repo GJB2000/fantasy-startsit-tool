@@ -47,6 +47,16 @@ export interface PlayerComparisonInput {
   isOnByeThisWeek: boolean;
   matchupContext: MatchupContext | null;
   nflverse: NflverseSignals;
+  /**
+   * Whether a same-position teammate is currently listed Out/Doubtful
+   * ("handcuff" bump) — a current-week, pregame-knowable fact computed
+   * from a different source per mode: nflverse's injury report joined
+   * against a historical team+position roster in backtest mode
+   * (weekSlice.hasLimitedTeammate), SportsDataIO's live Player.InjuryStatus
+   * in live mode — same live-vs-backtest split as the engine's existing
+   * injury flagging. See CLAUDE.md's unused-data-audit follow-up.
+   */
+  hasLimitedTeammate: boolean;
 }
 
 export interface PlayerScoreBreakdown {
@@ -75,6 +85,7 @@ export interface PlayerScoreBreakdown {
   rbEpaModifier: number;
   dropRateAvg: number | null;
   dropRateModifier: number;
+  teammateOutBumpModifier: number;
   targetShare: number | null;
   separation: number | null;
   finalScore: number | null;

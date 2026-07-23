@@ -23,7 +23,8 @@ export type BaselineId =
   | "epaPerPlay"
   | "successRate"
   | "dropRate"
-  | "createdReceptionRate";
+  | "createdReceptionRate"
+  | "teammateOutBump";
 
 export const BASELINE_LABELS: Record<BaselineId, string> = {
   priorWeek: "Prior week's points",
@@ -47,6 +48,7 @@ export const BASELINE_LABELS: Record<BaselineId, string> = {
   successRate: "Success rate (role-scoped: rush/dropback/target, nflverse play-by-play)",
   dropRate: "Drop rate, lower wins (WR/TE, FTN Charting)",
   createdReceptionRate: "Created-reception rate (contested/tough catches, WR/TE, FTN Charting)",
+  teammateOutBump: "Same-position teammate Out/Doubtful this week (\"handcuff\" bump)",
 };
 
 function average(values: number[]): number {
@@ -284,6 +286,29 @@ export function pickByRedZoneTouches(weekSlice: BacktestWeekSlice, playerIds: [n
 }
 
 /**
+ * Naive baseline: pick whoever currently has a same-position teammate
+ * listed Out/Doubtful this week ("handcuff" bump) — a current-week,
+ * pregame-knowable fact (weekSlice.hasLimitedTeammate), not a trailing
+ * average. Motivated by a standalone effect-size check (not itself a
+ * baseline) that found a real, stable within-player share increase when
+ * a teammate is out — largest for RB (+7.8-8.3pp rush share), smaller
+ * for WR/TE (+1-2pp target share) — see CLAUDE.md's unused-data-audit
+ * follow-up. This baseline tests whether that share bump actually
+ * translates into being the better start that week, not just a bigger
+ * slice of a pie that may not itself be larger.
+ */
+export function pickByTeammateOutBump(weekSlice: BacktestWeekSlice, playerIds: [number, number]): number | null {
+  const flags = playerIds.map((id) => {
+    const games = weekSlice.recentGamesByPlayer(id);
+    if (games.length === 0) return null;
+    const last = games.at(-1)!;
+    return weekSlice.hasLimitedTeammate(last.Team, last.Position, id, weekSlice.targetWeek);
+  });
+  if (flags[0] == null || flags[1] == null || flags[0] === flags[1]) return null;
+  return flags[0] ? playerIds[0] : playerIds[1];
+}
+
+/**
  * Same shape as pickByRedZoneTouches, tighter yardline_100<=5 cutoff —
  * tests whether a stricter "goal line" definition is a cleaner QB-
  * rushing signal than the full red zone (<=20) or total rush attempts,
@@ -462,4 +487,5 @@ export const BASELINE_PICKERS: Record<
   successRate: pickBySuccessRate,
   dropRate: pickByDropRate,
   createdReceptionRate: pickByCreatedReceptionRate,
+  teammateOutBump: pickByTeammateOutBump,
 };

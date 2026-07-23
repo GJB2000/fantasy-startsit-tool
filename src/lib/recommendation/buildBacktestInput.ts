@@ -46,6 +46,7 @@ export function buildBacktestComparisonInput(
       isOnByeThisWeek: false,
       matchupContext: null,
       nflverse: EMPTY_NFLVERSE_SIGNALS,
+      hasLimitedTeammate: false,
     };
   }
 
@@ -100,6 +101,8 @@ export function buildBacktestComparisonInput(
     dropRate: averageDropRate(recentNflverseStats, position),
   };
 
+  const hasLimitedTeammate = team ? weekSlice.hasLimitedTeammate(team, position, playerId, targetWeek) : false;
+
   return {
     requestedPlayerId: playerId,
     player,
@@ -110,5 +113,6 @@ export function buildBacktestComparisonInput(
     isOnByeThisWeek,
     matchupContext,
     nflverse,
+    hasLimitedTeammate,
   };
 }

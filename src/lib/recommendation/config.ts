@@ -267,3 +267,34 @@ export const POINTS_PER_DROP_RATE_UNIT = 182.75;
  * for the two-season sweep.
  */
 export const DROP_RATE_BLEND_WEIGHT = 0.2;
+
+/**
+ * Empirically-derived PPR point bonus for WR when a same-position
+ * teammate is currently Out/Doubtful ("handcuff" bump) — within-player
+ * average PPR points in teammate-out weeks minus their own average in
+ * normal weeks, across every played WR game-week of the 2025 season.
+ * Unlike every other conversion factor in this file, this backs a
+ * BOOLEAN flag, not a continuous rate/count, so the shape is different:
+ * modifier = hasLimitedTeammate ? weight * POINTS_PER_TEAMMATE_OUT_BUMP_WR
+ * : 0 (a flat bonus when true, not a blend toward an absolute estimate
+ * — blending toward a fixed value would incorrectly pull every
+ * non-flagged player's score toward it as weight increases). A
+ * standalone effect-size check found WR's target-share bump is modest
+ * (+1.7pp both seasons) but stable — see CLAUDE.md's unused-data-audit
+ * follow-up for the full investigation, including why RB's much larger
+ * touch-share bump (+8pp) didn't translate to a useful signal.
+ */
+export const POINTS_PER_TEAMMATE_OUT_BUMP_WR = 1.014;
+
+/**
+ * How much of the empirical bonus above to actually apply — see that
+ * comment for the flat-bonus shape (not the usual blend-toward-estimate
+ * pattern). Kept at 0 (no-op) — swept 0.1-1.0 against both seasons and
+ * every nonzero weight made BOTH 2025 (58.3%→57.4%) and 2024
+ * (59.5%→58.5%) worse, not a tradeoff to negotiate like QB rushing/WR
+ * drop rate, just a clean rejection: the real, stable standalone effect
+ * (item 33 follow-up) adds nothing once blended into an already-tuned
+ * WR score — same failure mode as QB success rate. Code kept, not
+ * deleted, same precedent as every other rejected signal in this file.
+ */
+export const TEAMMATE_OUT_BUMP_WEIGHT_WR = 0;

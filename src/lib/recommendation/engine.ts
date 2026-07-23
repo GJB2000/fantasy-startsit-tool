@@ -10,6 +10,7 @@ import {
   POINTS_PER_REDZONE_TOUCH_RB,
   POINTS_PER_SNAP_SHARE_UNIT_TE,
   POINTS_PER_SUCCESS_RATE_UNIT_QB,
+  POINTS_PER_TEAMMATE_OUT_BUMP_WR,
   POINTS_PER_VOLUME_UNIT,
   QB_GOAL_LINE_BLEND_WEIGHT,
   QB_RUSH_BLEND_WEIGHT,
@@ -23,6 +24,7 @@ import {
   RECENT_WEIGHT_PER_GAME,
   REDZONE_BLEND_WEIGHT_RB,
   SNAP_SHARE_BLEND_WEIGHT_TE,
+  TEAMMATE_OUT_BUMP_WEIGHT_WR,
   VOLUME_BLEND_WEIGHT,
 } from "./config";
 import type {
@@ -217,6 +219,14 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     );
   }
 
+  let teammateOutBumpModifier = 0;
+  if (blendedScore != null && position === "WR" && input.hasLimitedTeammate) {
+    teammateOutBumpModifier = TEAMMATE_OUT_BUMP_WEIGHT_WR * POINTS_PER_TEAMMATE_OUT_BUMP_WR;
+    notes.push(
+      `A same-position teammate is listed Out/Doubtful — worth roughly ${teammateOutBumpModifier.toFixed(1)} extra PPR points at this position's typical rate.`
+    );
+  }
+
   const finalScore =
     blendedScore == null
       ? null
@@ -229,7 +239,8 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
         qbGoalLineModifier +
         qbSuccessRateModifier +
         rbEpaModifier +
-        dropRateModifier;
+        dropRateModifier +
+        teammateOutBumpModifier;
 
   const injuryStatus = input.player?.InjuryStatus ?? null;
   if (injuryStatus === "Questionable") {
@@ -271,6 +282,7 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     rbEpaModifier,
     dropRateAvg,
     dropRateModifier,
+    teammateOutBumpModifier,
     targetShare: input.nflverse.targetShare,
     separation: input.nflverse.separation,
     finalScore,

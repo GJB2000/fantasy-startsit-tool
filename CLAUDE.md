@@ -1375,15 +1375,80 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       even WR drop rate cleared in item 33. Diagnostic route was
       temporary and has been deleted; the numbers above are the only
       lasting artifact, same discipline as items 22/29.
+35. **Tested the classic "handcuff" idea directly** — does a player's
+    target/touch share meaningfully increase in weeks a same-position
+    teammate is Out/Doubtful, and if so, does that translate into being
+    the better start that week. A genuinely new kind of signal for this
+    document: every prior item measured a player's own recent stats;
+    this one measures a *roster-relative, current-week* fact (is a
+    teammate out right now), using nflverse's real injury-report data
+    (item 18) joined against a historical team+position roster set
+    (built from weeks strictly before the target week — same
+    no-hindsight discipline as `positionDefenseTable`/`seasonToDateTable`
+    — so this correctly returns nothing in week 1, before any roster
+    composition is knowable).
+    - **Step 1 — effect size first, before any grading**: for each
+      player, split their own played weeks into "teammate limited" vs.
+      "normal" and compared average share (a within-player paired
+      design, not a raw pooled average, since pooling would confound the
+      effect with which players happen to have more of each kind of
+      week). **Result: a large, stable RB effect** (rush share among a
+      team's RBs: +7.8pp in 2025, +8.3pp in 2024, n=75-102 qualifying
+      players, 201-247 teammate-out weeks) — remarkably consistent
+      across seasons, one of the largest effect sizes found in this
+      entire investigation. **WR and TE show the same direction but much
+      smaller magnitude** (target share: WR +1.7pp both seasons; TE
+      +0.9-1.9pp, noisier) — real, but modest, since targets are
+      naturally split across more pass-catchers than RB touches are
+      split across backs.
+    - **Step 2 — graded as a standalone baseline** (`pickByTeammateOutBump`
+      in `baselines.ts`, backed by a new `BacktestWeekSlice.hasLimitedTeammate`
+      helper in `weekData.ts`): pick whoever currently has the bump, when
+      exactly one of the two paired players does. **A genuinely
+      counterintuitive result**: RB's large +8pp effect barely beats
+      chance once graded (52.4% 2025, 51.2% 2024, n=42-43) — a bigger
+      slice of touches doesn't mean a bigger slice of *points*, plausibly
+      because a bumped backup RB is still usually lower-talent than
+      whoever they're paired against. **WR, despite its much smaller
+      effect size, was the more useful signal**: 55.9% (2025, n=68) /
+      53.8% (2024, n=65) — modest but stable in both seasons. **TE was
+      too thin and unstable to trust** (68.8%→44.4%, n=16-18).
+    - **Step 3 — took WR to full integration, since it cleared the
+      "shows promise" bar**: added `hasLimitedTeammate: boolean` to
+      `PlayerComparisonInput` (computed differently per mode, same
+      live-vs-backtest split as the engine's existing injury flagging —
+      `weekSlice.hasLimitedTeammate` for backtest, SportsDataIO's live
+      `Player.InjuryStatus` scanned across `getAllPlayers()` for live
+      mode) and a new additive term in `engine.ts`. Unlike every other
+      additive term in this file, this backs a *boolean* flag, not a
+      continuous rate, so the shape is a flat bonus when true
+      (`weight * POINTS_PER_TEAMMATE_OUT_BUMP_WR`), not the usual
+      blend-toward-an-absolute-estimate pattern (which would incorrectly
+      pull every non-flagged player toward a fixed value as weight
+      increases). `POINTS_PER_TEAMMATE_OUT_BUMP_WR=1.014` computed as
+      the within-player average PPR-point differential (teammate-out
+      minus normal weeks) across the full 2025 season.
+    - **Swept 0.1-1.0 against both seasons — a clean rejection, not a
+      tradeoff.** Every nonzero weight made BOTH 2025 (58.3%→57.4%) and
+      2024 (59.5%→58.5%) worse — unlike QB rushing/WR drop rate, where
+      one season improved as the other declined, here both seasons move
+      the same (wrong) direction together. Same failure mode as QB
+      success rate (item 33): a real, stable standalone signal that adds
+      nothing once blended into an already-tuned score.
+      `TEAMMATE_OUT_BUMP_WEIGHT_WR` stays at 0 — code kept, not deleted,
+      same precedent as every other rejected signal.
+    - **Net takeaway for future signal-hunting in this document**: effect
+      size and predictive/gradeable accuracy are not the same thing, and
+      neither is standalone baseline accuracy the same thing as
+      integration value — three different bars, and a signal can clear
+      any subset of them independently. RB cleared none past step 1; WR
+      cleared steps 1-2 but not step 3.
 
-### Open items (as of item 34 — pick up here)
-Everything through item 30 is committed (`git log`). Items 31-33 (the
-EPA/success-rate audit, FTN Charting audit, and this integration pass)
-are implemented and verified but not yet committed as of this writing.
-Item 34 (weather) is analysis only — same as item 29, it used a
-temporary diagnostic route that was deleted after producing its
-findings, so there is no code change to commit for it, just this
-write-up. Nothing below is started or fixed yet:
+### Open items (as of item 35 — pick up here)
+Everything through item 34 is committed (`git log`). Item 35 (the
+handcuff/teammate-out investigation immediately above) is implemented
+and verified but not yet committed as of this writing. Nothing below is
+started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
