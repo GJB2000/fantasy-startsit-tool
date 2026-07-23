@@ -19,7 +19,11 @@ export type BaselineId =
   | "injuryStatus"
   | "redZoneTouches"
   | "qbRushingAttempts"
-  | "goalLineTouches";
+  | "goalLineTouches"
+  | "epaPerPlay"
+  | "successRate"
+  | "dropRate"
+  | "createdReceptionRate";
 
 export const BASELINE_LABELS: Record<BaselineId, string> = {
   priorWeek: "Prior week's points",
@@ -39,6 +43,10 @@ export const BASELINE_LABELS: Record<BaselineId, string> = {
   redZoneTouches: "Red zone touches (rush attempts + targets inside the 20, nflverse play-by-play)",
   qbRushingAttempts: "Recent rushing attempts (QB only)",
   goalLineTouches: "Goal line touches (rush attempts + targets inside the 5, nflverse play-by-play)",
+  epaPerPlay: "EPA per play (role-scoped: rush/dropback/target, nflverse play-by-play)",
+  successRate: "Success rate (role-scoped: rush/dropback/target, nflverse play-by-play)",
+  dropRate: "Drop rate, lower wins (WR/TE, FTN Charting)",
+  createdReceptionRate: "Created-reception rate (contested/tough catches, WR/TE, FTN Charting)",
 };
 
 function average(values: number[]): number {
@@ -305,6 +313,107 @@ export function pickByGoalLineTouches(weekSlice: BacktestWeekSlice, playerIds: [
 }
 
 /**
+ * Naive baseline: pick whoever has the better recent EPA-per-play,
+ * role-scoped by position (rush attempts for RB, dropbacks for QB,
+ * targets for WR/TE) — the play-by-play release's own headline
+ * efficiency metric, never used anywhere in this app before. Tests
+ * whether "true" per-play value-added beats the volume/points signals
+ * already shipped, which don't otherwise account for play context
+ * (down/distance/score situation).
+ */
+export function pickByEpaPerPlay(weekSlice: BacktestWeekSlice, playerIds: [number, number]): number | null {
+  const avgs = playerIds.map((id) => {
+    const games = weekSlice.recentGamesByPlayer(id);
+    if (games.length === 0) return null;
+    const position = games.at(-1)!.Position;
+    const values = games
+      .map((game) => {
+        const stat = weekSlice.nflverseStatForWeek(id, game.Week);
+        if (position === "RB") return stat?.rushEpaPerPlay ?? null;
+        if (position === "QB") return stat?.qbEpaPerDropback ?? null;
+        if (position === "WR" || position === "TE") return stat?.recEpaPerTarget ?? null;
+        return null;
+      })
+      .filter((v): v is number => v != null);
+    return values.length > 0 ? average(values) : null;
+  });
+  if (avgs[0] == null || avgs[1] == null || avgs[0] === avgs[1]) return null;
+  return avgs[0] > avgs[1] ? playerIds[0] : playerIds[1];
+}
+
+/**
+ * Same shape as pickByEpaPerPlay, using the play-by-play "success" flag
+ * (a binary, down/distance-adjusted "did this play succeed" indicator)
+ * instead of raw EPA — a cruder, more robust-to-outliers cousin of the
+ * same idea.
+ */
+export function pickBySuccessRate(weekSlice: BacktestWeekSlice, playerIds: [number, number]): number | null {
+  const avgs = playerIds.map((id) => {
+    const games = weekSlice.recentGamesByPlayer(id);
+    if (games.length === 0) return null;
+    const position = games.at(-1)!.Position;
+    const values = games
+      .map((game) => {
+        const stat = weekSlice.nflverseStatForWeek(id, game.Week);
+        if (position === "RB") return stat?.rushSuccessRate ?? null;
+        if (position === "QB") return stat?.qbSuccessRate ?? null;
+        if (position === "WR" || position === "TE") return stat?.recSuccessRate ?? null;
+        return null;
+      })
+      .filter((v): v is number => v != null);
+    return values.length > 0 ? average(values) : null;
+  });
+  if (avgs[0] == null || avgs[1] == null || avgs[0] === avgs[1]) return null;
+  return avgs[0] > avgs[1] ? playerIds[0] : playerIds[1];
+}
+
+/**
+ * Naive baseline: pick whoever has the LOWER recent drop rate — WR/TE
+ * only (FTN Charting has no meaningful denominator for other
+ * positions). Tests a "hands"/reliability signal that's never been
+ * available before: FTN Charting flagged as a candidate signal family
+ * back in item 14, deliberately deprioritized, picked up here for the
+ * first time — see CLAUDE.md's unused-data-audit follow-up.
+ */
+export function pickByDropRate(weekSlice: BacktestWeekSlice, playerIds: [number, number]): number | null {
+  const positions = playerIds.map((id) => positionOf(weekSlice, id));
+  if (positions.some((p) => p !== "WR" && p !== "TE")) return null;
+
+  const avgs = playerIds.map((id) => {
+    const games = weekSlice.recentGamesByPlayer(id);
+    const values = games
+      .map((game) => weekSlice.nflverseStatForWeek(id, game.Week)?.dropRate ?? null)
+      .filter((v): v is number => v != null);
+    return values.length > 0 ? average(values) : null;
+  });
+  if (avgs[0] == null || avgs[1] == null || avgs[0] === avgs[1]) return null;
+  return avgs[0] < avgs[1] ? playerIds[0] : playerIds[1];
+}
+
+/**
+ * Same shape as pickByDropRate — created-reception rate (contested/
+ * tough catches the receiver made themselves), WR/TE only. Higher wins,
+ * unlike drop rate.
+ */
+export function pickByCreatedReceptionRate(
+  weekSlice: BacktestWeekSlice,
+  playerIds: [number, number]
+): number | null {
+  const positions = playerIds.map((id) => positionOf(weekSlice, id));
+  if (positions.some((p) => p !== "WR" && p !== "TE")) return null;
+
+  const avgs = playerIds.map((id) => {
+    const games = weekSlice.recentGamesByPlayer(id);
+    const values = games
+      .map((game) => weekSlice.nflverseStatForWeek(id, game.Week)?.createdReceptionRate ?? null)
+      .filter((v): v is number => v != null);
+    return values.length > 0 ? average(values) : null;
+  });
+  if (avgs[0] == null || avgs[1] == null || avgs[0] === avgs[1]) return null;
+  return avgs[0] > avgs[1] ? playerIds[0] : playerIds[1];
+}
+
+/**
  * Naive baseline: pick whoever has averaged more recent rushing
  * attempts — QB only. Tests rushing volume as its own, standalone
  * signal, distinct from `pickByRecentVolume` (pass attempts only for
@@ -349,4 +458,8 @@ export const BASELINE_PICKERS: Record<
   redZoneTouches: pickByRedZoneTouches,
   qbRushingAttempts: pickByQbRushingAttempts,
   goalLineTouches: pickByGoalLineTouches,
+  epaPerPlay: pickByEpaPerPlay,
+  successRate: pickBySuccessRate,
+  dropRate: pickByDropRate,
+  createdReceptionRate: pickByCreatedReceptionRate,
 };

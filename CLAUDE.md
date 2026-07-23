@@ -1116,27 +1116,149 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       attempts), unchanged from item 30. Both alternate variants tested
       here (red-zone-only, goal-line-only) are documented, implemented,
       and deliberately not activated.
+31. **Audited the play-by-play release for two more genuinely unused
+    columns — EPA and the binary `success` flag** — the same
+    "what's sitting unused" logic behind the original volume signal
+    (item 6) and the red-zone/goal-line work (items 19/30), extended to
+    nflverse's own headline efficiency metrics rather than another raw
+    volume count. Both are read from the *same already-fetched* `pbp`
+    rows red-zone/goal-line touches already parse — no new fetch or file
+    needed, just two more columns added to the existing allowlist
+    (`PBP_COLUMNS` in `playByPlay.ts`) and two more accumulators in the
+    same aggregation pass. Role-scoped exactly like every other signal in
+    this family: rush attempts for RB, dropbacks (passes + sacks +
+    scrambles) for QB, targets for WR/TE. New standalone baselines
+    `pickByEpaPerPlay`/`pickBySuccessRate` in `baselines.ts`.
+    - **Overall numbers were unremarkable** (EPA: 47.2%/50.6%, success
+      rate: 49.1%/52.6% — both near chance across all positions
+      combined) but, per the pattern that's held throughout this whole
+      investigation, **a real position-specific signal was hiding in the
+      average**:
 
-### Open items (as of item 30 — pick up here)
-Everything through item 29 is committed (`git log`). Item 30 (the QB
-rushing additive term immediately above) is implemented and verified but
-not yet committed as of this writing. Nothing below is started or fixed
-yet:
+      | position | EPA/play (2025/2024) | success rate (2025/2024) |
+      |---|---|---|
+      | QB | 38.0% / 44.0% (bad) | **53.0% / 52.0%** (stable) |
+      | RB | 52.2% / 57.2% | 49.8% / 56.2% |
+      | WR | 49.5% / 50.3% | 47.7% / 52.6% |
+      | TE | 41.8% / 44.4% (bad) | 46.4% / 45.7% (bad) |
 
-1. **RB's 2024 drop (58.6%→52.4%) was never decomposed** — confirmed
+    - **QB success rate is the standout finding**: raw EPA-per-dropback
+      is clearly *worse* than chance for QB in both seasons (38%/44%) —
+      plausibly too dominated by boom/bust outlier plays (long TDs,
+      picks) to be a stable predictor — but the cruder, down/distance-
+      adjusted success-rate flag is modestly positive **and stable
+      across both seasons** (53.0%→52.0%), a property no QB-rushing
+      variant tried in items 25/26/30/30a ever achieved. Genuinely
+      promising for the position that's been the hardest, most
+      season-unstable problem in this entire document.
+    - **RB EPA-per-rush is a secondary candidate**: positive in both
+      seasons and *improves* in 2024 (52.2%→57.2%) rather than degrading
+      like most signals do out-of-sample.
+    - **WR shows nothing** (both metrics hover at chance both seasons);
+      **TE is consistently below chance on both metrics, both seasons**
+      — not promising, but at least stable in that (bad) direction
+      rather than swinging.
+    - **Not integrated yet** — standalone numbers only, same "prove it
+      before wiring it in" discipline as every other signal in this
+      document. QB success rate and RB EPA-per-rush are both flagged as
+      real candidates in the open items below; WR/TE results are
+      negative findings, recorded here rather than chased further.
+32. **Finally picked up FTN Charting** — the "third candidate signal
+    family" flagged back in item 14 and left on the open-items list ever
+    since (deliberately deprioritized behind red-zone touches at the
+    time). Human-charted, play-level data (drops, contested/created
+    receptions, pressure, personnel) not derivable from raw stats or
+    play-by-play alone. Confirmed live against the real release before
+    building anything (not assumed): covers 2022-2025 (both backtest
+    seasons included), and — unlike every other nflverse source used so
+    far — carries no player ID or name of its own. It's keyed by
+    `nflverse_game_id`/`nflverse_play_id`, confirmed to match the main
+    `pbp` release's `game_id`/`play_id` exactly, so it's joined onto the
+    same pbp rows red-zone/EPA aggregation already iterates (`game_id`/
+    `play_id` added to `PBP_COLUMNS`; new `ftnCharting.ts` fetches and
+    keys the charting file, `playByPlay.ts` looks it up per-row using
+    pbp's own `receiver_player_id` to attribute a charted target to a
+    player) — no second full pbp parse needed. Tracked `is_drop` and
+    `is_created_reception` as the two most fantasy-relevant charted
+    fields; skipped pressure/personnel context (`n_blitzers`,
+    `is_qb_out_of_pocket`, box counts) for this pass since those describe
+    the opposing pass rush/scheme more than the player's own skill — the
+    same attribution concern that sank the team-level game-script
+    baseline in item 12 — and would need their own dedicated pass if
+    revisited. New standalone baselines `pickByDropRate`/
+    `pickByCreatedReceptionRate` in `baselines.ts`, WR/TE only (denominator
+    is charted targets, via a `chartedTargetCount` accumulator kept
+    separate from raw target count in case charting coverage has gaps).
+    - **Results, by position (2025/2024):**
+
+      | position | drop rate (lower wins) | created-reception rate |
+      |---|---|---|
+      | WR | 52.4% / 53.1% | 52.9% / 48.3% |
+      | TE | 50.0% / 54.8% | 55.2% / 53.0% |
+
+    - **Drop rate is a real, if modest, candidate**: small (2-5pp above
+      chance) but genuinely stable across both positions and both
+      seasons — never dips below chance anywhere in the table. A
+      "reliability" signal with no equivalent anywhere else in this app.
+      Flagged as a real candidate in the open items below, same
+      treatment as QB success rate/RB EPA-per-rush.
+    - **Created-reception rate is a documented negative/mixed finding,
+      not a candidate.** Solid and stable for TE (55.2%→53.0%) but
+      unstable for WR — crosses from positive (52.9%) to below chance
+      (48.3%) between seasons, the same season-to-season sign-flip
+      pattern that's sunk several other signals in this document (QB
+      rushing volume, red-zone-only QB rushes). Not pursued further; not
+      added to the open-items candidate list.
+
+### Open items (as of item 32 — pick up here)
+Everything through item 30 is committed (`git log`). Items 31-32 (the
+EPA/success-rate and FTN Charting audits immediately above) are
+implemented and verified but not yet committed as of this writing.
+Nothing below is started or fixed yet:
+
+1. **QB success rate — standalone-validated, not yet integrated.**
+   Stable across both seasons (53.0% 2025 / 52.0% 2024, item 31) —
+   notably, the first QB-specific signal in this whole investigation
+   that didn't flip direction or magnitude between seasons. Candidate
+   for the same additive-term-plus-two-season-sweep treatment as
+   red-zone touches (RB)/snap share (TE)/QB rushing volume, using
+   `qbSuccessRate` (already computed in `NflverseWeekStat`, role-scoped
+   to dropbacks) — no new data plumbing needed, just the engine-side
+   integration and weight sweep.
+2. **RB EPA-per-rush — standalone-validated, not yet integrated.**
+   Positive in both seasons and *improves* out-of-sample (52.2%→57.2%,
+   item 31), unlike most signals tested in this document. Candidate for
+   the same additive-term treatment, using `rushEpaPerPlay` (already
+   computed, role-scoped to rush attempts) — same "no new plumbing
+   needed" situation as QB success rate above.
+3. **WR/TE drop rate — standalone-validated, not yet integrated.**
+   Modest but stable across both positions and both seasons (WR
+   52.4%→53.1%, TE 50.0%→54.8%, item 32) — a "reliability" signal with
+   no equivalent anywhere else in this app. Candidate for the same
+   additive-term treatment, using `dropRate` (already computed in
+   `NflverseWeekStat`, target-scoped, denominator is charted targets via
+   `chartedTargetCount`) — same "no new plumbing needed" situation as
+   the two candidates above. Note: would need a sign-flip (lower is
+   better, unlike every other additive term shipped so far, which are
+   all "more is better") if integrated.
+4. **RB's 2024 drop (58.6%→52.4%) was never decomposed** — confirmed
    real (red-zone data joins and the modifier fires correctly on 2024
    data), but *why* it dropped wasn't isolated the way the original
    weight sweep decomposed 2025's numbers (item 24).
-2. **`rushYoe` swings hard between seasons** (44.6%→59.8%) — a NextGen-
+5. **`rushYoe` swings hard between seasons** (44.6%→59.8%) — a NextGen-
    Stats-derived rushing efficiency metric; `qbRushingAttempts` (the
    other signal that showed this same instability) is now addressed by
    item 30's additive-term integration, but `rushYoe` itself was never
    investigated further (item 26).
-3. **FTN charting** (play-level pressure/blitz/play-action/drops data)
-   was flagged early as a third candidate signal family, deliberately
-   deprioritized behind red-zone touches, and never picked back up
-   (item 14). No code exists for it.
-4. **`/api/backtest/broad-nflverse` has no single-pair equivalent** —
+6. **FTN Charting's pressure/personnel fields** (`n_blitzers`,
+   `is_qb_out_of_pocket`, box counts, play-action/RPO/screen flags) were
+   deliberately skipped in item 32 in favor of drop/created-reception
+   rate — these describe the opposing pass rush/scheme more than the
+   player's own skill (the same attribution concern that sank the
+   team-level game-script baseline in item 12), so they'd need their own
+   dedicated pass to figure out how to attribute them fairly, not a
+   quick extension of item 32's join.
+7. **`/api/backtest/broad-nflverse` has no single-pair equivalent** —
    only Broad mode works for 2024 (see item 24's design constraint);
    the Backtest page's "Single pair" mode is SportsDataIO/2025-only and
    the season toggle is correctly hidden outside Broad mode. Not a bug,
@@ -1211,7 +1333,14 @@ yet:
   `yardline_100 <= 20`, counting rush attempts/targets per player per
   game); play-by-play identifies players by `gsis_id` rather than name,
   so it resolves through `players.ts` (nflverse's ID crosswalk release)
-  before the usual name join. `playerMatch.ts` does the
+  before the usual name join. `playByPlay.ts` also computes goal-line
+  touches, EPA-per-play, success rate (all role-scoped: rush for RB,
+  dropback for QB, target for WR/TE), and FTN Charting's drop/created-
+  reception rate (target-scoped) in the same single pass over the pbp
+  rows — see "Backtesting & Tuning History" items 30-32. `ftnCharting.ts`
+  fetches the FTN Charting release (human-charted play-level data — no
+  player ID of its own, joined onto `playByPlay.ts`'s pbp rows by
+  `game_id`/`play_id`). `playerMatch.ts` does the
   name-normalization join onto SportsDataIO `PlayerID`s (see Data Source
   Notes for the validation story); `weekTable.ts` combines every source
   above into one `PlayerID -> week -> stat` table, built by both

@@ -27,6 +27,16 @@ export interface NflverseWeekStat {
   /** Same shape, tighter yardline_100<=5 cutoff — see playByPlay.ts. */
   goalLineRushAttempts: number | null;
   goalLineTargets: number | null;
+  /** EPA-per-play and success rate, role-scoped (rush for RB, dropback for QB, target for WR/TE) — already a per-week rate, see playByPlay.ts. */
+  rushEpaPerPlay: number | null;
+  rushSuccessRate: number | null;
+  qbEpaPerDropback: number | null;
+  qbSuccessRate: number | null;
+  recEpaPerTarget: number | null;
+  recSuccessRate: number | null;
+  /** FTN Charting, target-scoped (WR/TE) — see ftnCharting.ts/playByPlay.ts. */
+  dropRate: number | null;
+  createdReceptionRate: number | null;
 }
 
 export interface NflverseSourceRows {
@@ -74,6 +84,14 @@ export function buildNflversePlayerWeekTable(
         redZoneTargets: null,
         goalLineRushAttempts: null,
         goalLineTargets: null,
+        rushEpaPerPlay: null,
+        rushSuccessRate: null,
+        qbEpaPerDropback: null,
+        qbSuccessRate: null,
+        recEpaPerTarget: null,
+        recSuccessRate: null,
+        dropRate: null,
+        createdReceptionRate: null,
       };
       byWeek.set(week, stat);
     }
@@ -134,6 +152,14 @@ export function buildNflversePlayerWeekTable(
     stat.redZoneTargets = row.redZoneTargets;
     stat.goalLineRushAttempts = row.goalLineRushAttempts;
     stat.goalLineTargets = row.goalLineTargets;
+    stat.rushEpaPerPlay = row.rushEpaPerPlay;
+    stat.rushSuccessRate = row.rushSuccessRate;
+    stat.qbEpaPerDropback = row.qbEpaPerDropback;
+    stat.qbSuccessRate = row.qbSuccessRate;
+    stat.recEpaPerTarget = row.recEpaPerTarget;
+    stat.recSuccessRate = row.recSuccessRate;
+    stat.dropRate = row.dropRate;
+    stat.createdReceptionRate = row.createdReceptionRate;
   }
 
   return table;
