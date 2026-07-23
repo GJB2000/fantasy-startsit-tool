@@ -118,3 +118,38 @@ export const POINTS_PER_SNAP_SHARE_UNIT_TE = 9.607;
  * the full table and the caveat about this weight's sample size.
  */
 export const SNAP_SHARE_BLEND_WEIGHT_TE = 0.4;
+
+/**
+ * Empirically-derived PPR points per QB rushing attempt (total QB PPR
+ * points across every played QB game-week of the 2025 season, divided
+ * by total QB rushing attempts over the same set — same "ratio of
+ * sums" method as POINTS_PER_VOLUME_UNIT/POINTS_PER_REDZONE_TOUCH_RB;
+ * cross-checked by recomputing POINTS_PER_VOLUME_UNIT.QB's 0.511 the
+ * same way from the same data pull and getting an identical value).
+ * Rush attempts convert to points at roughly 7.7x the rate of pass
+ * attempts (3.929 vs. 0.511) — rarer but disproportionately high-value
+ * touches (designed runs/scrambles, goal-line work). A standalone
+ * "more recent rush attempts wins" baseline backtested unstably across
+ * seasons (46.8% in 2025, 63.0% in 2024 — see CLAUDE.md item 26) before
+ * this was attempted as its own additive term rather than blended into
+ * the existing pass-attempts-only POINTS_PER_VOLUME_UNIT.QB (item 25's
+ * blended attempt was reverted) — see item 30 for the full story.
+ */
+export const POINTS_PER_QB_RUSH_ATTEMPT = 3.929;
+
+/**
+ * How much weight QB rushing volume (converted to points via
+ * POINTS_PER_QB_RUSH_ATTEMPT) carries against the running QB score
+ * (post-volume-blend), same additive-stack shape as
+ * REDZONE_BLEND_WEIGHT_RB/SNAP_SHARE_BLEND_WEIGHT_TE. Unlike those two,
+ * this is NOT a free win at any weight — swept in 0.1 steps against
+ * BOTH 2025 (SportsDataIO) and 2024 (nflverse-only) QB accuracy: every
+ * nonzero weight makes 2025 worse than the w=0 baseline (56.9%) while
+ * 2024 climbs from 42.2% toward a 64.7% peak at w=0.7. 0.3 is the
+ * deliberately-chosen balance point (52.9%/55.9% — both clearly above
+ * chance, roughly matched) rather than either season's individual
+ * optimum, on the explicit judgment that cross-season stability matters
+ * more than peak single-season accuracy. See CLAUDE.md item 30 for the
+ * full two-season sweep table and the tradeoff this represents.
+ */
+export const QB_RUSH_BLEND_WEIGHT = 0.3;

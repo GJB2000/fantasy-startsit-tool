@@ -3,9 +3,11 @@ import {
   CLOSE_CALL_RELATIVE_PCT,
   MATCHUP_MODIFIER_CAP,
   MATCHUP_MODIFIER_SCALE,
+  POINTS_PER_QB_RUSH_ATTEMPT,
   POINTS_PER_REDZONE_TOUCH_RB,
   POINTS_PER_SNAP_SHARE_UNIT_TE,
   POINTS_PER_VOLUME_UNIT,
+  QB_RUSH_BLEND_WEIGHT,
   RECENT_WEEK_COUNT,
   RECENT_WEIGHT_BASE,
   RECENT_WEIGHT_MAX,
@@ -20,7 +22,7 @@ import type {
   PlayerComparisonInput,
   PlayerScoreBreakdown,
 } from "./types";
-import { getVolumeStat } from "./volume";
+import { getQbRushAttemptStat, getVolumeStat } from "./volume";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -129,8 +131,27 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     );
   }
 
+  let qbRushModifier = 0;
+  let recentQbRushAttemptsAvg: number | null = null;
+  if (blendedScore != null && position === "QB") {
+    const rushValues = input.recentGames.map(getQbRushAttemptStat).filter((v): v is number => v != null);
+    if (rushValues.length > 0) {
+      recentQbRushAttemptsAvg = average(rushValues);
+      const runningScore = blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier;
+      const expectedPointsFromQbRush = recentQbRushAttemptsAvg * POINTS_PER_QB_RUSH_ATTEMPT;
+      const blendedWithQbRush =
+        (1 - QB_RUSH_BLEND_WEIGHT) * runningScore + QB_RUSH_BLEND_WEIGHT * expectedPointsFromQbRush;
+      qbRushModifier = blendedWithQbRush - runningScore;
+      notes.push(
+        `Averaging ${recentQbRushAttemptsAvg.toFixed(1)} rushing attempts/game over their last ${rushValues.length} game${rushValues.length === 1 ? "" : "s"} — worth roughly ${expectedPointsFromQbRush.toFixed(1)} PPR points at this position's typical rate.`
+      );
+    }
+  }
+
   const finalScore =
-    blendedScore == null ? null : blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier;
+    blendedScore == null
+      ? null
+      : blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier + qbRushModifier;
 
   const injuryStatus = input.player?.InjuryStatus ?? null;
   if (injuryStatus === "Questionable") {
@@ -162,6 +183,8 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     redZoneModifier,
     snapShareAvg,
     snapShareModifier,
+    recentQbRushAttemptsAvg,
+    qbRushModifier,
     targetShare: input.nflverse.targetShare,
     separation: input.nflverse.separation,
     finalScore,

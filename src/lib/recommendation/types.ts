@@ -53,6 +53,8 @@ export interface PlayerScoreBreakdown {
   redZoneModifier: number;
   snapShareAvg: number | null;
   snapShareModifier: number;
+  recentQbRushAttemptsAvg: number | null;
+  qbRushModifier: number;
   targetShare: number | null;
   separation: number | null;
   finalScore: number | null;

@@ -127,6 +127,15 @@ This is the most important section — the "brain" of the tool.
     WR-only close-call tiebreaker rather than a scoring factor — see
     "Backtesting & Tuning History" item 20 for why each was scoped the
     way it was.
+  - QB rushing attempts, as a second, separate additive term stacked
+    alongside (not blended into) the existing pass-attempts-only volume
+    signal (`QB_RUSH_BLEND_WEIGHT`/`POINTS_PER_QB_RUSH_ATTEMPT` in
+    `config.ts`) — added specifically to close a real 2024 out-of-sample
+    gap (rush-heavy QBs like Lamar Jackson/Jayden Daniels were
+    systematically undervalued). Deliberately tuned as a two-season
+    tradeoff rather than a clean win: every nonzero weight costs some
+    2025 accuracy in exchange for 2024 accuracy — see "Backtesting &
+    Tuning History" item 30 for the full sweep and why 0.3 was chosen.
   - [Add more factors here as they're decided]
 - When it's a close call statistically, say so. Don't force false
   confidence.
@@ -931,37 +940,119 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       second sample (see the "single-season" caveat at the top of this
       section) rather than chasing further on 2025 alone.
 
-### Open items (as of item 29 — pick up here)
-Everything through item 28 is committed (`git log` — "Add nflverse data
-source, wire three signals into the engine, and validate against 2024").
-Item 29 (the `hasLimitedData`-vs-`confident` investigation immediately
-above) is analysis only — it used a temporary diagnostic route that was
-deleted after producing its findings, so there is no code change to
-commit for it, just this write-up. Nothing below is started or fixed
+30. **Fixed (with a deliberate tradeoff) the QB-doesn't-generalize-to-
+    2024 problem flagged in item 24 and left open after items 25/26's two
+    failed attempts** — this time using a THIRD architecture: QB rushing
+    volume as its own separate additive term, mirroring exactly how RB's
+    red-zone touches (item 20) were stacked on top of the general volume
+    blend rather than merged into RB's touches count. Followed the same
+    process discipline as every other signal in this document: standalone
+    test first, then integrate only if it earns it, then sweep the
+    weight rather than guessing.
+    - **Step 1 — reconfirmed the standalone signal is genuinely
+      unstable, not different from item 26's finding**: re-ran the
+      existing `pickByQbRushingAttempts` baseline against both seasons
+      and got the identical numbers already on record — 46.8% (2025,
+      n=94, worse than chance), 63.0% (2024, n=100). Proceeded anyway,
+      since the whole point of this pass was testing whether the
+      *additive-term* architecture (rather than blending rush into the
+      existing pass-attempts number, item 25's rejected approach, or
+      trusting the standalone signal directly, item 26's rejected
+      approach) behaves differently from a single-number standalone
+      pick — flagged this instability honestly before proceeding rather
+      than treating it as a clean green light.
+    - **Step 2 — added `getQbRushAttemptStat` (`volume.ts`)**, separate
+      from `getVolumeStat`'s existing pass-attempts-only QB signal, and
+      a new additive term in `scorePlayer` (`engine.ts`): `runningScore
+      = blendedScore + matchupModifier + volumeModifier + redZoneModifier
+      + snapShareModifier`, then `finalScore = (1-w)*runningScore +
+      w*expectedPointsFromQbRush` where `expectedPointsFromQbRush =
+      recentQbRushAttemptsAvg * POINTS_PER_QB_RUSH_ATTEMPT`.
+      `POINTS_PER_QB_RUSH_ATTEMPT = 3.929` computed via the same
+      "ratio of sums" method as every other conversion factor (total QB
+      PPR points ÷ total QB rushing attempts across every played
+      QB game-week of the 2025 season) — cross-checked by recomputing
+      `POINTS_PER_VOLUME_UNIT.QB` the same way from the same data pull
+      and getting an identical 0.511, confirming the method is sound.
+      Rush attempts convert at ~7.7x the rate of pass attempts (3.929 vs.
+      0.511 pts/attempt) — rarer but disproportionately high-value
+      touches. New `PlayerScoreBreakdown` fields:
+      `recentQbRushAttemptsAvg`/`qbRushModifier` (`types.ts`).
+    - **Step 3 — swept `QB_RUSH_BLEND_WEIGHT` in 0.1 steps against BOTH
+      seasons' QB accuracy** (not just 2025, unlike every prior sweep in
+      this document — the explicit point of having 2024 data now):
+
+      | `w` | 2025 QB | 2024 QB |
+      |---|---|---|
+      | 0 (baseline) | 56.9% | 42.2% |
+      | 0.1 | 51.0% | 50.0% |
+      | 0.2 | 52.9% | 52.9% |
+      | 0.3 | 52.9% | 55.9% |
+      | 0.4 | 50.0% | 57.8% |
+      | 0.5 | 49.0% | 62.7% |
+      | 0.6 | 48.0% | 63.7% |
+      | 0.7 | 48.0% | **64.7% (peak)** |
+      | 0.8 | 47.1% | 63.7% |
+      | 0.9 | 47.1% | 63.7% |
+
+      **This curve has a fundamentally different shape than RB's
+      red-zone or TE's snap-share sweeps** — those were net wins on the
+      primary (2025) season at nearly every weight tested, so the sweep
+      was only about avoiding an overfit single-point peak. Here, *every
+      nonzero weight makes 2025 worse than the shipped baseline* — there
+      is no free win. It's a genuine seesaw: 2024 climbs steadily as 2025
+      falls, crossing near-equal around w=0.2-0.3, then 2025 keeps
+      sliding below chance (47-48%) at higher weights while 2024
+      plateaus around 63-65%.
+    - **Step 4 — this was flagged explicitly as a real tradeoff, not a
+      clean win, and put to the user rather than resolved unilaterally**
+      (unlike every prior weight choice in this document, which had an
+      unambiguous best point). Given the choice between not shipping
+      it, the balanced w=0.3 compromise, or the 2024-favoring w=0.7 peak,
+      **the user chose w=0.3** — a deliberate bet that cross-season
+      stability matters more than peak single-season accuracy, on the
+      explicit understanding it costs 2025 a real -4pp.
+    - **Result at w=0.3**: QB 52.9% (2025, down from 56.9%) / 55.9% (2024,
+      up from 42.2%) — both clearly above chance and roughly matched,
+      rather than one season strong and the other near/below chance.
+      **Overall engine accuracy**: 2025 57.05%→56.39% (-0.66pp), 2024
+      53.9%→56.18% (+2.28pp) — the two seasons now sit close together
+      (56.39% vs. 56.18%) at the whole-engine level too, not just QB.
+    - **Verified live end-to-end**, not just backtest: a real
+      `/api/compare` request (Lamar Jackson vs. Joe Burrow, 2025 season)
+      showed `qbRushModifier` firing in both directions as expected —
+      positive for Lamar (high rush-attempt rate, even off a
+      limited/3-game recent sample) and negative for Burrow (a
+      pass-only-attempts contributor, and his rushing volume converts to
+      fewer points than his existing running score) — with the new note
+      line ("Averaging X.X rushing attempts/game... worth roughly Y.Y
+      PPR points...") rendering correctly for both.
+    - **This resolves item 1 of the (now former) open-items list below**
+      with an explicit, documented tradeoff rather than a clean fix — the
+      QB volume/pass-attempts signal itself (`POINTS_PER_VOLUME_UNIT.QB`,
+      `VOLUME_BLEND_WEIGHT`) is untouched; the fix is a second, separate
+      additive term stacked alongside it.
+
+### Open items (as of item 30 — pick up here)
+Everything through item 29 is committed (`git log`). Item 30 (the QB
+rushing additive term immediately above) is implemented and verified but
+not yet committed as of this writing. Nothing below is started or fixed
 yet:
 
-1. **The QB volume signal still doesn't generalize to 2024** (42.2%,
-   worse than chance) — the single biggest open problem from this whole
-   investigation. Two fix attempts both failed: blending rushing
-   attempts into the existing pass-attempts signal regressed 2025 at
-   every weight tried (item 25, reverted); testing rushing attempts as
-   its own standalone signal flipped from 46.8% (2025) to 63% (2024) —
-   too unstable across two seasons to trust (item 26). `volume.ts`/
-   `config.ts` are back to pass-attempts-only, unchanged from before
-   this was discovered. No safe fix identified yet.
-2. **RB's 2024 drop (58.6%→52.4%) was never decomposed** — confirmed
+1. **RB's 2024 drop (58.6%→52.4%) was never decomposed** — confirmed
    real (red-zone data joins and the modifier fires correctly on 2024
    data), but *why* it dropped wasn't isolated the way the original
    weight sweep decomposed 2025's numbers (item 24).
-3. **`rushYoe` and `qbRushingAttempts` both swing hard between seasons**
-   (44.6%→59.8% and 46.8%→63% respectively) — both are NextGen-Stats-
-   derived rushing efficiency metrics, which may not be a coincidence,
-   but this was never investigated (item 26).
-4. **FTN charting** (play-level pressure/blitz/play-action/drops data)
+2. **`rushYoe` swings hard between seasons** (44.6%→59.8%) — a NextGen-
+   Stats-derived rushing efficiency metric; `qbRushingAttempts` (the
+   other signal that showed this same instability) is now addressed by
+   item 30's additive-term integration, but `rushYoe` itself was never
+   investigated further (item 26).
+3. **FTN charting** (play-level pressure/blitz/play-action/drops data)
    was flagged early as a third candidate signal family, deliberately
    deprioritized behind red-zone touches, and never picked back up
    (item 14). No code exists for it.
-5. **`/api/backtest/broad-nflverse` has no single-pair equivalent** —
+4. **`/api/backtest/broad-nflverse` has no single-pair equivalent** —
    only Broad mode works for 2024 (see item 24's design constraint);
    the Backtest page's "Single pair" mode is SportsDataIO/2025-only and
    the season toggle is correctly hidden outside Broad mode. Not a bug,

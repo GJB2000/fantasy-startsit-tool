@@ -27,3 +27,13 @@ export function getVolumeStat(row: PlayerGameStat): number | null {
       return null;
   }
 }
+
+/**
+ * QB rushing attempts only, kept separate from getVolumeStat's
+ * pass-attempts-only QB signal so it can be scored as its own additive
+ * term (see QB_RUSH_BLEND_WEIGHT in config.ts) rather than blended into
+ * the already-validated pass-attempts number — see CLAUDE.md item 30.
+ */
+export function getQbRushAttemptStat(row: PlayerGameStat): number | null {
+  return row.Position === "QB" ? row.RushingAttempts : null;
+}
