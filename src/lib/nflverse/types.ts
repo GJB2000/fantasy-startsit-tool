@@ -59,4 +59,7 @@ export interface RedZoneTouchRow {
   playerDisplayName: string;
   redZoneRushAttempts: number;
   redZoneTargets: number;
+  /** Same shape, tighter yardline_100<=5 cutoff — see playByPlay.ts. */
+  goalLineRushAttempts: number;
+  goalLineTargets: number;
 }

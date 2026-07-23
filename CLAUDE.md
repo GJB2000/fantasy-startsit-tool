@@ -1033,6 +1033,90 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       `VOLUME_BLEND_WEIGHT`) is untouched; the fix is a second, separate
       additive term stacked alongside it.
 
+30a. **Follow-up: confirmed item 30's w=0.3 choice against naive
+    baselines (not just chance), and tested two more targeted variants
+    of the same signal before settling on w=0.3 as final.**
+    - **Baseline check first**: re-ran the full baseline suite (QB-only,
+      both seasons) to confirm the fixed engine still beats simple naive
+      rules, not just a coin flip. **2024: confirmed** — engine 55.9% vs.
+      seasonAvg 52.9% (+3.0pp) and recentVolume 49.5% (+6.4pp). **2025:
+      did not hold up as cleanly** — the engine now exactly *ties*
+      seasonAvg (52.9%=52.9%, identical correct/incorrect counts) and is
+      clearly *beaten* by the plain recentVolume baseline (57.0% vs.
+      52.9%, a 4.1pp loss). Worth noting this wasn't purely introduced by
+      the rush term: even pre-fix, the old engine's 2025 QB accuracy
+      (56.9%) was already a near-tie with recentVolume's 57.0% — the
+      w=0.3 change turned a rounding-distance gap into a real, visible
+      one. Flagged honestly rather than glossed over, since it's a real
+      cost of the item 30 tradeoff.
+    - **Tested a red-zone-only variant** (yardline_100<=20, mirroring
+      RB's existing red-zone touches exactly) as a "cleaner" alternative
+      to total rush attempts — standalone via the existing
+      `redZoneTouches` baseline (already handles QB as a first-class
+      rush-only branch, so no new code was needed to check this).
+      **Result: 49.5% (2025, n=91) / 63.0% (2024, n=92)** — nearly
+      identical to total attempts' 46.8%/63.0%. Not a cleaner signal:
+      the same QBs who rush a lot in general are largely the same ones
+      who get more red-zone rushes, so narrowing to the red zone doesn't
+      isolate a meaningfully different group or fix the instability.
+      Not pursued further.
+    - **Tested a goal-line-only variant** (yardline_100<=5, a new,
+      tighter cutoff computed alongside the existing red-zone stat in
+      the same play-by-play pass — see `playByPlay.ts`'s
+      `goalLineRushAttempts`/`goalLineTargets`, threaded through
+      `weekTable.ts`/`aggregate.ts`'s new `averageGoalLineTouches` and
+      wired into both `buildInput.ts` (live) and `buildBacktestInput.ts`
+      the same way red-zone touches already are). **Standalone result:
+      53.3% (2025, n=75) / 52.7% (2024, n=74)** — genuinely different
+      from the other two variants: stable and consistent across seasons
+      instead of swinging 46-49%→63%. Cleared the "shows promise" bar,
+      so it was integrated as a real additive term
+      (`POINTS_PER_QB_GOAL_LINE_RUSH=64.543` — note the much larger
+      conversion factor than red zone's 4.797 or total attempts' 3.929,
+      simply because goal-line rush attempts are rare: only 138 total
+      across every QB, every week, of the 2025 season — same "ratio of
+      sums" numerator over a much smaller denominator) and swept against
+      both seasons in fine (0.01-0.05) steps given the larger factor's
+      likely sensitivity.
+      - **Found a real "both seasons improve" region** (roughly
+        w=0.08-0.22) — something neither total attempts nor red-zone-
+        only ever produced: e.g. w=0.2 gave 57.8% (2025, +0.9pp over
+        baseline) / 50.0% (2024, +7.8pp over baseline), no season worse
+        off. But the movement was jagged and step-like (accuracy jumping
+        in 1-2pp increments at specific weights — e.g. 2024 sat flat at
+        43.1% for w=0.08-0.12 then jumped straight to 48-50% by
+        w=0.18-0.2), consistent with a signal thin enough that each step
+        is really just 1-2 individual pairs flipping, not a smooth
+        trend. Its best 2024 result anywhere in the sweep (52.0% at
+        w=0.25) barely clears a coin flip — nowhere near the 55.9-64.7%
+        the noisier signals reached.
+      - **Deliberately NOT shipped** despite the appealing "no tradeoff"
+        headline number: 138 total plays across a full season is too
+        thin a foundation to trust over a signal backed by a much larger
+        sample (total attempts: 2267), and the modest ceiling means it
+        wouldn't meaningfully close the 2024 gap even if the exact peak
+        held up. Code is complete and live-wired (not just backtest) but
+        gated off via `QB_GOAL_LINE_BLEND_WEIGHT=0` — kept in place
+        rather than deleted so this doesn't need re-deriving from
+        scratch if revisited once a third season of data exists.
+    - **Re-examined whether a more conservative total-attempts weight
+      (0.15-0.2, i.e. a smaller tradeoff than 0.3) would preserve more of
+      2025** — the direct, obvious next idea after the goal-line variant
+      didn't pan out. **It doesn't hold up**: 2025's cost isn't smooth
+      as weight increases — it dips to 51.0% around w=0.1-0.15, then
+      recovers to a flat 52.9% plateau from w=0.18 through w=0.3. Within
+      that plateau, **2025's cost is identical at every point (52.9%),
+      but 2024 keeps improving all the way to w=0.3** (52.0%→52.9%→
+      55.9% across w=0.18→0.2→0.3). So w=0.2 doesn't actually preserve
+      more of 2025 than w=0.3 — it pays the same 2025 cost for a smaller
+      2024 payoff. **w=0.3 is Pareto-best within this family**, not an
+      arbitrary pick to be second-guessed down — confirmed this rather
+      than assumed it.
+    - **Final decision: kept `QB_RUSH_BLEND_WEIGHT=0.3`** (total
+      attempts), unchanged from item 30. Both alternate variants tested
+      here (red-zone-only, goal-line-only) are documented, implemented,
+      and deliberately not activated.
+
 ### Open items (as of item 30 — pick up here)
 Everything through item 29 is committed (`git log`). Item 30 (the QB
 rushing additive term immediately above) is implemented and verified but

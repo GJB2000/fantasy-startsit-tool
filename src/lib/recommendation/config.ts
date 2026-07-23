@@ -153,3 +153,40 @@ export const POINTS_PER_QB_RUSH_ATTEMPT = 3.929;
  * full two-season sweep table and the tradeoff this represents.
  */
 export const QB_RUSH_BLEND_WEIGHT = 0.3;
+
+/**
+ * Empirically-derived PPR points per QB goal-line rush attempt
+ * (yardline_100<=5, vs. red zone's <=20 — same "ratio of sums" method:
+ * total QB PPR points ÷ total QB goal-line rush attempts across every
+ * played QB game-week of the 2025 season). Much larger than the red-
+ * zone/total-attempt factors (64.5 vs. 4.797/3.929) simply because
+ * goal-line rush attempts are rare (138 total across the entire 2025
+ * season, all QBs) — same numerator, much smaller denominator. Tested
+ * as a candidate replacement for QB_RUSH_BLEND_WEIGHT/
+ * POINTS_PER_QB_RUSH_ATTEMPT above after that signal (and the red-zone-
+ * only variant, <=20) both showed unstable cross-season standalone
+ * accuracy (46.8%→63% and 49.5%→63%); this one was notably *stable*
+ * standalone (53.3% 2025, 52.7% 2024). Ultimately NOT shipped
+ * (QB_GOAL_LINE_BLEND_WEIGHT below stays at 0) despite finding a real
+ * "both seasons improve" region (w~0.08-0.22) — the underlying signal is
+ * too thin (138 total plays across the whole 2025 season) to trust,
+ * and its best 2024 result only reaches a bare coin flip (52%), nowhere
+ * near fixing the gap. Kept as a documented, deliberately-rejected
+ * finding — see CLAUDE.md item 30 follow-up for the full sweep.
+ */
+export const POINTS_PER_QB_GOAL_LINE_RUSH = 64.543;
+
+/**
+ * How much weight QB goal-line rush attempts (converted to points via
+ * POINTS_PER_QB_GOAL_LINE_RUSH) carry against the running QB score
+ * (post-volume-blend, stacked alongside QB_RUSH_BLEND_WEIGHT's term).
+ * Kept at 0 (no-op) — deliberately not shipped despite a promising
+ * standalone/sweep result, since the underlying signal is too thin
+ * (138 plays across all of 2025) to trust over a total-attempts signal
+ * that, while a bigger tradeoff, is at least backed by a much larger
+ * sample (2267 attempts). Code kept in place, documented, and gated
+ * off rather than deleted, so this isn't re-discovered from scratch if
+ * revisited with a future season's data. See CLAUDE.md item 30
+ * follow-up for the full two-season sweep.
+ */
+export const QB_GOAL_LINE_BLEND_WEIGHT = 0;

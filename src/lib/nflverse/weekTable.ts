@@ -24,6 +24,9 @@ export interface NflverseWeekStat {
   /** Real zeros are meaningful here (played, zero red-zone touches) — see playByPlay.ts. Left null only when the player has no PlayerGameStat row for that week at all. */
   redZoneRushAttempts: number | null;
   redZoneTargets: number | null;
+  /** Same shape, tighter yardline_100<=5 cutoff — see playByPlay.ts. */
+  goalLineRushAttempts: number | null;
+  goalLineTargets: number | null;
 }
 
 export interface NflverseSourceRows {
@@ -69,6 +72,8 @@ export function buildNflversePlayerWeekTable(
         injuryStatus: null,
         redZoneRushAttempts: null,
         redZoneTargets: null,
+        goalLineRushAttempts: null,
+        goalLineTargets: null,
       };
       byWeek.set(week, stat);
     }
@@ -127,6 +132,8 @@ export function buildNflversePlayerWeekTable(
     const stat = getOrCreate(playerId, row.week);
     stat.redZoneRushAttempts = row.redZoneRushAttempts;
     stat.redZoneTargets = row.redZoneTargets;
+    stat.goalLineRushAttempts = row.goalLineRushAttempts;
+    stat.goalLineTargets = row.goalLineTargets;
   }
 
   return table;

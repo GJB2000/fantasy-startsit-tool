@@ -4,6 +4,7 @@ import type { RedZoneTouchRow } from "./types";
 
 const REVALIDATE_SECONDS = 24 * 60 * 60;
 const RED_ZONE_YARDLINE = 20;
+const GOAL_LINE_YARDLINE = 5;
 
 // pbp has ~192 columns; this is every one actually read below. Passed to
 // fetchNflverseCsv so the other ~184 are never retained in the 24h cache
@@ -30,6 +31,11 @@ const PBP_COLUMNS = [
  * name via the `players` crosswalk release before returning, so the
  * caller can join it the same way as every other nflverse source (by
  * normalized name — see playerMatch.ts).
+ *
+ * Also tracks a tighter goal-line cutoff (yardline_100<=5) in the same
+ * pass, tested as a candidate QB-rushing signal — see CLAUDE.md item 30
+ * follow-up. Every goal-line play is a subset of the red-zone plays
+ * above, so both are computed from the same row without a second parse.
  */
 export async function getRedZoneTouches(season: number): Promise<RedZoneTouchRow[]> {
   const [rows, gsisIdToName] = await Promise.all([
@@ -39,35 +45,46 @@ export async function getRedZoneTouches(season: number): Promise<RedZoneTouchRow
 
   const totals = new Map<string, RedZoneTouchRow>();
 
-  function add(gsisId: string, week: number, field: "redZoneRushAttempts" | "redZoneTargets") {
+  function getOrCreate(gsisId: string, week: number): RedZoneTouchRow | null {
     const name = gsisIdToName.get(gsisId);
-    if (!name) return;
+    if (!name) return null;
     const key = `${gsisId}/${week}`;
-    const existing = totals.get(key);
-    if (existing) {
-      existing[field] += 1;
-    } else {
-      totals.set(key, {
+    let existing = totals.get(key);
+    if (!existing) {
+      existing = {
         season,
         week,
         playerDisplayName: name,
-        redZoneRushAttempts: field === "redZoneRushAttempts" ? 1 : 0,
-        redZoneTargets: field === "redZoneTargets" ? 1 : 0,
-      });
+        redZoneRushAttempts: 0,
+        redZoneTargets: 0,
+        goalLineRushAttempts: 0,
+        goalLineTargets: 0,
+      };
+      totals.set(key, existing);
     }
+    return existing;
   }
 
   for (const row of rows) {
     if (row.season_type !== "REG" || Number(row.season) !== season) continue;
     const yardline = Number(row.yardline_100);
     if (!Number.isFinite(yardline) || yardline > RED_ZONE_YARDLINE) continue;
+    const isGoalLine = yardline <= GOAL_LINE_YARDLINE;
 
     const week = Number(row.week);
     if (row.rush_attempt === "1" && row.rusher_player_id) {
-      add(row.rusher_player_id, week, "redZoneRushAttempts");
+      const stat = getOrCreate(row.rusher_player_id, week);
+      if (stat) {
+        stat.redZoneRushAttempts += 1;
+        if (isGoalLine) stat.goalLineRushAttempts += 1;
+      }
     }
     if (row.pass_attempt === "1" && row.receiver_player_id) {
-      add(row.receiver_player_id, week, "redZoneTargets");
+      const stat = getOrCreate(row.receiver_player_id, week);
+      if (stat) {
+        stat.redZoneTargets += 1;
+        if (isGoalLine) stat.goalLineTargets += 1;
+      }
     }
   }
 

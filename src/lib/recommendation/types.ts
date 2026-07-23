@@ -16,6 +16,8 @@ export interface NflverseSignals {
   targetShare: number | null;
   separation: number | null;
   redZoneTouches: number | null;
+  /** Tighter yardline_100<=5 cutoff, QB-rushing candidate signal — see CLAUDE.md item 30 follow-up. */
+  goalLineTouches: number | null;
 }
 
 export const EMPTY_NFLVERSE_SIGNALS: NflverseSignals = {
@@ -23,6 +25,7 @@ export const EMPTY_NFLVERSE_SIGNALS: NflverseSignals = {
   targetShare: null,
   separation: null,
   redZoneTouches: null,
+  goalLineTouches: null,
 };
 
 export interface PlayerComparisonInput {
@@ -55,6 +58,8 @@ export interface PlayerScoreBreakdown {
   snapShareModifier: number;
   recentQbRushAttemptsAvg: number | null;
   qbRushModifier: number;
+  goalLineTouchesAvg: number | null;
+  qbGoalLineModifier: number;
   targetShare: number | null;
   separation: number | null;
   finalScore: number | null;

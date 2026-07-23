@@ -18,7 +18,8 @@ export type BaselineId =
   | "receivingComposite"
   | "injuryStatus"
   | "redZoneTouches"
-  | "qbRushingAttempts";
+  | "qbRushingAttempts"
+  | "goalLineTouches";
 
 export const BASELINE_LABELS: Record<BaselineId, string> = {
   priorWeek: "Prior week's points",
@@ -37,6 +38,7 @@ export const BASELINE_LABELS: Record<BaselineId, string> = {
   injuryStatus: "Avoid the more injured player (nflverse weekly injury report)",
   redZoneTouches: "Red zone touches (rush attempts + targets inside the 20, nflverse play-by-play)",
   qbRushingAttempts: "Recent rushing attempts (QB only)",
+  goalLineTouches: "Goal line touches (rush attempts + targets inside the 5, nflverse play-by-play)",
 };
 
 function average(values: number[]): number {
@@ -274,6 +276,35 @@ export function pickByRedZoneTouches(weekSlice: BacktestWeekSlice, playerIds: [n
 }
 
 /**
+ * Same shape as pickByRedZoneTouches, tighter yardline_100<=5 cutoff —
+ * tests whether a stricter "goal line" definition is a cleaner QB-
+ * rushing signal than the full red zone (<=20) or total rush attempts,
+ * both of which showed unstable cross-season accuracy. See CLAUDE.md
+ * item 30 follow-up.
+ */
+export function pickByGoalLineTouches(weekSlice: BacktestWeekSlice, playerIds: [number, number]): number | null {
+  const avgs = playerIds.map((id) => {
+    const games = weekSlice.recentGamesByPlayer(id);
+    if (games.length === 0) return null;
+    const position = games.at(-1)!.Position;
+    const values = games
+      .map((game) => {
+        const stat = weekSlice.nflverseStatForWeek(id, game.Week);
+        const rush = stat?.goalLineRushAttempts ?? 0;
+        const targets = stat?.goalLineTargets ?? 0;
+        if (position === "RB") return rush + targets;
+        if (position === "QB") return rush;
+        if (position === "WR" || position === "TE") return targets;
+        return null;
+      })
+      .filter((v): v is number => v != null);
+    return values.length > 0 ? average(values) : null;
+  });
+  if (avgs[0] == null || avgs[1] == null || avgs[0] === avgs[1]) return null;
+  return avgs[0] > avgs[1] ? playerIds[0] : playerIds[1];
+}
+
+/**
  * Naive baseline: pick whoever has averaged more recent rushing
  * attempts — QB only. Tests rushing volume as its own, standalone
  * signal, distinct from `pickByRecentVolume` (pass attempts only for
@@ -317,4 +348,5 @@ export const BASELINE_PICKERS: Record<
   injuryStatus: pickByInjuryStatus,
   redZoneTouches: pickByRedZoneTouches,
   qbRushingAttempts: pickByQbRushingAttempts,
+  goalLineTouches: pickByGoalLineTouches,
 };

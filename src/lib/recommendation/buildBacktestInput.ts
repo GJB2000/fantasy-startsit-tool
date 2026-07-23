@@ -1,4 +1,10 @@
-import { averageRedZoneTouches, averageSeparation, averageSnapShare, averageTargetShare } from "@/lib/nflverse/aggregate";
+import {
+  averageGoalLineTouches,
+  averageRedZoneTouches,
+  averageSeparation,
+  averageSnapShare,
+  averageTargetShare,
+} from "@/lib/nflverse/aggregate";
 import { getMatchupContext } from "@/lib/sportsdata/positionDefense";
 import { isSkillPosition, type Player } from "@/lib/sportsdata/types";
 import type { BacktestWeekSlice } from "@/lib/backtest/weekData";
@@ -77,6 +83,11 @@ export function buildBacktestComparisonInput(
     targetShare: averageTargetShare(recentNflverseStats),
     separation: averageSeparation(recentNflverseStats),
     redZoneTouches: averageRedZoneTouches(
+      recentGames,
+      (week) => weekSlice.nflverseStatForWeek(playerId, week),
+      position
+    ),
+    goalLineTouches: averageGoalLineTouches(
       recentGames,
       (week) => weekSlice.nflverseStatForWeek(playerId, week),
       position

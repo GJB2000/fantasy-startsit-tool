@@ -3,10 +3,12 @@ import {
   CLOSE_CALL_RELATIVE_PCT,
   MATCHUP_MODIFIER_CAP,
   MATCHUP_MODIFIER_SCALE,
+  POINTS_PER_QB_GOAL_LINE_RUSH,
   POINTS_PER_QB_RUSH_ATTEMPT,
   POINTS_PER_REDZONE_TOUCH_RB,
   POINTS_PER_SNAP_SHARE_UNIT_TE,
   POINTS_PER_VOLUME_UNIT,
+  QB_GOAL_LINE_BLEND_WEIGHT,
   QB_RUSH_BLEND_WEIGHT,
   RECENT_WEEK_COUNT,
   RECENT_WEIGHT_BASE,
@@ -148,10 +150,30 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     }
   }
 
+  let qbGoalLineModifier = 0;
+  const goalLineTouchesAvg = input.nflverse.goalLineTouches;
+  if (blendedScore != null && position === "QB" && goalLineTouchesAvg != null) {
+    const runningScore =
+      blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier + qbRushModifier;
+    const expectedPointsFromGoalLine = goalLineTouchesAvg * POINTS_PER_QB_GOAL_LINE_RUSH;
+    const blendedWithGoalLine =
+      (1 - QB_GOAL_LINE_BLEND_WEIGHT) * runningScore + QB_GOAL_LINE_BLEND_WEIGHT * expectedPointsFromGoalLine;
+    qbGoalLineModifier = blendedWithGoalLine - runningScore;
+    notes.push(
+      `Averaging ${goalLineTouchesAvg.toFixed(2)} goal-line rush attempts/game recently — worth roughly ${expectedPointsFromGoalLine.toFixed(1)} PPR points at this position's typical rate.`
+    );
+  }
+
   const finalScore =
     blendedScore == null
       ? null
-      : blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier + qbRushModifier;
+      : blendedScore +
+        matchupModifier +
+        volumeModifier +
+        redZoneModifier +
+        snapShareModifier +
+        qbRushModifier +
+        qbGoalLineModifier;
 
   const injuryStatus = input.player?.InjuryStatus ?? null;
   if (injuryStatus === "Questionable") {
@@ -185,6 +207,8 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     snapShareModifier,
     recentQbRushAttemptsAvg,
     qbRushModifier,
+    goalLineTouchesAvg,
+    qbGoalLineModifier,
     targetShare: input.nflverse.targetShare,
     separation: input.nflverse.separation,
     finalScore,

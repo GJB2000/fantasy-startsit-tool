@@ -55,3 +55,31 @@ export function averageRedZoneTouches(
 
   return values.length > 0 ? average(values) : null;
 }
+
+/**
+ * Same shape as averageRedZoneTouches, tighter yardline_100<=5 cutoff —
+ * tested standalone as a candidate QB-rushing signal (see CLAUDE.md
+ * item 30 follow-up) before deciding whether it's worth wiring into the
+ * engine.
+ */
+export function averageGoalLineTouches(
+  games: PlayerGameStat[],
+  statForWeek: (week: number) => NflverseWeekStat | undefined,
+  position: string | null
+): number | null {
+  if (games.length === 0) return null;
+
+  const values = games
+    .map((game) => {
+      const stat = statForWeek(game.Week);
+      const rush = stat?.goalLineRushAttempts ?? 0;
+      const targets = stat?.goalLineTargets ?? 0;
+      if (position === "RB") return rush + targets;
+      if (position === "QB") return rush;
+      if (position === "WR" || position === "TE") return targets;
+      return null;
+    })
+    .filter((v): v is number => v != null);
+
+  return values.length > 0 ? average(values) : null;
+}

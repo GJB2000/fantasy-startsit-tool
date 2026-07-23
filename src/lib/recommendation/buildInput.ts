@@ -1,4 +1,10 @@
-import { averageRedZoneTouches, averageSeparation, averageSnapShare, averageTargetShare } from "@/lib/nflverse/aggregate";
+import {
+  averageGoalLineTouches,
+  averageRedZoneTouches,
+  averageSeparation,
+  averageSnapShare,
+  averageTargetShare,
+} from "@/lib/nflverse/aggregate";
 import { getByeWeekForTeam } from "@/lib/sportsdata/byes";
 import { getActivePlayerById, getAnyPlayerById } from "@/lib/sportsdata/players";
 import { getMatchupContext, type PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
@@ -60,6 +66,7 @@ export async function buildComparisonInput(
     targetShare: averageTargetShare(recentNflverseStats),
     separation: averageSeparation(recentNflverseStats),
     redZoneTouches: averageRedZoneTouches(recentGames, (week) => byWeek?.get(week), player.Position),
+    goalLineTouches: averageGoalLineTouches(recentGames, (week) => byWeek?.get(week), player.Position),
   };
 
   return {
