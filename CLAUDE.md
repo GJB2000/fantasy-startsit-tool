@@ -47,6 +47,28 @@ K/DEF positions, upcoming-schedule/next-opponent lookup (matchup
 difficulty is computed against each player's most recent completed
 opponent, not a hypothetical future one), multi-season history.
 
+**Candidate future improvement: next-opponent lookup for live matchup
+context.** The live tool's matchup modifier currently looks up each
+player's *last completed* opponent (see above) — for a "who should I
+start this week" tool, it arguably should look up their *next
+scheduled* opponent instead. This is a smaller, more contained fix than
+it might sound: the recent-form engine (PPR average, volume, red-zone
+touches, EPA, etc.) wouldn't need to change at all, since it's entirely
+about how a player has been performing recently — only the matchup
+modifier's opponent identification would need a schedule lookup
+(SportsDataIO likely has a `/Schedules` endpoint for this; not yet
+confirmed live). Backtest mode is arguably unaffected/already correct
+here, since it grades against the target week's real, already-known
+historical opponent. Two real constraints on pursuing this: (1) it
+can't be tested against the *live* tool outside the NFL season, since
+there's no "next game" to look up during the offseason (verify against
+backtest data instead, or wait for the 2026 season to start); (2)
+weather (wind specifically has real, well-documented fantasy effects —
+more than rain or cold) would be a natural signal to pair with this,
+but only becomes relevant once the tool actually knows which upcoming
+game a player is playing in — it doesn't fit the current last-opponent
+architecture at all.
+
 ## Data Source Notes
 - Football data comes from the SportsDataIO NFL API (Discovery Lab /
   free tier). API key is stored as the `SPORTSDATA_API_KEY` environment
@@ -1293,12 +1315,75 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       item, not a tradeoff at the whole-engine level (the WR drop-rate
       tradeoff and the RB EPA gain move in the same net-positive
       direction once combined).
+34. **Tested weather (wind) as a candidate signal — a genuinely new data
+    source, not another cut of nflverse's existing releases.** Motivated
+    by a design discussion about forward-looking next-opponent lookups
+    (see the Overview's "Candidate future improvement" note) — weather
+    only matters once the tool knows which specific game a player is
+    about to play in, which the live tool doesn't do yet, so this was
+    scoped as a pure backtest investigation (both seasons already have
+    known, played games) rather than something to wire into the live
+    engine regardless of outcome.
+    - **Confirmed nflverse's `schedules` release (`games.csv`) has real
+      per-game `roof`/`temp`/`wind` data**, covering both backtest
+      seasons. Found and fixed a real team-code mismatch before trusting
+      any numbers: SportsDataIO's 2025 pipeline uses `LAR` for the Rams,
+      nflverse's schedule uses `LA` — silently produced zero decidable
+      pairs for any Rams player until caught and normalized.
+    - **Checked sample size before testing anything** (the explicit
+      lesson from the goal-line rushing follow-up): at the wind
+      threshold most people would call genuinely "windy" (≥15mph),
+      decidable pairs (one player's team in a high-wind outdoor game,
+      the other's team in a calm/indoor one) drop to single digits for
+      QB (7-10) and low-teens for TE (9-13) — thinner than the
+      already-rejected goal-line signal (75-92 pairs). A looser ≥10mph
+      cutoff gives a healthier sample (25-53 pairs depending on
+      position) but is barely above the season-average wind speed
+      (7.9mph) — not "windy" in the intuitive sense.
+    - **Standalone results ("avoid the high-wind player"), by position
+      and threshold (2025/2024):**
 
-### Open items (as of item 33 — pick up here)
+      | position | wind≥10mph | wind≥12mph | wind≥15mph |
+      |---|---|---|---|
+      | QB | 53.3% / 54.5% (n=30/33) | 50.0% / 60.9% (n=22/23) | 70.0% / 42.9% (n=10/7) |
+      | RB | 53.1% / 47.2% (n=49/53) | 51.3% / 46.2% (n=40/39) | 47.8% / 43.8% (n=24/16) |
+      | WR | 58.8% / 60.0% (n=51/50) | 59.5% / 52.6% (n=37/39) | 68.2% / 42.9% (n=22/15) |
+      | TE | 36.0% / 38.2% (n=25/34) | 31.8% / 39.1% (n=22/23) | 44.4% / 44.4% (n=13/9) |
+
+    - **WR is the one real, if imperfect, finding — and it perfectly
+      illustrates the sample-size lesson from goal-line rushing.** At
+      the statistically trustworthy ≥10mph threshold, WR is genuinely
+      stable and positive in both seasons (58.8%/60.0%, n=50-51) — one
+      of the more convincing "both seasons agree" results in this whole
+      document. But push to the ≥15mph threshold that actually matches
+      the football intuition ("real wind hurts the passing game"), and
+      it flips hard (68.2%→42.9%, below chance) on a sample of just
+      15-22 — the identical instability pattern that sank the goal-line
+      signal. The two thresholds can't both be right: the trustworthy
+      number is barely above average wind (not dramatically "windy"),
+      and the intuitive number doesn't have enough games to trust.
+    - **RB shows no signal at any threshold** (44-53%, essentially
+      chance) — a sensible, confirming negative result rather than a
+      concerning one, since wind shouldn't meaningfully affect the
+      running game. **QB is weak and inconsistent** across thresholds.
+      **TE is backwards** (consistently below chance at the two
+      trustworthy thresholds) and small-sample, consistent with TE's
+      history as the noisiest position throughout this document.
+    - **Not integrated — closed as a documented standalone finding.**
+      No clean, both-trustworthy-and-intuitive result exists for any
+      position, so this doesn't clear the bar that RB EPA-per-rush or
+      even WR drop rate cleared in item 33. Diagnostic route was
+      temporary and has been deleted; the numbers above are the only
+      lasting artifact, same discipline as items 22/29.
+
+### Open items (as of item 34 — pick up here)
 Everything through item 30 is committed (`git log`). Items 31-33 (the
 EPA/success-rate audit, FTN Charting audit, and this integration pass)
 are implemented and verified but not yet committed as of this writing.
-Nothing below is started or fixed yet:
+Item 34 (weather) is analysis only — same as item 29, it used a
+temporary diagnostic route that was deleted after producing its
+findings, so there is no code change to commit for it, just this
+write-up. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
