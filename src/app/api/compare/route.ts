@@ -2,6 +2,12 @@ import { getPositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { buildComparisonInput } from "@/lib/recommendation/buildInput";
 import { comparePlayers } from "@/lib/recommendation/engine";
+import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
+
+// A cold nflverse cache means aggregating the full play-by-play release
+// for red-zone touches (~5-7s) on top of everything else this route
+// already does — same 30s margin the backtest routes use.
+export const maxDuration = 30;
 
 export async function GET(request: Request) {
   const idsParam = new URL(request.url).searchParams.get("ids") ?? "";
@@ -19,13 +25,13 @@ export async function GET(request: Request) {
 
   try {
     const context = await getSeasonContext();
-    const positionDefenseTable = await getPositionDefenseTable(
-      context.lastCompletedApiSeason,
-      context.lastCompletedWeek
-    );
+    const [positionDefenseTable, nflversePlayerWeekTable] = await Promise.all([
+      getPositionDefenseTable(context.lastCompletedApiSeason, context.lastCompletedWeek),
+      getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
+    ]);
 
     const inputs = await Promise.all(
-      ids.map((id) => buildComparisonInput(id, context, positionDefenseTable))
+      ids.map((id) => buildComparisonInput(id, context, positionDefenseTable, nflversePlayerWeekTable))
     );
 
     const result = comparePlayers(inputs);

@@ -1,3 +1,4 @@
+import type { NflverseWeekStat } from "@/lib/nflverse/weekTable";
 import { buildPositionDefenseTableFromRows, type PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { buildSeasonToDatePlayerStatsFromRows } from "@/lib/sportsdata/seasonToDatePlayerStats";
 import { buildTeamPaceTableFromRows, type TeamPace } from "@/lib/sportsdata/teamGameStats";
@@ -10,6 +11,9 @@ export interface BacktestWeekSlice {
   seasonToDateTable: Map<number, PlayerSeasonStat>;
   teamPaceTable: Map<string, TeamPace>;
   recentGamesByPlayer: (playerId: number) => PlayerGameStat[];
+  recentNflverseByPlayer: (playerId: number) => NflverseWeekStat[];
+  /** Direct (non-averaged) lookup for a specific week — for facts like injury status that are current-week, not a trailing usage tendency to average over. */
+  nflverseStatForWeek: (playerId: number, week: number) => NflverseWeekStat | undefined;
 }
 
 /**
@@ -26,7 +30,8 @@ export function sliceWeekData(
   allWeeklyRows: PlayerGameStat[][],
   targetWeek: number,
   recentWeekCount: number,
-  allTeamWeeklyRows: TeamGameStat[][] = []
+  allTeamWeeklyRows: TeamGameStat[][] = [],
+  nflversePlayerWeekTable: Map<number, Map<number, NflverseWeekStat>> = new Map()
 ): BacktestWeekSlice {
   const priorRows = allWeeklyRows.slice(0, targetWeek - 1); // weeks 1..targetWeek-1
   const targetWeekRows = allWeeklyRows[targetWeek - 1] ?? [];
@@ -46,6 +51,21 @@ export function sliceWeekData(
       .sort((a, b) => a.Week - b.Week);
   }
 
+  function recentNflverseByPlayer(playerId: number): NflverseWeekStat[] {
+    const byWeek = nflversePlayerWeekTable.get(playerId);
+    if (!byWeek) return [];
+    const result: NflverseWeekStat[] = [];
+    for (let week = recentStart; week < targetWeek; week++) {
+      const stat = byWeek.get(week);
+      if (stat) result.push(stat);
+    }
+    return result.sort((a, b) => a.week - b.week);
+  }
+
+  function nflverseStatForWeek(playerId: number, week: number): NflverseWeekStat | undefined {
+    return nflversePlayerWeekTable.get(playerId)?.get(week);
+  }
+
   return {
     targetWeek,
     targetWeekRows,
@@ -53,5 +73,7 @@ export function sliceWeekData(
     seasonToDateTable,
     teamPaceTable,
     recentGamesByPlayer,
+    recentNflverseByPlayer,
+    nflverseStatForWeek,
   };
 }

@@ -1,3 +1,10 @@
+import { getInjuryReports } from "@/lib/nflverse/injuries";
+import { getNgsPassing, getNgsReceiving, getNgsRushing } from "@/lib/nflverse/nextGenStats";
+import { getRedZoneTouches } from "@/lib/nflverse/playByPlay";
+import { buildSdioPlayerIdByNormalizedName } from "@/lib/nflverse/playerMatch";
+import { getPlayerWeekStats } from "@/lib/nflverse/playerStats";
+import { getSnapCounts } from "@/lib/nflverse/snapCounts";
+import { buildNflversePlayerWeekTable, type NflverseWeekStat } from "@/lib/nflverse/weekTable";
 import { getByes } from "@/lib/sportsdata/byes";
 import { getAllPlayers } from "@/lib/sportsdata/players";
 import { getTeamGameStatsByWeek } from "@/lib/sportsdata/teamGameStats";
@@ -13,6 +20,8 @@ export interface BacktestRunData {
   allTeamWeeklyRows: TeamGameStat[][];
   byesByTeam: Map<string, number>;
   allPlayers: Player[];
+  /** PlayerID -> week -> snap share/target share/air yards share/NextGen Stats/injury status/red zone touches, joined from nflverse by name (see lib/nflverse/). */
+  nflversePlayerWeekTable: Map<number, Map<number, NflverseWeekStat>>;
 }
 
 /**
@@ -32,14 +41,64 @@ export async function loadBacktestRunData(
 ): Promise<BacktestRunData> {
   const weeks = Array.from({ length: maxWeek }, (_, i) => i + 1);
 
-  const [allWeeklyRows, allTeamWeeklyRows, byes, allPlayers] = await Promise.all([
+  // nflverse is an external, third-party data source (unlike SportsDataIO,
+  // the project's primary source) being trialed for these signals — a fetch
+  // failure there shouldn't take down the whole backtest, just leave the
+  // new nflverse-backed baselines with no data (they'll report no_pick).
+  function loadNflverse<T>(label: string, load: () => Promise<T[]>): Promise<T[]> {
+    return load().catch((err) => {
+      console.error(`Failed to load nflverse ${label}:`, err);
+      return [];
+    });
+  }
+
+  const [
+    allWeeklyRows,
+    allTeamWeeklyRows,
+    byes,
+    allPlayers,
+    snapCounts,
+    playerWeekStats,
+    ngsPassing,
+    ngsReceiving,
+    ngsRushing,
+    injuryReports,
+    redZoneTouches,
+  ] = await Promise.all([
     Promise.all(weeks.map((week) => getPlayerGameStatsByWeek(apiSeason, week))),
     Promise.all(weeks.map((week) => getTeamGameStatsByWeek(apiSeason, week))),
     getByes(season),
     getAllPlayers(),
+    loadNflverse("snap counts", () => getSnapCounts(season)),
+    loadNflverse("player week stats", () => getPlayerWeekStats(season)),
+    loadNflverse("NGS passing", () => getNgsPassing(season)),
+    loadNflverse("NGS receiving", () => getNgsReceiving(season)),
+    loadNflverse("NGS rushing", () => getNgsRushing(season)),
+    loadNflverse("injury reports", () => getInjuryReports(season)),
+    loadNflverse("red zone touches", () => getRedZoneTouches(season)),
   ]);
 
   const byesByTeam = new Map<string, number>(byes.map((b) => [b.Team, b.Week]));
+  const nflversePlayerWeekTable = buildNflversePlayerWeekTable(
+    {
+      snapRows: snapCounts,
+      statRows: playerWeekStats,
+      ngsPassingRows: ngsPassing,
+      ngsReceivingRows: ngsReceiving,
+      ngsRushingRows: ngsRushing,
+      injuryRows: injuryReports,
+      redZoneRows: redZoneTouches,
+    },
+    buildSdioPlayerIdByNormalizedName(allPlayers)
+  );
 
-  return { season, apiSeason, allWeeklyRows, allTeamWeeklyRows, byesByTeam, allPlayers };
+  return {
+    season,
+    apiSeason,
+    allWeeklyRows,
+    allTeamWeeklyRows,
+    byesByTeam,
+    allPlayers,
+    nflversePlayerWeekTable,
+  };
 }

@@ -1,7 +1,8 @@
+import { averageRedZoneTouches, averageSeparation, averageSnapShare, averageTargetShare } from "@/lib/nflverse/aggregate";
 import { getMatchupContext } from "@/lib/sportsdata/positionDefense";
 import { isSkillPosition, type Player } from "@/lib/sportsdata/types";
 import type { BacktestWeekSlice } from "@/lib/backtest/weekData";
-import type { PlayerComparisonInput } from "./types";
+import { EMPTY_NFLVERSE_SIGNALS, type PlayerComparisonInput } from "./types";
 
 /**
  * Builds a PlayerComparisonInput for a historical (apiSeason, targetWeek)
@@ -35,6 +36,7 @@ export function buildBacktestComparisonInput(
       byeWeek: null,
       isOnByeThisWeek: false,
       matchupContext: null,
+      nflverse: EMPTY_NFLVERSE_SIGNALS,
     };
   }
 
@@ -69,6 +71,18 @@ export function buildBacktestComparisonInput(
     matchupContext = getMatchupContext(weekSlice.positionDefenseTable, weekRow.Opponent, position);
   }
 
+  const recentNflverseStats = weekSlice.recentNflverseByPlayer(playerId);
+  const nflverse = {
+    snapShare: averageSnapShare(recentNflverseStats),
+    targetShare: averageTargetShare(recentNflverseStats),
+    separation: averageSeparation(recentNflverseStats),
+    redZoneTouches: averageRedZoneTouches(
+      recentGames,
+      (week) => weekSlice.nflverseStatForWeek(playerId, week),
+      position
+    ),
+  };
+
   return {
     requestedPlayerId: playerId,
     player,
@@ -78,5 +92,6 @@ export function buildBacktestComparisonInput(
     byeWeek,
     isOnByeThisWeek,
     matchupContext,
+    nflverse,
   };
 }

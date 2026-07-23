@@ -3,11 +3,15 @@ import {
   CLOSE_CALL_RELATIVE_PCT,
   MATCHUP_MODIFIER_CAP,
   MATCHUP_MODIFIER_SCALE,
+  POINTS_PER_REDZONE_TOUCH_RB,
+  POINTS_PER_SNAP_SHARE_UNIT_TE,
   POINTS_PER_VOLUME_UNIT,
   RECENT_WEEK_COUNT,
   RECENT_WEIGHT_BASE,
   RECENT_WEIGHT_MAX,
   RECENT_WEIGHT_PER_GAME,
+  REDZONE_BLEND_WEIGHT_RB,
+  SNAP_SHARE_BLEND_WEIGHT_TE,
   VOLUME_BLEND_WEIGHT,
 } from "./config";
 import type {
@@ -99,7 +103,34 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     }
   }
 
-  const finalScore = blendedScore == null ? null : blendedScore + matchupModifier + volumeModifier;
+  let redZoneModifier = 0;
+  const redZoneTouchesAvg = input.nflverse.redZoneTouches;
+  if (blendedScore != null && position === "RB" && redZoneTouchesAvg != null) {
+    const runningScore = blendedScore + matchupModifier + volumeModifier;
+    const expectedPointsFromRedZone = redZoneTouchesAvg * POINTS_PER_REDZONE_TOUCH_RB;
+    const blendedWithRedZone =
+      (1 - REDZONE_BLEND_WEIGHT_RB) * runningScore + REDZONE_BLEND_WEIGHT_RB * expectedPointsFromRedZone;
+    redZoneModifier = blendedWithRedZone - runningScore;
+    notes.push(
+      `Averaging ${redZoneTouchesAvg.toFixed(1)} red-zone touches/game recently — worth roughly ${expectedPointsFromRedZone.toFixed(1)} PPR points at this position's typical rate.`
+    );
+  }
+
+  let snapShareModifier = 0;
+  const snapShareAvg = input.nflverse.snapShare;
+  if (blendedScore != null && position === "TE" && snapShareAvg != null) {
+    const runningScore = blendedScore + matchupModifier + volumeModifier + redZoneModifier;
+    const expectedPointsFromSnapShare = snapShareAvg * POINTS_PER_SNAP_SHARE_UNIT_TE;
+    const blendedWithSnapShare =
+      (1 - SNAP_SHARE_BLEND_WEIGHT_TE) * runningScore + SNAP_SHARE_BLEND_WEIGHT_TE * expectedPointsFromSnapShare;
+    snapShareModifier = blendedWithSnapShare - runningScore;
+    notes.push(
+      `Snap share of ${(snapShareAvg * 100).toFixed(0)}% recently — worth roughly ${expectedPointsFromSnapShare.toFixed(1)} PPR points at this position's typical rate.`
+    );
+  }
+
+  const finalScore =
+    blendedScore == null ? null : blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier;
 
   const injuryStatus = input.player?.InjuryStatus ?? null;
   if (injuryStatus === "Questionable") {
@@ -127,6 +158,12 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     matchupModifier,
     recentVolumeAvg,
     volumeModifier,
+    redZoneTouchesAvg,
+    redZoneModifier,
+    snapShareAvg,
+    snapShareModifier,
+    targetShare: input.nflverse.targetShare,
+    separation: input.nflverse.separation,
     finalScore,
     injuryStatus,
     isOnByeThisWeek: input.isOnByeThisWeek,
@@ -179,6 +216,7 @@ export function comparePlayers(inputs: PlayerComparisonInput[]): ComparisonResul
       players: breakdowns,
       recommendedPlayerId: null,
       isCloseCall: false,
+      hasLimitedData: false,
       headline: "We couldn't find any of the selected players.",
       reasoning: ["Try searching again — none of the selected players matched current data."],
     };
@@ -216,7 +254,7 @@ export function comparePlayers(inputs: PlayerComparisonInput[]): ComparisonResul
     return b.finalScore - a.finalScore;
   });
 
-  const winner = ranked[0];
+  let winner = ranked[0];
   const wasOverridden = candidates.length < found.length;
 
   if (winner.finalScore == null) {
@@ -224,6 +262,7 @@ export function comparePlayers(inputs: PlayerComparisonInput[]): ComparisonResul
       players: breakdowns,
       recommendedPlayerId: null,
       isCloseCall: false,
+      hasLimitedData: false,
       headline: "Not enough data to make a confident call here.",
       reasoning: [
         ...overrideNotes,
@@ -232,14 +271,64 @@ export function comparePlayers(inputs: PlayerComparisonInput[]): ComparisonResul
     };
   }
 
+  // isCloseCall and hasLimitedData used to be one combined flag. Splitting
+  // them was a deliberate fix, not a cosmetic one: backtesting showed the
+  // two triggers behave completely differently — a genuinely close score
+  // gap is a real toss-up (51.1% backtested accuracy), while a
+  // data-quality gap (limited/insufficient recent data for either player)
+  // is actually *more* reliable than "confident" picks (59.5% vs. 54.2%).
+  // Blending them meant "close call" was telling users to hedge on picks
+  // that were, historically, some of the more trustworthy ones. See
+  // CLAUDE.md "Backtesting & Tuning History" items 21-22 for the full
+  // numbers. `anyUncertaintyTrigger` (either condition) still gates the
+  // WR tiebreaker below, unchanged from its original validated behavior
+  // (item 20) — only the user-facing flag/headline split.
   let isCloseCall = false;
+  let hasLimitedData = false;
+  let anyUncertaintyTrigger = false;
   if (ranked.length >= 2 && ranked[1].finalScore != null) {
     const gap = Math.abs(winner.finalScore - ranked[1].finalScore);
     const threshold = Math.max(
       CLOSE_CALL_ABS_POINTS,
       CLOSE_CALL_RELATIVE_PCT * Math.max(winner.finalScore, ranked[1].finalScore)
     );
-    isCloseCall = gap <= threshold || winner.dataQuality !== "full" || ranked[1].dataQuality !== "full";
+    const gapTriggered = gap <= threshold;
+    const dataQualityTriggered = winner.dataQuality !== "full" || ranked[1].dataQuality !== "full";
+    isCloseCall = gapTriggered && !dataQualityTriggered;
+    hasLimitedData = dataQualityTriggered;
+    anyUncertaintyTrigger = gapTriggered || dataQualityTriggered;
+  }
+
+  // On a close call between two WRs, defer to target share + separation
+  // when they independently agree — the strongest signal found in
+  // backtesting (59.2% at WR, vs. this comparison's ~55% baseline
+  // accuracy), but validated specifically as a close-call tiebreaker,
+  // not a general replacement for the score above. See CLAUDE.md
+  // "Backtesting & Tuning History" item 17.
+  if (anyUncertaintyTrigger && ranked.length >= 2) {
+    const [top, second] = ranked;
+    if (
+      top.position === "WR" &&
+      second.position === "WR" &&
+      top.targetShare != null &&
+      second.targetShare != null &&
+      top.separation != null &&
+      second.separation != null &&
+      top.targetShare !== second.targetShare &&
+      top.separation !== second.separation
+    ) {
+      const targetSharePick = top.targetShare > second.targetShare ? top : second;
+      const separationPick = top.separation > second.separation ? top : second;
+      if (targetSharePick.playerId === separationPick.playerId) {
+        const composite = targetSharePick;
+        overrideNotes.push(
+          `${composite.displayName} leads both target share and average separation from the defender recently — a strong secondary signal on this close call.`
+        );
+        winner = composite;
+        isCloseCall = false;
+        hasLimitedData = false;
+      }
+    }
   }
 
   let headline: string;
@@ -250,6 +339,8 @@ export function comparePlayers(inputs: PlayerComparisonInput[]): ComparisonResul
         : `Start ${winner.displayName}.`;
   } else if (isCloseCall) {
     headline = `Close call — lean ${winner.displayName}, but it's not a lock.`;
+  } else if (hasLimitedData) {
+    headline = `Start ${winner.displayName} — though we have limited recent data on at least one of these players.`;
   } else {
     headline = `Start ${winner.displayName}.`;
   }
@@ -260,6 +351,7 @@ export function comparePlayers(inputs: PlayerComparisonInput[]): ComparisonResul
     players: breakdowns,
     recommendedPlayerId: winner.playerId,
     isCloseCall,
+    hasLimitedData,
     headline,
     reasoning,
   };

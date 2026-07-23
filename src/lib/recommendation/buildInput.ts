@@ -1,3 +1,4 @@
+import { averageRedZoneTouches, averageSeparation, averageSnapShare, averageTargetShare } from "@/lib/nflverse/aggregate";
 import { getByeWeekForTeam } from "@/lib/sportsdata/byes";
 import { getActivePlayerById, getAnyPlayerById } from "@/lib/sportsdata/players";
 import { getMatchupContext, type PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
@@ -5,12 +6,14 @@ import { getPlayerSeasonStat } from "@/lib/sportsdata/seasonStats";
 import { isSkillPosition } from "@/lib/sportsdata/types";
 import { getRecentGameStatsForPlayer } from "@/lib/sportsdata/weeklyStats";
 import type { SeasonContext } from "@/lib/sportsdata/timeframes";
-import type { PlayerComparisonInput } from "./types";
+import type { NflversePlayerWeekTable } from "./nflverseLive";
+import { EMPTY_NFLVERSE_SIGNALS, type PlayerComparisonInput } from "./types";
 
 export async function buildComparisonInput(
   playerId: number,
   context: SeasonContext,
-  positionDefenseTable: PositionDefenseTable
+  positionDefenseTable: PositionDefenseTable,
+  nflversePlayerWeekTable: NflversePlayerWeekTable
 ): Promise<PlayerComparisonInput> {
   const player = await getActivePlayerById(playerId).catch(() => null);
 
@@ -26,6 +29,7 @@ export async function buildComparisonInput(
       byeWeek: null,
       isOnByeThisWeek: false,
       matchupContext: null,
+      nflverse: EMPTY_NFLVERSE_SIGNALS,
     };
   }
 
@@ -47,6 +51,17 @@ export async function buildComparisonInput(
     matchupContext = getMatchupContext(positionDefenseTable, lastGame.Opponent, player.Position);
   }
 
+  const byWeek = nflversePlayerWeekTable.get(playerId);
+  const recentNflverseStats = byWeek
+    ? context.recentWeeks.map((week) => byWeek.get(week)).filter((stat): stat is NonNullable<typeof stat> => stat != null)
+    : [];
+  const nflverse = {
+    snapShare: averageSnapShare(recentNflverseStats),
+    targetShare: averageTargetShare(recentNflverseStats),
+    separation: averageSeparation(recentNflverseStats),
+    redZoneTouches: averageRedZoneTouches(recentGames, (week) => byWeek?.get(week), player.Position),
+  };
+
   return {
     requestedPlayerId: playerId,
     player,
@@ -56,5 +71,6 @@ export async function buildComparisonInput(
     byeWeek,
     isOnByeThisWeek,
     matchupContext,
+    nflverse,
   };
 }

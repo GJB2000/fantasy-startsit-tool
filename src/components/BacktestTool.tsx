@@ -14,6 +14,11 @@ import { BacktestWeekTable } from "./BacktestWeekTable";
 import { PlayerSearchInput } from "./PlayerSearchInput";
 
 type Mode = "pair" | "broad";
+// "2024" only exists for Broad mode — see runBacktest()'s route selection.
+// The single-pair backtest is SportsDataIO-only; nflverse-only 2024 data
+// only has a broad-mode pipeline (see CLAUDE.md "Backtesting & Tuning
+// History" item 24).
+type Season = "2025" | "2024";
 const ALL_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 const WEEK_OPTIONS = Array.from({ length: 18 }, (_, i) => i + 1);
 
@@ -35,6 +40,7 @@ interface BroadResponse {
 
 export function BacktestTool() {
   const [mode, setMode] = useState<Mode>("pair");
+  const [season, setSeason] = useState<Season>("2025");
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
   const [weekFrom, setWeekFrom] = useState(1);
   const [weekTo, setWeekTo] = useState(18);
@@ -43,6 +49,7 @@ export function BacktestTool() {
   const [error, setError] = useState<string | null>(null);
   const [pairResult, setPairResult] = useState<PairResponse | null>(null);
   const [broadResult, setBroadResult] = useState<BroadResponse | null>(null);
+  const [broadResultSeason, setBroadResultSeason] = useState<Season>("2025");
 
   function addPlayer(player: PlayerSummary) {
     setPlayers((prev) => (prev.length >= 2 ? prev : [...prev, player]));
@@ -88,13 +95,17 @@ export function BacktestTool() {
           return;
         }
         const posParam = positions.join(",");
-        const res = await fetch(`/api/backtest/broad?weeks=${weeks}&positions=${posParam}`);
+        const path = season === "2024" ? "/api/backtest/broad-nflverse" : "/api/backtest/broad";
+        const query = new URLSearchParams({ weeks, positions: posParam });
+        if (season === "2024") query.set("season", "2024");
+        const res = await fetch(`${path}?${query}`);
         const data = await res.json();
         if (!res.ok) {
           setError(data.error ?? "Something went wrong.");
           return;
         }
         setBroadResult(data);
+        setBroadResultSeason(season);
       }
     } catch {
       setError("Couldn't reach the server. Try again shortly.");
@@ -105,7 +116,7 @@ export function BacktestTool() {
 
   return (
     <div className="mx-auto mt-8 w-full max-w-2xl space-y-6">
-      <BacktestCaveatNote />
+      <BacktestCaveatNote showNflverseCaveat={mode === "broad" && season === "2024"} />
 
       <div className="flex gap-2 text-sm">
         <button
@@ -167,21 +178,45 @@ export function BacktestTool() {
       )}
 
       {mode === "broad" && (
-        <div className="flex flex-wrap gap-2 text-sm">
-          {ALL_POSITIONS.map((position) => (
-            <label
-              key={position}
-              className="flex items-center gap-1.5 rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
-            >
-              <input
-                type="checkbox"
-                checked={positions.includes(position)}
-                onChange={() => togglePosition(position)}
-              />
-              {position}
-            </label>
-          ))}
-        </div>
+        <>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-zinc-500">Season</span>
+            {(["2025", "2024"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => {
+                  setSeason(s);
+                  setBroadResult(null);
+                }}
+                className={`rounded-md px-3 py-1.5 ${
+                  season === s ? "bg-foreground text-background" : "border border-zinc-300 dark:border-zinc-700"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+            <span className="text-xs text-zinc-500">
+              {season === "2025" ? "primary, tuned" : "out-of-sample validation (nflverse-only)"}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-sm">
+            {ALL_POSITIONS.map((position) => (
+              <label
+                key={position}
+                className="flex items-center gap-1.5 rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={positions.includes(position)}
+                  onChange={() => togglePosition(position)}
+                />
+                {position}
+              </label>
+            ))}
+          </div>
+        </>
       )}
 
       <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -248,6 +283,9 @@ export function BacktestTool() {
 
       {broadResult && (
         <div className="space-y-4">
+          <p className="text-xs font-medium text-zinc-500">
+            Showing {broadResultSeason} results ({broadResultSeason === "2025" ? "SportsDataIO" : "nflverse-only"})
+          </p>
           <BacktestSummaryView
             summary={broadResult.overall}
             byPosition={broadResult.byPosition}

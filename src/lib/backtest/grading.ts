@@ -105,17 +105,25 @@ export function summarize(results: WeekGradeResult[]): BacktestSummary {
 
 export interface ConfidenceBreakdown {
   confident: BacktestSummary;
+  limitedData: BacktestSummary;
   closeCall: BacktestSummary;
 }
 
 /**
- * Splits already-graded engine results by whether the engine itself
- * flagged the pick as a close call, so we can check whether that
- * self-reported confidence signal actually correlates with being right
- * more often — i.e. whether "close call" means anything.
+ * Splits already-graded engine results into three buckets by the
+ * engine's own isCloseCall/hasLimitedData flags, so we can check
+ * whether those self-reported signals actually correlate with being
+ * right more or less often. Originally one combined flag (confident vs.
+ * close call) — split into three after backtesting showed a genuinely
+ * close score gap (closeCall) and limited/insufficient recent data
+ * (limitedData) behave completely differently: the former is close to
+ * a coin flip, the latter is historically *more* reliable than a plain
+ * "confident" pick. Blending them into one flag was masking that. See
+ * CLAUDE.md "Backtesting & Tuning History" items 21-22.
  */
 export function summarizeByCloseCall(results: WeekGradeResult[]): ConfidenceBreakdown {
-  const confident = results.filter((r) => !r.result.isCloseCall);
+  const confident = results.filter((r) => !r.result.isCloseCall && !r.result.hasLimitedData);
+  const limitedData = results.filter((r) => !r.result.isCloseCall && r.result.hasLimitedData);
   const closeCall = results.filter((r) => r.result.isCloseCall);
-  return { confident: summarize(confident), closeCall: summarize(closeCall) };
+  return { confident: summarize(confident), limitedData: summarize(limitedData), closeCall: summarize(closeCall) };
 }

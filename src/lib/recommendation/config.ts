@@ -32,6 +32,10 @@ export const RECENT_WEEK_COUNT = 4;
  * unit-consistent blend rather than mixing points with raw target/touch
  * counts. QB: points per pass attempt. RB: points per touch (rushing
  * attempts + targets). WR/TE: points per target.
+ *
+ * QB was tried as pass+rush "touches" at several blend weights after
+ * item 24's 2024 validation exposed a real gap for rushing QBs — see
+ * CLAUDE.md item 25. Reverted: no tested weight was a clean win.
  */
 export const POINTS_PER_VOLUME_UNIT: Record<"QB" | "RB" | "WR" | "TE", number> = {
   QB: 0.511,
@@ -60,3 +64,57 @@ export const POINTS_PER_VOLUME_UNIT: Record<"QB" | "RB" | "WR" | "TE", number> =
  * "Backtesting & Tuning History" in CLAUDE.md for the full table.
  */
 export const VOLUME_BLEND_WEIGHT = 0.9;
+
+/**
+ * Empirically-derived PPR points per red-zone touch for RB (rush
+ * attempts + targets inside the opponent's 20-yard line, summed across
+ * every played RB game-week of the 2025 season, divided by total
+ * red-zone touches over the same set — same "ratio of sums" method as
+ * POINTS_PER_VOLUME_UNIT). Red-zone touches convert to points at a much
+ * higher rate than touches in general (4.797 vs. 0.808) since they're
+ * disproportionately touchdown chances. Backtested standalone at 58.2%
+ * for RB before integration — see CLAUDE.md item 19.
+ */
+export const POINTS_PER_REDZONE_TOUCH_RB = 4.797;
+
+/**
+ * How much weight red-zone touches (converted to points via
+ * POINTS_PER_REDZONE_TOUCH_RB) carry against the running RB score
+ * (post-volume-blend), same blend shape as VOLUME_BLEND_WEIGHT. Swept
+ * in 0.1 steps against the full backtest (RB accuracy): 0.1 -> 58.1%,
+ * **0.2 -> 58.6% (peak)**, 0.3 -> 58.1%, 0.4 -> 56.7%, 0.5 -> 55.7%,
+ * 0.6 -> 56.2%, 0.7 -> 57.1%, 0.8 -> 56.2% — 0.2 sits in the middle of a
+ * genuine 0.1-0.3 plateau, not an isolated spike (see "Backtesting &
+ * Tuning History" item 20 in CLAUDE.md for the full table).
+ */
+export const REDZONE_BLEND_WEIGHT_RB = 0.2;
+
+/**
+ * Empirically-derived PPR points per 100% offensive-snap-share
+ * equivalent for TE (total PPR points across every played TE game-week
+ * with snap data, divided by total snap share over the same set — same
+ * method as POINTS_PER_VOLUME_UNIT/POINTS_PER_REDZONE_TOUCH_RB).
+ * Backtested standalone at 57.7% for TE before integration — the best
+ * standalone signal found for TE, the engine's weakest position — see
+ * CLAUDE.md item 14.
+ */
+export const POINTS_PER_SNAP_SHARE_UNIT_TE = 9.607;
+
+/**
+ * How much weight snap share (converted to points via
+ * POINTS_PER_SNAP_SHARE_UNIT_TE) carries against the running TE score
+ * (post-volume-blend), same blend shape as VOLUME_BLEND_WEIGHT. TE's
+ * small pool (~100 pairs) makes this a much noisier curve than
+ * VOLUME_BLEND_WEIGHT's — full 0.05-step sweep against the backtest
+ * (TE accuracy) bounced between 52.5-58.4% with no clean monotonic
+ * climb, including a boundary peak at w=0.95-1.0 (58.4%) that would
+ * mean discarding the existing blended score entirely for TE.
+ * Deliberately did NOT take that peak — same "don't chase an isolated
+ * spike" discipline as VOLUME_BLEND_WEIGHT and the old capped-volume-
+ * modifier's CAP=30 rejection. Settled on **0.4**, the middle of a
+ * genuine two-point plateau at 0.35-0.4 (56.4%) that keeps the blend
+ * meaningfully anchored to both signals rather than replacing one
+ * outright. See "Backtesting & Tuning History" item 20 in CLAUDE.md for
+ * the full table and the caveat about this weight's sample size.
+ */
+export const SNAP_SHARE_BLEND_WEIGHT_TE = 0.4;

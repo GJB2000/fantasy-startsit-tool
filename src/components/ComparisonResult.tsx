@@ -19,7 +19,9 @@ export function ComparisonResult({ result, contextNote }: ComparisonResultProps)
         className={`rounded-lg border p-4 ${
           result.isCloseCall
             ? "border-amber-500/40 bg-amber-500/10"
-            : "border-emerald-500/40 bg-emerald-500/10"
+            : result.hasLimitedData
+              ? "border-sky-500/40 bg-sky-500/10"
+              : "border-emerald-500/40 bg-emerald-500/10"
         }`}
       >
         <p className="text-lg font-semibold">{result.headline}</p>

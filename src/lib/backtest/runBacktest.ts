@@ -18,16 +18,16 @@ import { loadBacktestRunData } from "./loadRun";
 import { buildAllPairsForWeek } from "./pairing";
 import { sliceWeekData, type BacktestWeekSlice } from "./weekData";
 
-const BASELINE_IDS = Object.keys(BASELINE_PICKERS) as BaselineId[];
+export const BASELINE_IDS = Object.keys(BASELINE_PICKERS) as BaselineId[];
 
-function emptyBaselineOutcomes(): Record<BaselineId, BacktestOutcome[]> {
+export function emptyBaselineOutcomes(): Record<BaselineId, BacktestOutcome[]> {
   const outcomes = {} as Record<BaselineId, BacktestOutcome[]>;
   for (const id of BASELINE_IDS) outcomes[id] = [];
   return outcomes;
 }
 
-/** Grades each naive baseline's pick for one pair/week against the same actual outcomes the engine is graded against. */
-function gradeBaselinesForPair(
+/** Grades each naive baseline's pick for one pair/week against the same actual outcomes the engine is graded against. Shared with runBacktestNflverseOnly.ts, so both pipelines' baseline numbers are directly comparable. */
+export function gradeBaselinesForPair(
   weekSlice: BacktestWeekSlice,
   playerIds: [number, number],
   targetWeekRows: PlayerGameStat[]
@@ -40,7 +40,7 @@ function gradeBaselinesForPair(
   return outcomes;
 }
 
-function summarizeBaselineOutcomes(
+export function summarizeBaselineOutcomes(
   collected: Record<BaselineId, BacktestOutcome[]>
 ): Record<BaselineId, BacktestSummary> {
   const summaries = {} as Record<BaselineId, BacktestSummary>;
@@ -70,7 +70,13 @@ export async function runPairBacktest(
   const baselineOutcomes = emptyBaselineOutcomes();
 
   const weekResults = weeks.map((week) => {
-    const weekSlice = sliceWeekData(runData.allWeeklyRows, week, RECENT_WEEK_COUNT, runData.allTeamWeeklyRows);
+    const weekSlice = sliceWeekData(
+      runData.allWeeklyRows,
+      week,
+      RECENT_WEEK_COUNT,
+      runData.allTeamWeeklyRows,
+      runData.nflversePlayerWeekTable
+    );
     const inputs = playerIds.map((id) =>
       buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
     );
@@ -115,7 +121,13 @@ export async function runBroadBacktest(
   const baselineOutcomes = emptyBaselineOutcomes();
 
   for (const week of weeks) {
-    const weekSlice = sliceWeekData(runData.allWeeklyRows, week, RECENT_WEEK_COUNT, runData.allTeamWeeklyRows);
+    const weekSlice = sliceWeekData(
+      runData.allWeeklyRows,
+      week,
+      RECENT_WEEK_COUNT,
+      runData.allTeamWeeklyRows,
+      runData.nflversePlayerWeekTable
+    );
     const pairs = buildAllPairsForWeek(weekSlice, positions);
 
     const weekResults: WeekGradeResult[] = [];

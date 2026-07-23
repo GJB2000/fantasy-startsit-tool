@@ -36,7 +36,11 @@ interface BacktestSummaryViewProps {
   byPosition?: Record<string, BacktestSummaryData>;
   baselineSummaries?: Record<BaselineId, BacktestSummaryData>;
   baselineLabels?: Record<BaselineId, string>;
-  confidenceBreakdown?: { confident: BacktestSummaryData; closeCall: BacktestSummaryData };
+  confidenceBreakdown?: {
+    confident: BacktestSummaryData;
+    limitedData: BacktestSummaryData;
+    closeCall: BacktestSummaryData;
+  };
 }
 
 export function BacktestSummaryView({
@@ -69,6 +73,7 @@ export function BacktestSummaryView({
       {confidenceBreakdown && (
         <Section title="By self-reported confidence">
           <AccuracyBanner label="Confident picks" summary={confidenceBreakdown.confident} />
+          <AccuracyBanner label="Limited data" summary={confidenceBreakdown.limitedData} />
           <AccuracyBanner label="Close calls" summary={confidenceBreakdown.closeCall} />
         </Section>
       )}
