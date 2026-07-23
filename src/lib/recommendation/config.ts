@@ -190,3 +190,80 @@ export const POINTS_PER_QB_GOAL_LINE_RUSH = 64.543;
  * follow-up for the full two-season sweep.
  */
 export const QB_GOAL_LINE_BLEND_WEIGHT = 0;
+
+/**
+ * Empirically-derived PPR points per unit of QB success rate (a binary,
+ * down/distance-adjusted "did this play succeed" flag, averaged to a
+ * per-dropback rate — see playByPlay.ts), same "ratio of sums" method as
+ * every other rate-based factor (total QB PPR points ÷ total QB success
+ * rate summed across every played QB game-week of 2025). Standalone-
+ * tested at a modest but *stable* 53.0% (2025) / 52.0% (2024) — the
+ * first QB signal in this whole investigation that didn't flip
+ * direction between seasons (see CLAUDE.md items 25/26/30/30a for the
+ * three QB-rushing variants that all failed that test). See item 33 for
+ * the integration/sweep story.
+ */
+export const POINTS_PER_SUCCESS_RATE_UNIT_QB = 31.93;
+
+/**
+ * How much weight QB success rate (converted to points via
+ * POINTS_PER_SUCCESS_RATE_UNIT_QB) carries against the running QB score
+ * (post-volume-blend, stacked after the rushing terms above). See
+ * CLAUDE.md item 33 for the two-season sweep.
+ */
+export const QB_SUCCESS_RATE_BLEND_WEIGHT = 0;
+
+/**
+ * RB EPA-per-rush is NOT scored via the usual "ratio of sums" method —
+ * unlike every volume/share/rate signal above, raw rushing EPA sums to a
+ * NEGATIVE total across the season (rushing plays average negative EPA
+ * leaguewide, a well-known fact — see nflverse's own advstats docs).
+ * Dividing total points by a negative sum flips the sign, which would
+ * make BETTER RBs by EPA score LOWER — backwards. Caught this before
+ * shipping it (not assumed correct): computed both ways and compared.
+ * Used a simple linear regression instead (PPR points ~ EPA-per-rush,
+ * ordinary least squares across every played RB game-week of 2025),
+ * which handles a rate centered away from zero correctly. Slope: 5.772
+ * points per unit of EPA. Because EPA doesn't naturally pass through
+ * the origin the way volume/share metrics do (0 EPA means "league-
+ * average," not "no production"), the regression's intercept is also
+ * needed — RB_EPA_PPR_AT_ZERO below — unlike every other conversion
+ * factor in this file, which implicitly assume 0 rate = 0 points.
+ */
+export const RB_EPA_REGRESSION_SLOPE = 5.772;
+
+/** Regression intercept — predicted PPR points at exactly 0 EPA-per-rush (league-average efficiency). Paired with RB_EPA_REGRESSION_SLOPE above; see that comment for why RB EPA needs an intercept term when nothing else in this file does. */
+export const RB_EPA_PPR_AT_ZERO = 9.749;
+
+/**
+ * How much weight RB EPA-per-rush (converted to points via
+ * expectedPoints = RB_EPA_PPR_AT_ZERO + epaPerPlay * RB_EPA_REGRESSION_SLOPE)
+ * carries against the running RB score (post-volume-blend, post-red-
+ * zone). Standalone-tested positive in both seasons and *improving*
+ * out-of-sample (52.2% 2025 → 57.2% 2024) — see CLAUDE.md item 33 for
+ * the two-season sweep.
+ */
+export const RB_EPA_BLEND_WEIGHT = 0.3;
+
+/**
+ * Empirically-derived PPR points LOST per unit of drop rate (FTN
+ * Charting, target-scoped WR/TE — see playByPlay.ts/ftnCharting.ts),
+ * same "ratio of sums" method as every other rate factor (total
+ * receiver PPR points ÷ total drop rate summed across every played
+ * WR/TE game-week of 2025 with charted-target coverage). Unlike every
+ * other signal in this file, this is a "lower is better" metric —
+ * applied with a NEGATIVE sign in engine.ts (a higher drop rate
+ * SUBTRACTS expected points, it doesn't add them). Standalone-tested
+ * modest but stable across both positions and both seasons (WR
+ * 52.4%→53.1%, TE 50.0%→54.8%) — see CLAUDE.md item 33 for the
+ * integration/sweep story.
+ */
+export const POINTS_PER_DROP_RATE_UNIT = 182.75;
+
+/**
+ * How much weight drop rate (converted to a point PENALTY via
+ * POINTS_PER_DROP_RATE_UNIT) carries against the running WR/TE score
+ * (post-volume-blend, post-snap-share for TE). See CLAUDE.md item 33
+ * for the two-season sweep.
+ */
+export const DROP_RATE_BLEND_WEIGHT = 0.2;

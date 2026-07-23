@@ -1,8 +1,11 @@
 import {
+  averageDropRate,
+  averageEpaPerPlay,
   averageGoalLineTouches,
   averageRedZoneTouches,
   averageSeparation,
   averageSnapShare,
+  averageSuccessRate,
   averageTargetShare,
 } from "@/lib/nflverse/aggregate";
 import { getByeWeekForTeam } from "@/lib/sportsdata/byes";
@@ -67,6 +70,9 @@ export async function buildComparisonInput(
     separation: averageSeparation(recentNflverseStats),
     redZoneTouches: averageRedZoneTouches(recentGames, (week) => byWeek?.get(week), player.Position),
     goalLineTouches: averageGoalLineTouches(recentGames, (week) => byWeek?.get(week), player.Position),
+    successRate: averageSuccessRate(recentNflverseStats, player.Position),
+    epaPerPlay: averageEpaPerPlay(recentNflverseStats, player.Position),
+    dropRate: averageDropRate(recentNflverseStats, player.Position),
   };
 
   return {

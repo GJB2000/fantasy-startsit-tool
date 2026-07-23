@@ -26,6 +26,42 @@ export function averageSeparation(stats: NflverseWeekStat[]): number | null {
 }
 
 /**
+ * Success rate (a binary, down/distance-adjusted "did this play succeed"
+ * flag), role-scoped by position (dropbacks for QB, rush attempts for
+ * RB, targets for WR/TE — mirrors volume.ts's getVolumeStat). Already a
+ * per-week rate (see playByPlay.ts), so this is a simple mean across
+ * recent weeks like snap share/target share, not a raw-count average
+ * like red-zone/goal-line touches. See CLAUDE.md's unused-data-audit
+ * follow-up (item 31).
+ */
+export function averageSuccessRate(stats: NflverseWeekStat[], position: string | null): number | null {
+  if (position === "QB") return averageStat(stats, "qbSuccessRate");
+  if (position === "RB") return averageStat(stats, "rushSuccessRate");
+  if (position === "WR" || position === "TE") return averageStat(stats, "recSuccessRate");
+  return null;
+}
+
+/**
+ * Same shape as averageSuccessRate, using EPA-per-play instead of the
+ * binary success flag. See CLAUDE.md item 31.
+ */
+export function averageEpaPerPlay(stats: NflverseWeekStat[], position: string | null): number | null {
+  if (position === "QB") return averageStat(stats, "qbEpaPerDropback");
+  if (position === "RB") return averageStat(stats, "rushEpaPerPlay");
+  if (position === "WR" || position === "TE") return averageStat(stats, "recEpaPerTarget");
+  return null;
+}
+
+/**
+ * FTN Charting drop rate, target-scoped (WR/TE only — no meaningful
+ * denominator for other positions). See CLAUDE.md item 32.
+ */
+export function averageDropRate(stats: NflverseWeekStat[], position: string | null): number | null {
+  if (position === "WR" || position === "TE") return averageStat(stats, "dropRate");
+  return null;
+}
+
+/**
  * Red-zone touches (rush attempts for RB, red-zone rush attempts for
  * QB, targets for WR/TE — mirrors volume.ts's getVolumeStat)
  * averaged over a player's actually-played recent games. Unlike the

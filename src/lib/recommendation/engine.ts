@@ -1,15 +1,22 @@
 import {
   CLOSE_CALL_ABS_POINTS,
   CLOSE_CALL_RELATIVE_PCT,
+  DROP_RATE_BLEND_WEIGHT,
   MATCHUP_MODIFIER_CAP,
   MATCHUP_MODIFIER_SCALE,
+  POINTS_PER_DROP_RATE_UNIT,
   POINTS_PER_QB_GOAL_LINE_RUSH,
   POINTS_PER_QB_RUSH_ATTEMPT,
   POINTS_PER_REDZONE_TOUCH_RB,
   POINTS_PER_SNAP_SHARE_UNIT_TE,
+  POINTS_PER_SUCCESS_RATE_UNIT_QB,
   POINTS_PER_VOLUME_UNIT,
   QB_GOAL_LINE_BLEND_WEIGHT,
   QB_RUSH_BLEND_WEIGHT,
+  QB_SUCCESS_RATE_BLEND_WEIGHT,
+  RB_EPA_BLEND_WEIGHT,
+  RB_EPA_PPR_AT_ZERO,
+  RB_EPA_REGRESSION_SLOPE,
   RECENT_WEEK_COUNT,
   RECENT_WEIGHT_BASE,
   RECENT_WEIGHT_MAX,
@@ -164,6 +171,52 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     );
   }
 
+  let qbSuccessRateModifier = 0;
+  const successRateAvg = input.nflverse.successRate;
+  if (blendedScore != null && position === "QB" && successRateAvg != null) {
+    const runningScore =
+      blendedScore +
+      matchupModifier +
+      volumeModifier +
+      redZoneModifier +
+      snapShareModifier +
+      qbRushModifier +
+      qbGoalLineModifier;
+    const expectedPointsFromSuccessRate = successRateAvg * POINTS_PER_SUCCESS_RATE_UNIT_QB;
+    const blendedWithSuccessRate =
+      (1 - QB_SUCCESS_RATE_BLEND_WEIGHT) * runningScore + QB_SUCCESS_RATE_BLEND_WEIGHT * expectedPointsFromSuccessRate;
+    qbSuccessRateModifier = blendedWithSuccessRate - runningScore;
+    notes.push(
+      `Succeeding on ${(successRateAvg * 100).toFixed(0)}% of recent dropbacks (down/distance-adjusted) — worth roughly ${expectedPointsFromSuccessRate.toFixed(1)} PPR points at this position's typical rate.`
+    );
+  }
+
+  let rbEpaModifier = 0;
+  const epaPerPlayAvg = input.nflverse.epaPerPlay;
+  if (blendedScore != null && position === "RB" && epaPerPlayAvg != null) {
+    const runningScore = blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier;
+    const expectedPointsFromEpa = RB_EPA_PPR_AT_ZERO + epaPerPlayAvg * RB_EPA_REGRESSION_SLOPE;
+    const blendedWithEpa = (1 - RB_EPA_BLEND_WEIGHT) * runningScore + RB_EPA_BLEND_WEIGHT * expectedPointsFromEpa;
+    rbEpaModifier = blendedWithEpa - runningScore;
+    notes.push(
+      `Averaging ${epaPerPlayAvg.toFixed(2)} EPA per rush recently — worth roughly ${expectedPointsFromEpa.toFixed(1)} PPR points at this position's typical rate.`
+    );
+  }
+
+  let dropRateModifier = 0;
+  const dropRateAvg = input.nflverse.dropRate;
+  if (blendedScore != null && position === "WR" && dropRateAvg != null) {
+    const runningScore = blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier;
+    const pointsLostFromDrops = dropRateAvg * POINTS_PER_DROP_RATE_UNIT;
+    const expectedPointsFromDropRate = runningScore - pointsLostFromDrops;
+    const blendedWithDropRate =
+      (1 - DROP_RATE_BLEND_WEIGHT) * runningScore + DROP_RATE_BLEND_WEIGHT * expectedPointsFromDropRate;
+    dropRateModifier = blendedWithDropRate - runningScore;
+    notes.push(
+      `Dropping ${(dropRateAvg * 100).toFixed(0)}% of recent charted targets — worth roughly ${pointsLostFromDrops.toFixed(1)} fewer PPR points at this position's typical rate.`
+    );
+  }
+
   const finalScore =
     blendedScore == null
       ? null
@@ -173,7 +226,10 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
         redZoneModifier +
         snapShareModifier +
         qbRushModifier +
-        qbGoalLineModifier;
+        qbGoalLineModifier +
+        qbSuccessRateModifier +
+        rbEpaModifier +
+        dropRateModifier;
 
   const injuryStatus = input.player?.InjuryStatus ?? null;
   if (injuryStatus === "Questionable") {
@@ -209,6 +265,12 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     qbRushModifier,
     goalLineTouchesAvg,
     qbGoalLineModifier,
+    successRateAvg,
+    qbSuccessRateModifier,
+    epaPerPlayAvg,
+    rbEpaModifier,
+    dropRateAvg,
+    dropRateModifier,
     targetShare: input.nflverse.targetShare,
     separation: input.nflverse.separation,
     finalScore,

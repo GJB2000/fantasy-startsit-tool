@@ -1,8 +1,11 @@
 import {
+  averageDropRate,
+  averageEpaPerPlay,
   averageGoalLineTouches,
   averageRedZoneTouches,
   averageSeparation,
   averageSnapShare,
+  averageSuccessRate,
   averageTargetShare,
 } from "@/lib/nflverse/aggregate";
 import { getMatchupContext } from "@/lib/sportsdata/positionDefense";
@@ -92,6 +95,9 @@ export function buildBacktestComparisonInput(
       (week) => weekSlice.nflverseStatForWeek(playerId, week),
       position
     ),
+    successRate: averageSuccessRate(recentNflverseStats, position),
+    epaPerPlay: averageEpaPerPlay(recentNflverseStats, position),
+    dropRate: averageDropRate(recentNflverseStats, position),
   };
 
   return {

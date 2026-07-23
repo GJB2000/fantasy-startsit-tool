@@ -18,6 +18,12 @@ export interface NflverseSignals {
   redZoneTouches: number | null;
   /** Tighter yardline_100<=5 cutoff, QB-rushing candidate signal — see CLAUDE.md item 30 follow-up. */
   goalLineTouches: number | null;
+  /** Role-scoped (dropback for QB, rush for RB, target for WR/TE) — see CLAUDE.md item 31. */
+  successRate: number | null;
+  /** Same role-scoping, EPA-per-play instead of the binary success flag — see CLAUDE.md item 31. */
+  epaPerPlay: number | null;
+  /** FTN Charting, target-scoped (WR/TE) — see CLAUDE.md item 32. */
+  dropRate: number | null;
 }
 
 export const EMPTY_NFLVERSE_SIGNALS: NflverseSignals = {
@@ -26,6 +32,9 @@ export const EMPTY_NFLVERSE_SIGNALS: NflverseSignals = {
   separation: null,
   redZoneTouches: null,
   goalLineTouches: null,
+  successRate: null,
+  epaPerPlay: null,
+  dropRate: null,
 };
 
 export interface PlayerComparisonInput {
@@ -60,6 +69,12 @@ export interface PlayerScoreBreakdown {
   qbRushModifier: number;
   goalLineTouchesAvg: number | null;
   qbGoalLineModifier: number;
+  successRateAvg: number | null;
+  qbSuccessRateModifier: number;
+  epaPerPlayAvg: number | null;
+  rbEpaModifier: number;
+  dropRateAvg: number | null;
+  dropRateModifier: number;
   targetShare: number | null;
   separation: number | null;
   finalScore: number | null;

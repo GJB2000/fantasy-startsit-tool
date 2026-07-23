@@ -136,6 +136,20 @@ This is the most important section — the "brain" of the tool.
     tradeoff rather than a clean win: every nonzero weight costs some
     2025 accuracy in exchange for 2024 accuracy — see "Backtesting &
     Tuning History" item 30 for the full sweep and why 0.3 was chosen.
+  - RB rushing EPA-per-play (`RB_EPA_BLEND_WEIGHT`/
+    `RB_EPA_REGRESSION_SLOPE`/`RB_EPA_PPR_AT_ZERO` in `config.ts`),
+    stacked after red-zone touches — a genuine two-season improvement,
+    not a tradeoff (unlike QB rushing above). Uses a linear-regression
+    conversion factor rather than every other signal's "ratio of sums,"
+    since raw rushing EPA sums negative across a season and would
+    otherwise flip the sign — see item 33.
+  - WR drop rate (FTN Charting, `DROP_RATE_BLEND_WEIGHT`/
+    `POINTS_PER_DROP_RATE_UNIT` in `config.ts`) — WR only, not TE (TE's
+    standalone result was too noisy to trust at any weight tested). A
+    "lower is better" signal, the only one shaped that way in this
+    engine; a real WR-specific tradeoff (2025 up, 2024 down as weight
+    increases), deliberately tuned to a balanced point rather than
+    either season's peak — see item 33.
   - [Add more factors here as they're decided]
 - When it's a close call statistically, say so. Don't force false
   confidence.
@@ -1209,48 +1223,103 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       pattern that's sunk several other signals in this document (QB
       rushing volume, red-zone-only QB rushes). Not pursued further; not
       added to the open-items candidate list.
+33. **Integrated the three items-31/32 candidates into the live engine**
+    — all three followed the same process (wire into `NflverseSignals`/
+    `aggregate.ts` if not already there, add an additive term mirroring
+    RB red-zone's shape, sweep both seasons), but landed in three
+    genuinely different places, which is itself the finding worth
+    recording.
+    - **Caught a real methodology bug before it shipped**: RB rushing
+      EPA sums to a *negative* total across the full 2025 season
+      (rushing plays average negative EPA leaguewide — a well-known,
+      real fact, not a data error), which breaks the "ratio of sums"
+      method used for every other conversion factor in this file —
+      dividing total points by a negative sum flips the sign, so
+      *better* RBs by EPA would score *lower*. Computed it both ways and
+      compared before trusting either. Fixed by using an OLS regression
+      slope (PPR points ~ EPA-per-rush) instead: slope 5.772, with an
+      intercept (`RB_EPA_PPR_AT_ZERO=9.749`) that every other conversion
+      factor in this file doesn't need, since EPA doesn't pass through
+      the origin the way volume/share metrics do (0 EPA means
+      "league-average," not "no production").
+    - **QB success rate: standalone-validated but rejected on
+      integration.** Every weight tested (0.1-0.9) made 2025 *worse*
+      than the w=0 baseline (52.9%), and 2024 never clearly beat its own
+      baseline either (mostly 51-56%, flat-to-worse). The standalone
+      finding (item 31) was real, but it adds nothing once blended
+      against a QB score already dominated by `VOLUME_BLEND_WEIGHT=0.9`
+      — the first case in this document where a signal that looked
+      genuinely stable standalone still failed on integration, a
+      different failure mode than the cross-season instability that
+      sank every prior QB attempt. `QB_SUCCESS_RATE_BLEND_WEIGHT` stays
+      at 0 — code kept, not deleted, same as the goal-line precedent.
+    - **RB EPA-per-rush: a clean, genuine win, shipped at w=0.3.**
+      Swept in 0.1 steps (then refined at 0.15/0.25/0.35): both seasons
+      sit at or above baseline across the entire w=0.1-0.4 range (2025:
+      58.6-60.6% vs. 58.6% baseline; 2024: 51.5-53.4% vs. 52.5%
+      baseline), a real plateau, not a tradeoff or an isolated spike —
+      the same shape as RB red-zone/TE snap-share's original integration
+      (item 20), unlike QB rushing's forced tradeoff. **Result at
+      w=0.3**: RB 59.6%/52.9% (both up from baseline).
+    - **Drop rate: a real WR-specific tradeoff, no clean TE signal —
+      put to the user rather than resolved unilaterally**, the same
+      "this is a genuine judgment call" treatment as item 30's QB
+      rushing weight. WR showed a clear, monotonic-ish tradeoff shape as
+      weight increased (2025 climbing from 55.9%→59.8%, 2024 declining
+      from 59.5%→57.5% across w=0-0.3) — structurally identical to QB
+      rushing's tradeoff, just for a different position. TE showed no
+      clean signal at any weight (noisy, non-monotonic, smallest sample
+      of anything tested — consistent with TE's history as this
+      document's noisiest position). **The user chose WR-only at the
+      balanced w=0.2** (58.3%/59.5%, both ≥ baseline) over the bigger
+      w=0.3 tradeoff or not shipping at all — required adding a TE
+      exemption to the modifier (mirroring the QB skip pattern used for
+      snap/target share in item 15), since the code previously applied
+      one shared weight to both positions. Verified TE is completely
+      unaffected (56.4%/57.4%, byte-for-byte unchanged) and WR moved
+      exactly as predicted.
+    - **Verified live end-to-end**, not just backtest: a real RB pair
+      (McCaffrey vs. Bijan Robinson) showed `rbEpaModifier` firing
+      correctly in both directions (each player's modifier reflects how
+      far *their own* running score sits from the EPA-implied estimate,
+      not a raw head-to-head EPA comparison — both landed negative here
+      since both are high-volume backs whose blended scores already sit
+      well above the EPA-implied baseline). A real WR pair (Jefferson
+      vs. Lamb) showed `dropRateModifier` correctly firing only for
+      Jefferson (6.25% recent drop rate → -2.28 points) and correctly
+      showing zero for Lamb (0% recent drop rate).
+    - **Result: overall engine accuracy 2025 56.4%→57.5% (+1.1pp), 2024
+      56.2%→56.3% (+0.2pp)** — both seasons better than before this
+      item, not a tradeoff at the whole-engine level (the WR drop-rate
+      tradeoff and the RB EPA gain move in the same net-positive
+      direction once combined).
 
-### Open items (as of item 32 — pick up here)
-Everything through item 30 is committed (`git log`). Items 31-32 (the
-EPA/success-rate and FTN Charting audits immediately above) are
-implemented and verified but not yet committed as of this writing.
+### Open items (as of item 33 — pick up here)
+Everything through item 30 is committed (`git log`). Items 31-33 (the
+EPA/success-rate audit, FTN Charting audit, and this integration pass)
+are implemented and verified but not yet committed as of this writing.
 Nothing below is started or fixed yet:
 
-1. **QB success rate — standalone-validated, not yet integrated.**
-   Stable across both seasons (53.0% 2025 / 52.0% 2024, item 31) —
-   notably, the first QB-specific signal in this whole investigation
-   that didn't flip direction or magnitude between seasons. Candidate
-   for the same additive-term-plus-two-season-sweep treatment as
-   red-zone touches (RB)/snap share (TE)/QB rushing volume, using
-   `qbSuccessRate` (already computed in `NflverseWeekStat`, role-scoped
-   to dropbacks) — no new data plumbing needed, just the engine-side
-   integration and weight sweep.
-2. **RB EPA-per-rush — standalone-validated, not yet integrated.**
-   Positive in both seasons and *improves* out-of-sample (52.2%→57.2%,
-   item 31), unlike most signals tested in this document. Candidate for
-   the same additive-term treatment, using `rushEpaPerPlay` (already
-   computed, role-scoped to rush attempts) — same "no new plumbing
-   needed" situation as QB success rate above.
-3. **WR/TE drop rate — standalone-validated, not yet integrated.**
-   Modest but stable across both positions and both seasons (WR
-   52.4%→53.1%, TE 50.0%→54.8%, item 32) — a "reliability" signal with
-   no equivalent anywhere else in this app. Candidate for the same
-   additive-term treatment, using `dropRate` (already computed in
-   `NflverseWeekStat`, target-scoped, denominator is charted targets via
-   `chartedTargetCount`) — same "no new plumbing needed" situation as
-   the two candidates above. Note: would need a sign-flip (lower is
-   better, unlike every other additive term shipped so far, which are
-   all "more is better") if integrated.
-4. **RB's 2024 drop (58.6%→52.4%) was never decomposed** — confirmed
+1. **TE drop rate remains unresolved** — noisy and non-monotonic at
+   every weight tested in item 33 (smallest sample of anything
+   integrated so far), unlike WR's clean tradeoff shape. Deliberately
+   left untouched (TE exempted from `DROP_RATE_BLEND_WEIGHT` in
+   `engine.ts`) rather than forced into either direction. Would need a
+   larger sample (a future season) or a different TE-specific approach
+   to resolve, not a quick re-sweep of the existing data.
+2. **RB's 2024 drop (58.6%→52.4%) was never decomposed** — confirmed
    real (red-zone data joins and the modifier fires correctly on 2024
    data), but *why* it dropped wasn't isolated the way the original
-   weight sweep decomposed 2025's numbers (item 24).
-5. **`rushYoe` swings hard between seasons** (44.6%→59.8%) — a NextGen-
+   weight sweep decomposed 2025's numbers (item 24). Note RB's baseline
+   has since shifted with item 33's EPA-per-rush addition (2024 RB is
+   now 52.9%, not 52.4%) — worth re-checking this decomposition against
+   the current numbers if picked up.
+3. **`rushYoe` swings hard between seasons** (44.6%→59.8%) — a NextGen-
    Stats-derived rushing efficiency metric; `qbRushingAttempts` (the
    other signal that showed this same instability) is now addressed by
    item 30's additive-term integration, but `rushYoe` itself was never
    investigated further (item 26).
-6. **FTN Charting's pressure/personnel fields** (`n_blitzers`,
+4. **FTN Charting's pressure/personnel fields** (`n_blitzers`,
    `is_qb_out_of_pocket`, box counts, play-action/RPO/screen flags) were
    deliberately skipped in item 32 in favor of drop/created-reception
    rate — these describe the opposing pass rush/scheme more than the
@@ -1258,7 +1327,7 @@ Nothing below is started or fixed yet:
    team-level game-script baseline in item 12), so they'd need their own
    dedicated pass to figure out how to attribute them fairly, not a
    quick extension of item 32's join.
-7. **`/api/backtest/broad-nflverse` has no single-pair equivalent** —
+5. **`/api/backtest/broad-nflverse` has no single-pair equivalent** —
    only Broad mode works for 2024 (see item 24's design constraint);
    the Backtest page's "Single pair" mode is SportsDataIO/2025-only and
    the season toggle is correctly hidden outside Broad mode. Not a bug,
@@ -1348,7 +1417,9 @@ Nothing below is started or fixed yet:
   `recommendation/nflverseLive.ts` (live, one call per comparison
   request). `aggregate.ts` is the shared, pure "what's a player's recent
   signal value" layer on top of that table (`averageSnapShare`/
-  `averageTargetShare`/`averageSeparation`/`averageRedZoneTouches`) —
+  `averageTargetShare`/`averageSeparation`/`averageRedZoneTouches`/
+  `averageGoalLineTouches`/`averageSuccessRate`/`averageEpaPerPlay`/
+  `averageDropRate`) —
   used by both `recommendation/buildInput.ts`/`buildBacktestInput.ts`
   (feeding the live engine — see Recommendation Logic Philosophy and
   "Backtesting & Tuning History" item 20) and, independently,
