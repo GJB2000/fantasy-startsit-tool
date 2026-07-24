@@ -1893,15 +1893,63 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
     - Temporary sweep code (`qbRushEpaExperiment.ts` and its diagnostic
       route) deleted after shipping — unlike prior QB-rushing attempts,
       this one has real, lasting production code, not just a write-up.
+42. **Revisited item 38's joint logistic regression rejection now that
+    the pooled sample is ~4x bigger** (~2437 pairs vs. ~600/season) —
+    item 38 explicitly flagged this as worth revisiting "if a much larger
+    multi-season sample ever exists." Rebuilt `jointModel.ts` (deleted
+    after item 38) with the current engine's full feature set per
+    position, now including `qbRushEpaPerPlay` (shipped since item 38, in
+    item 41) alongside the original signals — same no-intercept,
+    L2-regularized logistic regression on standardized pairwise-diff
+    features as before.
+    - **Added a genuinely stronger test than item 38 had access to**:
+      leave-one-season-out cross-validation (train on 3 seasons, test on
+      the 4th held-out one, repeated for each of the 4 seasons) — a real
+      "never seen this season" check, unlike item 38's single 2025-train/
+      2024-test split or plain k-fold CV within one season (which only
+      tests generalization to a random subset of the *same* season).
+    - **Result: the gap narrowed substantially but the hand-tuned engine
+      still wins clearly.** Pooled (n=2437, l2=1): in-sample 55.7%,
+      10-fold CV 53.5%, leave-one-season-out 51.9%, vs. the engine's
+      55.9% on identical rows. Swept L2 from 1 to 5000 to find the best
+      case for the joint model (same "don't reject on an under-tuned
+      default" discipline as item 38): leave-one-season-out peaked at
+      53.5% (l2=500) before declining at higher regularization and
+      collapsing by l2=5000 — still a real ~2.4pp gap behind the engine
+      at its best point, down from item 38's original ~5-7pp gap (where
+      the joint model was at-or-below chance on every honest check).
+    - **By position (l2=1), the engine wins everywhere on
+      leave-one-season-out, by an uneven margin**: QB 53.7% vs. 57.8%
+      (4.1pp), RB 51.5% vs. 55.7% (4.2pp), WR 50.0% vs. 54.3% (4.3pp,
+      the joint model is genuinely a coin flip here), TE 55.1% vs. 57.5%
+      (2.4pp, the closest of the four — TE's smaller, noisier pool may
+      just mean less room for the engine's tuning discipline to compound
+      an edge). Per-season breakdown shows the joint model's held-out
+      accuracy swinging hard by which season is held out (QB: 61.8% held
+      out 2022, 48.0% held out 2024 — a 13.8pp spread) — it isn't
+      learning a uniformly transferable pattern the way the engine's
+      cross-season-checked weights do, just a better one on average than
+      item 38 found.
+    - **Conclusion: more data was a real, measurable improvement, but not
+      a reversal.** The direction of item 38's finding holds — the
+      conservative, plateau-seeking, cross-season-validated hand-tuning
+      process this document has used throughout still beats a jointly-
+      fit model at this data scale — but the margin shrank from "joint
+      model is at chance" to "joint model is real but ~2-4pp behind,"
+      which is itself informative: it suggests the original gap was
+      partly a genuine sample-size problem (as item 38 speculated) and
+      partly a real methodological edge that hand-tuning holds regardless
+      of sample size. Not chased further (e.g. no attempt to combine the
+      two approaches) — closed as a confirmed, updated rejection.
+      Temporary code (`jointModel.ts` and its diagnostic route) deleted
+      again after recording these numbers.
 
-### Open items (as of item 41 — pick up here)
-Everything through 9857e17 ("Ship QB rushing EPA as a new additive signal")
-is committed (`git log`), including items 40 and 41. Item 40 was
-standalone-only (no lasting code beyond the write-up). Item 41 shipped
-real production code: `QB_RUSH_EPA_BLEND_WEIGHT=0.2` in `config.ts`, plus
-the new `qbRushEpaPerPlay` signal wired through
-`aggregate.ts`/`engine.ts`/`buildBacktestInput.ts`/`buildInput.ts`.
-Nothing below is started or fixed yet:
+### Open items (as of item 42 — pick up here)
+Everything through 4c6deaa ("Fix stale commit-status note in open-items
+intro") is committed (`git log`). Item 42 (this revisit) is written up
+above but not yet committed — standalone-only, no lasting code (same as
+item 38, its temporary experiment file was deleted again). Nothing below
+is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
