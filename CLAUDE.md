@@ -1895,11 +1895,11 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       this one has real, lasting production code, not just a write-up.
 
 ### Open items (as of item 41 — pick up here)
-Everything through 42d1f3b ("Add 2022/2023 to the Backtest page's Season
-toggle") is committed (`git log`). Items 40-41 are written up above but
-not yet committed. Item 40 was standalone-only (no lasting code). Item 41
-shipped real production code: `QB_RUSH_EPA_BLEND_WEIGHT=0.2` in
-`config.ts`, plus the new `qbRushEpaPerPlay` signal wired through
+Everything through 9857e17 ("Ship QB rushing EPA as a new additive signal")
+is committed (`git log`), including items 40 and 41. Item 40 was
+standalone-only (no lasting code beyond the write-up). Item 41 shipped
+real production code: `QB_RUSH_EPA_BLEND_WEIGHT=0.2` in `config.ts`, plus
+the new `qbRushEpaPerPlay` signal wired through
 `aggregate.ts`/`engine.ts`/`buildBacktestInput.ts`/`buildInput.ts`.
 Nothing below is started or fixed yet:
 
