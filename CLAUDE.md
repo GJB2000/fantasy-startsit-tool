@@ -1506,11 +1506,117 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
     standalone. Deliberately stopped here rather than building the 2025
     mapping speculatively — no code was written, this is a scoping
     finding only. See open items below.
+38. **Tested fitting each position's weights jointly (a per-position
+    logistic regression) instead of the hand-tuned, one-signal-at-a-time
+    additive blend this whole document has used so far** — the natural
+    next question once several validated signals existed per position
+    (RB: red-zone touches + EPA-per-rush; WR: target share + separation +
+    drop rate; TE: snap share; QB: rush volume). Built as a standalone
+    backtest experiment, same discipline as every other candidate
+    approach in this document: prove it before shipping it.
+    - **Deliberately reused, not re-derived, the engine's own raw
+      per-player signals** (`scorePlayer()`'s `blendedScore`/
+      `matchupModifier`/`recentVolumeAvg` plus each position's validated
+      signal(s) above) as the joint model's features, so the comparison
+      isolates one variable — *how* the inputs get combined into a final
+      score (a fixed, sequentially-tuned additive blend vs. a jointly-fit
+      linear model) — rather than also changing *what* data each approach
+      sees. Framed as pairwise classification on the same broad-mode
+      adjacent-rank pairs every other number in this document uses
+      (`buildAllPairsForWeek`): feature = the two players' raw-signal
+      difference, label = who actually outscored whom that week. A
+      no-intercept, L2-regularized logistic regression (features
+      standardized per position) was fit via gradient descent — no
+      intercept is deliberate, not an oversight: pairing always lists the
+      higher-season-rank player first, so an intercept would conflate
+      real signal with list order; a model with no intercept is exactly
+      antisymmetric, the correct shape for "which of these two wins."
+    - **Fit on the full 2025 season** (mirroring how the hand-tuned
+      weights were also swept against the full 2025 backtest), then
+      checked three ways: in-sample 2025 accuracy, 5-fold cross-validated
+      2025 accuracy (an honest check, since a higher-capacity jointly-fit
+      model risks overfitting a single season more than the engine's
+      low-parameter blend does), and true out-of-sample 2024 accuracy
+      using the 2025-fit weights/standardizer completely unchanged — the
+      same generalization check every other tuned weight in this document
+      has been put through. The hand-tuned engine's own accuracy was
+      recomputed on these *identical* row subsets (not just quoted from
+      its documented headline number) for a fair apples-to-apples.
+    - **Results (overall, n=610 2025 / 607 2024):**
 
-### Open items (as of item 37 — pick up here)
-Everything through item 37 is committed (`git log`) — item 37 (depth
-charts) was a scoping finding only, no code was written, so its only
-artifact is the write-up above. Nothing below is started or fixed yet:
+      | | in-sample 2025 | 5-fold CV 2025 | out-of-sample 2024 |
+      |---|---|---|---|
+      | joint logistic regression | 56.4% | **48.9%** | **50.7%** |
+      | hand-tuned engine (same rows) | — | 57.5% | 56.3% |
+
+      By position, the same pattern holds everywhere except one:
+
+      | position | joint in-sample | joint CV | joint 2024 | engine 2025 | engine 2024 |
+      |---|---|---|---|---|---|
+      | QB | 57.8% | 48.0% | 48.0% | 52.9% | 55.9% |
+      | RB | 56.2% | 50.2% | 48.0% | 59.6% | 52.9% |
+      | WR | 57.8% | 52.9% | 51.0% | 58.3% | 59.5% |
+      | TE | 52.5% | **38.6%** | 58.4% | 56.4% | 57.4% |
+
+    - **The in-sample number is a mirage.** 56.4% looks competitive with
+      the engine's 57.5% — but that's exactly the number a higher-
+      capacity model is expected to produce on the data it was fit to.
+      Both the 5-fold cross-validation (48.9%, a coin flip) and the true
+      2024 out-of-sample check (50.7%) expose it: the jointly-fit model
+      does not generalize, while the hand-tuned engine — checked on these
+      same identical pairs — clearly does (57.5%/56.3%).
+    - **Confirmed this wasn't just an under-regularized default before
+      rejecting it** — swept L2 strength from 1 to 3000 (same "sweep it,
+      don't guess" discipline as every weight in this document):
+
+      | L2 | 1 | 5 | 20 | 50 | 100 | 200 | 500 | 1000 | 3000 |
+      |---|---|---|---|---|---|---|---|---|---|
+      | CV 2025 | 48.9% | 49.7% | 49.2% | 49.8% | 49.7% | 49.5% | 49.7% | 50.5% | 46.9% |
+      | 2024 | 50.7% | 51.4% | 51.7% | 52.1% | 52.9% | 52.9% | 52.6% | 49.9% | 45.3% |
+
+      Cross-validated accuracy never clears ~50.5% anywhere on this
+      curve — genuinely flat at chance, not a tuning problem — and 2024
+      out-of-sample tops out around 52.9% (L2=100-200) before collapsing
+      as regularization gets heavy enough to wash out even the real
+      blendedScore/volume signal. Nowhere on the curve does the joint
+      model approach the engine's 56.3% on identical 2024 pairs.
+    - **Best guess why a "more rigorous" joint fit loses to a hand-tuned
+      one here**: sample size relative to model capacity. ~100-200 pairs
+      per position is enough to fit 4-6 free parameters to real
+      training-set noise, especially with real collinearity between
+      `blendedScore` and `recentVolumeAvg` (better players get both more
+      volume and more points). The hand-tuned engine's weights, by
+      contrast, were never fit by unconstrained optimization at all —
+      each one was swept for a *plateau*, not a peak (see items 9/10/20),
+      and several were independently checked against 2024 before shipping
+      (items 30/33) — a much stronger implicit regularizer than a generic
+      L2 penalty on standardized coefficients.
+    - **TE's cross-validation number (38.6%, worse than any other
+      bucket) is likely small-sample noise, not a real finding** — TE has
+      the smallest pool in this whole document (n=101) and has been the
+      noisiest position throughout (see items 5/10/20). Its out-of-sample
+      2024 result (58.4%) is, oddly, the one case where the joint model
+      matches the engine — read this as a coincidence of a thin sample,
+      not evidence the joint approach works better at TE specifically.
+    - **Not integrated — closed as a documented negative finding.** This
+      doesn't undermine the project's existing tune-one-signal-at-a-time-
+      and-validate-out-of-sample discipline; if anything it reinforces it
+      — that more statistically "principled" joint fitting loses cleanly
+      to the conservative, plateau-seeking, cross-season-checked hand-
+      tuning process this document has used throughout, at this data
+      scale (~600 pairs/season). Worth revisiting if a much larger
+      multi-season sample ever exists, but not worth pursuing further on
+      two seasons of this size. The temporary `jointModel.ts` module and
+      its diagnostic route were deleted after recording these numbers,
+      same as the temporary diagnostics behind items 22/29/34 — this
+      write-up is the only lasting artifact.
+
+### Open items (as of item 38 — pick up here)
+Everything through item 37 is committed (`git log`); item 38 (the joint
+logistic regression comparison above) was a backtest-only experiment,
+tested and rejected — no config or engine code changed, and its temporary
+code was deleted after recording the numbers, so it has no separate git
+artifact beyond this write-up. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
