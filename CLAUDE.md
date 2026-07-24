@@ -1443,12 +1443,53 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       integration value — three different bars, and a signal can clear
       any subset of them independently. RB cleared none past step 1; WR
       cleared steps 1-2 but not step 3.
+36. **Added a 2024 (nflverse-only) path to the Backtest page's Single
+    pair mode** — closing the scope gap flagged since item 24: only
+    Broad mode had a 2024 equivalent, since the single-pair UI's player
+    search only ever queries SportsDataIO (real SportsDataIO PlayerIDs),
+    while the 2024 nflverse-only pipeline identifies players by its own
+    *synthetic* PlayerIDs (assigned in `gameLog.ts` from
+    `player_display_name`, a completely different ID space with no
+    relationship to SportsDataIO's). Rather than build a parallel
+    2024-specific search UI, resolved the gap server-side: a new
+    `resolveSdioNameToNflverseId()` (`playerMatch.ts`) takes whichever
+    SportsDataIO player the existing search already returned, looks up
+    their real name, and re-joins it into nflverse's synthetic ID space
+    — the same name-normalization join used everywhere else in this
+    pipeline, just run in the reverse direction. A genuine name-mismatch
+    miss (~1% of players, the same rate documented on
+    `normalizePlayerName`) throws a typed `PlayerNotInNflverseSeasonError`
+    that the route surfaces as a clear 404 message, never a silent wrong-
+    player substitution.
+    - New `runPairBacktestNflverseOnly()` (`runBacktestNflverseOnly.ts`)
+      mirrors `runBacktest.ts`'s `runPairBacktest` — same per-week loop,
+      sourced from `loadNflverseOnlyRunData` instead — with the name
+      resolution step in front. `BacktestRunData` (`loadRun.ts`) gained
+      one new optional field, `gameLogPlayerIdByNormalizedName`, set only
+      by the nflverse-only loader; the primary SportsDataIO pipeline is
+      untouched by this addition. New route:
+      `/api/backtest/pair-nflverse`.
+    - **Frontend**: the Season toggle (previously rendered only in Broad
+      mode) now renders for both modes, and `BacktestCaveatNote`'s
+      nflverse caveat now shows whenever 2024 is selected, regardless of
+      mode — matching how the caveat already worked for Broad mode.
+    - **Verified live in the browser**, not just via curl: selected 2024
+      in Single pair mode, searched and added Lamar Jackson and Joe
+      Burrow (both resolved via the existing SportsDataIO-backed search),
+      ran the backtest, and got back real week-by-week 2024 results
+      (correct real scores each week, e.g. week 7's 34.4 vs. 14.9,
+      matching real 2024 box scores) labeled "Showing 2024 results
+      (nflverse-only)" — confirmed this is genuinely running the
+      nflverse-only pipeline end-to-end through the UI, not just the API
+      in isolation. Regression-checked 2025 Single pair and both Broad
+      modes immediately after — all three unchanged from their
+      previously-recorded numbers.
 
-### Open items (as of item 35 — pick up here)
-Everything through item 34 is committed (`git log`). Item 35 (the
-handcuff/teammate-out investigation immediately above) is implemented
-and verified but not yet committed as of this writing. Nothing below is
-started or fixed yet:
+### Open items (as of item 36 — pick up here)
+Everything through item 34 is committed (`git log`). Items 35-36 (the
+handcuff/teammate-out investigation and this Single-pair 2024 addition)
+are implemented and verified but not yet committed as of this writing.
+Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -1477,11 +1518,6 @@ started or fixed yet:
    team-level game-script baseline in item 12), so they'd need their own
    dedicated pass to figure out how to attribute them fairly, not a
    quick extension of item 32's join.
-5. **`/api/backtest/broad-nflverse` has no single-pair equivalent** —
-   only Broad mode works for 2024 (see item 24's design constraint);
-   the Backtest page's "Single pair" mode is SportsDataIO/2025-only and
-   the season toggle is correctly hidden outside Broad mode. Not a bug,
-   just a scope boundary worth knowing about before assuming it's a gap.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
@@ -1626,10 +1662,11 @@ started or fixed yet:
   loader and a duplicated (not shared) orchestration loop, kept separate
   deliberately to avoid any risk to the already-validated 2025 numbers.
 - `src/app/api/players`, `src/app/api/compare`, `src/app/api/backtest/pair`,
-  `src/app/api/backtest/broad`, `src/app/api/backtest/broad-nflverse`
-  (item 24, out-of-sample validation only) — Route Handlers that
-  orchestrate the lib layers above and return trimmed JSON (never proxy
-  raw upstream payloads, never leak the API key).
+  `src/app/api/backtest/broad`, `src/app/api/backtest/broad-nflverse`,
+  `src/app/api/backtest/pair-nflverse` (the latter two, item 24/item 36,
+  out-of-sample validation only) — Route Handlers that orchestrate the
+  lib layers above and return trimmed JSON (never proxy raw upstream
+  payloads, never leak the API key).
 - `src/components/` — `StartSitTool.tsx`/`PlayerSearchInput.tsx`/
   `ComparisonResult.tsx` (live mode) and `BacktestTool.tsx`/
   `BacktestWeekTable.tsx`/`BacktestSummary.tsx`/`BacktestCaveatNote.tsx`

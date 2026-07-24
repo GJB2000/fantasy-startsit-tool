@@ -1,9 +1,18 @@
+import { resolveSdioNameToNflverseId } from "@/lib/nflverse/playerMatch";
 import { RECENT_WEEK_COUNT } from "@/lib/recommendation/config";
 import { buildBacktestComparisonInput } from "@/lib/recommendation/buildBacktestInput";
 import { comparePlayers } from "@/lib/recommendation/engine";
+import { getAnyPlayerById } from "@/lib/sportsdata/players";
 import type { SkillPosition } from "@/lib/sportsdata/types";
 import { type BaselineId } from "./baselines";
-import { gradeWeek, summarize, summarizeByCloseCall, type BacktestSummary, type ConfidenceBreakdown, type WeekGradeResult } from "./grading";
+import {
+  gradeWeek,
+  summarize,
+  summarizeByCloseCall,
+  type BacktestSummary,
+  type ConfidenceBreakdown,
+  type WeekGradeResult,
+} from "./grading";
 import { loadNflverseOnlyRunData } from "./loadRunNflverseOnly";
 import { buildAllPairsForWeek } from "./pairing";
 import { BASELINE_IDS, emptyBaselineOutcomes, gradeBaselinesForPair, summarizeBaselineOutcomes } from "./runBacktest";
@@ -14,6 +23,84 @@ export interface NflverseOnlyBroadBacktestResult {
   overall: BacktestSummary;
   baselineSummaries: Record<BaselineId, BacktestSummary>;
   confidenceBreakdown: ConfidenceBreakdown;
+}
+
+export interface NflverseOnlyPairBacktestResult {
+  weekResults: WeekGradeResult[];
+  summary: BacktestSummary;
+  baselineSummaries: Record<BaselineId, BacktestSummary>;
+  confidenceBreakdown: ConfidenceBreakdown;
+}
+
+/** Thrown when a SportsDataIO player can't be matched into nflverse's 2024 name space — surfaced by the route as a clear user-facing message rather than a silent wrong-player substitution. */
+export class PlayerNotInNflverseSeasonError extends Error {
+  constructor(public readonly displayName: string) {
+    super(`Couldn't find "${displayName}" in nflverse's 2024 data.`);
+  }
+}
+
+/**
+ * nflverse-only equivalent of runBacktest.ts's runPairBacktest. The
+ * single-pair UI only ever searches SportsDataIO's player list (see
+ * PlayerSearchInput.tsx), so the two requested IDs are SportsDataIO
+ * PlayerIDs — resolved here to nflverse's synthetic 2024 IDs by name
+ * (playerMatch.ts's reverse join) before running, so the same search box
+ * works for both pipelines without a parallel 2024-specific search UI.
+ * A genuine name-mismatch miss (~1% of players, per playerMatch.ts)
+ * throws PlayerNotInNflverseSeasonError rather than silently comparing
+ * the wrong player or a null one.
+ */
+export async function runPairBacktestNflverseOnly(
+  sdioPlayerIds: [number, number],
+  season: number,
+  weeks: number[]
+): Promise<NflverseOnlyPairBacktestResult> {
+  const maxWeek = Math.max(...weeks);
+  const [runData, sdioPlayers] = await Promise.all([
+    loadNflverseOnlyRunData(season, maxWeek),
+    Promise.all(sdioPlayerIds.map((id) => getAnyPlayerById(id))),
+  ]);
+  // Always set by loadNflverseOnlyRunData — see BacktestRunData's doc comment.
+  const nameMap = runData.gameLogPlayerIdByNormalizedName ?? new Map<string, number>();
+
+  const playerIds = sdioPlayerIds.map((sdioId, i) => {
+    const sdioPlayer = sdioPlayers[i];
+    if (!sdioPlayer) throw new PlayerNotInNflverseSeasonError(`player ${sdioId}`);
+    const displayName = `${sdioPlayer.FirstName} ${sdioPlayer.LastName}`;
+    const nflverseId = resolveSdioNameToNflverseId(displayName, nameMap);
+    if (nflverseId == null) throw new PlayerNotInNflverseSeasonError(displayName);
+    return nflverseId;
+  }) as [number, number];
+
+  const anyPlayerById = new Map(runData.allPlayers.map((p) => [p.PlayerID, p]));
+  const baselineOutcomes = emptyBaselineOutcomes();
+
+  const weekResults = weeks.map((week) => {
+    const weekSlice = sliceWeekData(
+      runData.allWeeklyRows,
+      week,
+      RECENT_WEEK_COUNT,
+      runData.allTeamWeeklyRows,
+      runData.nflversePlayerWeekTable
+    );
+    const inputs = playerIds.map((id) =>
+      buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
+    );
+    const result = comparePlayers(inputs);
+    const graded = gradeWeek(week, result, playerIds, weekSlice.targetWeekRows);
+
+    const baselineGrades = gradeBaselinesForPair(weekSlice, playerIds, weekSlice.targetWeekRows);
+    for (const id of BASELINE_IDS) baselineOutcomes[id].push(baselineGrades[id]);
+
+    return graded;
+  });
+
+  return {
+    weekResults,
+    summary: summarize(weekResults),
+    baselineSummaries: summarizeBaselineOutcomes(baselineOutcomes),
+    confidenceBreakdown: summarizeByCloseCall(weekResults),
+  };
 }
 
 /**

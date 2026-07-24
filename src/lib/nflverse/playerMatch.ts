@@ -44,3 +44,21 @@ export function buildSdioPlayerIdByNormalizedName(allPlayers: Player[]): Map<str
   }
   return result;
 }
+
+/**
+ * Resolves a SportsDataIO player's display name to nflverse's synthetic
+ * PlayerID for a given season (see gameLog.ts) — the reverse direction
+ * of buildSdioPlayerIdByNormalizedName's join, needed so the single-pair
+ * backtest UI (which only ever searches SportsDataIO's player list) can
+ * also target the nflverse-only 2024 pipeline. Returns null on a genuine
+ * name-mismatch miss (same ~1% miss rate documented on
+ * normalizePlayerName) — the caller is expected to surface that as a
+ * clear "couldn't find this player in 2024 data" message, not silently
+ * substitute a different player.
+ */
+export function resolveSdioNameToNflverseId(
+  displayName: string,
+  playerIdByNormalizedName: Map<string, number>
+): number | null {
+  return playerIdByNormalizedName.get(normalizePlayerName(displayName)) ?? null;
+}

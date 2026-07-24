@@ -92,5 +92,6 @@ export async function loadNflverseOnlyRunData(season: number, maxWeek: number): 
     byesByTeam,
     allPlayers: gameLog.players,
     nflversePlayerWeekTable,
+    gameLogPlayerIdByNormalizedName: gameLog.playerIdByNormalizedName,
   };
 }

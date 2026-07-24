@@ -22,6 +22,8 @@ export interface BacktestRunData {
   allPlayers: Player[];
   /** PlayerID -> week -> snap share/target share/air yards share/NextGen Stats/injury status/red zone touches, joined from nflverse by name (see lib/nflverse/). */
   nflversePlayerWeekTable: Map<number, Map<number, NflverseWeekStat>>;
+  /** Only set by loadRunNflverseOnly.ts's nflverse-only pipeline — the synthetic-ID name map from gameLog.ts, needed to resolve a SportsDataIO player selection into this pipeline's own ID space (see runBacktestNflverseOnly.ts's runPairBacktestNflverseOnly). Unset (and unused) for the primary SportsDataIO pipeline. */
+  gameLogPlayerIdByNormalizedName?: Map<string, number>;
 }
 
 /**

@@ -14,10 +14,11 @@ import { BacktestWeekTable } from "./BacktestWeekTable";
 import { PlayerSearchInput } from "./PlayerSearchInput";
 
 type Mode = "pair" | "broad";
-// "2024" only exists for Broad mode — see runBacktest()'s route selection.
-// The single-pair backtest is SportsDataIO-only; nflverse-only 2024 data
-// only has a broad-mode pipeline (see CLAUDE.md "Backtesting & Tuning
-// History" item 24).
+// 2024 runs against nflverse-only data for both modes — see
+// runBacktest()'s route selection. Single-pair mode resolves the
+// SportsDataIO player selection into nflverse's 2024 name space
+// server-side (see runBacktestNflverseOnly.ts), so the same search box
+// works for both seasons.
 type Season = "2025" | "2024";
 const ALL_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 const WEEK_OPTIONS = Array.from({ length: 18 }, (_, i) => i + 1);
@@ -48,6 +49,7 @@ export function BacktestTool() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pairResult, setPairResult] = useState<PairResponse | null>(null);
+  const [pairResultSeason, setPairResultSeason] = useState<Season>("2025");
   const [broadResult, setBroadResult] = useState<BroadResponse | null>(null);
   const [broadResultSeason, setBroadResultSeason] = useState<Season>("2025");
 
@@ -82,13 +84,17 @@ export function BacktestTool() {
           return;
         }
         const ids = players.map((p) => p.playerId).join(",");
-        const res = await fetch(`/api/backtest/pair?ids=${ids}&weeks=${weeks}`);
+        const path = season === "2024" ? "/api/backtest/pair-nflverse" : "/api/backtest/pair";
+        const query = new URLSearchParams({ ids, weeks });
+        if (season === "2024") query.set("season", "2024");
+        const res = await fetch(`${path}?${query}`);
         const data = await res.json();
         if (!res.ok) {
           setError(data.error ?? "Something went wrong.");
           return;
         }
         setPairResult(data);
+        setPairResultSeason(season);
       } else {
         if (positions.length === 0) {
           setError("Select at least one position.");
@@ -116,7 +122,7 @@ export function BacktestTool() {
 
   return (
     <div className="mx-auto mt-8 w-full max-w-2xl space-y-6">
-      <BacktestCaveatNote showNflverseCaveat={mode === "broad" && season === "2024"} />
+      <BacktestCaveatNote showNflverseCaveat={season === "2024"} />
 
       <div className="flex gap-2 text-sm">
         <button
@@ -141,6 +147,29 @@ export function BacktestTool() {
         >
           Broad (many pairs)
         </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-zinc-500">Season</span>
+        {(["2025", "2024"] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => {
+              setSeason(s);
+              setPairResult(null);
+              setBroadResult(null);
+            }}
+            className={`rounded-md px-3 py-1.5 ${
+              season === s ? "bg-foreground text-background" : "border border-zinc-300 dark:border-zinc-700"
+            }`}
+          >
+            {s}
+          </button>
+        ))}
+        <span className="text-xs text-zinc-500">
+          {season === "2025" ? "primary, tuned" : "out-of-sample validation (nflverse-only)"}
+        </span>
       </div>
 
       {mode === "pair" && (
@@ -179,28 +208,6 @@ export function BacktestTool() {
 
       {mode === "broad" && (
         <>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-zinc-500">Season</span>
-            {(["2025", "2024"] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => {
-                  setSeason(s);
-                  setBroadResult(null);
-                }}
-                className={`rounded-md px-3 py-1.5 ${
-                  season === s ? "bg-foreground text-background" : "border border-zinc-300 dark:border-zinc-700"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-            <span className="text-xs text-zinc-500">
-              {season === "2025" ? "primary, tuned" : "out-of-sample validation (nflverse-only)"}
-            </span>
-          </div>
-
           <div className="flex flex-wrap gap-2 text-sm">
             {ALL_POSITIONS.map((position) => (
               <label
@@ -271,6 +278,9 @@ export function BacktestTool() {
 
       {pairResult && (
         <div className="space-y-4">
+          <p className="text-xs font-medium text-zinc-500">
+            Showing {pairResultSeason} results ({pairResultSeason === "2025" ? "SportsDataIO" : "nflverse-only"})
+          </p>
           <BacktestSummaryView
             summary={pairResult.summary}
             baselineSummaries={pairResult.baselineSummaries}
