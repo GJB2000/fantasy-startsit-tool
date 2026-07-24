@@ -1611,12 +1611,169 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       same as the temporary diagnostics behind items 22/29/34 — this
       write-up is the only lasting artifact.
 
-### Open items (as of item 38 — pick up here)
-Everything through item 37 is committed (`git log`); item 38 (the joint
-logistic regression comparison above) was a backtest-only experiment,
-tested and rejected — no config or engine code changed, and its temporary
-code was deleted after recording the numbers, so it has no separate git
-artifact beyond this write-up. Nothing below is started or fixed yet:
+39. **Extended the nflverse-only backtest pipeline to 2022 and 2023,
+    doubling the out-of-sample seasons available from one (2024) to
+    four (2022-2025), then used the bigger pooled sample two ways: a
+    general robustness check, and a re-test of two signals previously
+    rejected for looking too thin on sample size alone rather than for a
+    wrong underlying idea (QB goal-line rushing — item 30 follow-up;
+    high-wind WR — item 34).**
+    - **Verified compatibility live before building anything** (not
+      assumed): fetched the real 2022/2023 nflverse-data release assets
+      for every source the nflverse-only pipeline depends on —
+      `stats_player_week`, `snap_counts`, `injuries`, `ftn_charting`,
+      `play_by_play`, `nextgen_stats`, and `schedules` — and confirmed
+      byte-identical column schemas to the already-validated 2024/2025
+      files (including `injuries`' `game_type`-not-`season_type` quirk
+      from item 26, present the same way in both new seasons). Team
+      codes also matched exactly between `schedules`' `home_team`/
+      `away_team` and `stats_player_week`'s own `team` column for both
+      seasons (e.g. both use `LA` for the Rams) — unlike item 34's
+      SportsDataIO-vs-nflverse `LAR`/`LA` mismatch, no team-code fix is
+      needed here since this pipeline never touches SportsDataIO's own
+      codes at all.
+    - **Built a permanent, reusable multi-season pooling capability**
+      rather than a one-off script, since "get more robust weight tuning
+      overall" is an ongoing need, not a single check: extracted the
+      per-season week/pair walk shared by every nflverse-only entry point
+      into `collectBroadResultsForSeason` (`runBacktestNflverseOnly.ts`),
+      then added `runBroadBacktestNflverseOnlyMultiSeason` on top of it,
+      pooling engine + full baseline-suite grading across an arbitrary
+      season list (default 2022-2025) while still reporting a per-season
+      breakdown alongside the pooled numbers — same "don't average away
+      a real per-bucket difference" discipline as `summarizeByCloseCall`.
+      New route: `/api/backtest/broad-nflverse-multiseason`. Deliberately
+      runs *all four* seasons — including 2025 — through this same
+      nflverse-only pipeline rather than mixing in the SportsDataIO
+      pipeline's own 2025 numbers, so every pooled season is paired/
+      scored by identical plumbing (item 24 already found the two
+      pipelines agree within ~0.15pp on 2025 in aggregate). Seasons load
+      sequentially, not concurrently, to avoid reproducing the peak-
+      memory reliability problem item 27 fixed for the single-season
+      case.
+    - **General robustness result: the engine holds up remarkably
+      consistently across all four individual seasons** — 2022 55.6%,
+      2023 54.8%, 2024 56.3%, 2025 56.4% (pooled: 55.8%, n=2437) — no
+      season is a wild outlier, which is itself a meaningfully stronger
+      claim than the two-season generalization checks earlier items
+      relied on. By-position pooled (QB 57.1%, RB 55.7%, WR 54.3%, TE
+      57.6%) is also more balanced than any single season showed — TE,
+      the weakest position throughout this document, is no longer
+      clearly the laggard once pooled. The confidence-calibration
+      inversion flagged in items 21-23 and left as a soft, unconfirmed
+      lean in item 29 (limited-data picks outperforming "confident"
+      ones) reappears at a much bigger scale (confident 52.3% n=778 vs.
+      limited-data 58.3% n=1449) — still not formally re-tested for
+      significance here, but a sample this size makes the pattern harder
+      to dismiss as noise; flagged as worth a dedicated pass rather than
+      chased further in this one.
+    - **Deliberate scope limit**: did not re-sweep every already-shipped
+      weight (`VOLUME_BLEND_WEIGHT`, `REDZONE_BLEND_WEIGHT_RB`,
+      `SNAP_SHARE_BLEND_WEIGHT_TE`, `RB_EPA_BLEND_WEIGHT`,
+      `DROP_RATE_BLEND_WEIGHT`) against the pooled sample — that's a
+      larger undertaking than what was asked this pass, which was to
+      extend the pipeline and specifically revisit the two
+      sample-size-limited signals below. Worth a dedicated follow-up.
+    - **QB goal-line rushing re-swept — same instability, better proof
+      of it.** Pooled goal-line-touch volume nearly quadrupled (592 touches
+      / 408 decidable QB pairs, vs. 138 touches / ~100 pairs on 2025
+      alone) — recomputed the conversion factor the same "ratio of sums"
+      way (59.80, close to the single-season 64.543, not re-derived in
+      `config.ts` to avoid disturbing the shipped constant). Swept
+      `w=0` through `0.5` against the pooled sample:
+
+      | `w` | pooled | 2022 | 2023 | 2024 | 2025 |
+      |---|---|---|---|---|---|
+      | 0 (baseline) | 57.1% | 59.8% | 58.8% | 55.9% | 53.9% |
+      | 0.1 | 56.9% | 62.7% | 55.9% | 55.9% | 52.9% |
+      | 0.2 | 57.8% | 63.7% | 57.8% | 55.9% | 53.9% |
+      | 0.3 | 56.1% | 62.7% | 52.9% | 54.9% | 53.9% |
+      | 0.5 | 56.9% | 62.7% | 54.9% | 53.9% | 55.9% |
+
+      The pooled number moves in a shallow, noisy 56.1-57.8% band with
+      no clean plateau — and the by-season columns show exactly why:
+      2022 improves sharply at *every* nonzero weight (+3-9pp) while
+      2023 gets steadily *worse* (58.8%→52.9% by `w=0.3`, a real -5.9pp
+      swing) and 2024/2025 stay roughly flat. A 4x bigger sample didn't
+      resolve the instability that kept this signal unshipped in items
+      30/30a — it replaced "too little data to tell" with a materially
+      different and more decisive verdict: **genuinely unstable even
+      with four seasons pooled**, not just data-starved. Still not
+      shipped — `QB_GOAL_LINE_BLEND_WEIGHT` stays at 0 in `config.ts`,
+      doc comments there updated with this result.
+    - **High-wind WR re-tested — and this time it held up.** Rebuilt the
+      weather join deleted after item 34 (`getGameWeatherByTeamWeek`,
+      now a permanent reader in `schedules.ts`, keying a team+week to
+      that game's roof/temp/wind from the same `schedules` release used
+      for byes), and re-ran "avoid the high-wind player" across all four
+      positions at four thresholds, pooled across 2022-2025:
+
+      | position | wind≥10mph | wind≥12mph | wind≥15mph | wind≥18mph |
+      |---|---|---|---|---|
+      | QB | 52.5% (n=118) | 53.3% (n=90) | 51.3% (n=39) | 46.7% (n=15) |
+      | RB | 49.5% (n=212) | 51.9% (n=160) | 53.8% (n=80) | 50.0% (n=26) |
+      | WR | 55.3% (n=199) | 53.9% (n=141) | 55.4% (n=65) | 44.4% (n=18) |
+      | TE | 45.5% (n=110) | 49.4% (n=83) | 55.6% (n=36) | 61.5% (n=13) |
+
+      **WR is the one real difference from item 34's two-season test.**
+      There, WR's signal *inverted* between the trustworthy 10mph
+      threshold (58.8%/60.0%) and the intuitive-but-thin 15mph one
+      (68.2%/42.9%) — the two couldn't both be right. Pooled across four
+      seasons, that inversion is gone: 10/12/15mph now agree with each
+      other (53.9-55.4%), a more modest number than the original 10mph
+      reading but a genuinely stable one across three different
+      thresholds and a much bigger sample (n=65-199 vs. n=37-101
+      before). 18mph is still thin (n=18) and still noisy — consistent
+      with every other over-narrow cutoff in this document. RB/QB/TE
+      show the same negative/inconsistent pattern as item 34 (RB: no
+      wind effect on the run game, as expected; QB: weak; TE: noisy,
+      this document's chronic small-sample position).
+    - **Promoted WR wind to a real, permanent standalone baseline** —
+      the first time this session's re-tests actually cleared the bar,
+      rather than just refining a rejection. Shipped at the 10mph
+      threshold specifically *because* it's the best-populated, most
+      stable point, not the highest single-point accuracy — the same
+      "prefer the trustworthy plateau over the intuitive-but-thin peak"
+      lesson item 34 itself first drew. Required real plumbing, not just
+      a throwaway script, to match how every other validated standalone
+      signal in this document is wired: `teamWeatherByTeamWeek` added to
+      `BacktestRunData` (populated only by `loadRunNflverseOnly.ts` —
+      the primary SportsDataIO pipeline has no weather data and doesn't
+      share nflverse's team-code conventions closely enough to join
+      directly, so it's simply absent/empty there, degrading to no_pick
+      like every other optional signal) and threaded through
+      `sliceWeekData`/`BacktestWeekSlice`. New `pickByWind` in
+      `baselines.ts` (WR-only, mirroring the position-scoping pattern
+      used throughout this file). Verified end-to-end through the real
+      shared pipeline, not just the throwaway sweep script: the real
+      `wind` baseline via `/api/backtest/broad-nflverse-multiseason`
+      returned 55.9% (n=195) — matching the standalone experiment's
+      55.3% (n=199) within the noise of minor tie-handling differences
+      between the two harnesses. **Not integrated into the live
+      engine** — same architectural blocker flagged in item 34 and the
+      Overview's "Candidate future improvement" note: this looks up the
+      target week's own actual recorded conditions, not a pregame
+      forecast, so it isn't live-wireable until the tool does
+      next-opponent lookup. It now sits at the same status as
+      separation/target share: a real, permanent, validated standalone
+      baseline that isn't (yet) part of `finalScore`.
+    - **Temporary code cleaned up, permanent code kept**: the ad hoc
+      sweep/test harness (`signalRevisitExperiment.ts` and its
+      diagnostic route) was deleted after recording these numbers, same
+      discipline as items 22/29/34/38 — but `getGameWeatherByTeamWeek`,
+      the `teamWeatherByTeamWeek` plumbing, and `pickByWind` all persist
+      as real code, since (unlike goal-line QB rushing) this signal
+      actually cleared the bar this time.
+
+### Open items (as of item 39 — pick up here)
+Everything through item 37 is committed (`git log`); items 38-39 are
+written up above but not yet committed. Item 38 (joint logistic
+regression) was tested and rejected — no lasting code. Item 39 (four-
+season extension) left real, permanent code behind: the pooled
+multi-season route, the re-confirmed rejection of QB goal-line rushing
+(config.ts updated), and a newly-shipped `pickByWind` standalone
+baseline (not integrated into the live engine). Nothing below is
+started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything

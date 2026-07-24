@@ -3,7 +3,7 @@ import { getInjuryReports } from "@/lib/nflverse/injuries";
 import { getNgsPassing, getNgsReceiving, getNgsRushing } from "@/lib/nflverse/nextGenStats";
 import { getRedZoneTouches } from "@/lib/nflverse/playByPlay";
 import { getPlayerWeekStats } from "@/lib/nflverse/playerStats";
-import { getNflverseByes } from "@/lib/nflverse/schedules";
+import { getGameWeatherByTeamWeek, getNflverseByes } from "@/lib/nflverse/schedules";
 import { getSnapCounts } from "@/lib/nflverse/snapCounts";
 import { buildNflversePlayerWeekTable } from "@/lib/nflverse/weekTable";
 import type { BacktestRunData } from "./loadRun";
@@ -59,15 +59,20 @@ export async function loadNflverseOnlyRunData(season: number, maxWeek: number): 
 
   const gameLog = await getNflverseGameLog(season, maxWeek);
 
-  const [byesByTeam, snapCounts, playerWeekStats, ngsPassing, ngsReceiving, ngsRushing, injuryReports] = await Promise.all([
-    getNflverseByes(season, maxWeek),
-    loadNflverse("snap counts", () => getSnapCounts(season)),
-    loadNflverse("player week stats", () => getPlayerWeekStats(season)),
-    loadNflverse("NGS passing", () => getNgsPassing(season)),
-    loadNflverse("NGS receiving", () => getNgsReceiving(season)),
-    loadNflverse("NGS rushing", () => getNgsRushing(season)),
-    loadNflverse("injury reports", () => getInjuryReports(season)),
-  ]);
+  const [byesByTeam, teamWeatherByTeamWeek, snapCounts, playerWeekStats, ngsPassing, ngsReceiving, ngsRushing, injuryReports] =
+    await Promise.all([
+      getNflverseByes(season, maxWeek),
+      // Same underlying schedules/games.csv fetch as getNflverseByes above —
+      // shares client.ts's in-process cache, so this doesn't add a second
+      // network request.
+      getGameWeatherByTeamWeek(season),
+      loadNflverse("snap counts", () => getSnapCounts(season)),
+      loadNflverse("player week stats", () => getPlayerWeekStats(season)),
+      loadNflverse("NGS passing", () => getNgsPassing(season)),
+      loadNflverse("NGS receiving", () => getNgsReceiving(season)),
+      loadNflverse("NGS rushing", () => getNgsRushing(season)),
+      loadNflverse("injury reports", () => getInjuryReports(season)),
+    ]);
 
   const redZoneTouches = await loadNflverse("red zone touches", () => getRedZoneTouches(season));
 
@@ -93,5 +98,6 @@ export async function loadNflverseOnlyRunData(season: number, maxWeek: number): 
     allPlayers: gameLog.players,
     nflversePlayerWeekTable,
     gameLogPlayerIdByNormalizedName: gameLog.playerIdByNormalizedName,
+    teamWeatherByTeamWeek,
   };
 }

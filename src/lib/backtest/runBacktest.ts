@@ -75,7 +75,8 @@ export async function runPairBacktest(
       week,
       RECENT_WEEK_COUNT,
       runData.allTeamWeeklyRows,
-      runData.nflversePlayerWeekTable
+      runData.nflversePlayerWeekTable,
+      runData.teamWeatherByTeamWeek
     );
     const inputs = playerIds.map((id) =>
       buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
@@ -126,7 +127,8 @@ export async function runBroadBacktest(
       week,
       RECENT_WEEK_COUNT,
       runData.allTeamWeeklyRows,
-      runData.nflversePlayerWeekTable
+      runData.nflversePlayerWeekTable,
+      runData.teamWeatherByTeamWeek
     );
     const pairs = buildAllPairsForWeek(weekSlice, positions);
 

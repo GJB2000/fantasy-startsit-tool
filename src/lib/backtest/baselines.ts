@@ -24,7 +24,8 @@ export type BaselineId =
   | "successRate"
   | "dropRate"
   | "createdReceptionRate"
-  | "teammateOutBump";
+  | "teammateOutBump"
+  | "wind";
 
 export const BASELINE_LABELS: Record<BaselineId, string> = {
   priorWeek: "Prior week's points",
@@ -49,6 +50,7 @@ export const BASELINE_LABELS: Record<BaselineId, string> = {
   dropRate: "Drop rate, lower wins (WR/TE, FTN Charting)",
   createdReceptionRate: "Created-reception rate (contested/tough catches, WR/TE, FTN Charting)",
   teammateOutBump: "Same-position teammate Out/Doubtful this week (\"handcuff\" bump)",
+  wind: "Avoid the high-wind player (WR only, nflverse schedules)",
 };
 
 function average(values: number[]): number {
@@ -462,6 +464,46 @@ export function pickByQbRushingAttempts(weekSlice: BacktestWeekSlice, playerIds:
   return avgs[0] > avgs[1] ? playerIds[0] : playerIds[1];
 }
 
+const WIND_BASELINE_THRESHOLD_MPH = 10;
+
+/**
+ * Naive baseline: pick whoever's team is NOT playing in a high-wind game
+ * this week (wind reduces passing efficiency more than any other weather
+ * variable — rain/cold included — which is why this is scoped to WR
+ * only), from nflverse's schedules release (see schedules.ts's
+ * getGameWeatherByTeamWeek). Domes/no-wind-reading games are treated as
+ * "not windy" rather than excluded — they're the common comparison case
+ * a windy road environment should be measured against, not a gap in the
+ * data. 10mph was chosen deliberately over a more dramatic-sounding
+ * higher cutoff: re-tested across four pooled seasons (2022-2025) at
+ * several thresholds, 10mph gave the best-populated, most stable result
+ * (~55% across a much bigger sample), while higher cutoffs (15-18mph)
+ * looked more dramatic on a single season but flipped sign once pooled —
+ * see CLAUDE.md's wind re-test (originally item 34, revisited once
+ * 2022/2023 data extended the pooled sample).
+ *
+ * Only decidable when exactly one of the two players' teams is playing
+ * in a high-wind game this week — a current-week fact, not a trailing
+ * average, same shape as pickByInjuryStatus/pickByTeammateOutBump.
+ * Backtest-only: this looks up the TARGET week's own actual recorded
+ * conditions rather than a pregame forecast, so it isn't live-wireable
+ * until the tool does next-opponent lookup — see the Overview's
+ * "Candidate future improvement" note in CLAUDE.md.
+ */
+export function pickByWind(weekSlice: BacktestWeekSlice, playerIds: [number, number]): number | null {
+  const positions = playerIds.map((id) => positionOf(weekSlice, id));
+  if (positions.some((p) => p !== "WR")) return null;
+
+  const windy = playerIds.map((id) => {
+    const row = weekSlice.targetWeekRows.find((r) => r.PlayerID === id);
+    if (!row) return null;
+    const wind = weekSlice.teamWeatherByTeamWeek.get(`${row.Team}/${weekSlice.targetWeek}`)?.wind ?? null;
+    return wind != null && wind >= WIND_BASELINE_THRESHOLD_MPH;
+  });
+  if (windy[0] == null || windy[1] == null || windy[0] === windy[1]) return null;
+  return windy[0] ? playerIds[1] : playerIds[0];
+}
+
 export const BASELINE_PICKERS: Record<
   BaselineId,
   (weekSlice: BacktestWeekSlice, playerIds: [number, number]) => number | null
@@ -488,4 +530,5 @@ export const BASELINE_PICKERS: Record<
   dropRate: pickByDropRate,
   createdReceptionRate: pickByCreatedReceptionRate,
   teammateOutBump: pickByTeammateOutBump,
+  wind: pickByWind,
 };

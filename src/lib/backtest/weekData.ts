@@ -1,3 +1,4 @@
+import type { GameWeather } from "@/lib/nflverse/schedules";
 import type { NflverseWeekStat } from "@/lib/nflverse/weekTable";
 import { buildPositionDefenseTableFromRows, type PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { buildSeasonToDatePlayerStatsFromRows } from "@/lib/sportsdata/seasonToDatePlayerStats";
@@ -24,6 +25,8 @@ export interface BacktestWeekSlice {
    * signal — see CLAUDE.md's unused-data-audit follow-up.
    */
   hasLimitedTeammate: (team: string, position: string, playerId: number, week: number) => boolean;
+  /** `${team}/${week}` -> that game's weather (nflverse schedules release). Empty unless the nflverse-only pipeline supplied it (see loadRunNflverseOnly.ts) — backs the WR-only pickByWind baseline; absent for the primary SportsDataIO pipeline. */
+  teamWeatherByTeamWeek: Map<string, GameWeather>;
 }
 
 const LIMITED_INJURY_STATUSES = new Set(["Out", "Doubtful"]);
@@ -43,7 +46,8 @@ export function sliceWeekData(
   targetWeek: number,
   recentWeekCount: number,
   allTeamWeeklyRows: TeamGameStat[][] = [],
-  nflversePlayerWeekTable: Map<number, Map<number, NflverseWeekStat>> = new Map()
+  nflversePlayerWeekTable: Map<number, Map<number, NflverseWeekStat>> = new Map(),
+  teamWeatherByTeamWeek: Map<string, GameWeather> = new Map()
 ): BacktestWeekSlice {
   const priorRows = allWeeklyRows.slice(0, targetWeek - 1); // weeks 1..targetWeek-1
   const targetWeekRows = allWeeklyRows[targetWeek - 1] ?? [];
@@ -110,5 +114,6 @@ export function sliceWeekData(
     recentNflverseByPlayer,
     nflverseStatForWeek,
     hasLimitedTeammate,
+    teamWeatherByTeamWeek,
   };
 }

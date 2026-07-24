@@ -173,6 +173,13 @@ export const QB_RUSH_BLEND_WEIGHT = 0.3;
  * and its best 2024 result only reaches a bare coin flip (52%), nowhere
  * near fixing the gap. Kept as a documented, deliberately-rejected
  * finding — see CLAUDE.md item 30 follow-up for the full sweep.
+ *
+ * Re-swept once 2022/2023 nflverse data extended the pooled sample to
+ * four seasons (592 goal-line plays / 408 QB pairs, vs. 138/~100 on 2025
+ * alone) — recomputed pooled conversion factor: 59.80 (close to this
+ * single-season 64.543, not re-derived here to avoid disturbing the
+ * shipped constant). Conclusion unchanged: still not shipped — see
+ * QB_GOAL_LINE_BLEND_WEIGHT below.
  */
 export const POINTS_PER_QB_GOAL_LINE_RUSH = 64.543;
 
@@ -188,6 +195,17 @@ export const POINTS_PER_QB_GOAL_LINE_RUSH = 64.543;
  * off rather than deleted, so this isn't re-discovered from scratch if
  * revisited with a future season's data. See CLAUDE.md item 30
  * follow-up for the full two-season sweep.
+ *
+ * Re-swept against a four-season pooled sample (2022-2025, 408 QB pairs)
+ * once 2022/2023 nflverse data became available: pooled accuracy moved
+ * from 57.1% (w=0) to a shallow, noisy 56.1-57.8% across w=0-0.5, with
+ * NO clean plateau — by-season breakdown showed 2022 improving sharply
+ * at every nonzero weight (+5-9pp) while 2023 got steadily *worse*
+ * (-6pp by w=0.3) and 2024/2025 stayed roughly flat. A 4x bigger sample
+ * didn't resolve the instability that kept this unshipped in the first
+ * place — it confirmed the instability is a real property of this
+ * narrow a signal, not just an artifact of too little data. Still not
+ * shipped. See CLAUDE.md's four-season extension writeup.
  */
 export const QB_GOAL_LINE_BLEND_WEIGHT = 0;
 

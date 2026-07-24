@@ -3,6 +3,7 @@ import { getNgsPassing, getNgsReceiving, getNgsRushing } from "@/lib/nflverse/ne
 import { getRedZoneTouches } from "@/lib/nflverse/playByPlay";
 import { buildSdioPlayerIdByNormalizedName } from "@/lib/nflverse/playerMatch";
 import { getPlayerWeekStats } from "@/lib/nflverse/playerStats";
+import type { GameWeather } from "@/lib/nflverse/schedules";
 import { getSnapCounts } from "@/lib/nflverse/snapCounts";
 import { buildNflversePlayerWeekTable, type NflverseWeekStat } from "@/lib/nflverse/weekTable";
 import { getByes } from "@/lib/sportsdata/byes";
@@ -24,6 +25,16 @@ export interface BacktestRunData {
   nflversePlayerWeekTable: Map<number, Map<number, NflverseWeekStat>>;
   /** Only set by loadRunNflverseOnly.ts's nflverse-only pipeline — the synthetic-ID name map from gameLog.ts, needed to resolve a SportsDataIO player selection into this pipeline's own ID space (see runBacktestNflverseOnly.ts's runPairBacktestNflverseOnly). Unset (and unused) for the primary SportsDataIO pipeline. */
   gameLogPlayerIdByNormalizedName?: Map<string, number>;
+  /**
+   * `${team}/${week}` -> that game's weather, from nflverse's schedules
+   * release. Only set by loadRunNflverseOnly.ts — the primary SportsDataIO
+   * pipeline has no weather data of its own and doesn't share nflverse's
+   * team-code conventions closely enough to join onto directly (see
+   * CLAUDE.md's wind re-test). Backs the WR-only pickByWind baseline
+   * (baselines.ts); degrades to no_pick when unset, same as every other
+   * optional signal.
+   */
+  teamWeatherByTeamWeek?: Map<string, GameWeather>;
 }
 
 /**

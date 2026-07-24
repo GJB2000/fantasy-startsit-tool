@@ -9,10 +9,12 @@ import {
   gradeWeek,
   summarize,
   summarizeByCloseCall,
+  type BacktestOutcome,
   type BacktestSummary,
   type ConfidenceBreakdown,
   type WeekGradeResult,
 } from "./grading";
+import type { BacktestRunData } from "./loadRun";
 import { loadNflverseOnlyRunData } from "./loadRunNflverseOnly";
 import { buildAllPairsForWeek } from "./pairing";
 import { BASELINE_IDS, emptyBaselineOutcomes, gradeBaselinesForPair, summarizeBaselineOutcomes } from "./runBacktest";
@@ -23,6 +25,56 @@ export interface NflverseOnlyBroadBacktestResult {
   overall: BacktestSummary;
   baselineSummaries: Record<BaselineId, BacktestSummary>;
   confidenceBreakdown: ConfidenceBreakdown;
+}
+
+interface SeasonCollection {
+  allResults: WeekGradeResult[];
+  byPositionResults: Record<string, WeekGradeResult[]>;
+  baselineOutcomes: Record<BaselineId, BacktestOutcome[]>;
+}
+
+/**
+ * The per-season week/pair walk shared by runBroadBacktestNflverseOnly
+ * (single season) and runBroadBacktestNflverseOnlyMultiSeason (pools
+ * several seasons) — extracted so pooling across seasons doesn't require
+ * a second copy of this loop.
+ */
+function collectBroadResultsForSeason(
+  runData: BacktestRunData,
+  weeks: number[],
+  positions: SkillPosition[]
+): SeasonCollection {
+  const anyPlayerById = new Map(runData.allPlayers.map((p) => [p.PlayerID, p]));
+  const byPositionResults: Record<string, WeekGradeResult[]> = {};
+  const allResults: WeekGradeResult[] = [];
+  const baselineOutcomes = emptyBaselineOutcomes();
+
+  for (const week of weeks) {
+    const weekSlice = sliceWeekData(
+      runData.allWeeklyRows,
+      week,
+      RECENT_WEEK_COUNT,
+      runData.allTeamWeeklyRows,
+      runData.nflversePlayerWeekTable,
+      runData.teamWeatherByTeamWeek
+    );
+    const pairs = buildAllPairsForWeek(weekSlice, positions);
+
+    for (const pair of pairs) {
+      const inputs = pair.playerIds.map((id) =>
+        buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
+      );
+      const result = comparePlayers(inputs);
+      const graded = gradeWeek(week, result, pair.playerIds, weekSlice.targetWeekRows);
+      allResults.push(graded);
+      (byPositionResults[pair.position] ??= []).push(graded);
+
+      const baselineGrades = gradeBaselinesForPair(weekSlice, pair.playerIds, weekSlice.targetWeekRows);
+      for (const id of BASELINE_IDS) baselineOutcomes[id].push(baselineGrades[id]);
+    }
+  }
+
+  return { allResults, byPositionResults, baselineOutcomes };
 }
 
 export interface NflverseOnlyPairBacktestResult {
@@ -81,7 +133,8 @@ export async function runPairBacktestNflverseOnly(
       week,
       RECENT_WEEK_COUNT,
       runData.allTeamWeeklyRows,
-      runData.nflversePlayerWeekTable
+      runData.nflversePlayerWeekTable,
+      runData.teamWeatherByTeamWeek
     );
     const inputs = playerIds.map((id) =>
       buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
@@ -125,35 +178,7 @@ export async function runBroadBacktestNflverseOnly(
 ): Promise<NflverseOnlyBroadBacktestResult> {
   const maxWeek = Math.max(...weeks);
   const runData = await loadNflverseOnlyRunData(season, maxWeek);
-  const anyPlayerById = new Map(runData.allPlayers.map((p) => [p.PlayerID, p]));
-
-  const byPositionResults: Record<string, WeekGradeResult[]> = {};
-  const allResults: WeekGradeResult[] = [];
-  const baselineOutcomes = emptyBaselineOutcomes();
-
-  for (const week of weeks) {
-    const weekSlice = sliceWeekData(
-      runData.allWeeklyRows,
-      week,
-      RECENT_WEEK_COUNT,
-      runData.allTeamWeeklyRows,
-      runData.nflversePlayerWeekTable
-    );
-    const pairs = buildAllPairsForWeek(weekSlice, positions);
-
-    for (const pair of pairs) {
-      const inputs = pair.playerIds.map((id) =>
-        buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
-      );
-      const result = comparePlayers(inputs);
-      const graded = gradeWeek(week, result, pair.playerIds, weekSlice.targetWeekRows);
-      allResults.push(graded);
-      (byPositionResults[pair.position] ??= []).push(graded);
-
-      const baselineGrades = gradeBaselinesForPair(weekSlice, pair.playerIds, weekSlice.targetWeekRows);
-      for (const id of BASELINE_IDS) baselineOutcomes[id].push(baselineGrades[id]);
-    }
-  }
+  const { allResults, byPositionResults, baselineOutcomes } = collectBroadResultsForSeason(runData, weeks, positions);
 
   const byPosition: Record<string, BacktestSummary> = {};
   for (const [position, results] of Object.entries(byPositionResults)) {
@@ -165,5 +190,75 @@ export async function runBroadBacktestNflverseOnly(
     overall: summarize(allResults),
     baselineSummaries: summarizeBaselineOutcomes(baselineOutcomes),
     confidenceBreakdown: summarizeByCloseCall(allResults),
+  };
+}
+
+export interface NflverseOnlyMultiSeasonBroadBacktestResult {
+  /** Per-season breakdown, so any one season's behavior is visible directly rather than averaged away — see CLAUDE.md's joint-model item for why that matters. */
+  bySeason: Record<number, { overall: BacktestSummary; byPosition: Record<string, BacktestSummary> }>;
+  byPosition: Record<string, BacktestSummary>;
+  overall: BacktestSummary;
+  baselineSummaries: Record<BaselineId, BacktestSummary>;
+  confidenceBreakdown: ConfidenceBreakdown;
+}
+
+/**
+ * Pools the nflverse-only pipeline across several seasons (e.g. 2022-2025)
+ * into one combined sample — built to get a larger, more robust base for
+ * weight tuning than any single season offers, and specifically to
+ * re-check candidate signals that were previously rejected for looking
+ * thin on sample size alone (QB goal-line rushing, high-wind WR) rather
+ * than for a wrong underlying idea. Runs every requested season through
+ * this SAME nflverse-only pipeline — including 2025, even though the
+ * SportsDataIO pipeline is the one actually shipped — so every pooled
+ * season is paired/scored by identical plumbing; item 24 already found
+ * the two pipelines agree within ~0.15pp on 2025 in aggregate, so this
+ * doesn't trade away meaningful accuracy for that consistency.
+ *
+ * Seasons are loaded and collected sequentially, not via Promise.all: each
+ * season's load includes a full play-by-play parse, and firing several of
+ * those concurrently would reproduce the peak-memory reliability problem
+ * item 27 already fixed for the single-season case.
+ */
+export async function runBroadBacktestNflverseOnlyMultiSeason(
+  seasons: number[],
+  weeks: number[],
+  positions: SkillPosition[]
+): Promise<NflverseOnlyMultiSeasonBroadBacktestResult> {
+  const maxWeek = Math.max(...weeks);
+
+  const pooledAllResults: WeekGradeResult[] = [];
+  const pooledByPositionResults: Record<string, WeekGradeResult[]> = {};
+  const pooledBaselineOutcomes = emptyBaselineOutcomes();
+  const bySeason: Record<number, { overall: BacktestSummary; byPosition: Record<string, BacktestSummary> }> = {};
+
+  for (const season of seasons) {
+    const runData: BacktestRunData = await loadNflverseOnlyRunData(season, maxWeek);
+    const { allResults, byPositionResults, baselineOutcomes } = collectBroadResultsForSeason(runData, weeks, positions);
+
+    pooledAllResults.push(...allResults);
+    for (const [position, results] of Object.entries(byPositionResults)) {
+      (pooledByPositionResults[position] ??= []).push(...results);
+    }
+    for (const id of BASELINE_IDS) pooledBaselineOutcomes[id].push(...(baselineOutcomes[id] as BacktestOutcome[]));
+
+    const seasonByPosition: Record<string, BacktestSummary> = {};
+    for (const [position, results] of Object.entries(byPositionResults)) {
+      seasonByPosition[position] = summarize(results);
+    }
+    bySeason[season] = { overall: summarize(allResults), byPosition: seasonByPosition };
+  }
+
+  const byPosition: Record<string, BacktestSummary> = {};
+  for (const [position, results] of Object.entries(pooledByPositionResults)) {
+    byPosition[position] = summarize(results);
+  }
+
+  return {
+    bySeason,
+    byPosition,
+    overall: summarize(pooledAllResults),
+    baselineSummaries: summarizeBaselineOutcomes(pooledBaselineOutcomes),
+    confidenceBreakdown: summarizeByCloseCall(pooledAllResults),
   };
 }
