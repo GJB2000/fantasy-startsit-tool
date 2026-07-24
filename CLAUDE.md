@@ -1484,12 +1484,34 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       in isolation. Regression-checked 2025 Single pair and both Broad
       modes immediately after — all three unchanged from their
       previously-recorded numbers.
+37. **Scoped out nflverse's `depth_charts` release as a candidate signal
+    (official pregame role designation — starter vs. backup — rather
+    than anything derived from box-score stats) and found a real,
+    non-trivial blocker before writing any code.** 2024's file has the
+    expected clean `season`/`week`/`game_type`/`depth_team` schema (the
+    official weekly NFL depth-chart submission format — confirmed real
+    counts: e.g. 1087/1049/881 RB-weeks at depth_team 1/2/3, exactly the
+    "is this player the starter" signal this was meant to test). **But
+    2025's file uses a completely different schema** — keyed by `dt` (a
+    raw ESPN-scrape timestamp, 221 distinct snapshots across the season,
+    no `week` column at all) rather than the season/week format every
+    other nflverse source used in this project shares across both
+    backtest seasons. This is the first source where 2024 and 2025 are
+    structurally incompatible, not just a name/column-naming quirk like
+    the LAR/LA or season_type/game_type catches in earlier items —
+    reliably mapping each snapshot to "the week it represents" would be
+    its own nontrivial, leakage-prone inference problem (depth charts
+    shift continuously; a snapshot taken days before kickoff may not
+    match gameday reality) before the actual signal could even be tested
+    standalone. Deliberately stopped here rather than building the 2025
+    mapping speculatively — no code was written, this is a scoping
+    finding only. See open items below.
 
-### Open items (as of item 36 — pick up here)
-Everything through item 34 is committed (`git log`). Items 35-36 (the
-handcuff/teammate-out investigation and this Single-pair 2024 addition)
-are implemented and verified but not yet committed as of this writing.
-Nothing below is started or fixed yet:
+### Open items (as of item 37 — pick up here)
+Everything through item 36 is committed (`git log`). Item 37 (depth
+charts, immediately above) is a scoping finding only —
+no code was written, so there's nothing to commit for it beyond this
+write-up. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -1518,6 +1540,17 @@ Nothing below is started or fixed yet:
    team-level game-script baseline in item 12), so they'd need their own
    dedicated pass to figure out how to attribute them fairly, not a
    quick extension of item 32's join.
+5. **Depth charts (starter/backup role) — real signal candidate,
+   blocked on a schema incompatibility, not yet resolved.** 2024's
+   `depth_charts` file has the clean season/week format needed; 2025's
+   is a completely different ESPN-scrape/timestamp format with no week
+   column (item 37). Before this can even be standalone-tested
+   cross-season, someone needs to either (a) build a reliable
+   snapshot-to-week mapping for the 2025 file, or (b) test 2024 alone
+   first (accepting no cross-season validation until the mapping is
+   solved) to see if the signal is even worth the mapping effort. Not
+   started — item 37 deliberately stopped at the scoping stage rather
+   than guessing at a mapping.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
