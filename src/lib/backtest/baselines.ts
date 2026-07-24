@@ -25,7 +25,8 @@ export type BaselineId =
   | "dropRate"
   | "createdReceptionRate"
   | "teammateOutBump"
-  | "wind";
+  | "wind"
+  | "depthChart";
 
 export const BASELINE_LABELS: Record<BaselineId, string> = {
   priorWeek: "Prior week's points",
@@ -51,6 +52,7 @@ export const BASELINE_LABELS: Record<BaselineId, string> = {
   createdReceptionRate: "Created-reception rate (contested/tough catches, WR/TE, FTN Charting)",
   teammateOutBump: "Same-position teammate Out/Doubtful this week (\"handcuff\" bump)",
   wind: "Avoid the high-wind player (WR only, nflverse schedules)",
+  depthChart: "Higher on the official depth chart (RB/WR only, nflverse depth_charts, 2022-2024 only)",
 };
 
 function average(values: number[]): number {
@@ -504,6 +506,34 @@ export function pickByWind(weekSlice: BacktestWeekSlice, playerIds: [number, num
   return windy[0] ? playerIds[1] : playerIds[0];
 }
 
+/**
+ * Naive baseline: pick whoever's officially listed higher on the depth
+ * chart (lower `depth_team` — 1=starter, 2=backup, ...) — a current-week
+ * role fact, not a trailing performance average, same shape as
+ * pickByInjuryStatus/pickByWind. RB/WR only: standalone-tested at TE
+ * (56.5% pooled, but dipped below chance in one of three seasons — TE's
+ * usual noisiness throughout this app) and QB (n=15 total across three
+ * seasons, far too thin to trust) before scoping this to the two
+ * positions where it actually held up — see CLAUDE.md's depth-chart
+ * follow-up to item 37.
+ *
+ * Only ever populated for 2022-2024 (`weekSlice.depthChartByPlayerIdWeek`
+ * — see loadRunNflverseOnly.ts/nflverse/depthCharts.ts): 2025's file uses
+ * a structurally incompatible ESPN-scrape/timestamp schema with no week
+ * column, and reliably mapping snapshots to weeks would be its own
+ * leakage-prone inference problem, deliberately not attempted (item 37).
+ * No_pick for any pair evaluated against 2025 or the primary
+ * SportsDataIO pipeline, same graceful-degradation shape as wind.
+ */
+export function pickByDepthChart(weekSlice: BacktestWeekSlice, playerIds: [number, number]): number | null {
+  const positions = playerIds.map((id) => positionOf(weekSlice, id));
+  if (positions.some((p) => p !== "RB" && p !== "WR")) return null;
+
+  const depths = playerIds.map((id) => weekSlice.depthChartByPlayerIdWeek.get(id)?.get(weekSlice.targetWeek) ?? null);
+  if (depths[0] == null || depths[1] == null || depths[0] === depths[1]) return null;
+  return depths[0] < depths[1] ? playerIds[0] : playerIds[1];
+}
+
 export const BASELINE_PICKERS: Record<
   BaselineId,
   (weekSlice: BacktestWeekSlice, playerIds: [number, number]) => number | null
@@ -531,4 +561,5 @@ export const BASELINE_PICKERS: Record<
   createdReceptionRate: pickByCreatedReceptionRate,
   teammateOutBump: pickByTeammateOutBump,
   wind: pickByWind,
+  depthChart: pickByDepthChart,
 };

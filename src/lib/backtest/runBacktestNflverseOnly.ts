@@ -56,7 +56,8 @@ function collectBroadResultsForSeason(
       RECENT_WEEK_COUNT,
       runData.allTeamWeeklyRows,
       runData.nflversePlayerWeekTable,
-      runData.teamWeatherByTeamWeek
+      runData.teamWeatherByTeamWeek,
+      runData.depthChartByPlayerIdWeek
     );
     const pairs = buildAllPairsForWeek(weekSlice, positions);
 
@@ -134,7 +135,8 @@ export async function runPairBacktestNflverseOnly(
       RECENT_WEEK_COUNT,
       runData.allTeamWeeklyRows,
       runData.nflversePlayerWeekTable,
-      runData.teamWeatherByTeamWeek
+      runData.teamWeatherByTeamWeek,
+      runData.depthChartByPlayerIdWeek
     );
     const inputs = playerIds.map((id) =>
       buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)

@@ -1,3 +1,4 @@
+import { getDepthChartByNormalizedNameWeek } from "@/lib/nflverse/depthCharts";
 import { getNflverseGameLog } from "@/lib/nflverse/gameLog";
 import { getInjuryReports } from "@/lib/nflverse/injuries";
 import { getNgsPassing, getNgsReceiving, getNgsRushing } from "@/lib/nflverse/nextGenStats";
@@ -59,22 +60,46 @@ export async function loadNflverseOnlyRunData(season: number, maxWeek: number): 
 
   const gameLog = await getNflverseGameLog(season, maxWeek);
 
-  const [byesByTeam, teamWeatherByTeamWeek, snapCounts, playerWeekStats, ngsPassing, ngsReceiving, ngsRushing, injuryReports] =
-    await Promise.all([
-      getNflverseByes(season, maxWeek),
-      // Same underlying schedules/games.csv fetch as getNflverseByes above —
-      // shares client.ts's in-process cache, so this doesn't add a second
-      // network request.
-      getGameWeatherByTeamWeek(season),
-      loadNflverse("snap counts", () => getSnapCounts(season)),
-      loadNflverse("player week stats", () => getPlayerWeekStats(season)),
-      loadNflverse("NGS passing", () => getNgsPassing(season)),
-      loadNflverse("NGS receiving", () => getNgsReceiving(season)),
-      loadNflverse("NGS rushing", () => getNgsRushing(season)),
-      loadNflverse("injury reports", () => getInjuryReports(season)),
-    ]);
+  const [
+    byesByTeam,
+    teamWeatherByTeamWeek,
+    depthChartByNormalizedNameWeek,
+    snapCounts,
+    playerWeekStats,
+    ngsPassing,
+    ngsReceiving,
+    ngsRushing,
+    injuryReports,
+  ] = await Promise.all([
+    getNflverseByes(season, maxWeek),
+    // Same underlying schedules/games.csv fetch as getNflverseByes above —
+    // shares client.ts's in-process cache, so this doesn't add a second
+    // network request.
+    getGameWeatherByTeamWeek(season),
+    getDepthChartByNormalizedNameWeek(season).catch((err) => {
+      console.error(`Failed to load nflverse depth charts (${season} nflverse-only backtest):`, err);
+      return new Map<string, Map<number, number>>();
+    }),
+    loadNflverse("snap counts", () => getSnapCounts(season)),
+    loadNflverse("player week stats", () => getPlayerWeekStats(season)),
+    loadNflverse("NGS passing", () => getNgsPassing(season)),
+    loadNflverse("NGS receiving", () => getNgsReceiving(season)),
+    loadNflverse("NGS rushing", () => getNgsRushing(season)),
+    loadNflverse("injury reports", () => getInjuryReports(season)),
+  ]);
 
   const redZoneTouches = await loadNflverse("red zone touches", () => getRedZoneTouches(season));
+
+  // Resolve depth_charts' own normalized-name keys onto this pipeline's
+  // synthetic PlayerIDs — same join gameLog.playerIdByNormalizedName
+  // already does for nflversePlayerWeekTable below, just done here
+  // instead since depth charts aren't part of that shared table's shape.
+  const depthChartByPlayerIdWeek = new Map<number, Map<number, number>>();
+  for (const [normalizedName, byWeek] of depthChartByNormalizedNameWeek) {
+    const playerId = gameLog.playerIdByNormalizedName.get(normalizedName);
+    if (playerId == null) continue;
+    depthChartByPlayerIdWeek.set(playerId, byWeek);
+  }
 
   const nflversePlayerWeekTable = buildNflversePlayerWeekTable(
     {
@@ -99,5 +124,6 @@ export async function loadNflverseOnlyRunData(season: number, maxWeek: number): 
     nflversePlayerWeekTable,
     gameLogPlayerIdByNormalizedName: gameLog.playerIdByNormalizedName,
     teamWeatherByTeamWeek,
+    depthChartByPlayerIdWeek,
   };
 }

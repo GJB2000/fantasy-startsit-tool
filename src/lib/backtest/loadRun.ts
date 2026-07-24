@@ -35,6 +35,19 @@ export interface BacktestRunData {
    * optional signal.
    */
   teamWeatherByTeamWeek?: Map<string, GameWeather>;
+  /**
+   * PlayerID -> week -> depth-chart role (1=starter, 2=backup, ...), from
+   * nflverse's `depth_charts` release, already resolved from its native
+   * normalized-name join onto this pipeline's own synthetic PlayerIDs
+   * (via gameLog.ts's playerIdByNormalizedName — same resolution step
+   * nflversePlayerWeekTable itself goes through). Only set by
+   * loadRunNflverseOnly.ts, and only ever populated for 2022-2024 — 2025
+   * uses an incompatible schema (see nflverse/depthCharts.ts) and the
+   * primary SportsDataIO pipeline doesn't carry this data at all. Backs
+   * the RB/WR-only `pickByDepthChart` baseline (baselines.ts); degrades
+   * to no_pick when unset, same as every other optional signal.
+   */
+  depthChartByPlayerIdWeek?: Map<number, Map<number, number>>;
 }
 
 /**

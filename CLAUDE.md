@@ -2121,14 +2121,73 @@ single-season numbers for those specific constants.
       "Close call" headline). This item confirms that design decision
       was right, rather than changing anything about it. Closes the
       open question item 29 and item 39 both left hanging.
+46. **Picked depth charts back up (item 37's scoped-out blocker) — now
+    unblocked for 3 of 4 seasons without ever solving 2025's mapping
+    problem.** Confirmed live before writing anything: 2022 and 2023's
+    `depth_charts` files share 2024's clean `season`/`week`/`game_type`/
+    `depth_team` schema (2025 alone is the odd one out, still using the
+    incompatible ESPN-scrape/timestamp format item 37 found) — so 3 full
+    seasons of the clean format were available without needing to
+    attempt that leakage-prone snapshot-to-week inference at all.
+    - **Verified the join before trusting any numbers**: `depth_charts`
+      identifies players by `gsis_id`, resolved through the same
+      `players.ts` crosswalk `playByPlay.ts` already uses for red-zone
+      touches. 100% match rate on offensive skill-position rows across
+      all three seasons (8836/8836, 8779/8779, 8629/8629) — no
+      degradation to worry about, unlike the ~99% name-based joins used
+      elsewhere in this app.
+    - **Standalone-tested by position (pooled 2022-2024, `depth_team`
+      1=starter/2=backup/...; pick whoever's listed higher when they
+      differ)**: RB 57.7% (n=149, stable across all 3 individual seasons
+      — 57.7%/61.1%/53.5%, never below chance), WR 58.3% (n=48, also
+      stable — 55.0%/57.9%/66.7%), TE 56.5% (n=62, but dipped to 41.2% —
+      *below* chance — in 2024, TE's usual noisiness throughout this
+      app), QB 80.0% (n=15 total, 5/season — far too thin to mean
+      anything). Decision rate is low (~15% of pairs, most adjacent-rank
+      pairs are both already starters) — the same "rare but real"
+      current-week-fact shape as `injuryStatus` (item 18), not a data
+      problem (the 100% match rate rules that out).
+    - **Shipped as a permanent standalone baseline, RB/WR only** —
+      TE excluded for the same below-chance-in-one-season instability
+      that already exempts it from `DROP_RATE_BLEND_WEIGHT`; QB excluded
+      for sample size, mirroring the QB exemption already used for
+      `snapShare`/`targetShare` (item 15). Matches `injuryStatus`'s
+      precedent exactly: a real, rare, current-week signal earns a
+      permanent baseline even without ever being engine-integrated.
+      New `nflverse/depthCharts.ts` (`getDepthChartByNormalizedNameWeek`
+      — returns an empty map for any season ≥2025 rather than
+      attempting to parse the incompatible schema), `BacktestRunData`'s
+      `depthChartByPlayerIdWeek` (resolved onto the nflverse-only
+      pipeline's synthetic PlayerIDs at load time via
+      `gameLog.playerIdByNormalizedName`, the same resolution step
+      `nflversePlayerWeekTable` itself goes through), threaded through
+      `sliceWeekData`/`BacktestWeekSlice` exactly like `teamWeatherByTeamWeek`.
+      New `pickByDepthChart` in `baselines.ts`.
+    - **Verified against the real shared pipeline**: the `depthChart`
+      baseline via `/api/backtest/broad-nflverse-multiseason` returned
+      57.9% (n=197) — matching the standalone RB+WR count exactly
+      (149+48=197). Confirmed graceful degradation on the primary
+      SportsDataIO pipeline (612/612 no-pick, zero effect on that
+      pipeline's own 57.5% overall number) and that pooling this into
+      the shared architecture didn't change the engine's own accuracy
+      at all (56.50% pooled, unchanged) — this is a baseline-only
+      addition, not wired into `finalScore`.
+    - **Not integrated into the live engine** — same status as
+      `injuryStatus`/`wind`: a real, validated, permanent standalone
+      baseline, visible in backtest mode, not part of scoring. Also
+      structurally can't reach the live 2025 tool even if it were
+      engine-integrated, since 2025's depth-chart schema was never
+      solved. Temporary experiment code deleted after the validated
+      parts were promoted to permanent code, same as `wind`'s item 39
+      promotion.
 
-### Open items (as of item 45 — pick up here)
-Everything through c5886e3 ("Fix several stale sections in CLAUDE.md
-after the 4-season work") is committed (`git log`). Item 45 (this
-significance test) is written up above but not yet committed —
-standalone-only, no lasting code (a one-off statistical check against
-already-available data, not a new experiment file). Nothing below is
-started or fixed yet:
+### Open items (as of item 46 — pick up here)
+Everything through 55d504f ("Confirm confidence-calibration inversion is
+statistically significant") is committed (`git log`). Item 46 (depth
+charts) is written up above but not yet committed — it shipped real,
+permanent code (`nflverse/depthCharts.ts`, the `depthChartByPlayerIdWeek`
+plumbing, and the new `pickByDepthChart` baseline), verified against the
+real shared pipeline. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -2157,17 +2216,6 @@ started or fixed yet:
    team-level game-script baseline in item 12), so they'd need their own
    dedicated pass to figure out how to attribute them fairly, not a
    quick extension of item 32's join.
-5. **Depth charts (starter/backup role) — real signal candidate,
-   blocked on a schema incompatibility, not yet resolved.** 2024's
-   `depth_charts` file has the clean season/week format needed; 2025's
-   is a completely different ESPN-scrape/timestamp format with no week
-   column (item 37). Before this can even be standalone-tested
-   cross-season, someone needs to either (a) build a reliable
-   snapshot-to-week mapping for the 2025 file, or (b) test 2024 alone
-   first (accepting no cross-season validation until the mapping is
-   solved) to see if the signal is even worth the mapping effort. Not
-   started — item 37 deliberately stopped at the scoping stage rather
-   than guessing at a mapping.
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
