@@ -1765,15 +1765,67 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       as real code, since (unlike goal-line QB rushing) this signal
       actually cleared the bar this time.
 
-### Open items (as of item 39 — pick up here)
-Everything through item 37 is committed (`git log`); items 38-39 are
-written up above but not yet committed. Item 38 (joint logistic
-regression) was tested and rejected — no lasting code. Item 39 (four-
-season extension) left real, permanent code behind: the pooled
-multi-season route, the re-confirmed rejection of QB goal-line rushing
-(config.ts updated), and a newly-shipped `pickByWind` standalone
-baseline (not integrated into the live engine). Nothing below is
-started or fixed yet:
+40. **Quick cross-position checks on already-validated signals** — not a
+    new investigation, just asking whether a signal validated (and in
+    some cases shipped) at one position says anything at positions it
+    wasn't scoped to, using code and data that already existed (the
+    pooled 2022-2025 sample from item 39, the existing `baselines.ts`
+    pickers). One new picker was added (QB's own rushing EPA), everything
+    else reused as-is. Standalone-only — no engine/config changes.
+    - **The user's literal example — WR drop rate at TE — is slightly
+      negative on the bigger pool**: 46.4% (n=280), down from the
+      original single-season 50.0%/54.8% (item 32). Reinforces, with a
+      cleaner number, why TE is exempted from `DROP_RATE_BLEND_WEIGHT`.
+      WR's own standalone drop-rate number also softened pooled (49.0%,
+      n=643, vs. the original 52.4%/53.1%) — worth flagging honestly: the
+      *standalone* picker looks closer to chance at this larger sample
+      than it did on either single season, even though the signal still
+      earned its keep once *blended* into the full engine score in item
+      33 (a real, if modest, WR-specific gain as weight increased). A
+      weak standalone signal and a real marginal contribution once
+      stacked with several other signals aren't a contradiction, but
+      it's a good reminder not to over-read a single season's standalone
+      number the way items 9/10/20 already cautioned against.
+    - **TE's shipped snap-share signal isn't particularly TE-special once
+      pooled**: TE 54.5% (n=393, down from the single-season 57.7%), but
+      RB 54.6% (n=786) and WR 52.7% (n=786) land in the same modest
+      52-55% band — snap share looks like a broadly modest opportunity
+      signal across positions at this sample size, not a TE-specific
+      standout the way the original number suggested.
+    - **RB's red-zone-touches signal, cross-tested at QB, moved from
+      near-chance to a real positive** — 56.3% (n=355), up from the
+      original single-season 49.5% (item 19). WR stayed a negative
+      finding (48.6%, n=722, consistent with item 19's 43.0%) and TE
+      stayed near chance (51.7%, n=356, vs. 48.8%). Not chased further
+      this pass — QB already has its own red-zone/goal-line rushing
+      story (items 30/30a/39) — but worth remembering if QB rushing
+      signals get revisited again.
+    - **Separation (the WR/TE receiving tiebreaker) softened at TE
+      pooled**: 49.1% (n=334, down from the single-season 53.8%) while
+      WR held (53.6%, n=773, vs. 54.1%) — reinforces why the composite
+      tiebreaker (item 17/20) was scoped WR-only rather than WR+TE.
+    - **The one genuinely new result: QB's own rushing EPA-per-play**
+      (distinct from `qbEpaPerDropback`, already tested and rejected in
+      item 31 at 38.0%/44.0% — this reads the same `rushEpaPerPlay`
+      field RB's shipped EPA signal uses, just for a QB's own carries
+      instead of a RB's). **54.8% pooled (n=398)** — modestly positive,
+      and notably not showing the wild season-to-season sign-flips every
+      other QB-rushing signal in this document has shown (items
+      25/26/30/30a). A real candidate worth a proper look (by-season
+      breakdown, integration sweep) if QB rushing gets revisited again —
+      flagged here as a lead, not chased further this pass per the
+      "quick check" scope.
+    - Temporary code (`crossCheckExperiment.ts` and its diagnostic route)
+      deleted after recording these numbers, same discipline as items
+      22/29/34/38.
+
+### Open items (as of item 40 — pick up here)
+Everything through 2011c79 ("Extend nflverse-only backtest to 2022-2023")
+and 42d1f3b ("Add 2022/2023 to the Backtest page's Season toggle") is
+committed (`git log`). Item 40 (this cross-check pass) is written up
+above but not yet committed — standalone-only, no lasting code beyond
+this write-up (its temporary experiment file was deleted). Nothing below
+is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
