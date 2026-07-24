@@ -14,12 +14,13 @@ import { BacktestWeekTable } from "./BacktestWeekTable";
 import { PlayerSearchInput } from "./PlayerSearchInput";
 
 type Mode = "pair" | "broad";
-// 2024 runs against nflverse-only data for both modes — see
-// runBacktest()'s route selection. Single-pair mode resolves the
-// SportsDataIO player selection into nflverse's 2024 name space
+// Every season but 2025 runs against nflverse-only data, for both modes —
+// see runBacktest()'s route selection. Single-pair mode resolves the
+// SportsDataIO player selection into that season's nflverse name space
 // server-side (see runBacktestNflverseOnly.ts), so the same search box
-// works for both seasons.
-type Season = "2025" | "2024";
+// works for every season.
+type Season = "2025" | "2024" | "2023" | "2022";
+const SEASON_OPTIONS = ["2025", "2024", "2023", "2022"] as const;
 const ALL_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 const WEEK_OPTIONS = Array.from({ length: 18 }, (_, i) => i + 1);
 
@@ -84,9 +85,9 @@ export function BacktestTool() {
           return;
         }
         const ids = players.map((p) => p.playerId).join(",");
-        const path = season === "2024" ? "/api/backtest/pair-nflverse" : "/api/backtest/pair";
+        const path = season === "2025" ? "/api/backtest/pair" : "/api/backtest/pair-nflverse";
         const query = new URLSearchParams({ ids, weeks });
-        if (season === "2024") query.set("season", "2024");
+        if (season !== "2025") query.set("season", season);
         const res = await fetch(`${path}?${query}`);
         const data = await res.json();
         if (!res.ok) {
@@ -101,9 +102,9 @@ export function BacktestTool() {
           return;
         }
         const posParam = positions.join(",");
-        const path = season === "2024" ? "/api/backtest/broad-nflverse" : "/api/backtest/broad";
+        const path = season === "2025" ? "/api/backtest/broad" : "/api/backtest/broad-nflverse";
         const query = new URLSearchParams({ weeks, positions: posParam });
-        if (season === "2024") query.set("season", "2024");
+        if (season !== "2025") query.set("season", season);
         const res = await fetch(`${path}?${query}`);
         const data = await res.json();
         if (!res.ok) {
@@ -122,7 +123,7 @@ export function BacktestTool() {
 
   return (
     <div className="mx-auto mt-8 w-full max-w-2xl space-y-6">
-      <BacktestCaveatNote showNflverseCaveat={season === "2024"} />
+      <BacktestCaveatNote season={season} showNflverseCaveat={season !== "2025"} />
 
       <div className="flex gap-2 text-sm">
         <button
@@ -151,7 +152,7 @@ export function BacktestTool() {
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-zinc-500">Season</span>
-        {(["2025", "2024"] as const).map((s) => (
+        {SEASON_OPTIONS.map((s) => (
           <button
             key={s}
             type="button"
