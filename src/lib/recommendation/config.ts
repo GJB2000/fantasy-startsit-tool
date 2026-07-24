@@ -98,21 +98,29 @@ export const POINTS_PER_REDZONE_TOUCH_RB = 4.797;
  *
  * Re-swept against the pooled 2022-2025 sample (n=812) as part of a
  * broader re-check of every already-shipped blend weight — see CLAUDE.md's
- * four-season re-sweep. Unlike TE snap-share/WR drop-rate's re-sweeps
- * (both confirmed near-optimal unchanged), this one is a genuine
- * surprise: pooled accuracy is actually HIGHEST at w=0 (56.5%, i.e. no
- * red-zone-touches term at all) and declines through the shipped 0.2
- * (55.7%) down to a low around 0.4 (54.2%) before a partial recovery at
- * higher weights. By season, only 2025 favors the shipped weight (0→0.2:
- * 56.2%→59.1%); 2022/2023/2024 all do WORSE at 0.2 than at 0 (-2.0 to
- * -2.5pp each) — the opposite of the "every season improves" shape this
- * constant's original 2025-only tuning found. Deliberately left at 0.2
- * rather than resolved unilaterally — this interacts with
- * RB_EPA_BLEND_WEIGHT below (both apply to RB, sequentially), which
- * shows the same pattern, so a proper answer likely needs a joint
- * re-sweep of both together, not two independent one-at-a-time checks.
+ * four-season re-sweep. One-at-a-time, pooled accuracy was highest at
+ * w=0 (56.5% vs. the then-shipped 0.2's 55.7%) — the opposite of the
+ * "every season improves" shape this constant's original 2025-only
+ * tuning found. A follow-up joint 2D sweep with RB_EPA_BLEND_WEIGHT
+ * confirmed it wasn't a one-at-a-time artifact: the pooled-accuracy
+ * surface declines smoothly in both weights from a single (0, 0) peak
+ * (57.5%) with no interior optimum anywhere in the grid. By season,
+ * 2022/2023/2024 all improve substantially at (0, 0) (+3.0 to +3.9pp
+ * each vs. the old 0.2/0.3), while 2025 — the season both signals were
+ * originally validated on — declines (-2.9pp for RB alone, though at the
+ * whole-model level 2025 was already only marginally beating the naive
+ * recentVolume baseline either way, and disabling both flips that one
+ * season from a narrow win to a narrow loss against that baseline; every
+ * other season's margin over the baseline widens). Whole-model gain:
+ * +0.62pp pooled (55.89%→56.50%), the largest single change found in
+ * this four-season investigation. **Disabled (set to 0) as a deliberate,
+ * user-confirmed judgment call** given that net picture — same
+ * "explicit tradeoff, not resolved unilaterally" precedent as
+ * QB_RUSH_BLEND_WEIGHT (item 30) and QB_RUSH_EPA_BLEND_WEIGHT (item 41).
+ * `POINTS_PER_REDZONE_TOUCH_RB` above is kept, not deleted, same
+ * precedent as every other zeroed-out signal in this file.
  */
-export const REDZONE_BLEND_WEIGHT_RB = 0.2;
+export const REDZONE_BLEND_WEIGHT_RB = 0;
 
 /**
  * Empirically-derived PPR points per 100% offensive-snap-share
@@ -291,16 +299,18 @@ export const RB_EPA_PPR_AT_ZERO = 9.749;
  *
  * Re-swept against the pooled 2022-2025 sample (n=812) as part of a
  * broader re-check of every already-shipped blend weight — see CLAUDE.md's
- * four-season re-sweep. Same surprise as REDZONE_BLEND_WEIGHT_RB above:
- * pooled accuracy is highest at w=0 (56.2%) and declines steadily through
- * the shipped 0.3 (55.7%) down to 52.8% by w=0.6. By season, 2024/2025
- * still favor the shipped weight over 0 (roughly matching the original
- * out-of-sample finding), but 2022/2023 now do WORSE at 0.3 than at 0.
- * Deliberately left at 0.3 rather than resolved unilaterally — see
- * REDZONE_BLEND_WEIGHT_RB's comment for why this likely needs a joint
- * re-sweep with that weight rather than two independent checks.
+ * four-season re-sweep. Same surprise as REDZONE_BLEND_WEIGHT_RB above,
+ * one-at-a-time: pooled accuracy was highest at w=0 (56.2% vs. the
+ * then-shipped 0.3's 55.7%). A follow-up joint 2D sweep with
+ * REDZONE_BLEND_WEIGHT_RB confirmed both weights together are best at
+ * (0, 0) — see that constant's comment for the full grid, by-season
+ * breakdown, and the whole-model/baseline framing behind the decision.
+ * **Disabled (set to 0) as a deliberate, user-confirmed judgment call**,
+ * same precedent as QB_RUSH_BLEND_WEIGHT/QB_RUSH_EPA_BLEND_WEIGHT.
+ * `RB_EPA_REGRESSION_SLOPE`/`RB_EPA_PPR_AT_ZERO` above are kept, not
+ * deleted, same precedent as every other zeroed-out signal in this file.
  */
-export const RB_EPA_BLEND_WEIGHT = 0.3;
+export const RB_EPA_BLEND_WEIGHT = 0;
 
 /**
  * Empirically-derived PPR points LOST per unit of drop rate (FTN

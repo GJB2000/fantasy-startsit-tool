@@ -2001,15 +2001,71 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       follow-up rather than guessed at.
     - Temporary code (`weightResweepExperiment.ts`, both versions, and
       its diagnostic route) deleted after recording these numbers.
+44. **Ran the joint 2D re-sweep item 43 flagged as a follow-up** —
+    `REDZONE_BLEND_WEIGHT_RB` and `RB_EPA_BLEND_WEIGHT` varied together
+    (not one at a time), since both apply sequentially to the same
+    position and item 43's independent sweeps may have understated their
+    interaction. Verified the harness against the real engine first this
+    time (exact match at the shipped point, 452/360) before trusting the
+    grid — the same safeguard added after item 43's bug.
+    - **Result: a clean, decisive corner optimum, not an ambiguous
+      tradeoff.** The pooled-accuracy surface declines smoothly in both
+      weights from a single peak at (0, 0) — 57.5%, vs. 55.7% at the
+      shipped (0.2, 0.3) — with no interior local maximum anywhere in the
+      7×7 grid tested. This is the biggest single-item accuracy gain
+      found in the whole four-season investigation.
+    - **But it is a real tradeoff, not a free win.** By season: 2022
+      (53.7%→57.6%), 2023 (56.9%→59.9%), and 2024 (52.9%→56.4%) all
+      improve substantially (+3.0 to +3.9pp each), while 2025 — the
+      season both signals were originally validated on — declines
+      (59.1%→56.2%, -2.9pp). Checked for a middle-ground weight
+      combination that preserves more of 2025 without giving up the
+      broader gain; none exists in the tested grid — 2025 specifically
+      wants red-zone touches kept nonzero, every other season wants it
+      at zero, and moving away from (0, 0) in that dimension costs
+      pooled accuracy immediately.
+    - **Reframed against the naive `recentVolume` baseline before
+      deciding, not just against the signals' own prior values** — this
+      changed how the 2025 "cost" reads. RB-only, 2025's recentVolume
+      baseline is 59.8%: the shipped engine (59.1%) was *already* barely
+      below it, not clearly beating it. At the whole-model level (all 4
+      positions), the shipped engine beats the baseline in all 4
+      seasons, but only narrowly in 2022 and 2025 (+0.1pp and +0.4pp
+      respectively) — and disabling both RB signals flips 2025
+      specifically from that narrow win (57.0% vs. 56.6%) to a narrow
+      loss (56.1% vs. 56.6%), while widening the win in 2022/2023/2024.
+      Whole-model gain: +0.62pp pooled (55.89%→56.50%).
+    - **Put the tradeoff to the user rather than resolved unilaterally**
+      (same precedent as items 30/33/41): a decisive, broad, 3-season
+      pooled gain against a real but narrow whole-model cost in the one
+      season these signals were built on. **User chose to disable both**
+      (`REDZONE_BLEND_WEIGHT_RB=0`, `RB_EPA_BLEND_WEIGHT=0`) — the
+      underlying conversion factors/constants
+      (`POINTS_PER_REDZONE_TOUCH_RB`, `RB_EPA_REGRESSION_SLOPE`,
+      `RB_EPA_PPR_AT_ZERO`) are kept in `config.ts`, not deleted, same
+      precedent as every other zeroed-out signal in this file.
+    - **Verified against the real engine, not just the sweep harness**:
+      re-ran the pooled 4-season backtest after shipping and got an
+      exact match to the sweep's prediction (overall 56.50%, RB 57.51%),
+      with QB/WR/TE byte-for-byte unchanged. Verified live end-to-end via
+      a real `/api/compare` request (Bijan Robinson vs. Christian
+      McCaffrey): `redZoneModifier`/`rbEpaModifier` both correctly read 0
+      for both players, while the underlying raw stats
+      (`redZoneTouchesAvg`/`epaPerPlayAvg`) still populate and still
+      appear in the reasoning notes — the same "note describes the raw
+      signal regardless of whether its weight is 0" behavior every other
+      zeroed-out signal in this app already has (not a new quirk this
+      change introduced).
+    - Temporary code (`rbJointSweepExperiment.ts` and its diagnostic
+      route) deleted after recording these numbers.
 
-### Open items (as of item 43 — pick up here)
-Everything through 4c6deaa ("Fix stale commit-status note in open-items
-intro") is committed (`git log`). Item 42 is committed; item 43 (this
-weight re-sweep) is written up above but not yet committed —
-standalone-only in the end (the two changes it briefly shipped were
-reverted after the bug was caught), no lasting code beyond the write-up
-and updated doc comments on the five weights in `config.ts`. Nothing
-below is started or fixed yet:
+### Open items (as of item 44 — pick up here)
+Everything through 06d66f0 ("Re-sweep all five shipped blend weights
+against pooled 4-season sample") is committed (`git log`). Item 44 (this
+RB joint sweep) is written up above but not yet committed — it shipped
+real, lasting config changes (`REDZONE_BLEND_WEIGHT_RB=0`,
+`RB_EPA_BLEND_WEIGHT=0`), verified against the real engine and live.
+Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -2049,14 +2105,6 @@ below is started or fixed yet:
    solved) to see if the signal is even worth the mapping effort. Not
    started — item 37 deliberately stopped at the scoping stage rather
    than guessing at a mapping.
-6. **RB's two additive signals (red-zone touches, EPA-per-rush) both
-   pooled better at zero weight than at their shipped values** (item 43)
-   — a real reversal from their original single/two-season tuning, left
-   unresolved since the two interact (applied sequentially to the same
-   position) and a proper answer likely needs a joint 2D re-sweep of
-   both weights together, not two independent one-at-a-time checks like
-   every other weight in this file has used. Not started.
-
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
