@@ -40,12 +40,17 @@ section current as real decisions get made.)*
 Current state: v1 of the core start/sit comparison tool is live — real
 player search, real SportsDataIO data, a rules-based recommendation
 engine, and a working UI — plus a backtesting mode that replays the
-engine against the completed 2025 season using only data that would
-have been known before each tested week (see Conventions below for the
-actual file layout). Out of scope so far: database/persistence, auth,
-K/DEF positions, upcoming-schedule/next-opponent lookup (matchup
-difficulty is computed against each player's most recent completed
-opponent, not a hypothetical future one), multi-season history.
+engine against completed seasons using only data that would have been
+known before each tested week (see Conventions below for the actual
+file layout). The live tool itself is still 2025-only (SportsDataIO),
+but backtest mode now covers four seasons (2022-2025, via the
+nflverse-only pipeline for anything before 2025) in both Single pair and
+Broad modes, plus a permanent pooled-multi-season route/summary for
+validating tuning decisions across all four at once — see "Backtesting &
+Tuning History" items 24/36/39. Out of scope so far: database/
+persistence, auth, K/DEF positions, upcoming-schedule/next-opponent
+lookup (matchup difficulty is computed against each player's most
+recent completed opponent, not a hypothetical future one).
 
 **Candidate future improvement: next-opponent lookup for live matchup
 context.** The live tool's matchup modifier currently looks up each
@@ -92,15 +97,20 @@ architecture at all.
   History" item 18) and is used there for one standalone baseline test —
   but that's a backtest-only trial, not a change to how the live tool's
   own (already-real-time) injury flag works.
-- **2024 (and presumably earlier) season data is NOT accessible on this
-  plan** — confirmed directly: any 2024 request (e.g.
-  `PlayerSeasonStats/2024`, `PlayerGameStatsByWeek/2024REG/1`) returns a
-  clean `401 Unauthorized Season` with "contact sales@sportsdata.io" to
-  unlock it. This means every "re-validate once a second season of data
-  exists" caveat elsewhere in this doc refers to *waiting for the 2026
-  season to complete under the current plan* — it is not a "just query
-  an already-completed prior season" fix; that would require a paid
-  tier upgrade.
+- **2024 (and presumably earlier) season data is NOT accessible via
+  SportsDataIO on this plan** — confirmed directly: any 2024 request
+  (e.g. `PlayerSeasonStats/2024`, `PlayerGameStatsByWeek/2024REG/1`)
+  returns a clean `401 Unauthorized Season` with "contact
+  sales@sportsdata.io" to unlock it; that would require a paid tier
+  upgrade. This is a SportsDataIO-specific limit, not a project-wide
+  one — the live tool and the *primary* 2025 backtest pipeline both stay
+  SportsDataIO-only, but backtest mode's separate nflverse-only pipeline
+  (see Conventions) has since been used to validate tuning decisions
+  against 2022-2025 anyway (see "Backtesting & Tuning History" items
+  24/36/39) — every "re-validate against more data" caveat elsewhere in
+  this doc that predates that work is stale in that specific sense; the
+  4-season nflverse-only sample is the current out-of-sample check, not
+  a wait for the 2026 season.
 - **SportsDataIO does not offer snap counts, target share, or air yards
   at any tier** — confirmed against the live NFL API doc catalog (not
   just skimmed): zero endpoints or fields for any of the three,
@@ -141,10 +151,9 @@ This is the most important section — the "brain" of the tool.
     and why the weights are set where they are.
   - Injury status (Questionable/Doubtful/Out) — flag prominently, but
     don't treat "Questionable" as an automatic bench
-  - Red-zone touches (RB only) and offensive snap share (TE only,
-    fixing the position's long-standing weak spot), both from nflverse
-    (see Data Source Notes), blended into the running score the same
-    way volume is (`REDZONE_BLEND_WEIGHT_RB`/`SNAP_SHARE_BLEND_WEIGHT_TE`
+  - Offensive snap share (TE only, fixing the position's long-standing
+    weak spot), from nflverse (see Data Source Notes), blended into the
+    running score the same way volume is (`SNAP_SHARE_BLEND_WEIGHT_TE`
     in `config.ts`). Target share + separation (also nflverse) act as a
     WR-only close-call tiebreaker rather than a scoring factor — see
     "Backtesting & Tuning History" item 20 for why each was scoped the
@@ -158,13 +167,13 @@ This is the most important section — the "brain" of the tool.
     tradeoff rather than a clean win: every nonzero weight costs some
     2025 accuracy in exchange for 2024 accuracy — see "Backtesting &
     Tuning History" item 30 for the full sweep and why 0.3 was chosen.
-  - RB rushing EPA-per-play (`RB_EPA_BLEND_WEIGHT`/
-    `RB_EPA_REGRESSION_SLOPE`/`RB_EPA_PPR_AT_ZERO` in `config.ts`),
-    stacked after red-zone touches — a genuine two-season improvement,
-    not a tradeoff (unlike QB rushing above). Uses a linear-regression
-    conversion factor rather than every other signal's "ratio of sums,"
-    since raw rushing EPA sums negative across a season and would
-    otherwise flip the sign — see item 33.
+  - QB rushing EPA-per-play, a third QB signal stacked after the two
+    above (`QB_RUSH_EPA_BLEND_WEIGHT`/`POINTS_PER_QB_RUSH_EPA` in
+    `config.ts`) — rushing *quality*, not volume, and notably more
+    stable across all four backtest seasons than any prior QB-rushing
+    signal. Shipped at a deliberately balanced 0.2 after another
+    real, user-confirmed tradeoff (whole-model gain, one season's
+    QB accuracy declines) — see item 41.
   - WR drop rate (FTN Charting, `DROP_RATE_BLEND_WEIGHT`/
     `POINTS_PER_DROP_RATE_UNIT` in `config.ts`) — WR only, not TE (TE's
     standalone result was too noisy to trust at any weight tested). A
@@ -172,6 +181,18 @@ This is the most important section — the "brain" of the tool.
     engine; a real WR-specific tradeoff (2025 up, 2024 down as weight
     increases), deliberately tuned to a balanced point rather than
     either season's peak — see item 33.
+  - **RB red-zone touches and RB rushing EPA-per-play were both tried
+    and shipped, then later disabled** (`REDZONE_BLEND_WEIGHT_RB`/
+    `RB_EPA_BLEND_WEIGHT` both `0` in `config.ts`) — each looked like a
+    genuine win on the original 1-2 season validation, but a four-season
+    pooled re-sweep (2022-2025) found both scored highest at zero
+    weight, a real reversal rather than an artifact of one-at-a-time
+    tuning (confirmed via a joint 2D grid search). The underlying
+    conversion factors/constants are kept in `config.ts`, not deleted,
+    in case a future season's data changes the picture again — see
+    items 43-44 for the full story, including the real tradeoff (2025
+    specifically gets worse; 2022/2023/2024 all improve) that was put to
+    the user before disabling.
   - [Add more factors here as they're decided]
 - When it's a close call statistically, say so. Don't force false
   confidence.
@@ -182,13 +203,17 @@ Narrative record of what was tried, what worked, and why — so this
 reasoning isn't lost if we come back to tune this further. All numbers
 below are from backtesting against the full completed 2025 season
 (weeks 1-18), broad mode, all positions, adjacent-rank pairs (~612
-pair-evaluations) unless noted otherwise. **Caveat that applies to every
-number here**: this is validated against a single season. There's a real
-risk some of this is tuned to 2025-specific dynamics rather than a
-durable pattern — re-validate once a second season of data exists. Note:
-that's the 2026 season completing under the *current* SportsDataIO
-plan, not 2024 — confirmed that season is locked behind a paid tier
-(see Data Source Notes).
+pair-evaluations) unless noted otherwise. **Caveat that applied through
+item 23**: everything up to that point is validated against a single
+season, with a real risk some of it is tuned to 2025-specific dynamics
+rather than a durable pattern. That caveat was substantially addressed
+starting at item 24 (a second, nflverse-only pipeline validating against
+2024) and again at item 39 (extended further to 2022-2023, making a
+pooled 4-season sample the norm for anything tuned or re-checked from
+that point on — see items 40-44). Read each item's own text for which
+sample it used; later items that explicitly re-swept earlier ones
+(e.g. item 43 re-sweeping items 13/19/20/33) supersede the original
+single-season numbers for those specific constants.
 
 1. **Built backtest mode first** (`/backtest`) specifically to check
    whether the engine's recommendations were actually good, not just
@@ -2060,12 +2085,11 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       route) deleted after recording these numbers.
 
 ### Open items (as of item 44 — pick up here)
-Everything through 06d66f0 ("Re-sweep all five shipped blend weights
-against pooled 4-season sample") is committed (`git log`). Item 44 (this
-RB joint sweep) is written up above but not yet committed — it shipped
-real, lasting config changes (`REDZONE_BLEND_WEIGHT_RB=0`,
-`RB_EPA_BLEND_WEIGHT=0`), verified against the real engine and live.
-Nothing below is started or fixed yet:
+Everything through a373790 ("Disable RB red-zone touches and EPA-per-rush
+after joint 2D re-sweep") is committed (`git log`), including item 44's
+config changes (`REDZONE_BLEND_WEIGHT_RB=0`, `RB_EPA_BLEND_WEIGHT=0`),
+verified against the real engine and live. Nothing below is started or
+fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
