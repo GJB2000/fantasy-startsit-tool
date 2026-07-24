@@ -62,6 +62,15 @@ export const POINTS_PER_VOLUME_UNIT: Record<"QB" | "RB" | "WR" | "TE", number> =
  * when overtuning the old capped-modifier version) — 0.9 sits in the
  * middle of that plateau rather than being an isolated spike. See
  * "Backtesting & Tuning History" in CLAUDE.md for the full table.
+ *
+ * Re-checked against the pooled 2022-2025 sample (n=2437) as part of a
+ * broader re-check of every already-shipped blend weight — confirmed,
+ * not changed: pooled accuracy climbs to a plateau across 0.85-1.0
+ * (55.6-56.1%), with 0.9 (55.8%) sitting inside it, close behind the
+ * nominal peak at 0.95 (56.1%) and ahead of the 1.0 boundary (55.9%).
+ * See CLAUDE.md's four-season re-sweep (which also caught and fixed a
+ * real bug in the first version of that re-sweep's harness — see there
+ * for what it was).
  */
 export const VOLUME_BLEND_WEIGHT = 0.9;
 
@@ -81,11 +90,27 @@ export const POINTS_PER_REDZONE_TOUCH_RB = 4.797;
  * How much weight red-zone touches (converted to points via
  * POINTS_PER_REDZONE_TOUCH_RB) carry against the running RB score
  * (post-volume-blend), same blend shape as VOLUME_BLEND_WEIGHT. Swept
- * in 0.1 steps against the full backtest (RB accuracy): 0.1 -> 58.1%,
- * **0.2 -> 58.6% (peak)**, 0.3 -> 58.1%, 0.4 -> 56.7%, 0.5 -> 55.7%,
- * 0.6 -> 56.2%, 0.7 -> 57.1%, 0.8 -> 56.2% — 0.2 sits in the middle of a
- * genuine 0.1-0.3 plateau, not an isolated spike (see "Backtesting &
+ * in 0.1 steps against the full 2025-only backtest (RB accuracy): 0.1 ->
+ * 58.1%, **0.2 -> 58.6% (peak)**, 0.3 -> 58.1%, 0.4 -> 56.7%, 0.5 ->
+ * 55.7%, 0.6 -> 56.2%, 0.7 -> 57.1%, 0.8 -> 56.2% — 0.2 sat in the middle
+ * of a genuine 0.1-0.3 plateau, not an isolated spike (see "Backtesting &
  * Tuning History" item 20 in CLAUDE.md for the full table).
+ *
+ * Re-swept against the pooled 2022-2025 sample (n=812) as part of a
+ * broader re-check of every already-shipped blend weight — see CLAUDE.md's
+ * four-season re-sweep. Unlike TE snap-share/WR drop-rate's re-sweeps
+ * (both confirmed near-optimal unchanged), this one is a genuine
+ * surprise: pooled accuracy is actually HIGHEST at w=0 (56.5%, i.e. no
+ * red-zone-touches term at all) and declines through the shipped 0.2
+ * (55.7%) down to a low around 0.4 (54.2%) before a partial recovery at
+ * higher weights. By season, only 2025 favors the shipped weight (0→0.2:
+ * 56.2%→59.1%); 2022/2023/2024 all do WORSE at 0.2 than at 0 (-2.0 to
+ * -2.5pp each) — the opposite of the "every season improves" shape this
+ * constant's original 2025-only tuning found. Deliberately left at 0.2
+ * rather than resolved unilaterally — this interacts with
+ * RB_EPA_BLEND_WEIGHT below (both apply to RB, sequentially), which
+ * shows the same pattern, so a proper answer likely needs a joint
+ * re-sweep of both together, not two independent one-at-a-time checks.
  */
 export const REDZONE_BLEND_WEIGHT_RB = 0.2;
 
@@ -104,18 +129,21 @@ export const POINTS_PER_SNAP_SHARE_UNIT_TE = 9.607;
  * How much weight snap share (converted to points via
  * POINTS_PER_SNAP_SHARE_UNIT_TE) carries against the running TE score
  * (post-volume-blend), same blend shape as VOLUME_BLEND_WEIGHT. TE's
- * small pool (~100 pairs) makes this a much noisier curve than
- * VOLUME_BLEND_WEIGHT's — full 0.05-step sweep against the backtest
- * (TE accuracy) bounced between 52.5-58.4% with no clean monotonic
- * climb, including a boundary peak at w=0.95-1.0 (58.4%) that would
- * mean discarding the existing blended score entirely for TE.
- * Deliberately did NOT take that peak — same "don't chase an isolated
- * spike" discipline as VOLUME_BLEND_WEIGHT and the old capped-volume-
- * modifier's CAP=30 rejection. Settled on **0.4**, the middle of a
- * genuine two-point plateau at 0.35-0.4 (56.4%) that keeps the blend
- * meaningfully anchored to both signals rather than replacing one
- * outright. See "Backtesting & Tuning History" item 20 in CLAUDE.md for
- * the full table and the caveat about this weight's sample size.
+ * small pool (~100 pairs/season) makes this a much noisier curve than
+ * VOLUME_BLEND_WEIGHT's — full 0.05-step sweep against the 2025-only
+ * backtest bounced between 52.5-58.4% with no clean monotonic climb,
+ * including a boundary peak at w=0.95-1.0 (58.4%) that would mean
+ * discarding the existing blended score entirely for TE. Originally
+ * settled on 0.4 (the middle of a two-point plateau at 0.35-0.4, 56.4%
+ * on 2025 alone) rather than chase that boundary spike.
+ *
+ * Re-swept against the pooled 2022-2025 sample (n=405, ~4x the original)
+ * as part of a broader re-check of every already-shipped blend weight —
+ * see CLAUDE.md's four-season re-sweep. Confirmed, not changed: 0.4 is
+ * now the genuine pooled peak (57.5%, up from 54.8-56.5% on either side —
+ * 0.35 gives 57.0%, 0.45 gives 56.3%), a cleaner result than the original
+ * 2025-only sweep found. Reasonably solid across seasons too (2022 56.4%,
+ * 2023 54.9%, 2024 57.4%, 2025 61.4%).
  */
 export const SNAP_SHARE_BLEND_WEIGHT_TE = 0.4;
 
@@ -260,6 +288,17 @@ export const RB_EPA_PPR_AT_ZERO = 9.749;
  * zone). Standalone-tested positive in both seasons and *improving*
  * out-of-sample (52.2% 2025 → 57.2% 2024) — see CLAUDE.md item 33 for
  * the two-season sweep.
+ *
+ * Re-swept against the pooled 2022-2025 sample (n=812) as part of a
+ * broader re-check of every already-shipped blend weight — see CLAUDE.md's
+ * four-season re-sweep. Same surprise as REDZONE_BLEND_WEIGHT_RB above:
+ * pooled accuracy is highest at w=0 (56.2%) and declines steadily through
+ * the shipped 0.3 (55.7%) down to 52.8% by w=0.6. By season, 2024/2025
+ * still favor the shipped weight over 0 (roughly matching the original
+ * out-of-sample finding), but 2022/2023 now do WORSE at 0.3 than at 0.
+ * Deliberately left at 0.3 rather than resolved unilaterally — see
+ * REDZONE_BLEND_WEIGHT_RB's comment for why this likely needs a joint
+ * re-sweep with that weight rather than two independent checks.
  */
 export const RB_EPA_BLEND_WEIGHT = 0.3;
 
@@ -280,9 +319,16 @@ export const POINTS_PER_DROP_RATE_UNIT = 182.75;
 
 /**
  * How much weight drop rate (converted to a point PENALTY via
- * POINTS_PER_DROP_RATE_UNIT) carries against the running WR/TE score
- * (post-volume-blend, post-snap-share for TE). See CLAUDE.md item 33
- * for the two-season sweep.
+ * POINTS_PER_DROP_RATE_UNIT) carries against the running WR score
+ * (post-volume-blend; TE is exempted from this modifier entirely — see
+ * engine.ts). Originally set to 0.2 from a two-season (2025/2024) sweep
+ * — see CLAUDE.md item 33.
+ *
+ * Re-swept against the pooled 2022-2025 sample (n=812 WR pairs) as part
+ * of a broader re-check of every already-shipped blend weight — see
+ * CLAUDE.md's four-season re-sweep. Confirmed, not changed: 0.2 sits at
+ * a genuine local peak (54.1%), backed by a real neighborhood (0.15
+ * gives 53.9%, 0.25 gives 53.7%) rather than an isolated spike.
  */
 export const DROP_RATE_BLEND_WEIGHT = 0.2;
 

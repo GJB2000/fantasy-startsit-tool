@@ -1944,12 +1944,72 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
       Temporary code (`jointModel.ts` and its diagnostic route) deleted
       again after recording these numbers.
 
-### Open items (as of item 42 — pick up here)
+43. **Re-swept all five already-shipped blend weights against the pooled
+    2022-2025 sample** (`VOLUME_BLEND_WEIGHT`, `REDZONE_BLEND_WEIGHT_RB`,
+    `SNAP_SHARE_BLEND_WEIGHT_TE`, `RB_EPA_BLEND_WEIGHT`,
+    `DROP_RATE_BLEND_WEIGHT`) — all five were originally tuned against
+    2025 alone or a 2025/2024 two-season check, a scope limit item 39
+    explicitly flagged as worth a dedicated follow-up.
+    - **Caught and fixed a real bug in the sweep harness before trusting
+      any result — worth recording since it nearly shipped two wrong
+      config changes.** The harness re-implements scorePlayer()'s
+      finalScore chain (rather than modifying engine.ts) so each weight
+      could be varied one at a time. The first version started its
+      running score at `blendedScore + matchupModifier` and blended
+      volume against that — but engine.ts's actual `volumeModifier`
+      blends against `blendedScore` ALONE; matchupModifier only enters
+      the running-score basis starting at `redZoneModifier`. That
+      silently corrupted every downstream modifier whenever
+      matchupModifier wasn't exactly 0 (i.e. almost always). It wasn't
+      caught until *after* shipping `SNAP_SHARE_BLEND_WEIGHT_TE` (0.4→
+      0.15) and `DROP_RATE_BLEND_WEIGHT` (0.2→0.15) based on the buggy
+      numbers — a real-engine check afterward showed TE accuracy had
+      dropped from 57.5% to 55.8%, the opposite of what the sweep
+      predicted. Both changes were reverted immediately. Fixed the
+      harness (matched engine.ts's two-tier structure exactly) and added
+      a permanent safeguard: every sweep now cross-checks its own
+      "shipped value" reproduction against the real engine's actual
+      graded accuracy on the same rows *before* any result is trusted —
+      the same "verify against the real code" discipline used
+      everywhere else in this document, just applied one step too late
+      the first time.
+    - **Corrected results: three of the five are already at or very near
+      optimal — confirmed unchanged.** `VOLUME_BLEND_WEIGHT` (0.9) sits
+      inside a genuine 0.85-1.0 plateau (55.6-56.1%). `SNAP_SHARE_BLEND_
+      WEIGHT_TE` (0.4) turned out to be the actual pooled peak (57.5%,
+      cleaner than the original 2025-only sweep found). `DROP_RATE_
+      BLEND_WEIGHT` (0.2) sits at a real local peak (54.1%) backed by a
+      genuine neighborhood, not an isolated spike.
+    - **The other two — both RB signals — turned up a real surprise.**
+      Pooled across 4 seasons, both `REDZONE_BLEND_WEIGHT_RB` (56.5% at
+      w=0 vs. 55.7% shipped at 0.2) and `RB_EPA_BLEND_WEIGHT` (56.2% at
+      w=0 vs. 55.7% shipped at 0.3) score HIGHEST at zero weight — i.e.
+      no additive term at all pools better than either shipped value. By
+      season, only 2025 clearly favors red-zone touches' shipped weight
+      (2022/2023/2024 all do worse at 0.2 than at 0); RB EPA is similar
+      but slightly more mixed (2024/2025 still favor the shipped weight,
+      2022/2023 don't). This is a real reversal from the original
+      single/two-season tuning, not confirmation of it.
+    - **Deliberately left both at their shipped values rather than
+      resolved unilaterally.** These two interact — both apply to RB,
+      applied sequentially (red-zone touches feeds into the running
+      score RB EPA then blends against) — so evaluating them
+      independently, one at a time while holding the other fixed, may
+      understate or misstate what a *joint* re-tuning of both would
+      show. A proper answer needs a 2D grid search over both weights
+      together, not two separate one-at-a-time sweeps; flagged here as a
+      follow-up rather than guessed at.
+    - Temporary code (`weightResweepExperiment.ts`, both versions, and
+      its diagnostic route) deleted after recording these numbers.
+
+### Open items (as of item 43 — pick up here)
 Everything through 4c6deaa ("Fix stale commit-status note in open-items
-intro") is committed (`git log`). Item 42 (this revisit) is written up
-above but not yet committed — standalone-only, no lasting code (same as
-item 38, its temporary experiment file was deleted again). Nothing below
-is started or fixed yet:
+intro") is committed (`git log`). Item 42 is committed; item 43 (this
+weight re-sweep) is written up above but not yet committed —
+standalone-only in the end (the two changes it briefly shipped were
+reverted after the bug was caught), no lasting code beyond the write-up
+and updated doc comments on the five weights in `config.ts`. Nothing
+below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -1989,6 +2049,13 @@ is started or fixed yet:
    solved) to see if the signal is even worth the mapping effort. Not
    started — item 37 deliberately stopped at the scoping stage rather
    than guessing at a mapping.
+6. **RB's two additive signals (red-zone touches, EPA-per-rush) both
+   pooled better at zero weight than at their shipped values** (item 43)
+   — a real reversal from their original single/two-season tuning, left
+   unresolved since the two interact (applied sequentially to the same
+   position) and a proper answer likely needs a joint 2D re-sweep of
+   both weights together, not two independent one-at-a-time checks like
+   every other weight in this file has used. Not started.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
