@@ -2084,12 +2084,51 @@ single-season numbers for those specific constants.
     - Temporary code (`rbJointSweepExperiment.ts` and its diagnostic
       route) deleted after recording these numbers.
 
-### Open items (as of item 44 — pick up here)
-Everything through a373790 ("Disable RB red-zone touches and EPA-per-rush
-after joint 2D re-sweep") is committed (`git log`), including item 44's
-config changes (`REDZONE_BLEND_WEIGHT_RB=0`, `RB_EPA_BLEND_WEIGHT=0`),
-verified against the real engine and live. Nothing below is started or
-fixed yet:
+45. **Formally re-tested the confidence-calibration inversion for
+    statistical significance** — item 29 found "limited data" picks
+    outperforming "confident" ones (54.2% vs. 59.5%, item 22-23) but
+    couldn't confirm it wasn't noise (z≈1.23 on the 2025-only sample,
+    short of the z≈1.96 needed for conventional significance); item 39
+    saw the same pattern hold at pooled 4-season scale (52.3% vs. 58.3%)
+    but flagged it as still not formally tested. Pulled the current
+    `confidenceBreakdown` from the permanent pooled-multi-season route
+    (post item 41/44 engine changes) and ran a proper two-proportion
+    z-test.
+    - **Confirmed real, not noise**: confident 52.44% (n=820) vs.
+      limitedData 58.84% (n=1443) — z=-2.95, two-tailed p=0.003,
+      significant at p<0.01. The much bigger pooled sample (n=820/1443
+      vs. item 29's n=212/351) gave this the statistical power the
+      original single-season test lacked.
+    - **The other two pairwise comparisons are NOT significant**:
+      confident vs. closeCall (z=-0.93, p=0.35) and limitedData vs.
+      closeCall (z=0.64, p=0.52) — closeCall's much smaller sample
+      (n=174) doesn't have the power to detect a difference even if one
+      exists. So the confirmed finding is specifically "limited-data
+      picks are more reliable than confident picks," not a full
+      three-way ranking.
+    - **Caveat stated honestly**: a standard two-proportion z-test
+      assumes independent observations, which pair-week backtest results
+      aren't strictly (a single bad week can correlate outcomes across
+      several pairs) — the same caveat implicit in every accuracy number
+      in this document. The effect size here is large enough (z=-2.95,
+      comfortably past the 1.96 threshold) to have real margin against
+      that kind of mild correlation inflation, but it's not a
+      randomized-trial-grade test.
+    - **No code change** — item 23 already split the flags and
+      headlines correctly based on the *directionally* real (if then
+      statistically unconfirmed) pattern ("Start X — though we have
+      limited recent data..." carries no hedging, unlike the genuine
+      "Close call" headline). This item confirms that design decision
+      was right, rather than changing anything about it. Closes the
+      open question item 29 and item 39 both left hanging.
+
+### Open items (as of item 45 — pick up here)
+Everything through c5886e3 ("Fix several stale sections in CLAUDE.md
+after the 4-season work") is committed (`git log`). Item 45 (this
+significance test) is written up above but not yet committed —
+standalone-only, no lasting code (a one-off statistical check against
+already-available data, not a new experiment file). Nothing below is
+started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
