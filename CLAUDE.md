@@ -1508,10 +1508,9 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
     finding only. See open items below.
 
 ### Open items (as of item 37 — pick up here)
-Everything through item 36 is committed (`git log`). Item 37 (depth
-charts, immediately above) is a scoping finding only —
-no code was written, so there's nothing to commit for it beyond this
-write-up. Nothing below is started or fixed yet:
+Everything through item 37 is committed (`git log`) — item 37 (depth
+charts) was a scoping finding only, no code was written, so its only
+artifact is the write-up above. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
