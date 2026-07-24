@@ -24,6 +24,8 @@ export interface NflverseSignals {
   epaPerPlay: number | null;
   /** FTN Charting, target-scoped (WR/TE) — see CLAUDE.md item 32. */
   dropRate: number | null;
+  /** QB-only: EPA on the QB's own rush attempts, distinct from epaPerPlay's QB mapping (qbEpaPerDropback, a passing-EPA signal already tested and rejected — see item 31). See CLAUDE.md's QB-rushing-EPA follow-up to item 40. */
+  qbRushEpaPerPlay: number | null;
 }
 
 export const EMPTY_NFLVERSE_SIGNALS: NflverseSignals = {
@@ -35,6 +37,7 @@ export const EMPTY_NFLVERSE_SIGNALS: NflverseSignals = {
   successRate: null,
   epaPerPlay: null,
   dropRate: null,
+  qbRushEpaPerPlay: null,
 };
 
 export interface PlayerComparisonInput {
@@ -85,6 +88,8 @@ export interface PlayerScoreBreakdown {
   rbEpaModifier: number;
   dropRateAvg: number | null;
   dropRateModifier: number;
+  qbRushEpaAvg: number | null;
+  qbRushEpaModifier: number;
   teammateOutBumpModifier: number;
   targetShare: number | null;
   separation: number | null;

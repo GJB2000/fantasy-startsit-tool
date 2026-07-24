@@ -1818,14 +1818,90 @@ plan, not 2024 — confirmed that season is locked behind a paid tier
     - Temporary code (`crossCheckExperiment.ts` and its diagnostic route)
       deleted after recording these numbers, same discipline as items
       22/29/34/38.
+41. **Followed up on item 40's QB-rushing-EPA lead — by-season stability
+    check, then an integration sweep, then shipped it at a user-approved
+    weight.** The most thorough QB-rushing investigation in this
+    document, and the first one that actually shipped.
+    - **Standalone by-season breakdown was the real test**: 58.6% (2022) /
+      59.4% (2023) / 49.5% (2024) / 51.5% (2025) — never below chance,
+      genuinely more stable than every prior QB-rushing signal (total
+      attempts, red-zone-only, goal-line-only, NextGen rushYoe), all of
+      which swung from clearly-below-chance to clearly-above-chance
+      across seasons. One caution surfaced alongside this: the
+      *conversion factor* itself (points per unit of EPA) swings hard by
+      season (47.4 / 149.7 / 33.0 / 34.9) even though the win/loss picks
+      don't — a different kind of instability than the pick-accuracy
+      swings every other QB-rushing signal showed.
+    - **Confirmed the sum-safety check RB's EPA integration needed
+      (item 33) doesn't apply here**: QB rushing EPA sums POSITIVE in
+      every season (183.65 / 58.07 / 276.78 / 254.27), unlike RB's
+      rushing EPA which summed negative and forced an OLS-regression
+      workaround. Plain "ratio of sums" is safe — computed from the full
+      2022-2025 pooled sample (45.814 points per unit) rather than 2025
+      alone, since the whole point of this signal was cross-season
+      robustness.
+    - **Integration sweep (additive term, mirroring RB EPA's shape) was
+      genuinely mixed, not a clean win**: pooled QB accuracy peaked at
+      58.1% (w=0.2, vs. 57.1% baseline), but 2024 declined
+      *monotonically* at every nonzero weight tested (55.9%→50.0%) while
+      2022/2023/2025 improved or held flat — not the "every season at or
+      above baseline" shape RB's EPA integration showed.
+    - **Reframed at the whole-model level before deciding — this mattered
+      a lot.** QB is one of four position pools, so even QB's best-case
+      +1pp gain only moved *overall* accuracy by +0.16pp (55.77%→55.93%
+      pooled). Checked one more thing before asking for a decision: did
+      the model still beat the simple `recentVolume` baseline in every
+      individual season at w=0.2? Yes — and 2025 (the one season the
+      model currently loses to `recentVolume` on, 56.4% vs. 56.6%)
+      flipped to winning (56.9% vs. 56.6%).
+    - **Put the tradeoff to the user rather than resolved unilaterally**
+      (same precedent as items 30/33): small-but-real whole-model gain,
+      universal-baseline-beating preserved and even improved in the one
+      season that was previously a loss, against a real, monotonic
+      2024-specific QB decline. **User chose to ship at w=0.2.**
+    - **Shipped as `QB_RUSH_EPA_BLEND_WEIGHT=0.2`**/
+      `POINTS_PER_QB_RUSH_EPA=45.814` in `config.ts`, following the exact
+      same additive-term pattern as every other QB modifier
+      (`engine.ts`'s `qbRushEpaModifier`, stacked after
+      `qbSuccessRateModifier`). New `NflverseSignals.qbRushEpaPerPlay`
+      field and `aggregate.ts`'s `averageQbRushEpa()` (QB-only; reads the
+      same `rushEpaPerPlay` field RB's shipped signal uses, distinct from
+      `epaPerPlay`'s QB mapping to `qbEpaPerDropback`, a passing-EPA
+      signal already tested and rejected in item 31). Wired into both
+      `buildBacktestInput.ts` and `buildInput.ts` (live), matching every
+      other signal's live/backtest parity.
+    - **Verified against the real shipped code, not just the sweep
+      harness** — the temporary sweep script approximated the rushing-EPA
+      average by walking `recentGamesByPlayer` directly, while the
+      shipped code uses the canonical `recentNflverseByPlayer()` window
+      every other signal uses; the two differ slightly on which weeks
+      they include at the margin. Re-ran the real pooled backtest after
+      shipping to get the authoritative numbers (slightly different from
+      the sweep's approximation, same overall story): pooled QB 57.1%→
+      57.8%, overall 55.77%→55.89%, 2024 QB 55.9%→52.0% (a bigger dip
+      than the sweep predicted), 2023 QB 58.8%→61.8% (a bigger gain).
+      Every individual season still beat `recentVolume` post-ship (2022
+      55.6% vs. 55.5%, 2023 55.2% vs. 53.3%, 2024 55.7% vs. 53.3%, 2025
+      57.0% vs. 56.6%).
+    - **Verified live end-to-end**, not just backtest: a real
+      `/api/compare` request (Lamar Jackson vs. Joe Burrow, 2025 season)
+      showed `qbRushEpaModifier` firing in both directions as expected —
+      negative for Jackson (0.14 EPA/rush, below what his running score
+      already implies) and positive for Burrow (0.39 EPA/rush, well
+      above), with the new note ("Averaging X.XX EPA per rush attempt
+      recently (as a runner)...") rendering correctly for both.
+    - Temporary sweep code (`qbRushEpaExperiment.ts` and its diagnostic
+      route) deleted after shipping — unlike prior QB-rushing attempts,
+      this one has real, lasting production code, not just a write-up.
 
-### Open items (as of item 40 — pick up here)
-Everything through 2011c79 ("Extend nflverse-only backtest to 2022-2023")
-and 42d1f3b ("Add 2022/2023 to the Backtest page's Season toggle") is
-committed (`git log`). Item 40 (this cross-check pass) is written up
-above but not yet committed — standalone-only, no lasting code beyond
-this write-up (its temporary experiment file was deleted). Nothing below
-is started or fixed yet:
+### Open items (as of item 41 — pick up here)
+Everything through 42d1f3b ("Add 2022/2023 to the Backtest page's Season
+toggle") is committed (`git log`). Items 40-41 are written up above but
+not yet committed. Item 40 was standalone-only (no lasting code). Item 41
+shipped real production code: `QB_RUSH_EPA_BLEND_WEIGHT=0.2` in
+`config.ts`, plus the new `qbRushEpaPerPlay` signal wired through
+`aggregate.ts`/`engine.ts`/`buildBacktestInput.ts`/`buildInput.ts`.
+Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything

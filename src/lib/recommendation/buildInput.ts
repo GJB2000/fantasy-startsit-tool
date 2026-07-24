@@ -2,6 +2,7 @@ import {
   averageDropRate,
   averageEpaPerPlay,
   averageGoalLineTouches,
+  averageQbRushEpa,
   averageRedZoneTouches,
   averageSeparation,
   averageSnapShare,
@@ -86,6 +87,7 @@ export async function buildComparisonInput(
     successRate: averageSuccessRate(recentNflverseStats, player.Position),
     epaPerPlay: averageEpaPerPlay(recentNflverseStats, player.Position),
     dropRate: averageDropRate(recentNflverseStats, player.Position),
+    qbRushEpaPerPlay: averageQbRushEpa(recentNflverseStats, player.Position),
   };
 
   return {

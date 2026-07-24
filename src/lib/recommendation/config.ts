@@ -316,3 +316,52 @@ export const POINTS_PER_TEAMMATE_OUT_BUMP_WR = 1.014;
  * deleted, same precedent as every other rejected signal in this file.
  */
 export const TEAMMATE_OUT_BUMP_WEIGHT_WR = 0;
+
+/**
+ * Empirically-derived PPR points per unit of QB rushing EPA-per-play
+ * (distinct from POINTS_PER_VOLUME_UNIT.QB/POINTS_PER_QB_RUSH_ATTEMPT,
+ * which are about rushing VOLUME — this is about rushing QUALITY, EPA on
+ * the QB's own carries). Unlike RB's rushing EPA (RB_EPA_REGRESSION_SLOPE
+ * above), QB rushing EPA sums POSITIVE across every season tested
+ * (2022-2025 pooled: +772.76 total, never negative in any individual
+ * season) — so the plain "ratio of sums" method is safe here, no OLS
+ * regression/intercept needed. Computed from the full 2022-2025 pooled
+ * sample (35403.4 total QB PPR points ÷ 772.76 total rushing-EPA-summed-
+ * by-rush-count), not just 2025 alone, since the whole point of this
+ * signal was cross-season stability — see below.
+ *
+ * Distinct from `epaPerPlay`'s QB mapping (qbEpaPerDropback, a passing-
+ * EPA signal already tested and rejected — item 31, 38.0%/44.0%, both
+ * worse than chance). This reads the same `rushEpaPerPlay` field RB's
+ * shipped EPA signal uses, just for a QB's own rush attempts.
+ *
+ * Standalone-tested notably more STABLE than every prior QB-rushing
+ * signal in this document (total attempts, red-zone-only, goal-line-
+ * only, NextGen rushYoe — all of which swung from clearly-below-chance
+ * to clearly-above-chance across seasons): 58.6% (2022) / 59.4% (2023) /
+ * 49.5% (2024) / 51.5% (2025) — never below chance, a real methodological
+ * improvement even though the per-season conversion factor itself is
+ * less stable (47.4 / 149.7 / 33.0 / 34.9) than the pick accuracy is.
+ */
+export const POINTS_PER_QB_RUSH_EPA = 45.814;
+
+/**
+ * How much weight QB rushing EPA (converted to points via
+ * POINTS_PER_QB_RUSH_EPA) carries against the running QB score (post-
+ * volume-blend, stacked alongside the other QB-rushing terms). Swept
+ * 0-0.5 against the full 2022-2025 pooled sample: pooled QB accuracy
+ * peaked at 58.1% (w=0.2, up from the 57.1% baseline), but 2024 declined
+ * MONOTONICALLY at every nonzero weight tested (55.9%→50.0%) while 2022/
+ * 2023/2025 improved or held roughly flat. At the whole-model level (all
+ * four positions, not just QB) the effect is much smaller — 55.77%→55.93%
+ * at w=0.2, since QB is only one of four position pools — and every
+ * individual season still beat the simple recentVolume baseline at w=0.2,
+ * including 2025 (currently the one season that narrowly loses to it at
+ * w=0, and flips to winning at w=0.2). Shipped at 0.2 as a deliberate,
+ * user-confirmed judgment call given that whole-model framing — a small
+ * but real overall gain, accepting 2024's QB-specific decline as the
+ * tradeoff, the same kind of explicit tradeoff decision as
+ * QB_RUSH_BLEND_WEIGHT (item 30) and DROP_RATE_BLEND_WEIGHT (item 33).
+ * See CLAUDE.md's QB-rushing-EPA follow-up to item 40 for the full sweep.
+ */
+export const QB_RUSH_EPA_BLEND_WEIGHT = 0.2;

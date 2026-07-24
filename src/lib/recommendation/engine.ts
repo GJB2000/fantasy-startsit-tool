@@ -7,6 +7,7 @@ import {
   POINTS_PER_DROP_RATE_UNIT,
   POINTS_PER_QB_GOAL_LINE_RUSH,
   POINTS_PER_QB_RUSH_ATTEMPT,
+  POINTS_PER_QB_RUSH_EPA,
   POINTS_PER_REDZONE_TOUCH_RB,
   POINTS_PER_SNAP_SHARE_UNIT_TE,
   POINTS_PER_SUCCESS_RATE_UNIT_QB,
@@ -14,6 +15,7 @@ import {
   POINTS_PER_VOLUME_UNIT,
   QB_GOAL_LINE_BLEND_WEIGHT,
   QB_RUSH_BLEND_WEIGHT,
+  QB_RUSH_EPA_BLEND_WEIGHT,
   QB_SUCCESS_RATE_BLEND_WEIGHT,
   RB_EPA_BLEND_WEIGHT,
   RB_EPA_PPR_AT_ZERO,
@@ -193,6 +195,27 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     );
   }
 
+  let qbRushEpaModifier = 0;
+  const qbRushEpaAvg = input.nflverse.qbRushEpaPerPlay;
+  if (blendedScore != null && position === "QB" && qbRushEpaAvg != null) {
+    const runningScore =
+      blendedScore +
+      matchupModifier +
+      volumeModifier +
+      redZoneModifier +
+      snapShareModifier +
+      qbRushModifier +
+      qbGoalLineModifier +
+      qbSuccessRateModifier;
+    const expectedPointsFromQbRushEpa = qbRushEpaAvg * POINTS_PER_QB_RUSH_EPA;
+    const blendedWithQbRushEpa =
+      (1 - QB_RUSH_EPA_BLEND_WEIGHT) * runningScore + QB_RUSH_EPA_BLEND_WEIGHT * expectedPointsFromQbRushEpa;
+    qbRushEpaModifier = blendedWithQbRushEpa - runningScore;
+    notes.push(
+      `Averaging ${qbRushEpaAvg.toFixed(2)} EPA per rush attempt recently (as a runner) — worth roughly ${expectedPointsFromQbRushEpa.toFixed(1)} PPR points at this position's typical rate.`
+    );
+  }
+
   let rbEpaModifier = 0;
   const epaPerPlayAvg = input.nflverse.epaPerPlay;
   if (blendedScore != null && position === "RB" && epaPerPlayAvg != null) {
@@ -238,6 +261,7 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
         qbRushModifier +
         qbGoalLineModifier +
         qbSuccessRateModifier +
+        qbRushEpaModifier +
         rbEpaModifier +
         dropRateModifier +
         teammateOutBumpModifier;
@@ -282,6 +306,8 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     rbEpaModifier,
     dropRateAvg,
     dropRateModifier,
+    qbRushEpaAvg,
+    qbRushEpaModifier,
     teammateOutBumpModifier,
     targetShare: input.nflverse.targetShare,
     separation: input.nflverse.separation,
