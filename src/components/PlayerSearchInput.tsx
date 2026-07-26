@@ -53,11 +53,11 @@ export function PlayerSearchInput({ onSelect, excludeIds, placeholder }: PlayerS
         onFocus={() => query.trim() && results.length > 0 && setIsOpen(true)}
         onBlur={() => setTimeout(() => setIsOpen(false), 150)}
         placeholder={placeholder ?? "Search a player…"}
-        className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-background text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-400"
+        className="w-full rounded-xl border border-zinc-200 bg-white dark:bg-zinc-900 text-foreground px-3.5 py-2.5 text-sm shadow-sm outline-none transition-shadow placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 dark:border-zinc-800"
       />
       {isOpen && query.trim() && (loading || visibleResults.length > 0) && (
-        <ul className="absolute z-10 mt-1 w-full max-h-64 overflow-auto rounded-md border border-zinc-300 dark:border-zinc-700 bg-background shadow-lg">
-          {loading && <li className="px-3 py-2 text-sm text-zinc-500">Searching…</li>}
+        <ul className="absolute z-10 mt-1.5 w-full max-h-64 overflow-auto rounded-xl border border-zinc-200 bg-white dark:bg-zinc-900 shadow-lg dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800">
+          {loading && <li className="px-3.5 py-2.5 text-sm text-zinc-500">Searching…</li>}
           {!loading &&
             visibleResults.map((player) => (
               <li key={player.playerId}>
@@ -70,7 +70,7 @@ export function PlayerSearchInput({ onSelect, excludeIds, placeholder }: PlayerS
                     setResults([]);
                     setIsOpen(false);
                   }}
-                  className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-sm transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-500/10"
                 >
                   <span>
                     {player.name}{" "}

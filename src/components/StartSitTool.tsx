@@ -52,24 +52,34 @@ export function StartSitTool() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
-      <div className="space-y-3">
+    <div className="mx-auto mt-10 w-full max-w-2xl">
+      <div className="space-y-2.5">
         {selectedPlayers.map((player) => (
           <div
             key={player.playerId}
-            className="flex items-center justify-between rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2"
+            className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-3 py-2.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
           >
-            <span className="text-sm">
-              {player.name}{" "}
-              <span className="text-zinc-500">
-                {player.position}
-                {player.team ? ` · ${player.team}` : ""}
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-500/10 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                {player.name
+                  .split(" ")
+                  .map((part) => part[0])
+                  .slice(0, 2)
+                  .join("")
+                  .toUpperCase()}
               </span>
-            </span>
+              <span className="text-sm">
+                <span className="font-medium">{player.name}</span>{" "}
+                <span className="text-zinc-500">
+                  {player.position}
+                  {player.team ? ` · ${player.team}` : ""}
+                </span>
+              </span>
+            </div>
             <button
               type="button"
               onClick={() => removePlayer(player.playerId)}
-              className="text-sm text-zinc-500 hover:text-foreground"
+              className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
               aria-label={`Remove ${player.name}`}
             >
               ✕
@@ -94,7 +104,7 @@ export function StartSitTool() {
         type="button"
         onClick={handleCompare}
         disabled={selectedPlayers.length < 2 || loading}
-        className="mt-4 w-full rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-40"
+        className="mt-5 w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-indigo-600"
       >
         {loading ? "Comparing…" : "Compare"}
       </button>
