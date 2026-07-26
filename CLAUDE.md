@@ -64,7 +64,12 @@ scoped to the live start/sit and trade pages; the Backtest page's own
 internal chrome (mode buttons, season toggle, table) was left on the
 prior zinc/rounded-md styling both times, since it's the secondary/
 internal validation tool, not a page newsletter readers use directly.
-Out of scope so far: database/
+Both live tools also gained real PPR/Half-PPR/Standard scoring-format
+toggles — not just a relabeled display, the five active conversion
+factors were empirically re-tuned per format and the choice is threaded
+all the way through matchup tables, scoring, and the primary backtest's
+grading — see "Backtesting & Tuning History" item 50. Out of scope so
+far: database/
 persistence, auth, K/DEF positions. Upcoming-schedule/next-opponent
 lookup — previously fully out of scope — is now partially built (see
 below): the live start/sit tool's own matchup modifier still looks up
@@ -185,6 +190,14 @@ mapping pieces are already built and proven, just not yet pointed at
   list (opponents known, scores blank) as soon as the NFL publishes it,
   not just completed seasons, by pulling the real file mid-2026-offseason
   and finding all 272 of the 2026 season's games already present.
+- **SportsDataIO's `FantasyPoints` (standard, 0/reception) and
+  `FantasyPointsPPR` (full PPR, 1/reception) are otherwise identical** —
+  confirmed live at both the game and season level:
+  `FantasyPointsPPR - FantasyPoints` equals the row's own `Receptions`
+  field exactly (e.g. Justin Jefferson, 2025 week 8: 14.4 - 7.4 = 7.0
+  receptions, matching exactly). This is what makes half-PPR scoring a
+  free derivation (`getFantasyPoints()` in `sportsdata/types.ts`) rather
+  than needing a new data source or endpoint — see item 50.
 
 ## Recommendation Logic Philosophy
 This is the most important section — the "brain" of the tool.
@@ -2349,16 +2362,108 @@ single-season numbers for those specific constants.
       how to generate realistic multi-player synthetic trade candidates
       before extending, not a quick generalization of the 1-for-1
       pairing this item reused. See Open Items below.
+50. **Added real PPR/Half-PPR/Standard scoring-format toggles to both
+    live tools** — not a shallow relabel of displayed numbers, but the
+    selected format threaded all the way through matchup tables,
+    scoring, and the primary backtest's grading, with the underlying
+    conversion factors empirically re-tuned per format.
+    - **The key data insight**: confirmed live that SportsDataIO's
+      `FantasyPoints` (standard) and `FantasyPointsPPR` (full PPR) are
+      otherwise identical — `FantasyPointsPPR - FantasyPoints` equals
+      the row's own `Receptions` field exactly, at both the game and
+      season level. That makes half-PPR a free derivation
+      (`getFantasyPoints()` in `sportsdata/types.ts`) rather than
+      needing a new data source — see Data Source Notes.
+    - **Chose the rigorous option over the shallow one, on the user's
+      explicit call**: the volume/matchup modifiers driving most of the
+      final score use conversion factors ("points per target," etc.)
+      that were empirically tuned against full-PPR data specifically.
+      Recomputed all five active factors (`POINTS_PER_VOLUME_UNIT`,
+      `POINTS_PER_SNAP_SHARE_UNIT_TE`, `POINTS_PER_QB_RUSH_ATTEMPT`,
+      `POINTS_PER_QB_RUSH_EPA`, `POINTS_PER_DROP_RATE_UNIT`) for
+      half-PPR and standard using the exact same "ratio of sums" method
+      as the shipped PPR values, against the full 2025 season, via a
+      temporary diagnostic route (`/api/debug-scoring-factors`,
+      reusing `loadBacktestRunData` directly — deleted after recording
+      the numbers, same precedent as every other one-off analysis in
+      this document).
+    - **Verified the recomputation against known values before trusting
+      it, and caught two real bugs doing so** — the same "reproduce the
+      shipped value before trusting the sweep" discipline as items
+      43/44: the PPR column initially didn't match the shipped
+      `POINTS_PER_QB_RUSH_EPA` (784.7 vs. 45.814, ~20x off) or
+      `POINTS_PER_DROP_RATE_UNIT` (207.0 vs. 182.75). Root causes: QB
+      rush EPA's denominator needed to be that week's rate WEIGHTED BY
+      rush attempts (`rushEpaPerPlay * RushingAttempts`), not the raw
+      per-week rate summed alone (confirmed by cross-checking against
+      item 41's own documented 2025-only sub-value, 34.9 — the fixed
+      computation lands at 34.41, matching almost exactly); drop rate's
+      population needed to include TE rows, not just WR (the underlying
+      constant was always computed WR+TE, even though only WR gets the
+      blend weight — TE is exempted from `DROP_RATE_BLEND_WEIGHT`
+      itself, item 33, not from how the conversion factor was derived).
+      Both fixes brought the PPR column to an exact or near-exact match.
+    - **QB-scoped factors barely move by format, exactly as expected**
+      (QBs essentially never record receptions): `POINTS_PER_QB_RUSH_
+      ATTEMPT` goes 3.929 → 3.925 → 3.920 (ppr/half/standard).
+      `POINTS_PER_QB_RUSH_EPA` is the one factor NOT recomputed fresh
+      from 2025-only data — doing so would have quietly replaced its
+      4-season-pooled shipped value (45.814) with a 2025-only one
+      (34.41), a real methodology downgrade. Instead scaled the shipped
+      pooled value by the half/standard-vs-ppr ratio measured in the
+      same 2025-only diagnostic run (45.814 → 45.77 → 45.725) — small
+      and safe either way, since this factor barely moves regardless.
+      Reception-driven positions move substantially, as expected:
+      `POINTS_PER_VOLUME_UNIT.WR` goes 1.729 → 1.418 → 1.106,
+      `POINTS_PER_SNAP_SHARE_UNIT_TE` goes 9.607 → 7.698 → 5.788,
+      `POINTS_PER_DROP_RATE_UNIT` goes 182.75 → 148.75 → 114.74.
+    - **Made `pairing.ts`'s adjacent-rank ranking and `grading.ts`'s
+      ground truth format-aware too**, not just the engine — which
+      players count as "adjacent rank" genuinely shifts by format
+      (reception-heavy players rank differently under PPR vs.
+      Standard), and grading a Half-PPR-scored recommendation against
+      PPR ground truth would silently defeat the whole point.
+    - **Re-ran the primary broad backtest per format to confirm the
+      retuned engine still performs**: PPR 57.5%, Half-PPR 55.2%,
+      Standard 56.3% — all comfortably above chance. PPR still performs
+      best, since the blend *weights* themselves (`VOLUME_BLEND_
+      WEIGHT=0.9`, etc.) were tuned against it specifically and weren't
+      independently re-swept per format in this pass — only the
+      conversion factors were. A real, honest limitation, not silently
+      glossed over: full parity would need re-sweeping every blend
+      weight per format too, the same scale of work as the original
+      tuning history above.
+    - **Deliberately scoped out**: the nflverse-only 2022-2024 backtest
+      pipeline and all naive baseline pickers (`baselines.ts`) stay
+      PPR-only — re-tuning those too would be a much larger extension,
+      and format-awareness on the primary 2025 pipeline already
+      validates the core engine change soundly. See Open Items below.
+    - **UI**: a shared segmented-control toggle
+      (`ScoringFormatToggle.tsx`), persisted via `localStorage`
+      (`useScoringFormat.ts` — no backend/account system, consistent
+      with this app's "no persistence" scope) so picking a format once
+      carries across Start/Sit and the Trade Analyzer within a session.
+      Every previously-hardcoded "PPR" label and reasoning sentence
+      (`engine.ts`, `evaluateTrade.ts`) is now format-aware.
+    - **Caught one more real bug during UI verification**: a template-
+      literal Tailwind class in an earlier redesign pass wasn't the
+      issue here, but a genuine hardcoded "PPR points" string survived
+      in `evaluateTrade.ts`'s reasoning text even in Standard mode —
+      found by actually reading the rendered output in Standard format,
+      not just checking the numbers, and fixed.
 
-### Open items (as of item 49 — pick up here)
-Everything through 66f643d ("Add a backtest mode for the trade
-analyzer") is committed (`git log`), including item 46's real,
-permanent code (`nflverse/depthCharts.ts`, the
-`depthChartByPlayerIdWeek` plumbing, and the new `pickByDepthChart`
-baseline) and items 47-49's real, permanent code (`lib/trade/`,
-`lib/recommendation/restOfSeason.ts`, `lib/backtest/tradeBacktest.ts`,
-the `/trade` page, and the new `/api/backtest/trade*` routes). Nothing
-below is started or fixed yet:
+### Open items (as of item 50 — pick up here)
+Everything through e90a12d ("Add PPR/Half-PPR/Standard scoring format
+toggles") is committed (`git log`), including item 46's real, permanent
+code (`nflverse/depthCharts.ts`, the `depthChartByPlayerIdWeek`
+plumbing, and the new `pickByDepthChart` baseline), items 47-49's real,
+permanent code (`lib/trade/`, `lib/recommendation/restOfSeason.ts`,
+`lib/backtest/tradeBacktest.ts`, the `/trade` page, and the new
+`/api/backtest/trade*` routes), and item 50's real, permanent code
+(`getFantasyPoints`/`ScoringFormat`/`parseScoringFormat` in
+`sportsdata/types.ts`, the per-format `config.ts` constants,
+`ScoringFormatToggle.tsx`, `useScoringFormat.ts`). Nothing below is
+started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -2396,6 +2501,18 @@ below is started or fixed yet:
    own design pass (how to pick realistic multi-player groupings, not
    just an extension of the existing pairing loop) before the backtest
    can cover it.
+6. **Scoring-format toggle isn't fully universal yet** — deferred in
+   item 50. The nflverse-only 2022-2024 backtest pipeline
+   (`runBacktestNflverseOnly.ts`, `tradeBacktest.ts`) and every naive
+   baseline picker (`baselines.ts`) still score everything in PPR
+   regardless of the format passed elsewhere; extending them would
+   mean re-deriving `Receptions`-aware baselines and re-validating the
+   nflverse-only pipeline the same way item 50 did for the primary one.
+   Separately, the blend *weights* (`VOLUME_BLEND_WEIGHT`,
+   `SNAP_SHARE_BLEND_WEIGHT_TE`, etc.) were never independently
+   re-swept per format — only the conversion factors were — so
+   Half-PPR/Standard accuracy (55.2%/56.3%) trails PPR's 57.5% by a
+   real, unaddressed margin.
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
@@ -2406,9 +2523,13 @@ below is started or fixed yet:
 - `src/lib/sportsdata/` — low-level SportsDataIO fetch client and typed
   data-access functions (`client.ts`, `players.ts`, `seasonStats.ts`,
   `weeklyStats.ts`, `byes.ts`, `timeframes.ts`, `positionDefense.ts`,
-  `seasonToDatePlayerStats.ts`, `teamGameStats.ts`). Server-only
-  (guarded via the `server-only` package) — never import this from a
-  `"use client"` file. `client.ts`'s `sportsDataFetch()` supports two
+  `seasonToDatePlayerStats.ts`, `teamGameStats.ts`). `types.ts` itself
+  is NOT server-only (unlike the fetch/data-access files above) — it's
+  imported from client components too (e.g. `ScoringFormatToggle.tsx`)
+  for its plain types/pure functions, `ScoringFormat`/`getFantasyPoints`/
+  `parseScoringFormat` (item 50) included. `client.ts` and friends
+  remain server-only (guarded via the `server-only` package) — never
+  import those from a `"use client"` file. `client.ts`'s `sportsDataFetch()` supports two
   API hosts via `opts.base` (`API_BASES`): `"fantasy"` (default, most
   endpoints) and `"odds"` (`TeamGameStats` lives there) — the
   in-process cache keys on `${base}:${path}` so there's no collision
@@ -2430,9 +2551,19 @@ below is started or fixed yet:
   the current season, fetched once per `/api/compare` request and
   passed into every `buildComparisonInput` call, the same way
   `positionDefenseTable` already is). All three feed the *same*
-  unmodified `scorePlayer`/`comparePlayers`. Tunable weights live in
-  `config.ts` — adjust there as the logic gets tuned, per the
-  Recommendation Logic Philosophy section above. `volume.ts`'s
+  unmodified `scorePlayer`/`comparePlayers`, which as of item 50 both
+  take an explicit `ScoringFormat` parameter (default call sites that
+  haven't been made format-aware — the nflverse-only backtest pipeline,
+  the trade backtest — pass `"ppr"` literally, not a default parameter
+  value, so it's visible at each call site rather than implicit).
+  Tunable weights live in `config.ts` — adjust there as the logic gets
+  tuned, per the Recommendation Logic Philosophy section above; the five
+  active `POINTS_PER_*` conversion factors are `Record<ScoringFormat,
+  ...>` as of item 50, empirically re-tuned per format (see
+  "Backtesting & Tuning History" for the full story) — the *disabled*
+  factors (weight `0`: red-zone, goal-line, QB success rate, RB EPA,
+  teammate-bump) were deliberately left as plain PPR-only numbers, since
+  a dormant constant doesn't need per-format recalibration. `volume.ts`'s
   `getVolumeStat()` reads `ReceivingTargets`/`RushingAttempts`/
   `PassingAttempts` off `PlayerGameStat` — these fields were already
   present in every SportsDataIO response but unused until the volume
@@ -2550,7 +2681,10 @@ below is started or fixed yet:
   as player recent-form, not full season-to-date, since team/player
   tendencies can shift within a season), `grading.ts`
   (correct/incorrect/push/no_pick outcomes + accuracy summary, plus
-  `summarizeByCloseCall` for confidence-calibration checks), `baselines.ts`
+  `summarizeByCloseCall` for confidence-calibration checks — as of item
+  50, `gradeOutcome`/`gradeWeek` take an optional `ScoringFormat`,
+  default `"ppr"`, so ground truth is graded in whatever format the
+  engine was scored in), `baselines.ts`
   (naive strategies graded by the identical `gradeOutcome` rules as the
   engine, over the same weeks/matchups, so accuracy is directly
   comparable — prior-week points, season-to-date average, recent volume,
@@ -2564,9 +2698,17 @@ below is started or fixed yet:
   just standalone), and `redZoneTouches`/`dropRate` (both WERE shipped
   into the engine at some point — `dropRate` still is, WR-only;
   `redZoneTouches`'s engine weight was later zeroed, item 44, though the
-  baseline itself still runs). See "Backtesting & Tuning History" for
+  baseline itself still runs — all of `baselines.ts` stays PPR-only even
+  after item 50, a deliberate scope limit, not an oversight; see Open
+  Items). See "Backtesting & Tuning History" for
   the full status of each), `pairing.ts` (broad-mode adjacent-rank
-  pairing methodology), `runBacktest.ts` (orchestration), `config.ts`/
+  pairing methodology — `buildPairsForWeek`/`buildAllPairsForWeek` also
+  take an optional `ScoringFormat`, default `"ppr"`, as of item 50,
+  since which players count as "adjacent rank" genuinely shifts by
+  format), `runBacktest.ts` (orchestration — `runPairBacktest`/
+  `runBroadBacktest` are the only two backtest entry points made fully
+  format-aware, item 50; `runBacktestNflverseOnly.ts`/`tradeBacktest.ts`
+  still call everything with `"ppr"` hardcoded), `config.ts`/
   `params.ts` (tunables, query parsing). The engine's own grading logic
   still always treats injury status as unknown — the `injuryStatus`
   baseline above is the only place in backtest mode that reads real
@@ -2595,8 +2737,11 @@ below is started or fixed yet:
   cutoff walk (mirroring `collectBroadResultsForSeason`'s role in
   `runBacktestNflverseOnly.ts`), shared by the single-cutoff
   `runTradeBacktest` and the pooled `runTradeBacktestMultiSeason`.
-- `src/app/api/players`, `src/app/api/compare`, `src/app/api/trade` (item
-  47), `src/app/api/backtest/pair`, `src/app/api/backtest/broad`,
+- `src/app/api/players`, `src/app/api/compare`, `src/app/api/trade`
+  (item 47 — both `compare` and `trade` also accept an optional
+  `scoringFormat` query param, `ppr`/`half_ppr`/`standard`, via
+  `parseScoringFormat()`, item 50), `src/app/api/backtest/pair`,
+  `src/app/api/backtest/broad` (also `scoringFormat`-aware, item 50),
   `src/app/api/backtest/broad-nflverse`,
   `src/app/api/backtest/pair-nflverse`,
   `src/app/api/backtest/broad-nflverse-multiseason`,
@@ -2610,7 +2755,13 @@ below is started or fixed yet:
   `StartSitTool.tsx`/`PlayerSearchInput.tsx`/`ComparisonResult.tsx` (live
   start/sit mode), `TradeAnalyzer.tsx`/`TradeResult.tsx` (live Trade
   Analyzer mode, at `/trade`, item 47 — `TradeAnalyzer.tsx` reuses
-  `PlayerSearchInput.tsx` for both sides of a trade), and
+  `PlayerSearchInput.tsx` for both sides of a trade), `ScoringFormatToggle.tsx`
+  (item 50 — the PPR/Half-PPR/Standard segmented control, shared by
+  `StartSitTool.tsx` and `TradeAnalyzer.tsx`; its selected value is
+  owned by `src/lib/useScoringFormat.ts`, a small localStorage-backed
+  hook — no backend/account system, consistent with this app's "no
+  persistence" scope — so the choice carries across both live tools
+  within a session), and
   `BacktestTool.tsx`/`BacktestWeekTable.tsx`/`BacktestSummary.tsx`/
   `BacktestCaveatNote.tsx`/`TradeBacktestTable.tsx` (backtest mode, at
   `/backtest` — `BacktestTool.tsx` has three modes, Single pair/Broad/
