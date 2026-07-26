@@ -53,11 +53,11 @@ export function PlayerSearchInput({ onSelect, excludeIds, placeholder }: PlayerS
         onFocus={() => query.trim() && results.length > 0 && setIsOpen(true)}
         onBlur={() => setTimeout(() => setIsOpen(false), 150)}
         placeholder={placeholder ?? "Search a player…"}
-        className="w-full rounded-xl border border-zinc-200 bg-white dark:bg-zinc-900 text-foreground px-3.5 py-2.5 text-sm shadow-sm outline-none transition-shadow placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 dark:border-zinc-800"
+        className="w-full rounded-2xl border border-foreground/10 bg-surface text-foreground px-4 py-3 text-sm shadow-sm outline-none transition-shadow placeholder:text-foreground/35 focus:border-accent focus:ring-4 focus:ring-accent/15"
       />
       {isOpen && query.trim() && (loading || visibleResults.length > 0) && (
-        <ul className="absolute z-10 mt-1.5 w-full max-h-64 overflow-auto rounded-xl border border-zinc-200 bg-white dark:bg-zinc-900 shadow-lg dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800">
-          {loading && <li className="px-3.5 py-2.5 text-sm text-zinc-500">Searching…</li>}
+        <ul className="absolute z-10 mt-2 w-full max-h-64 overflow-auto rounded-2xl border border-foreground/10 bg-surface shadow-xl divide-y divide-foreground/[0.06]">
+          {loading && <li className="px-4 py-2.5 text-sm text-foreground/50">Searching…</li>}
           {!loading &&
             visibleResults.map((player) => (
               <li key={player.playerId}>
@@ -70,17 +70,17 @@ export function PlayerSearchInput({ onSelect, excludeIds, placeholder }: PlayerS
                     setResults([]);
                     setIsOpen(false);
                   }}
-                  className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-sm transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-500/10"
+                  className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent/[0.07]"
                 >
                   <span>
                     {player.name}{" "}
-                    <span className="text-zinc-500">
+                    <span className="text-foreground/50">
                       {player.position}
                       {player.team ? ` · ${player.team}` : ""}
                     </span>
                   </span>
                   {player.injuryStatus && (
-                    <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-xs text-amber-600 dark:text-amber-400">
+                    <span className="ml-2 rounded-full bg-caution/15 px-2 py-0.5 text-xs font-medium text-caution">
                       {player.injuryStatus}
                     </span>
                   )}

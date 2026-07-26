@@ -1,30 +1,67 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fafafa;
-  --foreground: #18181b;
+  --background: #f5f6f8;
+  --foreground: #14161a;
+  --surface: #ffffff;
+  --surface-glass: rgba(255, 255, 255, 0.72);
+  --accent: #0e8074;
+  --accent-ink: #ffffff;
+  --good: #2a9a4a;
+  --bad: #d8433a;
+  --caution: #b87614;
+  --info: #2b76b0;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: var(--surface);
+  --color-surface-glass: var(--surface-glass);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  --color-caution: var(--caution);
+  --color-info: var(--info);
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-rounded:
+    ui-rounded, -apple-system, BlinkMacSystemFont, "SF Pro Rounded",
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #09090b;
-    --foreground: #f4f4f5;
+    --background: #0a0c0e;
+    --foreground: #f1f2f4;
+    --surface: #17191c;
+    --surface-glass: rgba(23, 25, 28, 0.66);
+    --accent: #35c9ba;
+    --accent-ink: #06201d;
+    --good: #3fdc6c;
+    --bad: #ff6a61;
+    --caution: #ffb748;
+    --info: #5fbbff;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--color-indigo-500) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.hero-glow {
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--accent) 14%, transparent),
+    transparent 70%
+  );
 }

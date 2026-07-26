@@ -57,10 +57,10 @@ export function StartSitTool() {
         {selectedPlayers.map((player) => (
           <div
             key={player.playerId}
-            className="flex items-center justify-between rounded-xl border border-zinc-200 bg-white px-3 py-2.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+            className="flex items-center justify-between rounded-2xl border border-foreground/10 bg-surface px-4 py-3 shadow-sm transition-shadow hover:shadow-md"
           >
             <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-500/10 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent/12 text-sm font-bold text-accent">
                 {player.name
                   .split(" ")
                   .map((part) => part[0])
@@ -69,8 +69,8 @@ export function StartSitTool() {
                   .toUpperCase()}
               </span>
               <span className="text-sm">
-                <span className="font-medium">{player.name}</span>{" "}
-                <span className="text-zinc-500">
+                <span className="font-semibold">{player.name}</span>{" "}
+                <span className="text-foreground/50">
                   {player.position}
                   {player.team ? ` · ${player.team}` : ""}
                 </span>
@@ -79,7 +79,7 @@ export function StartSitTool() {
             <button
               type="button"
               onClick={() => removePlayer(player.playerId)}
-              className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+              className="rounded-full p-1.5 text-foreground/35 transition-colors hover:bg-bad/10 hover:text-bad"
               aria-label={`Remove ${player.name}`}
             >
               ✕
@@ -104,12 +104,12 @@ export function StartSitTool() {
         type="button"
         onClick={handleCompare}
         disabled={selectedPlayers.length < 2 || loading}
-        className="mt-5 w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-indigo-600"
+        className="mt-5 w-full rounded-full bg-accent px-4 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
       >
         {loading ? "Comparing…" : "Compare"}
       </button>
 
-      {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="mt-3 text-sm text-bad">{error}</p>}
 
       {response && (
         <ComparisonResult result={response.result} contextNote={response.context.contextNote} />
