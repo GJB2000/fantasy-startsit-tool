@@ -2182,12 +2182,11 @@ single-season numbers for those specific constants.
       promotion.
 
 ### Open items (as of item 46 — pick up here)
-Everything through 55d504f ("Confirm confidence-calibration inversion is
-statistically significant") is committed (`git log`). Item 46 (depth
-charts) is written up above but not yet committed — it shipped real,
-permanent code (`nflverse/depthCharts.ts`, the `depthChartByPlayerIdWeek`
-plumbing, and the new `pickByDepthChart` baseline), verified against the
-real shared pipeline. Nothing below is started or fixed yet:
+Everything through f2ecef0 ("Ship depth charts as a permanent RB/WR
+standalone baseline") is committed (`git log`), including item 46's
+real, permanent code (`nflverse/depthCharts.ts`, the
+`depthChartByPlayerIdWeek` plumbing, and the new `pickByDepthChart`
+baseline). Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -2259,13 +2258,20 @@ real shared pipeline. Nothing below is started or fixed yet:
   signal was added; `sportsDataFetch()` casts the raw JSON rather than
   whitelisting fields, so extending `PlayerGameStat` in
   `sportsdata/types.ts` needed zero fetch/mapping changes anywhere.
-  `PlayerComparisonInput.nflverse` (an `NflverseSignals`) carries the
-  snap-share/target-share/separation/red-zone-touches signals from
-  `nflverse/aggregate.ts` into `scorePlayer` — see "Backtesting &
-  Tuning History" item 20 for how each is scored (RB red-zone touches
-  and TE snap share are additive blends on top of the volume blend;
-  WR target share + separation is a close-call tiebreaker in
-  `comparePlayers`, not part of `finalScore` at all).
+  `PlayerComparisonInput.nflverse` (an `NflverseSignals`) carries every
+  nflverse-sourced signal from `nflverse/aggregate.ts` into `scorePlayer`
+  — see "Backtesting & Tuning History" for how each is scored and current
+  as of the most recent item touching it: TE snap share (item 20) and WR
+  drop rate (item 33) are additive blends on top of the volume blend; QB
+  gets three additional additive terms (rush volume item 30, rush EPA
+  item 41) stacked after volume; WR target share + separation is a
+  close-call tiebreaker in `comparePlayers`, not part of `finalScore` at
+  all (item 20). RB red-zone touches and RB EPA-per-rush were both
+  additive blends too, but are now disabled (`REDZONE_BLEND_WEIGHT_RB`/
+  `RB_EPA_BLEND_WEIGHT` both `0`) after a four-season pooled re-sweep
+  found the combination hurt more than it helped (item 44) — the raw
+  signals are still computed and shown in reasoning notes, just no
+  longer weighted into `finalScore`.
 - `src/lib/nflverse/` — server-only client for the free, no-auth
   nflverse-data GitHub releases (`client.ts`: fetch + parse + the same
   in-process TTL cache pattern as `sportsdata/client.ts`, since these
@@ -2302,7 +2308,9 @@ real shared pipeline. Nothing below is started or fixed yet:
   signal value" layer on top of that table (`averageSnapShare`/
   `averageTargetShare`/`averageSeparation`/`averageRedZoneTouches`/
   `averageGoalLineTouches`/`averageSuccessRate`/`averageEpaPerPlay`/
-  `averageDropRate`) —
+  `averageDropRate`/`averageQbRushEpa` — the last one QB-only, reading
+  the same `rushEpaPerPlay` field RB's EPA signal uses, just for a QB's
+  own carries; see item 41) —
   used by both `recommendation/buildInput.ts`/`buildBacktestInput.ts`
   (feeding the live engine — see Recommendation Logic Philosophy and
   "Backtesting & Tuning History" item 20) and, independently,
@@ -2321,8 +2329,14 @@ real shared pipeline. Nothing below is started or fixed yet:
   `gameLog.ts`/`schedules.ts` are the two files that make nflverse usable
   as a *primary* data source, not just a supplement — `gameLog.ts` builds
   a full `PlayerGameStat[][]` game log from `stats_player`, and
-  `schedules.ts` derives bye weeks from the `schedules` release's
-  `games.csv` (no dedicated byes endpoint exists) — both used only by
+  `schedules.ts` derives both bye weeks and per-team-per-week game
+  weather (`getGameWeatherByTeamWeek` — roof/temp/wind, backs the WR-only
+  `wind` baseline, item 39) from the `schedules` release's `games.csv`
+  (no dedicated byes endpoint exists). `depthCharts.ts` reads the
+  `depth_charts` release (official starter/backup role) — usable for
+  2022-2024 only, since 2025's file uses a structurally incompatible
+  ESPN-scrape/timestamp schema (item 37/46); backs the RB/WR-only
+  `depthChart` baseline. All of these are used only by
   `backtest/loadRunNflverseOnly.ts` (item 24), never by the live tool or
   the primary 2025 backtest.
 - `src/lib/backtest/` — the backtesting feature: `loadRun.ts` (the only
@@ -2336,34 +2350,47 @@ real shared pipeline. Nothing below is started or fixed yet:
   `summarizeByCloseCall` for confidence-calibration checks), `baselines.ts`
   (naive strategies graded by the identical `gradeOutcome` rules as the
   engine, over the same weeks/matchups, so accuracy is directly
-  comparable: prior-week points, season-to-date average, recent volume
-  — all shipped in the engine or kept as reference — plus every
-  nflverse-backed signal tested so far (`snapShare`/`targetShare`/
-  `airYardsShare`/`cpoe`/`aggressiveness`/`separation`/
-  `yacAboveExpectation`/`rushYoe`/`receivingComposite`/`injuryStatus`/
-  `redZoneTouches`), all tested and **not** shipped into the engine yet;
-  see "Backtesting & Tuning History"), `pairing.ts` (broad-mode
-  adjacent-rank pairing methodology), `runBacktest.ts` (orchestration),
-  `config.ts`/`params.ts` (tunables, query parsing). The engine's own
-  grading logic still always treats injury status as unknown — the
-  `injuryStatus` baseline above is the only place in backtest mode that
-  reads real historical designations, and only as a standalone trial
-  (see Data Source Notes). Both API routes return
-  `baselineSummaries` and `confidenceBreakdown` alongside the engine's
-  own accuracy so results are never reported in isolation from a
-  baseline/calibration check. `loadRunNflverseOnly.ts`/
-  `runBacktestNflverseOnly.ts` (item 24) are a parallel, nflverse-only
-  path for validating the tuned engine weights against seasons
-  SportsDataIO won't serve — same `BacktestRunData` shape and same
-  scoring/grading functions as the primary pipeline, just a different
-  loader and a duplicated (not shared) orchestration loop, kept separate
-  deliberately to avoid any risk to the already-validated 2025 numbers.
+  comparable — prior-week points, season-to-date average, recent volume,
+  plus every nflverse-backed signal tested so far: `snapShare`/
+  `targetShare`/`airYardsShare`/`cpoe`/`aggressiveness`/`separation`/
+  `yacAboveExpectation`/`rushYoe`/`receivingComposite`/`qbRushingAttempts`/
+  `goalLineTouches`/`epaPerPlay`/`successRate`/`createdReceptionRate`/
+  `teammateOutBump` (never shipped into the engine), `injuryStatus`/
+  `wind`/`depthChart` (real, permanent, current-week-fact baselines —
+  items 18/39/46 — not engine-integrated but not "unshipped" either,
+  just standalone), and `redZoneTouches`/`dropRate` (both WERE shipped
+  into the engine at some point — `dropRate` still is, WR-only;
+  `redZoneTouches`'s engine weight was later zeroed, item 44, though the
+  baseline itself still runs). See "Backtesting & Tuning History" for
+  the full status of each), `pairing.ts` (broad-mode adjacent-rank
+  pairing methodology), `runBacktest.ts` (orchestration), `config.ts`/
+  `params.ts` (tunables, query parsing). The engine's own grading logic
+  still always treats injury status as unknown — the `injuryStatus`
+  baseline above is the only place in backtest mode that reads real
+  historical designations, and only as a standalone trial (see Data
+  Source Notes). Both API routes return `baselineSummaries` and
+  `confidenceBreakdown` alongside the engine's own accuracy so results
+  are never reported in isolation from a baseline/calibration check.
+  `loadRunNflverseOnly.ts`/`runBacktestNflverseOnly.ts` (item 24) are a
+  parallel, nflverse-only path for validating the tuned engine weights
+  against seasons SportsDataIO won't serve (2022-2024) — same
+  `BacktestRunData` shape and same scoring/grading functions as the
+  primary pipeline, just a different loader and a duplicated (not
+  shared) orchestration loop, kept separate deliberately to avoid any
+  risk to the already-validated 2025 numbers.
+  `runBroadBacktestNflverseOnlyMultiSeason` (same file) pools this same
+  pipeline across an arbitrary season list (default 2022-2025) into one
+  combined sample, reporting both pooled and per-season breakdowns — the
+  permanent home for the "more robust, cross-season" checks used
+  throughout items 39-46 (as opposed to the 2025-vs-one-other-season
+  checks items 1-38 relied on).
 - `src/app/api/players`, `src/app/api/compare`, `src/app/api/backtest/pair`,
   `src/app/api/backtest/broad`, `src/app/api/backtest/broad-nflverse`,
-  `src/app/api/backtest/pair-nflverse` (the latter two, item 24/item 36,
-  out-of-sample validation only) — Route Handlers that orchestrate the
-  lib layers above and return trimmed JSON (never proxy raw upstream
-  payloads, never leak the API key).
+  `src/app/api/backtest/pair-nflverse`,
+  `src/app/api/backtest/broad-nflverse-multiseason` (the last three,
+  items 24/36/39, out-of-sample validation only) — Route Handlers that
+  orchestrate the lib layers above and return trimmed JSON (never proxy
+  raw upstream payloads, never leak the API key).
 - `src/components/` — `StartSitTool.tsx`/`PlayerSearchInput.tsx`/
   `ComparisonResult.tsx` (live mode) and `BacktestTool.tsx`/
   `BacktestWeekTable.tsx`/`BacktestSummary.tsx`/`BacktestCaveatNote.tsx`
