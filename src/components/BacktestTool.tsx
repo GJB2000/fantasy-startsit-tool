@@ -8,13 +8,15 @@ import type {
   WeekGradeResult,
 } from "@/lib/backtest/grading";
 import type { PlayerSummary } from "@/lib/sportsdata/types";
+import type { TradeGradeResult } from "@/lib/backtest/tradeBacktest";
 import { BacktestCaveatNote } from "./BacktestCaveatNote";
 import { BacktestSummaryView } from "./BacktestSummary";
 import { BacktestWeekTable } from "./BacktestWeekTable";
 import { PlayerSearchInput } from "./PlayerSearchInput";
+import { TradeBacktestTable } from "./TradeBacktestTable";
 
-type Mode = "pair" | "broad";
-// Every season but 2025 runs against nflverse-only data, for both modes —
+type Mode = "pair" | "broad" | "trade";
+// Every season but 2025 runs against nflverse-only data, for every mode —
 // see runBacktest()'s route selection. Single-pair mode resolves the
 // SportsDataIO player selection into that season's nflverse name space
 // server-side (see runBacktestNflverseOnly.ts), so the same search box
@@ -23,6 +25,7 @@ type Season = "2025" | "2024" | "2023" | "2022";
 const SEASON_OPTIONS = ["2025", "2024", "2023", "2022"] as const;
 const ALL_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 const WEEK_OPTIONS = Array.from({ length: 18 }, (_, i) => i + 1);
+const AS_OF_WEEK_OPTIONS = Array.from({ length: 17 }, (_, i) => i + 1);
 
 interface PairResponse {
   weekResults: WeekGradeResult[];
@@ -40,12 +43,19 @@ interface BroadResponse {
   confidenceBreakdown: ConfidenceBreakdown;
 }
 
+interface TradeResponse {
+  overall: BacktestSummaryData;
+  byPosition: Record<string, BacktestSummaryData>;
+  results: TradeGradeResult[];
+}
+
 export function BacktestTool() {
   const [mode, setMode] = useState<Mode>("pair");
   const [season, setSeason] = useState<Season>("2025");
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
   const [weekFrom, setWeekFrom] = useState(1);
   const [weekTo, setWeekTo] = useState(18);
+  const [asOfWeek, setAsOfWeek] = useState(8);
   const [positions, setPositions] = useState<string[]>([...ALL_POSITIONS]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +63,8 @@ export function BacktestTool() {
   const [pairResultSeason, setPairResultSeason] = useState<Season>("2025");
   const [broadResult, setBroadResult] = useState<BroadResponse | null>(null);
   const [broadResultSeason, setBroadResultSeason] = useState<Season>("2025");
+  const [tradeResult, setTradeResult] = useState<TradeResponse | null>(null);
+  const [tradeResultSeason, setTradeResultSeason] = useState<Season>("2025");
 
   function addPlayer(player: PlayerSummary) {
     setPlayers((prev) => (prev.length >= 2 ? prev : [...prev, player]));
@@ -75,6 +87,7 @@ export function BacktestTool() {
     setError(null);
     setPairResult(null);
     setBroadResult(null);
+    setTradeResult(null);
 
     const weeks = `${weekFrom}-${weekTo}`;
 
@@ -96,7 +109,7 @@ export function BacktestTool() {
         }
         setPairResult(data);
         setPairResultSeason(season);
-      } else {
+      } else if (mode === "broad") {
         if (positions.length === 0) {
           setError("Select at least one position.");
           return;
@@ -113,6 +126,23 @@ export function BacktestTool() {
         }
         setBroadResult(data);
         setBroadResultSeason(season);
+      } else {
+        if (positions.length === 0) {
+          setError("Select at least one position.");
+          return;
+        }
+        const posParam = positions.join(",");
+        const path = season === "2025" ? "/api/backtest/trade" : "/api/backtest/trade-nflverse";
+        const query = new URLSearchParams({ asOfWeek: String(asOfWeek), positions: posParam });
+        if (season !== "2025") query.set("season", season);
+        const res = await fetch(`${path}?${query}`);
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error ?? "Something went wrong.");
+          return;
+        }
+        setTradeResult(data);
+        setTradeResultSeason(season);
       }
     } catch {
       setError("Couldn't reach the server. Try again shortly.");
@@ -148,6 +178,17 @@ export function BacktestTool() {
         >
           Broad (many pairs)
         </button>
+        <button
+          type="button"
+          onClick={() => setMode("trade")}
+          className={`rounded-md px-3 py-1.5 ${
+            mode === "trade"
+              ? "bg-foreground text-background"
+              : "border border-zinc-300 dark:border-zinc-700"
+          }`}
+        >
+          Trade analyzer
+        </button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -160,6 +201,7 @@ export function BacktestTool() {
               setSeason(s);
               setPairResult(null);
               setBroadResult(null);
+              setTradeResult(null);
             }}
             className={`rounded-md px-3 py-1.5 ${
               season === s ? "bg-foreground text-background" : "border border-zinc-300 dark:border-zinc-700"
@@ -207,7 +249,16 @@ export function BacktestTool() {
         </div>
       )}
 
-      {mode === "broad" && (
+      {mode === "trade" && (
+        <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-3 text-xs text-sky-700 dark:text-sky-400">
+          <strong>Scope:</strong> synthetic 1-for-1 trades only, generated the same way broad-mode
+          start/sit pairs are (adjacent-rank pairs at each position, ranked as of the week below).
+          Grades the trade analyzer&apos;s rest-of-season projection against what each player
+          actually scored, summed, over the season&apos;s real remaining weeks.
+        </div>
+      )}
+
+      {(mode === "broad" || mode === "trade") && (
         <>
           <div className="flex flex-wrap gap-2 text-sm">
             {ALL_POSITIONS.map((position) => (
@@ -227,12 +278,46 @@ export function BacktestTool() {
         </>
       )}
 
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <label className="flex items-center gap-1.5">
-          Weeks
+      {mode === "trade" ? (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <label className="flex items-center gap-1.5">
+            As of week
+            <select
+              value={asOfWeek}
+              onChange={(e) => setAsOfWeek(Number(e.target.value))}
+              className="rounded-md border border-zinc-300 bg-background px-1.5 py-1 dark:border-zinc-700"
+            >
+              {AS_OF_WEEK_OPTIONS.map((w) => (
+                <option key={w} value={w}>
+                  {w}
+                </option>
+              ))}
+            </select>
+          </label>
+          <span className="text-xs text-zinc-500">
+            trades are built from data through this week, then graded against weeks {asOfWeek + 1}-18
+          </span>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <label className="flex items-center gap-1.5">
+            Weeks
+            <select
+              value={weekFrom}
+              onChange={(e) => setWeekFrom(Number(e.target.value))}
+              className="rounded-md border border-zinc-300 bg-background px-1.5 py-1 dark:border-zinc-700"
+            >
+              {WEEK_OPTIONS.map((w) => (
+                <option key={w} value={w}>
+                  {w}
+                </option>
+              ))}
+            </select>
+          </label>
+          <span className="text-zinc-500">to</span>
           <select
-            value={weekFrom}
-            onChange={(e) => setWeekFrom(Number(e.target.value))}
+            value={weekTo}
+            onChange={(e) => setWeekTo(Number(e.target.value))}
             className="rounded-md border border-zinc-300 bg-background px-1.5 py-1 dark:border-zinc-700"
           >
             {WEEK_OPTIONS.map((w) => (
@@ -241,30 +326,18 @@ export function BacktestTool() {
               </option>
             ))}
           </select>
-        </label>
-        <span className="text-zinc-500">to</span>
-        <select
-          value={weekTo}
-          onChange={(e) => setWeekTo(Number(e.target.value))}
-          className="rounded-md border border-zinc-300 bg-background px-1.5 py-1 dark:border-zinc-700"
-        >
-          {WEEK_OPTIONS.map((w) => (
-            <option key={w} value={w}>
-              {w}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={() => {
-            setWeekFrom(1);
-            setWeekTo(18);
-          }}
-          className="text-xs text-zinc-500 underline"
-        >
-          All weeks
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => {
+              setWeekFrom(1);
+              setWeekTo(18);
+            }}
+            className="text-xs text-zinc-500 underline"
+          >
+            All weeks
+          </button>
+        </div>
+      )}
 
       <button
         type="button"
@@ -304,6 +377,17 @@ export function BacktestTool() {
             baselineLabels={broadResult.baselineLabels}
             confidenceBreakdown={broadResult.confidenceBreakdown}
           />
+        </div>
+      )}
+
+      {tradeResult && (
+        <div className="space-y-4">
+          <p className="text-xs font-medium text-zinc-500">
+            Showing {tradeResultSeason} results ({tradeResultSeason === "2025" ? "SportsDataIO" : "nflverse-only"}) —{" "}
+            {tradeResult.results.length} synthetic trade{tradeResult.results.length === 1 ? "" : "s"}
+          </p>
+          <BacktestSummaryView summary={tradeResult.overall} byPosition={tradeResult.byPosition} />
+          <TradeBacktestTable results={tradeResult.results} />
         </div>
       )}
     </div>
