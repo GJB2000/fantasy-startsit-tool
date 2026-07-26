@@ -52,10 +52,19 @@ Tuning History" items 24/36/39. A second live tool, the Trade Analyzer
 of a trade and get a graded verdict (good/fair/bad) with reasoning,
 built on a rest-of-season value projection rather than a single game
 (see "Backtesting & Tuning History" items 47-49 and the Trade Analyzer
-paragraph below). The whole UI also got a cohesive visual pass (indigo
-accent, proper nav, consistent card/badge styling) — kept deliberately
-separate from the emerald/amber/sky/red palette that already carries
-semantic meaning in comparison results. Out of scope so far: database/
+paragraph below). The UI went through two visual passes: a first
+cohesive pass (indigo accent, proper nav, consistent card/badge
+styling), then a full Apple-inspired redesign that replaced it —
+system-font typography (`-apple-system`/`ui-rounded`, no webfont),
+a teal `--accent` plus semantic `--good`/`--bad`/`--caution`/`--info`
+tokens, a frosted-glass nav with a real segmented control, and squircle
+"insight card" styling for both `ComparisonResult.tsx` and
+`TradeResult.tsx` — see Conventions for the token system. Deliberately
+scoped to the live start/sit and trade pages; the Backtest page's own
+internal chrome (mode buttons, season toggle, table) was left on the
+prior zinc/rounded-md styling both times, since it's the secondary/
+internal validation tool, not a page newsletter readers use directly.
+Out of scope so far: database/
 persistence, auth, K/DEF positions. Upcoming-schedule/next-opponent
 lookup — previously fully out of scope — is now partially built (see
 below): the live start/sit tool's own matchup modifier still looks up
@@ -2607,14 +2616,32 @@ below is started or fixed yet:
   `/backtest` — `BacktestTool.tsx` has three modes, Single pair/Broad/
   Trade analyzer, the last added in item 48; `TradeBacktestTable.tsx` is
   its per-trade detail table, mirroring `BacktestWeekTable.tsx`'s role
-  for the other two modes). Indigo is the deliberate brand/UI-chrome
-  accent (nav, buttons, focus rings) across every page — kept separate
-  from the emerald/amber/sky/red palette, which already carries semantic
-  meaning (recommended pick, close call, limited data, injury risk) in
-  both `ComparisonResult.tsx` and `TradeResult.tsx`. Reuses the existing
-  `bg-background`/`text-foreground`/`font-sans` Tailwind tokens and
-  `prefers-color-scheme` dark mode from `globals.css` — no new theme
-  tokens or Tailwind config added.
+  for the other two modes). Restyled in an Apple-inspired pass,
+  superseding the original indigo-accent design: `globals.css` defines
+  a real token system via Tailwind v4's `@theme inline` — `--accent`
+  (teal, brand/UI-chrome only: nav, buttons, focus rings) plus
+  `--good`/`--bad`/`--caution`/`--info` (verdict semantics — recommended
+  pick, close call/bad trade, limited data — kept deliberately separate
+  from `--accent` so brand and meaning never collide), each tuned
+  separately for light/dark. `--font-sans` is the `-apple-system` stack
+  (genuinely SF Pro on Apple devices, no webfont/CSP risk) and a new
+  `--font-rounded` (`ui-rounded` → SF Pro Rounded on Apple platforms)
+  is applied via a `font-rounded` utility class to every stat numeral in
+  `ComparisonResult.tsx`/`TradeResult.tsx`, echoing how Apple Health/
+  Fitness renders its own numeric displays — replacing the prior
+  `font-mono`/Geist Mono usage there. `NavBar.tsx` is a frosted
+  `backdrop-blur` glass bar with a real segmented control tied to the
+  actual routes. One real bug caught before shipping: a template-
+  literal Tailwind class (`` `bg-${token}/12` ``) doesn't work — Tailwind's
+  static scanner only resolves complete literal class strings, so
+  verdict-to-badge-color mapping must go through a lookup object
+  (`VERDICT_BADGE` in `TradeResult.tsx`), not string interpolation.
+  Deliberately does NOT touch `BacktestTool.tsx`'s own chrome (mode
+  buttons, season toggle, table stay on the prior zinc/rounded-md
+  styling) — it inherits the new nav/background/fonts automatically
+  since components like `PlayerSearchInput.tsx` are shared, but the
+  backtest page is the secondary/internal validation tool, restyled
+  in neither visual pass.
 - Season/week resolution for the live tool is always computed live via
   `getSeasonContext()` (never hardcoded) — it correctly falls back to
   the last completed season during the NFL offseason. Backtest mode
