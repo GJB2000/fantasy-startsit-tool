@@ -47,10 +47,21 @@ but backtest mode now covers four seasons (2022-2025, via the
 nflverse-only pipeline for anything before 2025) in both Single pair and
 Broad modes, plus a permanent pooled-multi-season route/summary for
 validating tuning decisions across all four at once — see "Backtesting &
-Tuning History" items 24/36/39. Out of scope so far: database/
-persistence, auth, K/DEF positions, upcoming-schedule/next-opponent
-lookup (matchup difficulty is computed against each player's most
-recent completed opponent, not a hypothetical future one).
+Tuning History" items 24/36/39. A second live tool, the Trade Analyzer
+(`/trade`), shipped after v1 — enter any number of players on each side
+of a trade and get a graded verdict (good/fair/bad) with reasoning,
+built on a rest-of-season value projection rather than a single game
+(see "Backtesting & Tuning History" items 47-49 and the Trade Analyzer
+paragraph below). The whole UI also got a cohesive visual pass (indigo
+accent, proper nav, consistent card/badge styling) — kept deliberately
+separate from the emerald/amber/sky/red palette that already carries
+semantic meaning in comparison results. Out of scope so far: database/
+persistence, auth, K/DEF positions. Upcoming-schedule/next-opponent
+lookup — previously fully out of scope — is now partially built (see
+below): the live start/sit tool's own matchup modifier still looks up
+each player's most recent *completed* opponent, not a future one, but
+the schedule-lookup infrastructure this would need now exists and is
+proven, built for the Trade Analyzer's rest-of-season projection.
 
 **Candidate future improvement: next-opponent lookup for live matchup
 context.** The live tool's matchup modifier currently looks up each
@@ -60,19 +71,37 @@ scheduled* opponent instead. This is a smaller, more contained fix than
 it might sound: the recent-form engine (PPR average, volume, red-zone
 touches, EPA, etc.) wouldn't need to change at all, since it's entirely
 about how a player has been performing recently — only the matchup
-modifier's opponent identification would need a schedule lookup
-(SportsDataIO likely has a `/Schedules` endpoint for this; not yet
-confirmed live). Backtest mode is arguably unaffected/already correct
-here, since it grades against the target week's real, already-known
-historical opponent. Two real constraints on pursuing this: (1) it
-can't be tested against the *live* tool outside the NFL season, since
-there's no "next game" to look up during the offseason (verify against
-backtest data instead, or wait for the 2026 season to start); (2)
-weather (wind specifically has real, well-documented fantasy effects —
-more than rain or cold) would be a natural signal to pair with this,
-but only becomes relevant once the tool actually knows which upcoming
-game a player is playing in — it doesn't fit the current last-opponent
+modifier's opponent identification would need a schedule lookup.
+Backtest mode is arguably unaffected/already correct here, since it
+grades against the target week's real, already-known historical
+opponent. Two real constraints on pursuing this: (1) it can't be tested
+against the *live* tool outside the NFL season, since there's no "next
+game" to look up during the offseason (verify against backtest data
+instead, or wait for the 2026 season to start); (2) weather (wind
+specifically has real, well-documented fantasy effects — more than
+rain or cold) would be a natural signal to pair with this, but only
+becomes relevant once the tool actually knows which upcoming game a
+player is playing in — it doesn't fit the current last-opponent
 architecture at all.
+
+**Update, now that the Trade Analyzer exists (item 47):** the
+"SportsDataIO likely has a `/Schedules` endpoint; not yet confirmed
+live" uncertainty above is resolved — confirmed live it does NOT, on
+any tested path (every plausible endpoint name returns a clean `404`,
+not the `401`-style "paywalled but exists" signature seen elsewhere in
+this file). nflverse's `schedules` release fills the gap instead (see
+Data Source Notes) and now has real, working code reading it
+prospectively — `lib/recommendation/restOfSeason.ts`'s
+`sumProjectedPoints`/`computeMatchupModifier`, and the SportsDataIO/
+nflverse team-code mapping (`LAR`/`LA`, the only mismatch across all 32
+teams). None of that was wired into start/sit's own matchup modifier,
+by choice — this update only touches the Trade Analyzer, deliberately
+scoped that way rather than changing the already-validated live
+start/sit tool as a side effect. But it means this candidate
+improvement is now a meaningfully smaller lift than described above if
+picked up for start/sit itself: the schedule-reading and team-code-
+mapping pieces are already built and proven, just not yet pointed at
+`buildInput.ts`'s matchup-context construction.
 
 ## Data Source Notes
 - Football data comes from the SportsDataIO NFL API (Discovery Lab /
@@ -134,6 +163,19 @@ architecture at all.
   nflverse is caught and degrades to empty data (new baselines just
   report `no_pick`) rather than taking down the whole backtest — it's a
   third-party source being trialed, not the app's primary data path.
+- **SportsDataIO has no game-schedule endpoint on this plan** —
+  confirmed live while building the Trade Analyzer (item 47): every
+  plausible path (`/Schedules`, `/Games`, `/GamesByWeek`, etc., on both
+  the `fantasy` and `odds` hosts) returns a clean `404 Resource not
+  found`, not the `401`-style "exists but needs a paid tier" signature
+  seen for 2024 season data and red-zone stats above — a genuinely
+  different product family this subscription doesn't include at all,
+  not a paywall. nflverse's `schedules` release fills this gap for the
+  live tool (see `getRemainingOpponentsByTeam` in Conventions) —
+  confirmed it already carries the *upcoming* season's full fixture
+  list (opponents known, scores blank) as soon as the NFL publishes it,
+  not just completed seasons, by pulling the real file mid-2026-offseason
+  and finding all 272 of the 2026 season's games already present.
 
 ## Recommendation Logic Philosophy
 This is the most important section — the "brain" of the tool.
@@ -2181,12 +2223,133 @@ single-season numbers for those specific constants.
       parts were promoted to permanent code, same as `wind`'s item 39
       promotion.
 
-### Open items (as of item 46 — pick up here)
-Everything through f2ecef0 ("Ship depth charts as a permanent RB/WR
-standalone baseline") is committed (`git log`), including item 46's
-real, permanent code (`nflverse/depthCharts.ts`, the
+47. **Built the Trade Analyzer** (`/trade`) — a second live tool
+    alongside start/sit, evaluating multi-player trades rather than a
+    single roster-spot decision. Enter any number of players on each
+    side; get a graded verdict (good/fair/bad) with reasoning.
+    - **Key architectural insight, not a new scoring model**:
+      `scorePlayer()`'s `finalScore` is already computed entirely
+      independently per player — every input (recent form, volume,
+      matchup, nflverse signals) comes from that player's own data, not
+      a comparison partner's. Only `comparePlayers()`'s ranking/
+      tiebreaker logic is relative. That means `finalScore` already
+      doubles as a standalone absolute value, so a trade's two sides can
+      just be scored independently and summed — no new engine needed,
+      only a new evaluation layer (`lib/trade/evaluateTrade.ts`) on top
+      of the existing one.
+    - **Chose rest-of-season value over a single game's**, since "who's
+      better next game" is a materially weaker basis for judging a
+      trade than "who's better the rest of the way." Resolved the
+      `/Schedules` endpoint uncertainty the next-opponent-lookup note
+      above had flagged as unconfirmed — confirmed live SportsDataIO
+      has no schedule endpoint at all on this plan (see Data Source
+      Notes), so used nflverse's `schedules` release instead, which
+      already carries the upcoming season's full fixture list.
+    - **Projection method**: strip the "last opponent" matchup
+      adjustment out of a player's current score (`finalScore -
+      matchupModifier`) to get a stable per-game baseline, then
+      re-apply a fresh matchup adjustment for every remaining opponent
+      on their real schedule and sum across the season
+      (`lib/recommendation/restOfSeason.ts`'s `projectRestOfSeason`/
+      `sumProjectedPoints`). Everything else about the player (recent
+      form, volume, snap share, etc.) is held constant — deliberately,
+      matching the "recent-form engine wouldn't need to change" scoping
+      the next-opponent-lookup note above already called out.
+      `computeMatchupModifier` was extracted out of `engine.ts` as a
+      standalone pure function specifically so both the "last opponent"
+      case (start/sit) and the "every future opponent" case (trade
+      projection) share one formula rather than two copies.
+    - **Found and fixed the one real SportsDataIO/nflverse team-code
+      mismatch** (`LAR` vs. `LA` for the Rams — the same one item 34
+      already found for weather) — confirmed by pulling both sources'
+      full 32-team lists live rather than assuming it was the only one.
+    - **Found and fixed a real season-transition bug while explaining
+      the design to the user**, not from a bug report: the
+      schedule-season lookup originally trusted `isInSeason`, which can
+      flip `true` a few days *before* `lastCompletedWeek` itself
+      advances (right after a season's kickoff, before that week's own
+      timeframe has an `EndDate` in the past) — during that ~5-day
+      window each year it would have looked up a nonexistent week and
+      silently shown "not enough data" for every player instead of using
+      the new season. Failed safely (no wrong numbers, just an honest
+      gap) but was still wrong. Fixed by dropping the `isInSeason`
+      dependency entirely: just check whether the current season has any
+      games left, and roll forward to the next season if not.
+48. **Built a backtest mode for the Trade Analyzer**, to check whether
+    the rest-of-season projection is actually predictive rather than
+    just plausible-sounding — the same reason backtest mode was built
+    at all for start/sit (item 1).
+    - **Corrected an assumption made when this was first proposed**:
+      that there's "no ground truth to backtest a trade against."
+      There is one — real rest-of-season point totals, once a season
+      has actually played out. "Will side B outscore side A the rest of
+      the way" is directly checkable against a completed season.
+    - **Reused broad mode's adjacent-rank pairing** (`pairing.ts`) to
+      generate synthetic 1-for-1 "trades" as of a given week — same
+      pool/ranking methodology already validated for start/sit,
+      deliberately scoped to 1-for-1 only for this first version (see
+      Open Items below for multi-player trades).
+    - **No external schedule fetch needed in backtest mode**, unlike
+      live mode — every remaining week is already history, sitting in
+      the same box scores the rest of backtest mode already fetches
+      (any player's row for a team that week reveals that team's real
+      opponent).
+    - **Found and fixed a real bug on first run, not a design error**:
+      initial projected totals were wildly inflated (8000+ points vs.
+      ~150 real) — the opponent lookup pushed one entry per *player*
+      row in a week instead of once per *team*, so a team's real
+      opponent got duplicated ~15-20x (once per teammate who recorded a
+      stat that week). Fixed and reverified against real box scores
+      (e.g. Jonathan Taylor projected 151.6 vs. actual 145.7 as of week
+      8, 2025).
+    - **Result (2025, single cutoff, as of week 8)**: 69.4% overall
+      (25-11, n=36) — QB 50%, RB 58.3%, WR 75%, TE 100%. Flagged
+      honestly as thin (one season, one cutoff, small per-position
+      samples) rather than reported at face value — see item 49.
+49. **Pooled the trade backtest across many "as of week" cutoffs and all
+    four seasons** — item 48's single-cutoff/single-season check (36
+    trades) was too thin to trust on its own, the same lesson items 9/10/
+    20 already drew for weight-tuning sample sizes. Mirrors
+    `runBroadBacktestNflverseOnlyMultiSeason`'s established precedent
+    (item 39) closely: new `runTradeBacktestMultiSeason` runs every
+    season — including 2025 — through the same nflverse-only pipeline
+    for consistency, rather than mixing in SportsDataIO's own 2025
+    numbers, and loads seasons sequentially (not concurrently) for the
+    same peak-memory reason item 27 already fixed.
+    - **Capped the default cutoff range at week 12, not 17**: a trade
+      evaluated as of week 16 only has 1-2 remaining weeks to project
+      against, which barely tests the "sum across a real remaining
+      schedule" idea this feature exists to check — it degenerates
+      toward ordinary single-week grading. Every pooled cutoff in the
+      default range tests a genuinely multi-week projection (at least 6
+      remaining weeks).
+    - **No UI for the pooled route** (`/api/backtest/trade-nflverse-
+      multiseason`) — same precedent `broad-nflverse-multiseason`
+      already set: a validation tool, not an interactive mode.
+    - **Result: 1,728 pooled synthetic trades** (4 seasons × 12 cutoffs
+      × up to 36 pairs) — **55.2% overall**. By position: RB 57.6%, TE
+      60.4%, WR 53.3%, QB 49.0% (QB's weakness concentrated in 2024,
+      43.1% — consistent with QB being this project's most historically
+      unstable position for out-of-season generalization; see items
+      24/30/41). By season: 2022 55.8%, 2023 56.5%, 2024 49.8%, 2025
+      58.8% — three of four seasons clearly beat a coin flip, 2024 sits
+      right at chance.
+    - **Multi-player trades (2-for-1, 2-for-2, etc.) deliberately
+      deferred, not built** — adjacent-rank pairing doesn't obviously
+      generalize past two players; would need its own design pass on
+      how to generate realistic multi-player synthetic trade candidates
+      before extending, not a quick generalization of the 1-for-1
+      pairing this item reused. See Open Items below.
+
+### Open items (as of item 49 — pick up here)
+Everything through 66f643d ("Add a backtest mode for the trade
+analyzer") is committed (`git log`), including item 46's real,
+permanent code (`nflverse/depthCharts.ts`, the
 `depthChartByPlayerIdWeek` plumbing, and the new `pickByDepthChart`
-baseline). Nothing below is started or fixed yet:
+baseline) and items 47-49's real, permanent code (`lib/trade/`,
+`lib/recommendation/restOfSeason.ts`, `lib/backtest/tradeBacktest.ts`,
+the `/trade` page, and the new `/api/backtest/trade*` routes). Nothing
+below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -2215,6 +2378,15 @@ baseline). Nothing below is started or fixed yet:
    team-level game-script baseline in item 12), so they'd need their own
    dedicated pass to figure out how to attribute them fairly, not a
    quick extension of item 32's join.
+5. **Trade Analyzer: multi-player trades (2-for-1, 2-for-2, etc.)** —
+   deferred in item 49. The live `/trade` page and `evaluateTrade.ts`
+   already support any number of players per side (values are just
+   summed), but the *backtest* only validates 1-for-1 synthetic trades —
+   adjacent-rank pairing doesn't obviously generalize to grouping 3+
+   players into a realistic synthetic trade candidate, so this needs its
+   own design pass (how to pick realistic multi-player groupings, not
+   just an extension of the existing pairing loop) before the backtest
+   can cover it.
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
@@ -2271,7 +2443,23 @@ baseline). Nothing below is started or fixed yet:
   `RB_EPA_BLEND_WEIGHT` both `0`) after a four-season pooled re-sweep
   found the combination hurt more than it helped (item 44) — the raw
   signals are still computed and shown in reasoning notes, just no
-  longer weighted into `finalScore`.
+  longer weighted into `finalScore`. `restOfSeason.ts` (item 47) is a
+  fourth, standalone piece alongside the three bridging files above —
+  not part of `scorePlayer`/`comparePlayers` at all, but built on top of
+  them for the Trade Analyzer: `computeMatchupModifier` is exported from
+  `engine.ts` as a pure function so both `scorePlayer`'s "last completed
+  opponent" case and `restOfSeason.ts`'s "every future opponent" case
+  share one formula; `sumProjectedPoints`/`projectRestOfSeason` take a
+  player's score with that one matchup term stripped out and re-sum it
+  against every remaining opponent on their real schedule.
+- `src/lib/trade/` — `evaluateTrade.ts` (item 47), the Trade Analyzer's
+  evaluation layer. Deliberately thin: reuses `scorePlayer()`'s
+  `finalScore` as a standalone per-player value (see item 47's
+  architectural note) rather than introducing a second scoring model,
+  and reuses `CLOSE_CALL_ABS_POINTS`/`CLOSE_CALL_RELATIVE_PCT` from
+  `recommendation/config.ts` for the good/fair/bad threshold rather than
+  a separately-tuned one — there's no backtest ground truth to tune a
+  trade-specific threshold against yet.
 - `src/lib/nflverse/` — server-only client for the free, no-auth
   nflverse-data GitHub releases (`client.ts`: fetch + parse + the same
   in-process TTL cache pattern as `sportsdata/client.ts`, since these
@@ -2329,10 +2517,16 @@ baseline). Nothing below is started or fixed yet:
   `gameLog.ts`/`schedules.ts` are the two files that make nflverse usable
   as a *primary* data source, not just a supplement — `gameLog.ts` builds
   a full `PlayerGameStat[][]` game log from `stats_player`, and
-  `schedules.ts` derives both bye weeks and per-team-per-week game
-  weather (`getGameWeatherByTeamWeek` — roof/temp/wind, backs the WR-only
-  `wind` baseline, item 39) from the `schedules` release's `games.csv`
-  (no dedicated byes endpoint exists). `depthCharts.ts` reads the
+  `schedules.ts` derives bye weeks, per-team-per-week game weather
+  (`getGameWeatherByTeamWeek` — roof/temp/wind, backs the WR-only `wind`
+  baseline, item 39), and each team's remaining regular-season opponents
+  (`getRemainingOpponentsByTeam` — item 47, live-mode-only; powers the
+  Trade Analyzer's rest-of-season projection, not used by backtest mode,
+  which derives the equivalent directly from its own already-fetched
+  historical box scores instead — see `tradeBacktest.ts` below) from the
+  `schedules` release's `games.csv` (no dedicated byes/schedule endpoint
+  exists on either SportsDataIO or, for byes, nflverse). `depthCharts.ts`
+  reads the
   `depth_charts` release (official starter/backup role) — usable for
   2022-2024 only, since 2025's file uses a structurally incompatible
   ESPN-scrape/timestamp schema (item 37/46); backs the RB/WR-only
@@ -2383,21 +2577,44 @@ baseline). Nothing below is started or fixed yet:
   combined sample, reporting both pooled and per-season breakdowns — the
   permanent home for the "more robust, cross-season" checks used
   throughout items 39-46 (as opposed to the 2025-vs-one-other-season
-  checks items 1-38 relied on).
-- `src/app/api/players`, `src/app/api/compare`, `src/app/api/backtest/pair`,
-  `src/app/api/backtest/broad`, `src/app/api/backtest/broad-nflverse`,
+  checks items 1-38 relied on). `tradeBacktest.ts` (items 48-49) is the
+  Trade Analyzer's own backtest — a parallel feature, not an extension of
+  `runBacktest.ts`, since it grades a different thing (rest-of-season
+  totals across synthetic 1-for-1 trades, not single-week picks) but
+  reuses the same `pairing.ts`/`sliceWeekData`/`BacktestRunData`
+  plumbing. `collectTradeResultsForSeason` is its own per-season/per-
+  cutoff walk (mirroring `collectBroadResultsForSeason`'s role in
+  `runBacktestNflverseOnly.ts`), shared by the single-cutoff
+  `runTradeBacktest` and the pooled `runTradeBacktestMultiSeason`.
+- `src/app/api/players`, `src/app/api/compare`, `src/app/api/trade` (item
+  47), `src/app/api/backtest/pair`, `src/app/api/backtest/broad`,
+  `src/app/api/backtest/broad-nflverse`,
   `src/app/api/backtest/pair-nflverse`,
-  `src/app/api/backtest/broad-nflverse-multiseason` (the last three,
-  items 24/36/39, out-of-sample validation only) — Route Handlers that
+  `src/app/api/backtest/broad-nflverse-multiseason`,
+  `src/app/api/backtest/trade`, `src/app/api/backtest/trade-nflverse`,
+  `src/app/api/backtest/trade-nflverse-multiseason` (the trade-backtest
+  trio is items 48-49; the other nflverse-suffixed routes are items
+  24/36/39 — all out-of-sample validation only) — Route Handlers that
   orchestrate the lib layers above and return trimmed JSON (never proxy
   raw upstream payloads, never leak the API key).
-- `src/components/` — `StartSitTool.tsx`/`PlayerSearchInput.tsx`/
-  `ComparisonResult.tsx` (live mode) and `BacktestTool.tsx`/
-  `BacktestWeekTable.tsx`/`BacktestSummary.tsx`/`BacktestCaveatNote.tsx`
-  (backtest mode, at `/backtest`, linked from the nav in `layout.tsx`).
-  Reuses the existing `bg-background`/`text-foreground`/`font-sans`
-  Tailwind tokens and `prefers-color-scheme` dark mode from
-  `globals.css` — no new theme tokens or Tailwind config added.
+- `src/components/` — `NavBar.tsx` (shared sticky nav, all pages),
+  `StartSitTool.tsx`/`PlayerSearchInput.tsx`/`ComparisonResult.tsx` (live
+  start/sit mode), `TradeAnalyzer.tsx`/`TradeResult.tsx` (live Trade
+  Analyzer mode, at `/trade`, item 47 — `TradeAnalyzer.tsx` reuses
+  `PlayerSearchInput.tsx` for both sides of a trade), and
+  `BacktestTool.tsx`/`BacktestWeekTable.tsx`/`BacktestSummary.tsx`/
+  `BacktestCaveatNote.tsx`/`TradeBacktestTable.tsx` (backtest mode, at
+  `/backtest` — `BacktestTool.tsx` has three modes, Single pair/Broad/
+  Trade analyzer, the last added in item 48; `TradeBacktestTable.tsx` is
+  its per-trade detail table, mirroring `BacktestWeekTable.tsx`'s role
+  for the other two modes). Indigo is the deliberate brand/UI-chrome
+  accent (nav, buttons, focus rings) across every page — kept separate
+  from the emerald/amber/sky/red palette, which already carries semantic
+  meaning (recommended pick, close call, limited data, injury risk) in
+  both `ComparisonResult.tsx` and `TradeResult.tsx`. Reuses the existing
+  `bg-background`/`text-foreground`/`font-sans` Tailwind tokens and
+  `prefers-color-scheme` dark mode from `globals.css` — no new theme
+  tokens or Tailwind config added.
 - Season/week resolution for the live tool is always computed live via
   `getSeasonContext()` (never hardcoded) — it correctly falls back to
   the last completed season during the NFL offseason. Backtest mode
