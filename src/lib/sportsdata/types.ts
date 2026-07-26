@@ -47,6 +47,7 @@ export interface PlayerSeasonStat {
   Started: number;
   FantasyPoints: number;
   FantasyPointsPPR: number;
+  Receptions: number;
 }
 
 export interface PlayerGameStat {
@@ -64,6 +65,38 @@ export interface PlayerGameStat {
   ReceivingTargets: number;
   RushingAttempts: number;
   PassingAttempts: number;
+  Receptions: number;
+}
+
+/**
+ * League scoring convention for receptions — the one dimension real
+ * leagues actually vary on here. SportsDataIO's `FantasyPoints` (0/catch)
+ * and `FantasyPointsPPR` (1/catch) already bracket the range and are
+ * otherwise identical (confirmed live: FantasyPointsPPR - FantasyPoints
+ * equals Receptions exactly, at both the game and season level), so
+ * half-PPR is just their midpoint — no new data source needed.
+ */
+export type ScoringFormat = "ppr" | "half_ppr" | "standard";
+
+export function getFantasyPoints(
+  row: { FantasyPoints: number; FantasyPointsPPR: number; Receptions: number },
+  format: ScoringFormat
+): number {
+  switch (format) {
+    case "ppr":
+      return row.FantasyPointsPPR;
+    case "half_ppr":
+      return row.FantasyPointsPPR - 0.5 * row.Receptions;
+    case "standard":
+      return row.FantasyPoints;
+  }
+}
+
+const SCORING_FORMATS: readonly ScoringFormat[] = ["ppr", "half_ppr", "standard"];
+
+/** Parses a `scoringFormat` query param, defaulting to "ppr" (today's implicit behavior) for anything missing or unrecognized. */
+export function parseScoringFormat(raw: string | null): ScoringFormat {
+  return (SCORING_FORMATS as readonly string[]).includes(raw ?? "") ? (raw as ScoringFormat) : "ppr";
 }
 
 export interface Timeframe {

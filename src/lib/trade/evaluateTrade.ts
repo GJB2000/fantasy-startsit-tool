@@ -63,14 +63,14 @@ function playerLines(p: TradePlayerResult): string[] {
   if (p.recentPprAvg != null) {
     const seasonPart = p.seasonPprAvg != null ? ` (season average ${p.seasonPprAvg.toFixed(1)})` : "";
     lines.push(
-      `${p.displayName}: averaging ${p.recentPprAvg.toFixed(1)} PPR points over their last ${p.gamesUsedForRecent} game${p.gamesUsedForRecent === 1 ? "" : "s"}${seasonPart}.`
+      `${p.displayName}: averaging ${p.recentPprAvg.toFixed(1)} points over their last ${p.gamesUsedForRecent} game${p.gamesUsedForRecent === 1 ? "" : "s"}${seasonPart}.`
     );
   }
   for (const note of p.notes) {
     lines.push(`${p.displayName}: ${note}`);
   }
   lines.push(
-    `${p.displayName}: projected for roughly ${p.restOfSeasonTotal.toFixed(1)} PPR points over their remaining ${p.gamesRemaining} game${p.gamesRemaining === 1 ? "" : "s"} this season (~${(p.restOfSeasonPerGame ?? 0).toFixed(1)}/game, schedule-adjusted).`
+    `${p.displayName}: projected for roughly ${p.restOfSeasonTotal.toFixed(1)} points over their remaining ${p.gamesRemaining} game${p.gamesRemaining === 1 ? "" : "s"} this season (~${(p.restOfSeasonPerGame ?? 0).toFixed(1)}/game, schedule-adjusted).`
   );
   return lines;
 }
@@ -117,10 +117,10 @@ export function evaluateTrade(give: TradePlayerResult[], get: TradePlayerResult[
     headline = "Fair trade — roughly even value the rest of the season.";
   } else if (netValue > 0) {
     verdict = "good";
-    headline = `Good trade for you — you gain about ${netValue.toFixed(1)} PPR points the rest of the season.`;
+    headline = `Good trade for you — you gain about ${netValue.toFixed(1)} points the rest of the season.`;
   } else {
     verdict = "bad";
-    headline = `Bad trade for you — you give up about ${Math.abs(netValue).toFixed(1)} PPR points the rest of the season.`;
+    headline = `Bad trade for you — you give up about ${Math.abs(netValue).toFixed(1)} points the rest of the season.`;
   }
 
   return {

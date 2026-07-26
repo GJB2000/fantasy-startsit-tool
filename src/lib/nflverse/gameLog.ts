@@ -80,6 +80,7 @@ export async function getNflverseGameLog(season: number, maxWeek: number): Promi
       ReceivingTargets: r.targets === "" ? 0 : Number(r.targets),
       RushingAttempts: r.carries === "" ? 0 : Number(r.carries),
       PassingAttempts: r.attempts === "" ? 0 : Number(r.attempts),
+      Receptions: r.receptions === "" ? 0 : Number(r.receptions),
     });
   }
 

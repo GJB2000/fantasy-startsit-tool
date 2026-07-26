@@ -1,5 +1,6 @@
 import { getPositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
+import { parseScoringFormat } from "@/lib/sportsdata/types";
 import { buildComparisonInput } from "@/lib/recommendation/buildInput";
 import { scorePlayer } from "@/lib/recommendation/engine";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const giveIds = parseIds(url.searchParams.get("give"));
   const getIds = parseIds(url.searchParams.get("get"));
+  const format = parseScoringFormat(url.searchParams.get("scoringFormat"));
 
   if (giveIds.length === 0 || getIds.length === 0) {
     return Response.json(
@@ -34,7 +36,7 @@ export async function GET(request: Request) {
     const context = await getSeasonContext();
 
     const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt] = await Promise.all([
-      getPositionDefenseTable(context.lastCompletedApiSeason, context.lastCompletedWeek),
+      getPositionDefenseTable(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
       getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
       getRemainingOpponentsByTeam(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
         () => new Map<string, RemainingGame[]>()
@@ -66,7 +68,7 @@ export async function GET(request: Request) {
     ]);
 
     const toResult = (input: Awaited<ReturnType<typeof buildFor>>) => {
-      const breakdown = scorePlayer(input);
+      const breakdown = scorePlayer(input, format);
       const projection = projectRestOfSeason(breakdown, remainingOpponentsByTeam, positionDefenseTable);
       return toTradePlayerResult(breakdown, projection);
     };

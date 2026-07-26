@@ -1,9 +1,17 @@
 import type { ComparisonResult as ComparisonResultData } from "@/lib/recommendation/types";
+import type { ScoringFormat } from "@/lib/sportsdata/types";
 
 interface ComparisonResultProps {
   result: ComparisonResultData;
   contextNote: string;
+  scoringFormat: ScoringFormat;
 }
+
+const FORMAT_LABEL: Record<ScoringFormat, string> = {
+  ppr: "PPR",
+  half_ppr: "Half PPR",
+  standard: "Standard",
+};
 
 function injuryBadgeClasses(status: string) {
   if (status === "Out" || status === "Doubtful") {
@@ -45,8 +53,9 @@ function HeadlineIcon({ result }: { result: ComparisonResultData }) {
   );
 }
 
-export function ComparisonResult({ result, contextNote }: ComparisonResultProps) {
+export function ComparisonResult({ result, contextNote, scoringFormat }: ComparisonResultProps) {
   const badgeSoft = result.isCloseCall ? "bg-caution/12" : result.hasLimitedData ? "bg-info/12" : "bg-good/12";
+  const formatLabel = FORMAT_LABEL[scoringFormat];
 
   return (
     <div className="mt-8 space-y-5">
@@ -130,13 +139,15 @@ export function ComparisonResult({ result, contextNote }: ComparisonResultProps)
 
               <dl className="mt-4 flex flex-col gap-2.5">
                 <div className="flex justify-between border-t border-foreground/[0.07] pt-2.5 first:border-none first:pt-0">
-                  <dt className="text-[13px] text-foreground/50">Last {player.gamesUsedForRecent || 0} games (PPR avg)</dt>
+                  <dt className="text-[13px] text-foreground/50">
+                    Last {player.gamesUsedForRecent || 0} games ({formatLabel} avg)
+                  </dt>
                   <dd className="font-rounded text-[15px] font-semibold tabular-nums">
                     {player.recentPprAvg != null ? player.recentPprAvg.toFixed(1) : "—"}
                   </dd>
                 </div>
                 <div className="flex justify-between border-t border-foreground/[0.07] pt-2.5">
-                  <dt className="text-[13px] text-foreground/50">Season avg (PPR)</dt>
+                  <dt className="text-[13px] text-foreground/50">Season avg ({formatLabel})</dt>
                   <dd className="font-rounded text-[15px] font-semibold tabular-nums">
                     {player.seasonPprAvg != null ? player.seasonPprAvg.toFixed(1) : "—"}
                   </dd>

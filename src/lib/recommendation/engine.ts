@@ -37,6 +37,7 @@ import type {
 } from "./types";
 import { getQbRushAttemptStat, getVolumeStat } from "./volume";
 import type { MatchupContext } from "@/lib/sportsdata/positionDefense";
+import { getFantasyPoints, type ScoringFormat } from "@/lib/sportsdata/types";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -60,7 +61,7 @@ export function computeMatchupModifier(matchupContext: MatchupContext | null): n
   return clamp(diffRatio * MATCHUP_MODIFIER_SCALE, -MATCHUP_MODIFIER_CAP, MATCHUP_MODIFIER_CAP);
 }
 
-export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown {
+export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat): PlayerScoreBreakdown {
   const notes: string[] = [];
   const displayName = input.player
     ? `${input.player.FirstName} ${input.player.LastName}`
@@ -70,9 +71,9 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
 
   const gamesUsedForRecent = input.recentGames.length;
   const recentPprAvg =
-    gamesUsedForRecent > 0 ? average(input.recentGames.map((g) => g.FantasyPointsPPR)) : null;
+    gamesUsedForRecent > 0 ? average(input.recentGames.map((g) => getFantasyPoints(g, format))) : null;
   const seasonPprAvg = input.seasonStat
-    ? input.seasonStat.FantasyPointsPPR / Math.max(input.seasonStat.Played, 1)
+    ? getFantasyPoints(input.seasonStat, format) / Math.max(input.seasonStat.Played, 1)
     : null;
 
   let blendedScore: number | null = null;
@@ -103,7 +104,7 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
       input.matchupContext;
     const direction = diffFromAverage >= 0 ? "friendlier" : "tougher";
     notes.push(
-      `In their last game (vs ${opponentTeam}), that defense ranked ${rank} of ${teamCount} in PPR points allowed to ${matchupPosition}s — a ${direction}-than-average matchup.`
+      `In their last game (vs ${opponentTeam}), that defense ranked ${rank} of ${teamCount} in points allowed to ${matchupPosition}s — a ${direction}-than-average matchup.`
     );
   } else {
     notes.push("No matchup data available for this player's most recent opponent.");
@@ -111,18 +112,18 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
 
   let volumeModifier = 0;
   let recentVolumeAvg: number | null = null;
-  if (blendedScore != null && position && position in POINTS_PER_VOLUME_UNIT) {
+  if (blendedScore != null && position && position in POINTS_PER_VOLUME_UNIT[format]) {
     const volumeValues = input.recentGames.map(getVolumeStat).filter((v): v is number => v != null);
     if (volumeValues.length > 0) {
       recentVolumeAvg = average(volumeValues);
-      const pointsPerUnit = POINTS_PER_VOLUME_UNIT[position as keyof typeof POINTS_PER_VOLUME_UNIT];
+      const pointsPerUnit = POINTS_PER_VOLUME_UNIT[format][position as keyof (typeof POINTS_PER_VOLUME_UNIT)[ScoringFormat]];
       const expectedPointsFromVolume = recentVolumeAvg * pointsPerUnit;
       const blendedWithVolume =
         (1 - VOLUME_BLEND_WEIGHT) * blendedScore + VOLUME_BLEND_WEIGHT * expectedPointsFromVolume;
       volumeModifier = blendedWithVolume - blendedScore;
       const unitLabel = position === "QB" ? "pass attempts" : position === "RB" ? "touches" : "targets";
       notes.push(
-        `Averaging ${recentVolumeAvg.toFixed(1)} ${unitLabel}/game over their last ${volumeValues.length} game${volumeValues.length === 1 ? "" : "s"} — worth roughly ${expectedPointsFromVolume.toFixed(1)} PPR points at this position's typical rate.`
+        `Averaging ${recentVolumeAvg.toFixed(1)} ${unitLabel}/game over their last ${volumeValues.length} game${volumeValues.length === 1 ? "" : "s"} — worth roughly ${expectedPointsFromVolume.toFixed(1)} points at this position's typical rate.`
       );
     }
   }
@@ -136,7 +137,7 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
       (1 - REDZONE_BLEND_WEIGHT_RB) * runningScore + REDZONE_BLEND_WEIGHT_RB * expectedPointsFromRedZone;
     redZoneModifier = blendedWithRedZone - runningScore;
     notes.push(
-      `Averaging ${redZoneTouchesAvg.toFixed(1)} red-zone touches/game recently — worth roughly ${expectedPointsFromRedZone.toFixed(1)} PPR points at this position's typical rate.`
+      `Averaging ${redZoneTouchesAvg.toFixed(1)} red-zone touches/game recently — worth roughly ${expectedPointsFromRedZone.toFixed(1)} points at this position's typical rate.`
     );
   }
 
@@ -144,12 +145,12 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
   const snapShareAvg = input.nflverse.snapShare;
   if (blendedScore != null && position === "TE" && snapShareAvg != null) {
     const runningScore = blendedScore + matchupModifier + volumeModifier + redZoneModifier;
-    const expectedPointsFromSnapShare = snapShareAvg * POINTS_PER_SNAP_SHARE_UNIT_TE;
+    const expectedPointsFromSnapShare = snapShareAvg * POINTS_PER_SNAP_SHARE_UNIT_TE[format];
     const blendedWithSnapShare =
       (1 - SNAP_SHARE_BLEND_WEIGHT_TE) * runningScore + SNAP_SHARE_BLEND_WEIGHT_TE * expectedPointsFromSnapShare;
     snapShareModifier = blendedWithSnapShare - runningScore;
     notes.push(
-      `Snap share of ${(snapShareAvg * 100).toFixed(0)}% recently — worth roughly ${expectedPointsFromSnapShare.toFixed(1)} PPR points at this position's typical rate.`
+      `Snap share of ${(snapShareAvg * 100).toFixed(0)}% recently — worth roughly ${expectedPointsFromSnapShare.toFixed(1)} points at this position's typical rate.`
     );
   }
 
@@ -160,12 +161,12 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     if (rushValues.length > 0) {
       recentQbRushAttemptsAvg = average(rushValues);
       const runningScore = blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier;
-      const expectedPointsFromQbRush = recentQbRushAttemptsAvg * POINTS_PER_QB_RUSH_ATTEMPT;
+      const expectedPointsFromQbRush = recentQbRushAttemptsAvg * POINTS_PER_QB_RUSH_ATTEMPT[format];
       const blendedWithQbRush =
         (1 - QB_RUSH_BLEND_WEIGHT) * runningScore + QB_RUSH_BLEND_WEIGHT * expectedPointsFromQbRush;
       qbRushModifier = blendedWithQbRush - runningScore;
       notes.push(
-        `Averaging ${recentQbRushAttemptsAvg.toFixed(1)} rushing attempts/game over their last ${rushValues.length} game${rushValues.length === 1 ? "" : "s"} — worth roughly ${expectedPointsFromQbRush.toFixed(1)} PPR points at this position's typical rate.`
+        `Averaging ${recentQbRushAttemptsAvg.toFixed(1)} rushing attempts/game over their last ${rushValues.length} game${rushValues.length === 1 ? "" : "s"} — worth roughly ${expectedPointsFromQbRush.toFixed(1)} points at this position's typical rate.`
       );
     }
   }
@@ -180,7 +181,7 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
       (1 - QB_GOAL_LINE_BLEND_WEIGHT) * runningScore + QB_GOAL_LINE_BLEND_WEIGHT * expectedPointsFromGoalLine;
     qbGoalLineModifier = blendedWithGoalLine - runningScore;
     notes.push(
-      `Averaging ${goalLineTouchesAvg.toFixed(2)} goal-line rush attempts/game recently — worth roughly ${expectedPointsFromGoalLine.toFixed(1)} PPR points at this position's typical rate.`
+      `Averaging ${goalLineTouchesAvg.toFixed(2)} goal-line rush attempts/game recently — worth roughly ${expectedPointsFromGoalLine.toFixed(1)} points at this position's typical rate.`
     );
   }
 
@@ -200,7 +201,7 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
       (1 - QB_SUCCESS_RATE_BLEND_WEIGHT) * runningScore + QB_SUCCESS_RATE_BLEND_WEIGHT * expectedPointsFromSuccessRate;
     qbSuccessRateModifier = blendedWithSuccessRate - runningScore;
     notes.push(
-      `Succeeding on ${(successRateAvg * 100).toFixed(0)}% of recent dropbacks (down/distance-adjusted) — worth roughly ${expectedPointsFromSuccessRate.toFixed(1)} PPR points at this position's typical rate.`
+      `Succeeding on ${(successRateAvg * 100).toFixed(0)}% of recent dropbacks (down/distance-adjusted) — worth roughly ${expectedPointsFromSuccessRate.toFixed(1)} points at this position's typical rate.`
     );
   }
 
@@ -216,12 +217,12 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
       qbRushModifier +
       qbGoalLineModifier +
       qbSuccessRateModifier;
-    const expectedPointsFromQbRushEpa = qbRushEpaAvg * POINTS_PER_QB_RUSH_EPA;
+    const expectedPointsFromQbRushEpa = qbRushEpaAvg * POINTS_PER_QB_RUSH_EPA[format];
     const blendedWithQbRushEpa =
       (1 - QB_RUSH_EPA_BLEND_WEIGHT) * runningScore + QB_RUSH_EPA_BLEND_WEIGHT * expectedPointsFromQbRushEpa;
     qbRushEpaModifier = blendedWithQbRushEpa - runningScore;
     notes.push(
-      `Averaging ${qbRushEpaAvg.toFixed(2)} EPA per rush attempt recently (as a runner) — worth roughly ${expectedPointsFromQbRushEpa.toFixed(1)} PPR points at this position's typical rate.`
+      `Averaging ${qbRushEpaAvg.toFixed(2)} EPA per rush attempt recently (as a runner) — worth roughly ${expectedPointsFromQbRushEpa.toFixed(1)} points at this position's typical rate.`
     );
   }
 
@@ -233,7 +234,7 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     const blendedWithEpa = (1 - RB_EPA_BLEND_WEIGHT) * runningScore + RB_EPA_BLEND_WEIGHT * expectedPointsFromEpa;
     rbEpaModifier = blendedWithEpa - runningScore;
     notes.push(
-      `Averaging ${epaPerPlayAvg.toFixed(2)} EPA per rush recently — worth roughly ${expectedPointsFromEpa.toFixed(1)} PPR points at this position's typical rate.`
+      `Averaging ${epaPerPlayAvg.toFixed(2)} EPA per rush recently — worth roughly ${expectedPointsFromEpa.toFixed(1)} points at this position's typical rate.`
     );
   }
 
@@ -241,13 +242,13 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
   const dropRateAvg = input.nflverse.dropRate;
   if (blendedScore != null && position === "WR" && dropRateAvg != null) {
     const runningScore = blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier;
-    const pointsLostFromDrops = dropRateAvg * POINTS_PER_DROP_RATE_UNIT;
+    const pointsLostFromDrops = dropRateAvg * POINTS_PER_DROP_RATE_UNIT[format];
     const expectedPointsFromDropRate = runningScore - pointsLostFromDrops;
     const blendedWithDropRate =
       (1 - DROP_RATE_BLEND_WEIGHT) * runningScore + DROP_RATE_BLEND_WEIGHT * expectedPointsFromDropRate;
     dropRateModifier = blendedWithDropRate - runningScore;
     notes.push(
-      `Dropping ${(dropRateAvg * 100).toFixed(0)}% of recent charted targets — worth roughly ${pointsLostFromDrops.toFixed(1)} fewer PPR points at this position's typical rate.`
+      `Dropping ${(dropRateAvg * 100).toFixed(0)}% of recent charted targets — worth roughly ${pointsLostFromDrops.toFixed(1)} fewer points at this position's typical rate.`
     );
   }
 
@@ -255,7 +256,7 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
   if (blendedScore != null && position === "WR" && input.hasLimitedTeammate) {
     teammateOutBumpModifier = TEAMMATE_OUT_BUMP_WEIGHT_WR * POINTS_PER_TEAMMATE_OUT_BUMP_WR;
     notes.push(
-      `A same-position teammate is listed Out/Doubtful — worth roughly ${teammateOutBumpModifier.toFixed(1)} extra PPR points at this position's typical rate.`
+      `A same-position teammate is listed Out/Doubtful — worth roughly ${teammateOutBumpModifier.toFixed(1)} extra points at this position's typical rate.`
     );
   }
 
@@ -342,11 +343,11 @@ function buildReasoning(
       const seasonPart =
         b.seasonPprAvg != null ? ` (season average ${b.seasonPprAvg.toFixed(1)})` : "";
       bullets.push(
-        `${b.displayName}: averaging ${b.recentPprAvg.toFixed(1)} PPR points over their last ${b.gamesUsedForRecent} game${b.gamesUsedForRecent === 1 ? "" : "s"}${seasonPart}.`
+        `${b.displayName}: averaging ${b.recentPprAvg.toFixed(1)} points over their last ${b.gamesUsedForRecent} game${b.gamesUsedForRecent === 1 ? "" : "s"}${seasonPart}.`
       );
     } else if (b.seasonPprAvg != null) {
       bullets.push(
-        `${b.displayName}: no recent games available; averaging ${b.seasonPprAvg.toFixed(1)} PPR points per game this season.`
+        `${b.displayName}: no recent games available; averaging ${b.seasonPprAvg.toFixed(1)} points per game this season.`
       );
     }
     for (const note of b.notes) {
@@ -361,8 +362,8 @@ function buildReasoning(
   return bullets;
 }
 
-export function comparePlayers(inputs: PlayerComparisonInput[]): ComparisonResult {
-  const breakdowns = inputs.map(scorePlayer);
+export function comparePlayers(inputs: PlayerComparisonInput[], format: ScoringFormat): ComparisonResult {
+  const breakdowns = inputs.map((input) => scorePlayer(input, format));
 
   const found = breakdowns.filter((b) => b.playerId !== null);
   const notFoundNames = breakdowns.filter((b) => b.playerId === null).map((b) => b.displayName);

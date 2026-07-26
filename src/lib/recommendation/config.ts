@@ -1,6 +1,8 @@
 // Tunable weights for the rules-based recommendation engine.
 // Adjust these as the recommendation logic gets tuned over time.
 
+import type { ScoringFormat } from "@/lib/sportsdata/types";
+
 /** Base weight given to recent-4-week form vs. season average, before scaling by sample size. */
 export const RECENT_WEIGHT_BASE = 0.35;
 
@@ -26,9 +28,10 @@ export const CLOSE_CALL_RELATIVE_PCT = 0.08;
 export const RECENT_WEEK_COUNT = 4;
 
 /**
- * Empirically-derived PPR points scored per unit of recent volume, by
- * position (points/game ÷ volume/game across every played game of the
- * 2025 season) — this is what makes VOLUME_BLEND_WEIGHT below a real,
+ * Empirically-derived points scored per unit of recent volume, by
+ * position and scoring format (points/game ÷ volume/game across every
+ * played game of the 2025 season, using getFantasyPoints() for the
+ * chosen format) — this is what makes VOLUME_BLEND_WEIGHT below a real,
  * unit-consistent blend rather than mixing points with raw target/touch
  * counts. QB: points per pass attempt. RB: points per touch (rushing
  * attempts + targets). WR/TE: points per target.
@@ -36,12 +39,18 @@ export const RECENT_WEEK_COUNT = 4;
  * QB was tried as pass+rush "touches" at several blend weights after
  * item 24's 2024 validation exposed a real gap for rushing QBs — see
  * CLAUDE.md item 25. Reverted: no tested weight was a clean win.
+ *
+ * half_ppr/standard recomputed the same "ratio of sums" way, same 2025
+ * population, once scoring-format toggles shipped — see CLAUDE.md's
+ * scoring-format item. QB barely moves across formats (QBs essentially
+ * never record receptions); RB moves moderately (targets are part of
+ * "touches"); WR/TE — genuinely reception-driven positions — drop
+ * substantially under lower-PPR formats, exactly as expected.
  */
-export const POINTS_PER_VOLUME_UNIT: Record<"QB" | "RB" | "WR" | "TE", number> = {
-  QB: 0.511,
-  RB: 0.808,
-  WR: 1.729,
-  TE: 1.817,
+export const POINTS_PER_VOLUME_UNIT: Record<ScoringFormat, Record<"QB" | "RB" | "WR" | "TE", number>> = {
+  ppr: { QB: 0.511, RB: 0.808, WR: 1.729, TE: 1.817 },
+  half_ppr: { QB: 0.511, RB: 0.73, WR: 1.418, TE: 1.456 },
+  standard: { QB: 0.51, RB: 0.653, WR: 1.106, TE: 1.095 },
 };
 
 /**
@@ -123,15 +132,24 @@ export const POINTS_PER_REDZONE_TOUCH_RB = 4.797;
 export const REDZONE_BLEND_WEIGHT_RB = 0;
 
 /**
- * Empirically-derived PPR points per 100% offensive-snap-share
- * equivalent for TE (total PPR points across every played TE game-week
- * with snap data, divided by total snap share over the same set — same
- * method as POINTS_PER_VOLUME_UNIT/POINTS_PER_REDZONE_TOUCH_RB).
+ * Empirically-derived points per 100% offensive-snap-share equivalent
+ * for TE, by scoring format (total points across every played TE
+ * game-week with snap data, divided by total snap share over the same
+ * set — same method as POINTS_PER_VOLUME_UNIT/POINTS_PER_REDZONE_TOUCH_RB).
  * Backtested standalone at 57.7% for TE before integration — the best
  * standalone signal found for TE, the engine's weakest position — see
  * CLAUDE.md item 14.
+ *
+ * half_ppr/standard recomputed the same way once scoring-format toggles
+ * shipped — TE is a real reception-driven position, so this drops
+ * substantially under lower-PPR formats (a TE's snaps translate to
+ * fewer catches worth fewer points without the reception bonus).
  */
-export const POINTS_PER_SNAP_SHARE_UNIT_TE = 9.607;
+export const POINTS_PER_SNAP_SHARE_UNIT_TE: Record<ScoringFormat, number> = {
+  ppr: 9.607,
+  half_ppr: 7.698,
+  standard: 5.788,
+};
 
 /**
  * How much weight snap share (converted to points via
@@ -170,8 +188,16 @@ export const SNAP_SHARE_BLEND_WEIGHT_TE = 0.4;
  * this was attempted as its own additive term rather than blended into
  * the existing pass-attempts-only POINTS_PER_VOLUME_UNIT.QB (item 25's
  * blended attempt was reverted) — see item 30 for the full story.
+ *
+ * half_ppr/standard recomputed once scoring-format toggles shipped —
+ * barely move at all (3.929/3.925/3.920), since QBs essentially never
+ * record receptions regardless of format.
  */
-export const POINTS_PER_QB_RUSH_ATTEMPT = 3.929;
+export const POINTS_PER_QB_RUSH_ATTEMPT: Record<ScoringFormat, number> = {
+  ppr: 3.929,
+  half_ppr: 3.925,
+  standard: 3.92,
+};
 
 /**
  * How much weight QB rushing volume (converted to points via
@@ -313,19 +339,27 @@ export const RB_EPA_PPR_AT_ZERO = 9.749;
 export const RB_EPA_BLEND_WEIGHT = 0;
 
 /**
- * Empirically-derived PPR points LOST per unit of drop rate (FTN
- * Charting, target-scoped WR/TE — see playByPlay.ts/ftnCharting.ts),
- * same "ratio of sums" method as every other rate factor (total
- * receiver PPR points ÷ total drop rate summed across every played
- * WR/TE game-week of 2025 with charted-target coverage). Unlike every
- * other signal in this file, this is a "lower is better" metric —
- * applied with a NEGATIVE sign in engine.ts (a higher drop rate
- * SUBTRACTS expected points, it doesn't add them). Standalone-tested
- * modest but stable across both positions and both seasons (WR
- * 52.4%→53.1%, TE 50.0%→54.8%) — see CLAUDE.md item 33 for the
- * integration/sweep story.
+ * Empirically-derived points LOST per unit of drop rate (FTN Charting,
+ * target-scoped WR/TE — see playByPlay.ts/ftnCharting.ts), same "ratio
+ * of sums" method as every other rate factor (total receiver points ÷
+ * total drop rate summed across every played WR/TE game-week of 2025
+ * with charted-target coverage). Unlike every other signal in this
+ * file, this is a "lower is better" metric — applied with a NEGATIVE
+ * sign in engine.ts (a higher drop rate SUBTRACTS expected points, it
+ * doesn't add them). Standalone-tested modest but stable across both
+ * positions and both seasons (WR 52.4%→53.1%, TE 50.0%→54.8%) — see
+ * CLAUDE.md item 33 for the integration/sweep story.
+ *
+ * half_ppr/standard recomputed once scoring-format toggles shipped —
+ * a dropped pass costs meaningfully fewer points without the reception
+ * bonus (182.75 → 148.75 → 114.74), the same reception-driven pattern
+ * seen in every other WR/TE-scoped constant in this file.
  */
-export const POINTS_PER_DROP_RATE_UNIT = 182.75;
+export const POINTS_PER_DROP_RATE_UNIT: Record<ScoringFormat, number> = {
+  ppr: 182.75,
+  half_ppr: 148.75,
+  standard: 114.74,
+};
 
 /**
  * How much weight drop rate (converted to a point PENALTY via
@@ -398,8 +432,24 @@ export const TEAMMATE_OUT_BUMP_WEIGHT_WR = 0;
  * 49.5% (2024) / 51.5% (2025) — never below chance, a real methodological
  * improvement even though the per-season conversion factor itself is
  * less stable (47.4 / 149.7 / 33.0 / 34.9) than the pick accuracy is.
+ *
+ * half_ppr/standard: unlike every other factor in this file, NOT
+ * recomputed as a fresh "ratio of sums" against 2025-only data — doing
+ * so would replace this constant's 4-season-pooled 45.814 with a
+ * 2025-only value (confirmed by a real diagnostic run: the 2025-only
+ * recomputation lands at 34.4, matching the 34.9 documented above for
+ * 2025 alone, not the pooled 45.814), a real methodology downgrade this
+ * feature shouldn't force. Instead, scaled the shipped pooled ppr value
+ * by the half/standard-vs-ppr RATIO measured from that same 2025-only
+ * diagnostic run (0.9990/0.9981) — QB rushing EPA barely moves by format
+ * regardless (QBs essentially never record receptions), so this is a
+ * safe, small adjustment either way.
  */
-export const POINTS_PER_QB_RUSH_EPA = 45.814;
+export const POINTS_PER_QB_RUSH_EPA: Record<ScoringFormat, number> = {
+  ppr: 45.814,
+  half_ppr: 45.77,
+  standard: 45.725,
+};
 
 /**
  * How much weight QB rushing EPA (converted to points via

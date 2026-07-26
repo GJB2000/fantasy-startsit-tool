@@ -3,7 +3,9 @@
 import { useState } from "react";
 import type { TradeEvaluation } from "@/lib/trade/evaluateTrade";
 import type { PlayerSummary } from "@/lib/sportsdata/types";
+import { useScoringFormat } from "@/lib/useScoringFormat";
 import { PlayerSearchInput } from "./PlayerSearchInput";
+import { ScoringFormatToggle } from "./ScoringFormatToggle";
 import { TradeResult } from "./TradeResult";
 
 const MAX_PER_SIDE = 4;
@@ -83,6 +85,7 @@ export function TradeAnalyzer() {
   const [response, setResponse] = useState<TradeResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scoringFormat, setScoringFormat] = useScoringFormat();
 
   function addTo(setter: typeof setGivePlayers) {
     return (player: PlayerSummary) => {
@@ -105,7 +108,7 @@ export function TradeAnalyzer() {
     try {
       const give = givePlayers.map((p) => p.playerId).join(",");
       const get = getPlayers.map((p) => p.playerId).join(",");
-      const res = await fetch(`/api/trade?give=${give}&get=${get}`);
+      const res = await fetch(`/api/trade?give=${give}&get=${get}&scoringFormat=${scoringFormat}`);
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Something went wrong.");
@@ -121,6 +124,17 @@ export function TradeAnalyzer() {
 
   return (
     <div className="mx-auto mt-10 w-full max-w-3xl">
+      <div className="mb-4 flex items-center justify-center gap-3">
+        <span className="text-xs font-medium uppercase tracking-wide text-foreground/40">Scoring</span>
+        <ScoringFormatToggle
+          value={scoringFormat}
+          onChange={(format) => {
+            setScoringFormat(format);
+            setResponse(null);
+          }}
+        />
+      </div>
+
       <div className="grid gap-6 sm:grid-cols-2">
         <TradeSide
           label="You give"
@@ -150,7 +164,11 @@ export function TradeAnalyzer() {
       {error && <p className="mt-3 text-sm text-bad">{error}</p>}
 
       {response && (
-        <TradeResult evaluation={response.evaluation} contextNote={response.context.contextNote} />
+        <TradeResult
+          evaluation={response.evaluation}
+          contextNote={response.context.contextNote}
+          scoringFormat={scoringFormat}
+        />
       )}
     </div>
   );

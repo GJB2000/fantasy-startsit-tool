@@ -3,7 +3,7 @@ import type { NflverseWeekStat } from "@/lib/nflverse/weekTable";
 import { buildPositionDefenseTableFromRows, type PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { buildSeasonToDatePlayerStatsFromRows } from "@/lib/sportsdata/seasonToDatePlayerStats";
 import { buildTeamPaceTableFromRows, type TeamPace } from "@/lib/sportsdata/teamGameStats";
-import type { PlayerGameStat, PlayerSeasonStat, TeamGameStat } from "@/lib/sportsdata/types";
+import type { PlayerGameStat, PlayerSeasonStat, ScoringFormat, TeamGameStat } from "@/lib/sportsdata/types";
 
 export interface BacktestWeekSlice {
   targetWeek: number;
@@ -50,12 +50,13 @@ export function sliceWeekData(
   allTeamWeeklyRows: TeamGameStat[][] = [],
   nflversePlayerWeekTable: Map<number, Map<number, NflverseWeekStat>> = new Map(),
   teamWeatherByTeamWeek: Map<string, GameWeather> = new Map(),
-  depthChartByPlayerIdWeek: Map<number, Map<number, number>> = new Map()
+  depthChartByPlayerIdWeek: Map<number, Map<number, number>> = new Map(),
+  format: ScoringFormat = "ppr"
 ): BacktestWeekSlice {
   const priorRows = allWeeklyRows.slice(0, targetWeek - 1); // weeks 1..targetWeek-1
   const targetWeekRows = allWeeklyRows[targetWeek - 1] ?? [];
 
-  const positionDefenseTable = buildPositionDefenseTableFromRows(priorRows);
+  const positionDefenseTable = buildPositionDefenseTableFromRows(priorRows, format);
   const seasonToDateTable = buildSeasonToDatePlayerStatsFromRows(priorRows);
 
   const recentStart = Math.max(1, targetWeek - recentWeekCount);

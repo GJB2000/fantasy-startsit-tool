@@ -65,7 +65,7 @@ function collectBroadResultsForSeason(
       const inputs = pair.playerIds.map((id) =>
         buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
       );
-      const result = comparePlayers(inputs);
+      const result = comparePlayers(inputs, "ppr");
       const graded = gradeWeek(week, result, pair.playerIds, weekSlice.targetWeekRows);
       allResults.push(graded);
       (byPositionResults[pair.position] ??= []).push(graded);
@@ -141,7 +141,7 @@ export async function runPairBacktestNflverseOnly(
     const inputs = playerIds.map((id) =>
       buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
     );
-    const result = comparePlayers(inputs);
+    const result = comparePlayers(inputs, "ppr");
     const graded = gradeWeek(week, result, playerIds, weekSlice.targetWeekRows);
 
     const baselineGrades = gradeBaselinesForPair(weekSlice, playerIds, weekSlice.targetWeekRows);

@@ -4,6 +4,7 @@ import { isSkillPosition, type PlayerGameStat, type PlayerSeasonStat } from "./t
 interface RunningTotal {
   points: number;
   pointsPPR: number;
+  receptions: number;
   played: number;
   started: number;
   team: string;
@@ -19,8 +20,9 @@ interface RunningTotal {
  * prediction) rather than the full-season hindsight totals that
  * `getPlayerSeasonStats` returns.
  *
- * Only `.FantasyPointsPPR` and `.Played` on the resulting `PlayerSeasonStat`
- * are ever read by the recommendation engine — `Team`/`Position`/`Started`
+ * `.FantasyPoints`/`.FantasyPointsPPR`/`.Receptions`/`.Played` on the
+ * resulting `PlayerSeasonStat` feed `getFantasyPoints()` for
+ * scoring-format-aware ranking and averages — `Team`/`Position`/`Started`
  * are carried through for completeness but not consulted for this
  * synthetic row.
  */
@@ -37,6 +39,7 @@ export function buildSeasonToDatePlayerStatsFromRows(
       if (existing) {
         existing.points += row.FantasyPoints;
         existing.pointsPPR += row.FantasyPointsPPR;
+        existing.receptions += row.Receptions;
         existing.played += 1;
         existing.started += row.Started;
         existing.team = row.Team;
@@ -46,6 +49,7 @@ export function buildSeasonToDatePlayerStatsFromRows(
         totals.set(row.PlayerID, {
           points: row.FantasyPoints,
           pointsPPR: row.FantasyPointsPPR,
+          receptions: row.Receptions,
           played: 1,
           started: row.Started,
           team: row.Team,
@@ -67,6 +71,7 @@ export function buildSeasonToDatePlayerStatsFromRows(
       Started: total.started,
       FantasyPoints: total.points,
       FantasyPointsPPR: total.pointsPPR,
+      Receptions: total.receptions,
     });
   }
   return result;

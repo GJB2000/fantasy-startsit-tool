@@ -1,5 +1,5 @@
 import { getPlayerGameStatsByWeek } from "./weeklyStats";
-import { SKILL_POSITIONS, isSkillPosition, type PlayerGameStat, type SkillPosition } from "./types";
+import { getFantasyPoints, SKILL_POSITIONS, isSkillPosition, type PlayerGameStat, type ScoringFormat, type SkillPosition } from "./types";
 
 type TeamPositionTotals = Record<string, Record<SkillPosition, number>>;
 
@@ -17,10 +17,15 @@ function emptyPositionRecord(): Record<SkillPosition, number> {
  * Pure aggregation over already-fetched weekly rows — used by both the
  * live fetch-based getPositionDefenseTable below and the backtest layer,
  * which pre-fetches all weeks once and slices from memory to avoid
- * redundant network calls across many weeks/pairs.
+ * redundant network calls across many weeks/pairs. "Points allowed" is
+ * scoring-format-aware (getFantasyPoints) since matchup difficulty
+ * itself depends on the league's reception scoring — a defense that's
+ * bad against high-target slot receivers looks worse specifically in
+ * PPR than in Standard.
  */
 export function buildPositionDefenseTableFromRows(
-  weeklyRows: PlayerGameStat[][]
+  weeklyRows: PlayerGameStat[][],
+  format: ScoringFormat
 ): PositionDefenseTable {
   const totalAllowed: TeamPositionTotals = {};
   const gamesPlayed: Record<string, number> = {};
@@ -33,7 +38,7 @@ export function buildPositionDefenseTableFromRows(
 
       teamsThisWeek.add(row.Opponent);
       totalAllowed[row.Opponent] ??= emptyPositionRecord();
-      totalAllowed[row.Opponent][row.Position] += row.FantasyPointsPPR;
+      totalAllowed[row.Opponent][row.Position] += getFantasyPoints(row, format);
     }
 
     for (const team of teamsThisWeek) {
@@ -72,24 +77,26 @@ export function buildPositionDefenseTableFromRows(
 }
 
 /**
- * Builds a league-wide "PPR fantasy points allowed per game, by position"
- * table by fetching and aggregating every completed week's box scores for
- * the season. Reuses the same per-week fetch (and its cache) as recent-form
- * lookups — no separate endpoint or cache layer needed.
+ * Builds a league-wide "fantasy points allowed per game, by position"
+ * table (in the requested scoring format) by fetching and aggregating
+ * every completed week's box scores for the season. Reuses the same
+ * per-week fetch (and its cache) as recent-form lookups — no separate
+ * endpoint or cache layer needed.
  */
 export async function getPositionDefenseTable(
   apiSeason: string,
-  throughWeek: number
+  throughWeek: number,
+  format: ScoringFormat
 ): Promise<PositionDefenseTable> {
   const weeks = Array.from({ length: throughWeek }, (_, i) => i + 1);
   const weeklyRows = await Promise.all(weeks.map((week) => getPlayerGameStatsByWeek(apiSeason, week)));
-  return buildPositionDefenseTableFromRows(weeklyRows);
+  return buildPositionDefenseTableFromRows(weeklyRows, format);
 }
 
 export interface MatchupContext {
   opponentTeam: string;
   position: SkillPosition;
-  pprAllowedPerGame: number;
+  allowedPerGame: number;
   leagueAverage: number;
   rank: number;
   teamCount: number;
@@ -104,15 +111,15 @@ export function getMatchupContext(
   const perGame = table.perGameAllowed[opponentTeam];
   if (!perGame) return null;
 
-  const pprAllowedPerGame = perGame[position];
+  const allowedPerGame = perGame[position];
   const leagueAverage = table.leagueAverage[position];
   return {
     opponentTeam,
     position,
-    pprAllowedPerGame,
+    allowedPerGame,
     leagueAverage,
     rank: table.rank[opponentTeam][position],
     teamCount: Object.keys(table.perGameAllowed).length,
-    diffFromAverage: pprAllowedPerGame - leagueAverage,
+    diffFromAverage: allowedPerGame - leagueAverage,
   };
 }

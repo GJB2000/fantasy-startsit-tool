@@ -1,5 +1,6 @@
 import { getPositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
+import { parseScoringFormat } from "@/lib/sportsdata/types";
 import { buildComparisonInput } from "@/lib/recommendation/buildInput";
 import { comparePlayers } from "@/lib/recommendation/engine";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
@@ -10,11 +11,13 @@ import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLiv
 export const maxDuration = 30;
 
 export async function GET(request: Request) {
-  const idsParam = new URL(request.url).searchParams.get("ids") ?? "";
+  const url = new URL(request.url);
+  const idsParam = url.searchParams.get("ids") ?? "";
   const ids = idsParam
     .split(",")
     .map((s) => Number(s.trim()))
     .filter((n) => Number.isFinite(n) && n > 0);
+  const format = parseScoringFormat(url.searchParams.get("scoringFormat"));
 
   if (ids.length < 2) {
     return Response.json(
@@ -26,7 +29,7 @@ export async function GET(request: Request) {
   try {
     const context = await getSeasonContext();
     const [positionDefenseTable, nflversePlayerWeekTable] = await Promise.all([
-      getPositionDefenseTable(context.lastCompletedApiSeason, context.lastCompletedWeek),
+      getPositionDefenseTable(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
       getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
     ]);
 
@@ -34,7 +37,7 @@ export async function GET(request: Request) {
       ids.map((id) => buildComparisonInput(id, context, positionDefenseTable, nflversePlayerWeekTable))
     );
 
-    const result = comparePlayers(inputs);
+    const result = comparePlayers(inputs, format);
 
     return Response.json({
       result,

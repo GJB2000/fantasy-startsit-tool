@@ -1,7 +1,7 @@
 import { RECENT_WEEK_COUNT } from "@/lib/recommendation/config";
 import { buildBacktestComparisonInput } from "@/lib/recommendation/buildBacktestInput";
 import { comparePlayers } from "@/lib/recommendation/engine";
-import type { PlayerGameStat, SkillPosition } from "@/lib/sportsdata/types";
+import type { PlayerGameStat, ScoringFormat, SkillPosition } from "@/lib/sportsdata/types";
 import { BASELINE_PICKERS, type BaselineId } from "./baselines";
 import {
   gradeOutcome,
@@ -61,7 +61,8 @@ export async function runPairBacktest(
   playerIds: [number, number],
   season: number,
   apiSeason: string,
-  weeks: number[]
+  weeks: number[],
+  format: ScoringFormat = "ppr"
 ): Promise<PairBacktestResult> {
   const maxWeek = Math.max(...weeks);
   const runData = await loadBacktestRunData(season, apiSeason, maxWeek);
@@ -77,13 +78,14 @@ export async function runPairBacktest(
       runData.allTeamWeeklyRows,
       runData.nflversePlayerWeekTable,
       runData.teamWeatherByTeamWeek,
-      runData.depthChartByPlayerIdWeek
+      runData.depthChartByPlayerIdWeek,
+      format
     );
     const inputs = playerIds.map((id) =>
       buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
     );
-    const result = comparePlayers(inputs);
-    const graded = gradeWeek(week, result, playerIds, weekSlice.targetWeekRows);
+    const result = comparePlayers(inputs, format);
+    const graded = gradeWeek(week, result, playerIds, weekSlice.targetWeekRows, format);
 
     const baselineGrades = gradeBaselinesForPair(weekSlice, playerIds, weekSlice.targetWeekRows);
     for (const id of BASELINE_IDS) baselineOutcomes[id].push(baselineGrades[id]);
@@ -111,7 +113,8 @@ export async function runBroadBacktest(
   season: number,
   apiSeason: string,
   weeks: number[],
-  positions: SkillPosition[]
+  positions: SkillPosition[],
+  format: ScoringFormat = "ppr"
 ): Promise<BroadBacktestResult> {
   const maxWeek = Math.max(...weeks);
   const runData = await loadBacktestRunData(season, apiSeason, maxWeek);
@@ -130,17 +133,18 @@ export async function runBroadBacktest(
       runData.allTeamWeeklyRows,
       runData.nflversePlayerWeekTable,
       runData.teamWeatherByTeamWeek,
-      runData.depthChartByPlayerIdWeek
+      runData.depthChartByPlayerIdWeek,
+      format
     );
-    const pairs = buildAllPairsForWeek(weekSlice, positions);
+    const pairs = buildAllPairsForWeek(weekSlice, positions, format);
 
     const weekResults: WeekGradeResult[] = [];
     for (const pair of pairs) {
       const inputs = pair.playerIds.map((id) =>
         buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
       );
-      const result = comparePlayers(inputs);
-      const graded = gradeWeek(week, result, pair.playerIds, weekSlice.targetWeekRows);
+      const result = comparePlayers(inputs, format);
+      const graded = gradeWeek(week, result, pair.playerIds, weekSlice.targetWeekRows, format);
       weekResults.push(graded);
       allResults.push(graded);
       (byPositionResults[pair.position] ??= []).push(graded);

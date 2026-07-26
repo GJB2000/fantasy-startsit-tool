@@ -3,8 +3,10 @@
 import { useState } from "react";
 import type { ComparisonResult as ComparisonResultData } from "@/lib/recommendation/types";
 import type { PlayerSummary } from "@/lib/sportsdata/types";
+import { useScoringFormat } from "@/lib/useScoringFormat";
 import { ComparisonResult } from "./ComparisonResult";
 import { PlayerSearchInput } from "./PlayerSearchInput";
+import { ScoringFormatToggle } from "./ScoringFormatToggle";
 
 const MAX_PLAYERS = 4;
 
@@ -18,6 +20,7 @@ export function StartSitTool() {
   const [response, setResponse] = useState<CompareResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scoringFormat, setScoringFormat] = useScoringFormat();
 
   function addPlayer(player: PlayerSummary) {
     setSelectedPlayers((prev) =>
@@ -37,7 +40,7 @@ export function StartSitTool() {
     setResponse(null);
     try {
       const ids = selectedPlayers.map((p) => p.playerId).join(",");
-      const res = await fetch(`/api/compare?ids=${ids}`);
+      const res = await fetch(`/api/compare?ids=${ids}&scoringFormat=${scoringFormat}`);
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Something went wrong.");
@@ -53,6 +56,17 @@ export function StartSitTool() {
 
   return (
     <div className="mx-auto mt-10 w-full max-w-2xl">
+      <div className="mb-4 flex items-center justify-center gap-3">
+        <span className="text-xs font-medium uppercase tracking-wide text-foreground/40">Scoring</span>
+        <ScoringFormatToggle
+          value={scoringFormat}
+          onChange={(format) => {
+            setScoringFormat(format);
+            setResponse(null);
+          }}
+        />
+      </div>
+
       <div className="space-y-2.5">
         {selectedPlayers.map((player) => (
           <div
@@ -112,7 +126,11 @@ export function StartSitTool() {
       {error && <p className="mt-3 text-sm text-bad">{error}</p>}
 
       {response && (
-        <ComparisonResult result={response.result} contextNote={response.context.contextNote} />
+        <ComparisonResult
+          result={response.result}
+          contextNote={response.context.contextNote}
+          scoringFormat={scoringFormat}
+        />
       )}
     </div>
   );

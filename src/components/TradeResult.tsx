@@ -1,9 +1,17 @@
 import type { TradeEvaluation, TradePlayerResult, TradeVerdict } from "@/lib/trade/evaluateTrade";
+import type { ScoringFormat } from "@/lib/sportsdata/types";
 
 interface TradeResultProps {
   evaluation: TradeEvaluation;
   contextNote: string;
+  scoringFormat: ScoringFormat;
 }
+
+const FORMAT_LABEL: Record<ScoringFormat, string> = {
+  ppr: "PPR",
+  half_ppr: "Half PPR",
+  standard: "Standard",
+};
 
 // Full literal class strings, not interpolated — Tailwind's static scanner
 // can't resolve a template like `bg-${token}/12`, only complete class names
@@ -46,7 +54,7 @@ function VerdictIcon({ verdict }: { verdict: TradeVerdict }) {
   );
 }
 
-function PlayerValueCard({ player }: { player: TradePlayerResult }) {
+function PlayerValueCard({ player, formatLabel }: { player: TradePlayerResult; formatLabel: string }) {
   return (
     <div className="rounded-2xl border border-foreground/10 bg-surface p-4 shadow-sm">
       <div className="flex items-center justify-between">
@@ -59,7 +67,7 @@ function PlayerValueCard({ player }: { player: TradePlayerResult }) {
         )}
       </div>
       <div className="mt-2 flex items-baseline justify-between border-t border-foreground/[0.07] pt-2">
-        <span className="text-xs text-foreground/50">Rest of season</span>
+        <span className="text-xs text-foreground/50">Rest of season ({formatLabel})</span>
         <span className="font-rounded text-[15px] font-semibold tabular-nums">
           {player.restOfSeasonTotal != null ? `${player.restOfSeasonTotal.toFixed(1)} pts` : "—"}
         </span>
@@ -74,7 +82,17 @@ function PlayerValueCard({ player }: { player: TradePlayerResult }) {
   );
 }
 
-function SideColumn({ label, players, total }: { label: string; players: TradePlayerResult[]; total: number | null }) {
+function SideColumn({
+  label,
+  players,
+  total,
+  formatLabel,
+}: {
+  label: string;
+  players: TradePlayerResult[];
+  total: number | null;
+  formatLabel: string;
+}) {
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between">
@@ -85,14 +103,15 @@ function SideColumn({ label, players, total }: { label: string; players: TradePl
       </div>
       <div className="space-y-2">
         {players.map((player, i) => (
-          <PlayerValueCard key={player.playerId ?? `unresolved-${i}`} player={player} />
+          <PlayerValueCard key={player.playerId ?? `unresolved-${i}`} player={player} formatLabel={formatLabel} />
         ))}
       </div>
     </div>
   );
 }
 
-export function TradeResult({ evaluation, contextNote }: TradeResultProps) {
+export function TradeResult({ evaluation, contextNote, scoringFormat }: TradeResultProps) {
+  const formatLabel = FORMAT_LABEL[scoringFormat];
   return (
     <div className="mt-8 space-y-5">
       <div className="rounded-3xl border border-foreground/10 bg-surface p-6 shadow-sm">
@@ -122,8 +141,8 @@ export function TradeResult({ evaluation, contextNote }: TradeResultProps) {
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2">
-        <SideColumn label="You give" players={evaluation.give} total={evaluation.giveTotal} />
-        <SideColumn label="You get" players={evaluation.get} total={evaluation.getTotal} />
+        <SideColumn label="You give" players={evaluation.give} total={evaluation.giveTotal} formatLabel={formatLabel} />
+        <SideColumn label="You get" players={evaluation.get} total={evaluation.getTotal} formatLabel={formatLabel} />
       </div>
     </div>
   );

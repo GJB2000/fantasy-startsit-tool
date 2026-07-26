@@ -148,7 +148,7 @@ function collectTradeResultsForSeason(
           weekSlice,
           runData.byesByTeam
         );
-        return scorePlayer(input);
+        return scorePlayer(input, "ppr");
       });
 
       const projected = breakdowns.map((b) =>

@@ -1,5 +1,5 @@
 import type { ComparisonResult } from "@/lib/recommendation/types";
-import type { PlayerGameStat } from "@/lib/sportsdata/types";
+import { getFantasyPoints, type PlayerGameStat, type ScoringFormat } from "@/lib/sportsdata/types";
 
 export type BacktestOutcome = "correct" | "incorrect" | "push" | "no_pick";
 
@@ -15,9 +15,9 @@ export interface WeekGradeResult {
   outcome: BacktestOutcome;
 }
 
-function getActualScore(playerId: number, targetWeekRows: PlayerGameStat[]): ActualScore {
+function getActualScore(playerId: number, targetWeekRows: PlayerGameStat[], format: ScoringFormat): ActualScore {
   const row = targetWeekRows.find((r) => r.PlayerID === playerId && r.Played === 1);
-  return row ? { pprPoints: row.FantasyPointsPPR, played: true } : { pprPoints: 0, played: false };
+  return row ? { pprPoints: getFantasyPoints(row, format), played: true } : { pprPoints: 0, played: false };
 }
 
 export interface OutcomeGrade {
@@ -30,7 +30,10 @@ export interface OutcomeGrade {
  * happened, decide correct/incorrect/push/no_pick. Used both for the
  * real engine's picks (via gradeWeek below) and for naive baseline
  * picks (see baselines.ts), so engine and baselines are graded by the
- * exact same rules against the exact same outcomes.
+ * exact same rules against the exact same outcomes. `format` defaults to
+ * "ppr" — the ground truth this whole backtest history was validated
+ * against; only the primary SportsDataIO pipeline's format-aware runs
+ * (see runBacktest.ts) pass something else.
  *
  * recommendedPlayerId===null is "no_pick", not "incorrect": for the
  * engine this is an expected early-season "insufficient data" state;
@@ -40,11 +43,12 @@ export interface OutcomeGrade {
 export function gradeOutcome(
   recommendedPlayerId: number | null,
   playerIds: number[],
-  targetWeekRows: PlayerGameStat[]
+  targetWeekRows: PlayerGameStat[],
+  format: ScoringFormat = "ppr"
 ): OutcomeGrade {
   const actualScores: Record<number, ActualScore> = {};
   for (const id of playerIds) {
-    actualScores[id] = getActualScore(id, targetWeekRows);
+    actualScores[id] = getActualScore(id, targetWeekRows, format);
   }
 
   let outcome: BacktestOutcome;
@@ -69,9 +73,10 @@ export function gradeWeek(
   week: number,
   result: ComparisonResult,
   playerIds: number[],
-  targetWeekRows: PlayerGameStat[]
+  targetWeekRows: PlayerGameStat[],
+  format: ScoringFormat = "ppr"
 ): WeekGradeResult {
-  const { actualScores, outcome } = gradeOutcome(result.recommendedPlayerId, playerIds, targetWeekRows);
+  const { actualScores, outcome } = gradeOutcome(result.recommendedPlayerId, playerIds, targetWeekRows, format);
   return { week, result, actualScores, outcome };
 }
 

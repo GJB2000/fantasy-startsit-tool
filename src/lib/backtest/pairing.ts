@@ -1,6 +1,6 @@
 import { BROAD_MODE_POOL_SIZE } from "./config";
 import type { BacktestWeekSlice } from "./weekData";
-import type { SkillPosition } from "@/lib/sportsdata/types";
+import { getFantasyPoints, type ScoringFormat, type SkillPosition } from "@/lib/sportsdata/types";
 
 export interface CandidatePair {
   position: SkillPosition;
@@ -9,18 +9,24 @@ export interface CandidatePair {
 
 /**
  * Broad-mode pairing for one position/week: rank players who actually
- * played that week by season-to-date PPR average (through the prior
- * week only), restrict to a realistic "startable" depth, then pair
- * ADJACENT ranks. This produces genuinely close, realistic start/sit
- * dilemmas rather than random blowout pairings that would trivially
- * inflate accuracy.
+ * played that week by season-to-date average (through the prior week
+ * only, in the requested scoring format — which players count as
+ * "adjacent rank" genuinely shifts by format, since reception-heavy
+ * players rank differently under PPR vs. Standard), restrict to a
+ * realistic "startable" depth, then pair ADJACENT ranks. This produces
+ * genuinely close, realistic start/sit dilemmas rather than random
+ * blowout pairings that would trivially inflate accuracy.
  *
  * Requiring Played===1 in the target week is a test-set eligibility
  * choice (we need a real outcome to grade against) — it uses hindsight
  * on PARTICIPATION only, never on performance, so it doesn't leak
  * predictive information into the comparison itself.
  */
-export function buildPairsForWeek(weekSlice: BacktestWeekSlice, position: SkillPosition): CandidatePair[] {
+export function buildPairsForWeek(
+  weekSlice: BacktestWeekSlice,
+  position: SkillPosition,
+  format: ScoringFormat = "ppr"
+): CandidatePair[] {
   const pool = weekSlice.targetWeekRows.filter((r) => r.Played === 1 && r.Position === position);
 
   const ranked = pool
@@ -28,9 +34,9 @@ export function buildPairsForWeek(weekSlice: BacktestWeekSlice, position: SkillP
     .filter((p) => p.seasonToDate != null && p.seasonToDate.Played > 0)
     .map((p) => ({
       playerId: p.playerId,
-      avgPpr: p.seasonToDate!.FantasyPointsPPR / p.seasonToDate!.Played,
+      avgPoints: getFantasyPoints(p.seasonToDate!, format) / p.seasonToDate!.Played,
     }))
-    .sort((a, b) => b.avgPpr - a.avgPpr)
+    .sort((a, b) => b.avgPoints - a.avgPoints)
     .slice(0, BROAD_MODE_POOL_SIZE[position]);
 
   const pairs: CandidatePair[] = [];
@@ -42,7 +48,8 @@ export function buildPairsForWeek(weekSlice: BacktestWeekSlice, position: SkillP
 
 export function buildAllPairsForWeek(
   weekSlice: BacktestWeekSlice,
-  positions: SkillPosition[]
+  positions: SkillPosition[],
+  format: ScoringFormat = "ppr"
 ): CandidatePair[] {
-  return positions.flatMap((position) => buildPairsForWeek(weekSlice, position));
+  return positions.flatMap((position) => buildPairsForWeek(weekSlice, position, format));
 }
