@@ -35,6 +35,46 @@ export async function getNflverseByes(season: number, maxWeek: number): Promise<
   return byesByTeam;
 }
 
+export interface RemainingGame {
+  week: number;
+  /** nflverse team code — see restOfSeason.ts for the SportsDataIO code mapping (only LAR/LA differ). */
+  opponent: string;
+}
+
+/**
+ * Every team's remaining regular-season opponents from `fromWeek` on,
+ * keyed by nflverse team code. Powers the trade analyzer's rest-of-season
+ * projection (see lib/recommendation/restOfSeason.ts) — reuses the same
+ * `schedules` release games.csv every other schedule reader here does.
+ * A team's bye week simply has no row that week, so it's naturally
+ * excluded rather than needing special-case handling. Confirmed live: the
+ * `schedules` release already carries the *upcoming* season's full
+ * fixture list (opponents known, scores blank) as soon as the NFL
+ * publishes it, not just completed seasons.
+ */
+export async function getRemainingOpponentsByTeam(
+  season: number,
+  fromWeek: number
+): Promise<Map<string, RemainingGame[]>> {
+  const rows = await fetchNflverseCsv("schedules", "games.csv", REVALIDATE_SECONDS);
+  const regSeasonRows = rows.filter(
+    (r) => Number(r.season) === season && r.game_type === "REG" && Number(r.week) >= fromWeek
+  );
+
+  const byTeam = new Map<string, RemainingGame[]>();
+  for (const r of regSeasonRows) {
+    const week = Number(r.week);
+    const home = byTeam.get(r.home_team) ?? [];
+    home.push({ week, opponent: r.away_team });
+    byTeam.set(r.home_team, home);
+    const away = byTeam.get(r.away_team) ?? [];
+    away.push({ week, opponent: r.home_team });
+    byTeam.set(r.away_team, away);
+  }
+  for (const games of byTeam.values()) games.sort((a, b) => a.week - b.week);
+  return byTeam;
+}
+
 export interface GameWeather {
   roof: string;
   temp: number | null;

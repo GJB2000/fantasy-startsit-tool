@@ -36,6 +36,7 @@ import type {
   PlayerScoreBreakdown,
 } from "./types";
 import { getQbRushAttemptStat, getVolumeStat } from "./volume";
+import type { MatchupContext } from "@/lib/sportsdata/positionDefense";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -43,6 +44,20 @@ function clamp(value: number, min: number, max: number): number {
 
 function average(values: number[]): number {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
+/**
+ * Pure matchup-modifier formula, extracted so it can be reused against a
+ * *future* opponent (rest-of-season trade projection, see
+ * lib/recommendation/restOfSeason.ts) as well as the "last completed
+ * opponent" case scorePlayer() uses below — the formula itself doesn't
+ * care which game the MatchupContext came from.
+ */
+export function computeMatchupModifier(matchupContext: MatchupContext | null): number {
+  if (!matchupContext) return 0;
+  const { leagueAverage, diffFromAverage } = matchupContext;
+  const diffRatio = leagueAverage !== 0 ? diffFromAverage / leagueAverage : 0;
+  return clamp(diffRatio * MATCHUP_MODIFIER_SCALE, -MATCHUP_MODIFIER_CAP, MATCHUP_MODIFIER_CAP);
 }
 
 export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown {
@@ -82,16 +97,10 @@ export function scorePlayer(input: PlayerComparisonInput): PlayerScoreBreakdown 
     );
   }
 
-  let matchupModifier = 0;
+  const matchupModifier = computeMatchupModifier(input.matchupContext);
   if (input.matchupContext) {
-    const { leagueAverage, diffFromAverage, opponentTeam, rank, teamCount, position: matchupPosition } =
+    const { diffFromAverage, opponentTeam, rank, teamCount, position: matchupPosition } =
       input.matchupContext;
-    const diffRatio = leagueAverage !== 0 ? diffFromAverage / leagueAverage : 0;
-    matchupModifier = clamp(
-      diffRatio * MATCHUP_MODIFIER_SCALE,
-      -MATCHUP_MODIFIER_CAP,
-      MATCHUP_MODIFIER_CAP
-    );
     const direction = diffFromAverage >= 0 ? "friendlier" : "tougher";
     notes.push(
       `In their last game (vs ${opponentTeam}), that defense ranked ${rank} of ${teamCount} in PPR points allowed to ${matchupPosition}s — a ${direction}-than-average matchup.`
