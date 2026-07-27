@@ -1,6 +1,7 @@
 import { BASELINE_LABELS } from "@/lib/backtest/baselines";
 import { parseWeeksParam } from "@/lib/backtest/params";
 import { PlayerNotInNflverseSeasonError, runPairBacktestNflverseOnly } from "@/lib/backtest/runBacktestNflverseOnly";
+import { parseScoringFormat } from "@/lib/sportsdata/types";
 
 // Same heavier cold path as /api/backtest/broad-nflverse (fresh
 // stats_player_week fetch plus play-by-play aggregation for red-zone
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
 
   const season = Number(url.searchParams.get("season") ?? "2024");
   const weeks = parseWeeksParam(url.searchParams.get("weeks"), 18);
+  const format = parseScoringFormat(url.searchParams.get("scoringFormat"));
 
   if (weeks.length === 0) {
     return Response.json({ error: "No valid weeks in the requested range." }, { status: 400 });
@@ -39,7 +41,8 @@ export async function GET(request: Request) {
     const { weekResults, summary, baselineSummaries, confidenceBreakdown } = await runPairBacktestNflverseOnly(
       [ids[0], ids[1]],
       season,
-      weeks
+      weeks,
+      format
     );
 
     return Response.json({
@@ -51,6 +54,7 @@ export async function GET(request: Request) {
       context: {
         season,
         weeks,
+        scoringFormat: format,
         source: "nflverse-only",
         caveat:
           "This route validates the already-tuned engine config (config.ts) against a season SportsDataIO can't serve on this plan — team pace/game-script data isn't available here, and historical injury status is treated as unknown, same as the primary backtest.",

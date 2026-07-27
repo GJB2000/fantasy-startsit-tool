@@ -3,7 +3,7 @@ import { RECENT_WEEK_COUNT } from "@/lib/recommendation/config";
 import { buildBacktestComparisonInput } from "@/lib/recommendation/buildBacktestInput";
 import { comparePlayers } from "@/lib/recommendation/engine";
 import { getAnyPlayerById } from "@/lib/sportsdata/players";
-import type { SkillPosition } from "@/lib/sportsdata/types";
+import type { ScoringFormat, SkillPosition } from "@/lib/sportsdata/types";
 import { type BaselineId } from "./baselines";
 import {
   gradeWeek,
@@ -42,7 +42,8 @@ interface SeasonCollection {
 function collectBroadResultsForSeason(
   runData: BacktestRunData,
   weeks: number[],
-  positions: SkillPosition[]
+  positions: SkillPosition[],
+  format: ScoringFormat = "ppr"
 ): SeasonCollection {
   const anyPlayerById = new Map(runData.allPlayers.map((p) => [p.PlayerID, p]));
   const byPositionResults: Record<string, WeekGradeResult[]> = {};
@@ -57,20 +58,21 @@ function collectBroadResultsForSeason(
       runData.allTeamWeeklyRows,
       runData.nflversePlayerWeekTable,
       runData.teamWeatherByTeamWeek,
-      runData.depthChartByPlayerIdWeek
+      runData.depthChartByPlayerIdWeek,
+      format
     );
-    const pairs = buildAllPairsForWeek(weekSlice, positions);
+    const pairs = buildAllPairsForWeek(weekSlice, positions, format);
 
     for (const pair of pairs) {
       const inputs = pair.playerIds.map((id) =>
         buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
       );
-      const result = comparePlayers(inputs, "ppr");
-      const graded = gradeWeek(week, result, pair.playerIds, weekSlice.targetWeekRows);
+      const result = comparePlayers(inputs, format);
+      const graded = gradeWeek(week, result, pair.playerIds, weekSlice.targetWeekRows, format);
       allResults.push(graded);
       (byPositionResults[pair.position] ??= []).push(graded);
 
-      const baselineGrades = gradeBaselinesForPair(weekSlice, pair.playerIds, weekSlice.targetWeekRows);
+      const baselineGrades = gradeBaselinesForPair(weekSlice, pair.playerIds, weekSlice.targetWeekRows, format);
       for (const id of BASELINE_IDS) baselineOutcomes[id].push(baselineGrades[id]);
     }
   }
@@ -106,7 +108,8 @@ export class PlayerNotInNflverseSeasonError extends Error {
 export async function runPairBacktestNflverseOnly(
   sdioPlayerIds: [number, number],
   season: number,
-  weeks: number[]
+  weeks: number[],
+  format: ScoringFormat = "ppr"
 ): Promise<NflverseOnlyPairBacktestResult> {
   const maxWeek = Math.max(...weeks);
   const [runData, sdioPlayers] = await Promise.all([
@@ -136,15 +139,16 @@ export async function runPairBacktestNflverseOnly(
       runData.allTeamWeeklyRows,
       runData.nflversePlayerWeekTable,
       runData.teamWeatherByTeamWeek,
-      runData.depthChartByPlayerIdWeek
+      runData.depthChartByPlayerIdWeek,
+      format
     );
     const inputs = playerIds.map((id) =>
       buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
     );
-    const result = comparePlayers(inputs, "ppr");
-    const graded = gradeWeek(week, result, playerIds, weekSlice.targetWeekRows);
+    const result = comparePlayers(inputs, format);
+    const graded = gradeWeek(week, result, playerIds, weekSlice.targetWeekRows, format);
 
-    const baselineGrades = gradeBaselinesForPair(weekSlice, playerIds, weekSlice.targetWeekRows);
+    const baselineGrades = gradeBaselinesForPair(weekSlice, playerIds, weekSlice.targetWeekRows, format);
     for (const id of BASELINE_IDS) baselineOutcomes[id].push(baselineGrades[id]);
 
     return graded;
@@ -176,11 +180,17 @@ export async function runPairBacktestNflverseOnly(
 export async function runBroadBacktestNflverseOnly(
   season: number,
   weeks: number[],
-  positions: SkillPosition[]
+  positions: SkillPosition[],
+  format: ScoringFormat = "ppr"
 ): Promise<NflverseOnlyBroadBacktestResult> {
   const maxWeek = Math.max(...weeks);
   const runData = await loadNflverseOnlyRunData(season, maxWeek);
-  const { allResults, byPositionResults, baselineOutcomes } = collectBroadResultsForSeason(runData, weeks, positions);
+  const { allResults, byPositionResults, baselineOutcomes } = collectBroadResultsForSeason(
+    runData,
+    weeks,
+    positions,
+    format
+  );
 
   const byPosition: Record<string, BacktestSummary> = {};
   for (const [position, results] of Object.entries(byPositionResults)) {
@@ -225,7 +235,8 @@ export interface NflverseOnlyMultiSeasonBroadBacktestResult {
 export async function runBroadBacktestNflverseOnlyMultiSeason(
   seasons: number[],
   weeks: number[],
-  positions: SkillPosition[]
+  positions: SkillPosition[],
+  format: ScoringFormat = "ppr"
 ): Promise<NflverseOnlyMultiSeasonBroadBacktestResult> {
   const maxWeek = Math.max(...weeks);
 
@@ -236,7 +247,12 @@ export async function runBroadBacktestNflverseOnlyMultiSeason(
 
   for (const season of seasons) {
     const runData: BacktestRunData = await loadNflverseOnlyRunData(season, maxWeek);
-    const { allResults, byPositionResults, baselineOutcomes } = collectBroadResultsForSeason(runData, weeks, positions);
+    const { allResults, byPositionResults, baselineOutcomes } = collectBroadResultsForSeason(
+      runData,
+      weeks,
+      positions,
+      format
+    );
 
     pooledAllResults.push(...allResults);
     for (const [position, results] of Object.entries(byPositionResults)) {

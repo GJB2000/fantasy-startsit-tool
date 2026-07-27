@@ -1,6 +1,7 @@
 import { BASELINE_LABELS } from "@/lib/backtest/baselines";
 import { parsePositionsParam, parseWeeksParam } from "@/lib/backtest/params";
 import { runBroadBacktestNflverseOnlyMultiSeason } from "@/lib/backtest/runBacktestNflverseOnly";
+import { parseScoringFormat } from "@/lib/sportsdata/types";
 
 // Heaviest route in the app: loads N full seasons sequentially, each with
 // its own play-by-play parse (see loadRunNflverseOnly.ts/client.ts) — see
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
   const seasons = parseSeasonsParam(url.searchParams.get("seasons"));
   const weeks = parseWeeksParam(url.searchParams.get("weeks"), 18);
   const positions = parsePositionsParam(url.searchParams.get("positions"));
+  const format = parseScoringFormat(url.searchParams.get("scoringFormat"));
 
   if (weeks.length === 0) {
     return Response.json({ error: "No valid weeks in the requested range." }, { status: 400 });
@@ -43,7 +45,7 @@ export async function GET(request: Request) {
 
   try {
     const { bySeason, byPosition, overall, baselineSummaries, confidenceBreakdown } =
-      await runBroadBacktestNflverseOnlyMultiSeason(seasons, weeks, positions);
+      await runBroadBacktestNflverseOnlyMultiSeason(seasons, weeks, positions, format);
 
     return Response.json({
       bySeason,
@@ -56,6 +58,7 @@ export async function GET(request: Request) {
         seasons,
         weeks,
         positions,
+        scoringFormat: format,
         source: "nflverse-only (pooled across seasons)",
       },
     });

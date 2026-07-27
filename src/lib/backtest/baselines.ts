@@ -1,5 +1,6 @@
 import type { NflverseWeekStat } from "@/lib/nflverse/weekTable";
 import { getVolumeStat } from "@/lib/recommendation/volume";
+import { getFantasyPoints, type ScoringFormat } from "@/lib/sportsdata/types";
 import type { BacktestWeekSlice } from "./weekData";
 
 export type BaselineId =
@@ -60,27 +61,39 @@ function average(values: number[]): number {
 }
 
 /**
- * Naive baseline: pick whoever scored more PPR points in the single
- * most recent prior week. Null (no pick) if either player has no game
- * in that window yet, or if they're tied — same "no signal" handling
- * the real engine uses for insufficient data, so baseline and engine
- * are graded by identical rules.
+ * Naive baseline: pick whoever scored more points (in the requested
+ * scoring format) in the single most recent prior week. Null (no pick)
+ * if either player has no game in that window yet, or if they're tied
+ * — same "no signal" handling the real engine uses for insufficient
+ * data, so baseline and engine are graded by identical rules.
  */
-export function pickPriorWeek(weekSlice: BacktestWeekSlice, playerIds: [number, number]): number | null {
-  const scores = playerIds.map((id) => weekSlice.recentGamesByPlayer(id).at(-1)?.FantasyPointsPPR ?? null);
+export function pickPriorWeek(
+  weekSlice: BacktestWeekSlice,
+  playerIds: [number, number],
+  format: ScoringFormat
+): number | null {
+  const scores = playerIds.map((id) => {
+    const row = weekSlice.recentGamesByPlayer(id).at(-1);
+    return row ? getFantasyPoints(row, format) : null;
+  });
   if (scores[0] == null || scores[1] == null || scores[0] === scores[1]) return null;
   return scores[0] > scores[1] ? playerIds[0] : playerIds[1];
 }
 
 /**
- * Naive baseline: pick whoever has the higher season-to-date PPR
- * average (through the prior week only — same point-in-time rule the
- * real engine follows, never full-season hindsight).
+ * Naive baseline: pick whoever has the higher season-to-date average (in
+ * the requested scoring format), through the prior week only — same
+ * point-in-time rule the real engine follows, never full-season
+ * hindsight.
  */
-export function pickSeasonAvg(weekSlice: BacktestWeekSlice, playerIds: [number, number]): number | null {
+export function pickSeasonAvg(
+  weekSlice: BacktestWeekSlice,
+  playerIds: [number, number],
+  format: ScoringFormat
+): number | null {
   const avgs = playerIds.map((id) => {
     const stat = weekSlice.seasonToDateTable.get(id);
-    return stat && stat.Played > 0 ? stat.FantasyPointsPPR / stat.Played : null;
+    return stat && stat.Played > 0 ? getFantasyPoints(stat, format) / stat.Played : null;
   });
   if (avgs[0] == null || avgs[1] == null || avgs[0] === avgs[1]) return null;
   return avgs[0] > avgs[1] ? playerIds[0] : playerIds[1];
@@ -534,9 +547,13 @@ export function pickByDepthChart(weekSlice: BacktestWeekSlice, playerIds: [numbe
   return depths[0] < depths[1] ? playerIds[0] : playerIds[1];
 }
 
+// Every picker besides pickPriorWeek/pickSeasonAvg ignores the format
+// param (their signals — volume, share, EPA, injury status, etc. — aren't
+// points-denominated) — TS permits assigning a function with fewer
+// declared params to a type expecting more, so they're unchanged below.
 export const BASELINE_PICKERS: Record<
   BaselineId,
-  (weekSlice: BacktestWeekSlice, playerIds: [number, number]) => number | null
+  (weekSlice: BacktestWeekSlice, playerIds: [number, number], format: ScoringFormat) => number | null
 > = {
   priorWeek: pickPriorWeek,
   seasonAvg: pickSeasonAvg,

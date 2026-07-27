@@ -26,16 +26,24 @@ export function emptyBaselineOutcomes(): Record<BaselineId, BacktestOutcome[]> {
   return outcomes;
 }
 
-/** Grades each naive baseline's pick for one pair/week against the same actual outcomes the engine is graded against. Shared with runBacktestNflverseOnly.ts, so both pipelines' baseline numbers are directly comparable. */
+/**
+ * Grades each naive baseline's pick for one pair/week against the same
+ * actual outcomes the engine is graded against. Shared with
+ * runBacktestNflverseOnly.ts, so both pipelines' baseline numbers are
+ * directly comparable. `format` defaults to "ppr" for callers that
+ * haven't been made format-aware (the trade backtest doesn't use
+ * baselines at all, so it never calls this).
+ */
 export function gradeBaselinesForPair(
   weekSlice: BacktestWeekSlice,
   playerIds: [number, number],
-  targetWeekRows: PlayerGameStat[]
+  targetWeekRows: PlayerGameStat[],
+  format: ScoringFormat = "ppr"
 ): Record<BaselineId, BacktestOutcome> {
   const outcomes = {} as Record<BaselineId, BacktestOutcome>;
   for (const id of BASELINE_IDS) {
-    const pick = BASELINE_PICKERS[id](weekSlice, playerIds);
-    outcomes[id] = gradeOutcome(pick, playerIds, targetWeekRows).outcome;
+    const pick = BASELINE_PICKERS[id](weekSlice, playerIds, format);
+    outcomes[id] = gradeOutcome(pick, playerIds, targetWeekRows, format).outcome;
   }
   return outcomes;
 }
@@ -87,7 +95,7 @@ export async function runPairBacktest(
     const result = comparePlayers(inputs, format);
     const graded = gradeWeek(week, result, playerIds, weekSlice.targetWeekRows, format);
 
-    const baselineGrades = gradeBaselinesForPair(weekSlice, playerIds, weekSlice.targetWeekRows);
+    const baselineGrades = gradeBaselinesForPair(weekSlice, playerIds, weekSlice.targetWeekRows, format);
     for (const id of BASELINE_IDS) baselineOutcomes[id].push(baselineGrades[id]);
 
     return graded;
@@ -149,7 +157,7 @@ export async function runBroadBacktest(
       allResults.push(graded);
       (byPositionResults[pair.position] ??= []).push(graded);
 
-      const baselineGrades = gradeBaselinesForPair(weekSlice, pair.playerIds, weekSlice.targetWeekRows);
+      const baselineGrades = gradeBaselinesForPair(weekSlice, pair.playerIds, weekSlice.targetWeekRows, format);
       for (const id of BASELINE_IDS) baselineOutcomes[id].push(baselineGrades[id]);
     }
     byWeekResults[week] = weekResults;
