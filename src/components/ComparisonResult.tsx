@@ -1,4 +1,5 @@
 import type { ComparisonResult as ComparisonResultData } from "@/lib/recommendation/types";
+import type { GameWeather } from "@/lib/nflverse/schedules";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
 
 interface ComparisonResultProps {
@@ -18,6 +19,24 @@ function injuryBadgeClasses(status: string) {
     return "bg-bad/15 text-bad";
   }
   return "bg-caution/15 text-caution";
+}
+
+const DOME_ROOFS = new Set(["dome", "closed"]);
+
+/**
+ * nflverse's schedule only carries actual recorded conditions, not a
+ * pregame forecast — wind/temp are frequently blank for games that
+ * haven't happened yet. Roof type is a fixed stadium property, so it's
+ * always knowable in advance regardless of how far out the game is.
+ */
+function formatWeather(weather: GameWeather | null): string {
+  if (!weather) return "Not yet available";
+  if (DOME_ROOFS.has(weather.roof)) return "Dome";
+  if (weather.temp == null && weather.wind == null) return "Forecast not yet available";
+  const parts: string[] = [];
+  if (weather.temp != null) parts.push(`${weather.temp}°F`);
+  if (weather.wind != null) parts.push(`${weather.wind} mph wind`);
+  return parts.join(" · ");
 }
 
 function initials(name: string) {
@@ -165,6 +184,22 @@ export function ComparisonResult({ result, contextNote, scoringFormat }: Compari
                     </dt>
                     <dd className="font-rounded text-[15px] font-semibold tabular-nums">
                       #{player.matchupContext.rank} of {player.matchupContext.teamCount}
+                    </dd>
+                  </div>
+                )}
+                {player.nextOpponent && (
+                  <div className="flex justify-between border-t border-foreground/[0.07] pt-2.5">
+                    <dt className="text-[13px] text-foreground/50">Next opponent</dt>
+                    <dd className="font-rounded text-[15px] font-semibold tabular-nums">
+                      {player.nextOpponent.team} · Wk {player.nextOpponent.week}
+                    </dd>
+                  </div>
+                )}
+                {player.nextOpponent && (
+                  <div className="flex justify-between border-t border-foreground/[0.07] pt-2.5">
+                    <dt className="text-[13px] text-foreground/50">Weather</dt>
+                    <dd className="font-rounded text-[15px] font-semibold tabular-nums">
+                      {formatWeather(player.nextGameWeather)}
                     </dd>
                   </div>
                 )}

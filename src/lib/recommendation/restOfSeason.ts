@@ -10,11 +10,11 @@ import type { PlayerScoreBreakdown } from "./types";
 const SDIO_TO_NFLVERSE_TEAM: Record<string, string> = { LAR: "LA" };
 const NFLVERSE_TO_SDIO_TEAM: Record<string, string> = { LA: "LAR" };
 
-function toNflverseTeam(sdioTeam: string): string {
+export function toNflverseTeam(sdioTeam: string): string {
   return SDIO_TO_NFLVERSE_TEAM[sdioTeam] ?? sdioTeam;
 }
 
-function toSdioTeam(nflverseTeam: string): string {
+export function toSdioTeam(nflverseTeam: string): string {
   return NFLVERSE_TO_SDIO_TEAM[nflverseTeam] ?? nflverseTeam;
 }
 

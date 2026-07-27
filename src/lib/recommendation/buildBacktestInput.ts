@@ -46,6 +46,8 @@ export function buildBacktestComparisonInput(
       byeWeek: null,
       isOnByeThisWeek: false,
       matchupContext: null,
+      nextOpponent: null,
+      nextGameWeather: null,
       nflverse: EMPTY_NFLVERSE_SIGNALS,
       hasLimitedTeammate: false,
     };
@@ -114,6 +116,8 @@ export function buildBacktestComparisonInput(
     byeWeek,
     isOnByeThisWeek,
     matchupContext,
+    nextOpponent: null,
+    nextGameWeather: null,
     nflverse,
     hasLimitedTeammate,
   };

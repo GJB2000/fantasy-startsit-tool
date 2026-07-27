@@ -117,6 +117,36 @@ picked up for start/sit itself: the schedule-reading and team-code-
 mapping pieces are already built and proven, just not yet pointed at
 `buildInput.ts`'s matchup-context construction.
 
+**Update: next opponent + weather now shown on the start/sit player
+cards — display only, still NOT wired into scoring.** Deliberately a
+narrower slice of the candidate improvement above: `ComparisonResult.tsx`
+now shows each player's next scheduled opponent and that game's weather
+(or "Dome" for a fixed-roof stadium), reusing the exact schedule
+infrastructure the Trade Analyzer already proved out
+(`getRemainingOpponentsByTeam`/`getGameWeatherByTeamWeek`, plus
+`restOfSeason.ts`'s `toNflverseTeam`/`toSdioTeam` team-code mapping, now
+exported for reuse) — but `finalScore`/`matchupModifier` are completely
+untouched; the recommendation engine still scores off the *last
+completed* opponent exactly as before. `PlayerComparisonInput`/
+`PlayerScoreBreakdown` gained inert `nextOpponent`/`nextGameWeather`
+fields (see Conventions) that flow through `buildInput.ts` →
+`scorePlayer` → the API response → the component, never touching
+`finalScore`. One real, verified-live limitation this surfaced: nflverse's
+`schedules` release does NOT carry a pregame weather *forecast* — `wind`/
+`temp` are blank for any game that hasn't been played yet (confirmed live:
+even played-months-out 2026 week-1 games show blank wind/temp), only
+becoming populated with actual recorded conditions at/after kickoff. Roof
+type (dome/outdoors/closed/open) IS known arbitrarily far in advance,
+since it's a fixed stadium property, so "Dome" always displays correctly;
+for outdoor games the card honestly shows "Forecast not yet available"
+rather than fabricating a number — verified live for both cases (a dome
+team and a normal-stadium team, months before their next games). This
+means the *actually* candidate-improvement-worthy backtest-validated
+signal from item 39 (the WR-only `wind` baseline) still can't be
+live-wired even now that next-opponent lookup exists for display — it
+would need real conditions, not a forecast, and those simply aren't
+knowable that far ahead from this data source.
+
 ## Data Source Notes
 - Football data comes from the SportsDataIO NFL API (Discovery Lab /
   free tier). API key is stored as the `SPORTSDATA_API_KEY` environment
@@ -2926,6 +2956,21 @@ doc entry. Nothing below is started or fixed yet:
   share one formula; `sumProjectedPoints`/`projectRestOfSeason` take a
   player's score with that one matchup term stripped out and re-sum it
   against every remaining opponent on their real schedule.
+  `toNflverseTeam`/`toSdioTeam` (the LAR/LA team-code mapping) are
+  exported from this file rather than kept private, since `buildInput.ts`
+  now needs the same translation for the next-opponent display feature
+  below — one source of truth for that mapping rather than a second copy.
+  `PlayerComparisonInput`/`PlayerScoreBreakdown` also carry
+  `nextOpponent`/`nextGameWeather` (`types.ts`) — a player's next
+  scheduled opponent and that game's weather (`GameWeather`, from
+  `nflverse/schedules.ts`), populated in live mode only
+  (`buildInput.ts`, via the same `getRemainingOpponentsByTeam`/
+  `getGameWeatherByTeamWeek` the Trade Analyzer already uses, fetched
+  once per `/api/compare` request with the same season-rollforward
+  fallback `/api/trade` uses) and always `null` in backtest mode
+  (`buildBacktestInput.ts`). Purely inert display data for
+  `ComparisonResult.tsx` — never read by `scorePlayer`/`comparePlayers`,
+  so it has zero effect on `finalScore` or any backtest number.
 - `src/lib/trade/` — `evaluateTrade.ts` (item 47), the Trade Analyzer's
   evaluation layer. Deliberately thin: reuses `scorePlayer()`'s
   `finalScore` as a standalone per-player value (see item 47's

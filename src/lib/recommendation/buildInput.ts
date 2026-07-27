@@ -16,8 +16,10 @@ import { getPlayerSeasonStat } from "@/lib/sportsdata/seasonStats";
 import { isSkillPosition } from "@/lib/sportsdata/types";
 import { getRecentGameStatsForPlayer } from "@/lib/sportsdata/weeklyStats";
 import type { SeasonContext } from "@/lib/sportsdata/timeframes";
+import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
 import type { NflversePlayerWeekTable } from "./nflverseLive";
-import { EMPTY_NFLVERSE_SIGNALS, type PlayerComparisonInput } from "./types";
+import { toNflverseTeam, toSdioTeam } from "./restOfSeason";
+import { EMPTY_NFLVERSE_SIGNALS, type NextOpponent, type PlayerComparisonInput } from "./types";
 
 const LIMITED_INJURY_STATUSES = new Set(["Out", "Doubtful"]);
 
@@ -25,7 +27,9 @@ export async function buildComparisonInput(
   playerId: number,
   context: SeasonContext,
   positionDefenseTable: PositionDefenseTable,
-  nflversePlayerWeekTable: NflversePlayerWeekTable
+  nflversePlayerWeekTable: NflversePlayerWeekTable,
+  remainingOpponentsByTeam: Map<string, RemainingGame[]> = new Map(),
+  teamWeatherByTeamWeek: Map<string, GameWeather> = new Map()
 ): Promise<PlayerComparisonInput> {
   const player = await getActivePlayerById(playerId).catch(() => null);
 
@@ -41,6 +45,8 @@ export async function buildComparisonInput(
       byeWeek: null,
       isOnByeThisWeek: false,
       matchupContext: null,
+      nextOpponent: null,
+      nextGameWeather: null,
       nflverse: EMPTY_NFLVERSE_SIGNALS,
       hasLimitedTeammate: false,
     };
@@ -74,6 +80,22 @@ export async function buildComparisonInput(
     matchupContext = getMatchupContext(positionDefenseTable, lastGame.Opponent, player.Position);
   }
 
+  // Forward-looking counterpart to matchupContext above — display-only (see
+  // NextOpponent/GameWeather in types.ts), not fed into finalScore. nflverse
+  // team codes throughout remainingOpponentsByTeam/teamWeatherByTeamWeek, so
+  // translate both directions around the lookup (toNflverseTeam/toSdioTeam
+  // handle the one known mismatch, LAR/LA — see restOfSeason.ts).
+  let nextOpponent: NextOpponent | null = null;
+  let nextGameWeather: GameWeather | null = null;
+  if (player.Team) {
+    const nflverseTeam = toNflverseTeam(player.Team);
+    const nextGame = remainingOpponentsByTeam.get(nflverseTeam)?.[0] ?? null;
+    if (nextGame) {
+      nextOpponent = { team: toSdioTeam(nextGame.opponent), week: nextGame.week };
+      nextGameWeather = teamWeatherByTeamWeek.get(`${nflverseTeam}/${nextGame.week}`) ?? null;
+    }
+  }
+
   const byWeek = nflversePlayerWeekTable.get(playerId);
   const recentNflverseStats = byWeek
     ? context.recentWeeks.map((week) => byWeek.get(week)).filter((stat): stat is NonNullable<typeof stat> => stat != null)
@@ -99,6 +121,8 @@ export async function buildComparisonInput(
     byeWeek,
     isOnByeThisWeek,
     matchupContext,
+    nextOpponent,
+    nextGameWeather,
     nflverse,
     hasLimitedTeammate,
   };

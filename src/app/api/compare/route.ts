@@ -4,6 +4,7 @@ import { parseScoringFormat } from "@/lib/sportsdata/types";
 import { buildComparisonInput } from "@/lib/recommendation/buildInput";
 import { comparePlayers } from "@/lib/recommendation/engine";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
+import { getGameWeatherByTeamWeek, getRemainingOpponentsByTeam, type RemainingGame } from "@/lib/nflverse/schedules";
 
 // A cold nflverse cache means aggregating the full play-by-play release
 // for red-zone touches (~5-7s) on top of everything else this route
@@ -28,13 +29,39 @@ export async function GET(request: Request) {
 
   try {
     const context = await getSeasonContext();
-    const [positionDefenseTable, nflversePlayerWeekTable] = await Promise.all([
+    const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt] = await Promise.all([
       getPositionDefenseTable(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
       getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
+      getRemainingOpponentsByTeam(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
+        () => new Map<string, RemainingGame[]>()
+      ),
     ]);
 
+    // Same season-rollforward pattern as /api/trade — try continuing the
+    // season lastCompletedWeek belongs to first; if it has no games left,
+    // roll forward to the next season's full schedule. Deliberately NOT
+    // keyed off `isInSeason` — see trade/route.ts's comment for why.
+    let scheduleSeason = context.lastCompletedSeason;
+    let remainingOpponentsByTeam = firstAttempt;
+    if (remainingOpponentsByTeam.size === 0) {
+      scheduleSeason = context.lastCompletedSeason + 1;
+      remainingOpponentsByTeam = await getRemainingOpponentsByTeam(scheduleSeason, 1).catch(
+        () => new Map<string, RemainingGame[]>()
+      );
+    }
+    const teamWeatherByTeamWeek = await getGameWeatherByTeamWeek(scheduleSeason).catch(() => new Map());
+
     const inputs = await Promise.all(
-      ids.map((id) => buildComparisonInput(id, context, positionDefenseTable, nflversePlayerWeekTable))
+      ids.map((id) =>
+        buildComparisonInput(
+          id,
+          context,
+          positionDefenseTable,
+          nflversePlayerWeekTable,
+          remainingOpponentsByTeam,
+          teamWeatherByTeamWeek
+        )
+      )
     );
 
     const result = comparePlayers(inputs, format);

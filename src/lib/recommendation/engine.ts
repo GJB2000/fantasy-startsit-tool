@@ -345,6 +345,8 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
     injuryStatus,
     isOnByeThisWeek: input.isOnByeThisWeek,
     matchupContext: input.matchupContext,
+    nextOpponent: input.nextOpponent,
+    nextGameWeather: input.nextGameWeather,
     dataQuality,
     notes,
   };

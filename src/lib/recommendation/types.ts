@@ -1,5 +1,12 @@
 import type { Player, PlayerGameStat, PlayerSeasonStat } from "@/lib/sportsdata/types";
 import type { MatchupContext } from "@/lib/sportsdata/positionDefense";
+import type { GameWeather } from "@/lib/nflverse/schedules";
+
+/** A player's next scheduled opponent — SportsDataIO team code, for display consistency with everything else in this app. */
+export interface NextOpponent {
+  team: string;
+  week: number;
+}
 
 export type DataQuality = "full" | "limited" | "insufficient";
 
@@ -49,6 +56,10 @@ export interface PlayerComparisonInput {
   byeWeek: number | null;
   isOnByeThisWeek: boolean;
   matchupContext: MatchupContext | null;
+  /** Forward-looking, live-mode-only (see buildInput.ts) — the schedule/weather counterpart to matchupContext's backward-looking last opponent. Always null in backtest mode. */
+  nextOpponent: NextOpponent | null;
+  /** Weather for the nextOpponent game, when known — nflverse's schedule only carries actual recorded conditions (not a pregame forecast), so wind/temp are frequently null for games that haven't happened yet; roof type (e.g. a dome) is known in advance regardless, since it's a fixed stadium property. */
+  nextGameWeather: GameWeather | null;
   nflverse: NflverseSignals;
   /**
    * Whether a same-position teammate is currently listed Out/Doubtful
@@ -97,6 +108,8 @@ export interface PlayerScoreBreakdown {
   injuryStatus: string | null;
   isOnByeThisWeek: boolean;
   matchupContext: MatchupContext | null;
+  nextOpponent: NextOpponent | null;
+  nextGameWeather: GameWeather | null;
   dataQuality: DataQuality;
   notes: string[];
 }
