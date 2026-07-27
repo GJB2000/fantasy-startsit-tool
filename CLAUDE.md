@@ -2679,10 +2679,66 @@ single-season numbers for those specific constants.
       than one modifier, since those seem to be more sensitive to
       pipeline-specific data differences than the individual-weight
       tuning this document has mostly done.
+54. **Tested exponentially-weighted recent performance (most recent game
+    weighted higher) as a standalone replacement for the engine's flat
+    recent-N-game average** — same underlying data
+    (`recentGamesByPlayer`'s last `RECENT_WEEK_COUNT` played games), just
+    reweighted. Tested standalone (pick whoever has the higher weighted
+    average, not blended with season average/volume/matchup the way the
+    real engine actually uses `recentPprAvg`), pooled 2022-2025
+    nflverse-only sample, decay parameterized so `decay=1.0` reproduces
+    the flat average exactly (the control case) and `decay<1.0` tilts
+    weight toward the most recent game.
+    - **Caught a second instance of the same bug class as item 53**: the
+      first pass's diagnostic route cached backtest cases in a single
+      format-blind variable rather than a `Map` keyed by format — so
+      after the first (PPR) request, every later Half-PPR/Standard
+      request silently reused the PPR-paired cases while scoring them in
+      the wrong format, identical in kind to item 53's pairing bug, just
+      a caching variant of it rather than a hardcoded-format variant.
+      Caught by re-running with a properly format-keyed cache and finding
+      Half-PPR's numbers changed substantially (54.0% vs. the buggy
+      50.9%) — the corrected numbers below superseded the originally
+      (buggy) reported ones for Half-PPR and Standard; PPR was never
+      affected (its own by-season checks used an inline per-request walk
+      that didn't go through the buggy shared cache).
+    - **Standalone accuracy is weak throughout** (50-55%, near chance) —
+      expected, since this is testing the raw recent-average signal in
+      total isolation, not blended with season average/volume the way
+      the real engine uses it; consistent with item 2's original finding
+      that raw points alone are close to a coin flip.
+    - **The corrected per-format picture has no unifying story**: PPR
+      wants mild recency weighting (`decay≈0.9`, +0.6pp overall, 3/4
+      seasons improve). Half-PPR wants NO weighting at all — flat
+      (`decay=1.0`) is the genuine best point, with any weighting making
+      it monotonically worse; by season, 3 of 4 are roughly flat but 2025
+      swings hard against weighting (-3.8pp), the exact kind of
+      single-season sensitivity this document has repeatedly flagged as
+      a reason not to trust a pooled number blindly. Standard wants
+      dramatically MORE aggressive weighting (`decay≈0.15-0.2`, meaning
+      the most recent 1-2 games nearly dominate), a real plateau across
+      that whole low-decay range (+2.3pp overall at peak, 3/4 seasons
+      improve, though 2022 declines by -2.8pp).
+    - **Not integrated — dropped, per user request, rather than pursued
+      further.** Three formats each wanting a qualitatively different
+      weighting scheme, with no plausible unifying mechanism found or
+      proposed, reads as more consistent with noise than a genuine
+      format-dependent signal — especially layered on top of how weak
+      the standalone signal is to begin with. **Flagged as worth
+      revisiting, not closed as a dead end**: the real, more relevant
+      test was never run — testing this INSIDE `blendedScore` (i.e.
+      reweighting the recent-vs-season blend the way the engine actually
+      uses `recentPprAvg`, rather than judging the raw recent-average
+      signal in total isolation) might tell a cleaner story, since
+      standalone accuracy this low doesn't say much about what happens
+      once it's blended with season average and run through the rest of
+      the pipeline. Temporary diagnostic route deleted after recording
+      these numbers, same precedent as every other one-off analysis in
+      this document.
 
-### Open items (as of item 53 — pick up here)
-Everything through aff6a84 ("Give Standard format its own volume and TE
-snap-share blend weights") is committed and pushed (`git log`),
+### Open items (as of item 54 — pick up here)
+Everything through 39afb85 ("Add a TE-only ensemble stage blending
+finalScore with recentVolume") is committed and pushed (`git log`),
 including item 46's real, permanent code (`nflverse/depthCharts.ts`, the
 `depthChartByPlayerIdWeek` plumbing, and the new `pickByDepthChart`
 baseline), items 47-49's real, permanent code (`lib/trade/`,
@@ -2692,12 +2748,11 @@ real, permanent code (`getFantasyPoints`/`ScoringFormat`/
 `parseScoringFormat` in `sportsdata/types.ts`, the per-format
 `config.ts` constants, `ScoringFormatToggle.tsx`, `useScoringFormat.ts`),
 item 51's format-threading work (`baselines.ts`, `runBacktest.ts`,
-`runBacktestNflverseOnly.ts`, and the three `*-nflverse*` routes), and
-item 52's per-format `VOLUME_BLEND_WEIGHT`/`SNAP_SHARE_BLEND_WEIGHT_TE`.
-Item 53's ensemble stage (`config.ts`'s `ENSEMBLE_VOLUME_BLEND_RATIO`,
-`engine.ts`'s final blend step) is done and verified but **not yet
-committed** — next step after this doc update is committing and pushing
-it. Nothing below is started or fixed yet:
+`runBacktestNflverseOnly.ts`, and the three `*-nflverse*` routes), item
+52's per-format `VOLUME_BLEND_WEIGHT`/`SNAP_SHARE_BLEND_WEIGHT_TE`, and
+item 53's `ENSEMBLE_VOLUME_BLEND_RATIO`. Item 54 (EWMA recent-average)
+was investigated and explicitly dropped — no code was shipped, only this
+doc entry. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -2762,6 +2817,17 @@ it. Nothing below is started or fixed yet:
    tension that originally justified 0.3 in item 30. Worth a dedicated
    pass: is this a real generalization gain, or an artifact of grading
    2025 through the nflverse-only pipeline instead of the primary one?
+8. **Exponentially-weighted recent performance, tested and dropped
+   standalone in item 54** — the real, more relevant test was never run.
+   Item 54 only judged the raw recent-average signal in total isolation
+   (pick whoever has the higher weighted average, nothing else), which
+   found no consistent per-format story and weak standalone accuracy
+   throughout. Worth revisiting by testing it INSIDE `blendedScore`
+   instead — reweighting the actual recent-vs-season blend the way
+   `scorePlayer` uses `recentPprAvg`, rather than judging the reweighted
+   average as a standalone signal — since standalone accuracy this low
+   doesn't say much about what happens once it's blended with season
+   average and run through the rest of the pipeline.
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
