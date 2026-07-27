@@ -3124,7 +3124,12 @@ doc entry. Nothing below is started or fixed yet:
 - `src/app/api/players`, `src/app/api/compare`, `src/app/api/trade`
   (item 47 — both `compare` and `trade` also accept an optional
   `scoringFormat` query param, `ppr`/`half_ppr`/`standard`, via
-  `parseScoringFormat()`, item 50), `src/app/api/backtest/pair`,
+  `parseScoringFormat()`, item 50). `compare` also fetches
+  `getRemainingOpponentsByTeam`/`getGameWeatherByTeamWeek` (the
+  next-opponent/weather display feature — see Overview and Conventions'
+  `buildInput.ts` entry) using the identical season-rollforward pattern
+  `trade` already established, rather than a second copy of that logic.
+  `src/app/api/backtest/pair`,
   `src/app/api/backtest/broad` (also `scoringFormat`-aware, item 50),
   `src/app/api/backtest/broad-nflverse`,
   `src/app/api/backtest/pair-nflverse`,
@@ -3137,7 +3142,9 @@ doc entry. Nothing below is started or fixed yet:
   raw upstream payloads, never leak the API key).
 - `src/components/` — `NavBar.tsx` (shared sticky nav, all pages),
   `StartSitTool.tsx`/`PlayerSearchInput.tsx`/`ComparisonResult.tsx` (live
-  start/sit mode), `TradeAnalyzer.tsx`/`TradeResult.tsx` (live Trade
+  start/sit mode — `ComparisonResult.tsx`'s player cards also show each
+  player's next opponent/weather, display-only; see Overview and the
+  `buildInput.ts` Conventions entry), `TradeAnalyzer.tsx`/`TradeResult.tsx` (live Trade
   Analyzer mode, at `/trade`, item 47 — `TradeAnalyzer.tsx` reuses
   `PlayerSearchInput.tsx` for both sides of a trade), `ScoringFormatToggle.tsx`
   (item 50 — the PPR/Half-PPR/Standard segmented control, shared by
