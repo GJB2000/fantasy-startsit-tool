@@ -2714,15 +2714,55 @@ single-season numbers for those specific constants.
       harmful, just below this season's pick-flip threshold). Verified
       live end-to-end: a real Kelce vs. Andrews Half-PPR comparison
       rendered correctly, no console errors.
-    - **Process note for future signal-hunting**: this is the first
-      candidate in this whole document that passed pooled multi-season
-      validation cleanly but still needed a THIRD check — direct
-      confirmation against the primary pipeline — before it was safe to
-      trust. Worth keeping as standard practice for any future signal
-      that operates on the full score (an ensemble/shrinkage step) rather
-      than one modifier, since those seem to be more sensitive to
-      pipeline-specific data differences than the individual-weight
-      tuning this document has mostly done.
+    - **The three positions failed (or passed) for three genuinely
+      different reasons, not one "ensemble doesn't work" story — worth
+      separating explicitly:**
+      - **RB: not a generalization gap at all — a bug.** The apparent
+        RB gain existed only in the buggy v1 harness (PPR-paired,
+        wrong-format-scored). Once re-paired correctly *within the same
+        pooled nflverse-only sample*, RB showed no signal in either
+        non-PPR format. It never reached the primary-pipeline test stage
+        with anything real to test.
+      - **WR: a real, new failure mode — cross-pipeline generalization
+        failure, not overfitting.** WR passed every check *within* the
+        pooled nflverse-only sample (correctly re-paired, positive
+        pooled gain, broadly consistent by-season). But that validation
+        happened entirely on nflverse-only data (synthetic PlayerIDs, its
+        own player-match/coverage quirks); tested against the structurally
+        different primary SportsDataIO pipeline, every ratio large enough
+        to move it at all moved it the WRONG way, consistently, across
+        three separate format/ratio tests. This is distinct from the
+        joint-logistic-regression rejection (items 38/42), which was
+        classic overfitting — in-sample fit vs. cross-validated/
+        leave-one-season-out fit, measured entirely *within one dataset/
+        pipeline*. WR's ensemble failure is not "fit training noise, fails
+        on held-out data from the same source" — it's "validated cleanly
+        on one pipeline's data, doesn't transfer to a different pipeline's
+        data." A sensitivity to exact input values and data-source
+        differences, not to sample size or model capacity.
+      - **TE: passed the hardest bar in the document so far.** Positive in
+        the pooled multi-season nflverse-only sample AND never regressed
+        against the primary pipeline (either a real small gain at a
+        nearby ratio, or a confirmed-harmless measured-zero effect at the
+        shipped ratio). The only one of the three that cleared all three
+        checks.
+    - **Standing rule going forward, not just a note on this item**: any
+      future candidate signal that operates on the WHOLE `finalScore`
+      (an ensemble/shrinkage/blend-toward-a-simple-baseline step, as
+      opposed to one additive modifier feeding into it) must clear THREE
+      checks before shipping, not the usual two:
+      1. Pooled multi-season accuracy (2022-2025, nflverse-only).
+      2. By-season breakdown showing no single season carrying the whole
+         result.
+      3. Direct re-test against the primary SportsDataIO pipeline, at the
+         actual ratio being considered — not assumed from steps 1-2.
+      This third check is the one every other individually-tuned weight
+      in this document has been able to skip (single-modifier weights
+      tuned on the pooled nflverse-only sample have transferred fine to
+      the primary pipeline every time they were checked). Whole-score
+      signals are not safe to assume the same about, per WR's result
+      above — they appear more sensitive to exactly which pipeline
+      produced the underlying numbers.
 54. **Tested exponentially-weighted recent performance (most recent game
     weighted higher) as a standalone replacement for the engine's flat
     recent-N-game average** — same underlying data
