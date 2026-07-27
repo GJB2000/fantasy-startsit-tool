@@ -2954,8 +2954,8 @@ single-season numbers for those specific constants.
       from item 56 held for this signal too.
 
 ### Open items (as of item 57 — pick up here)
-Everything through d878994 ("Wire real nflverse injury status into
-backtest recommendations") is committed and pushed (`git log`), including
+Everything through e2943cb ("Add weekly roster status (RES/IR) as a
+backtest injury signal") is committed and pushed (`git log`), including
 item 46's real, permanent code (`nflverse/depthCharts.ts`, the
 `depthChartByPlayerIdWeek` plumbing, and the new `pickByDepthChart`
 baseline), items 47-49's real, permanent code (`lib/trade/`,
@@ -2968,12 +2968,14 @@ item 51's format-threading work (`baselines.ts`, `runBacktest.ts`,
 `runBacktestNflverseOnly.ts`, and the three `*-nflverse*` routes), item
 52's per-format `VOLUME_BLEND_WEIGHT`/`SNAP_SHARE_BLEND_WEIGHT_TE`, item
 53's `ENSEMBLE_VOLUME_BLEND_RATIO`, the next-opponent/weather display
-feature (see Overview), and item 56's weekly-injury-report fix. Items 54
-(EWMA recent-average) and 55 (FantasyPros ECR) were both investigated and
+feature (see Overview), item 56's weekly-injury-report fix, and item 57's
+`nflverse/rosters.ts`/`rosterStatus` roster-status fix. Items 54 (EWMA
+recent-average) and 55 (FantasyPros ECR) were both investigated and
 explicitly dropped — no code was shipped for either, only these doc
-entries. Item 57's `nflverse/rosters.ts`/`rosterStatus` code is done and
-verified but **not yet committed** — next step after this doc update is
-committing and pushing it. Nothing below is started or fixed yet:
+entries. Both item 56 and item 57 were confirmed to have zero effect on
+the live tool (`buildInput.ts`/`nflverseLive.ts` untouched by either —
+the live tool already has real-time injury/roster status straight from
+SportsDataIO). Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
