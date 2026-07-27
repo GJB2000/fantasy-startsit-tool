@@ -52,7 +52,19 @@ Tuning History" items 24/36/39. A second live tool, the Trade Analyzer
 of a trade and get a graded verdict (good/fair/bad) with reasoning,
 built on a rest-of-season value projection rather than a single game
 (see "Backtesting & Tuning History" items 47-49 and the Trade Analyzer
-paragraph below). The UI went through two visual passes: a first
+paragraph below). A third live tool, the Waiver Wire recommender
+(`/waivers`), shipped after that — surfaces players whose recent
+opportunity (volume) is running ahead of their recent production, by
+position, with a plain-English reason and a suggested same-position
+drop candidate; deliberately built on the engine's already-validated
+absolute-opportunity signal rather than a trend/delta framing, after a
+dedicated backtest of the trend hypothesis came back negative (see
+"Backtesting & Tuning History" item 58). Its roster input started as
+manual one-by-one marking, then gained real Sleeper league import as
+the primary path after that turned out to be the actual pain point —
+connect once, one-click sync from then on — with manual marking kept
+only for one-off additions (see item 59). The UI went through two
+visual passes: a first
 cohesive pass (indigo accent, proper nav, consistent card/badge
 styling), then a full Apple-inspired redesign that replaced it —
 system-font typography (`-apple-system`/`ui-rounded`, no webfont),
@@ -242,6 +254,19 @@ knowable that far ahead from this data source.
   receptions, matching exactly). This is what makes half-PPR scoring a
   free derivation (`getFantasyPoints()` in `sportsdata/types.ts`) rather
   than needing a new data source or endpoint — see item 50.
+- **Sleeper's API is free, fully public, and needs no auth or API
+  key** — confirmed live (item 59): a nonexistent username returns HTTP
+  200 with a JSON `null` body, not a 404, so "not found" has to be
+  detected from the parsed body, not the status code. Like nflverse and
+  unlike SportsDataIO, Sleeper has no ID shared with this app's
+  SportsDataIO-based player space, so importing a roster needs its own
+  name-based join (`lib/sleeper/resolveRoster.ts`) — reuses nflverse/
+  playerMatch.ts's existing normalization rather than a third scheme.
+  The one large, expensive call (`/players/nfl`, ~12k entries) is a
+  dump of Sleeper's entire player database with no per-league
+  filtering; Sleeper's own docs ask callers not to hit it more than
+  once a day, so it's cached 24h in-process, same TTL discipline this
+  app already uses for nflverse's heavy CSV releases.
 
 ## Recommendation Logic Philosophy
 This is the most important section — the "brain" of the tool.
@@ -2993,7 +3018,312 @@ single-season numbers for those specific constants.
       in every case, confirming the zero-effect-on-Broad-mode prediction
       from item 56 held for this signal too.
 
-### Open items (as of item 57 — pick up here)
+58. **Back-tested the core hypothesis behind a proposed Waiver Wire tool
+    BEFORE writing any feature code — "does rising opportunity predict
+    next-week performance better than rising points?" — and the answer
+    was no, on both the first test and a real follow-up sweep.** The
+    original pitch was trajectory-based: surface players whose recent
+    opportunity (volume/share) had risen relative to their own baseline,
+    even before their points caught up — the opposite framing from
+    Start/Sit's absolute-value comparison. Same "prove it before building
+    it" discipline as every other candidate signal in this document.
+    - **Test design, deliberately NOT reusing `pairing.ts`'s adjacent-rank
+      pool**: `BROAD_MODE_POOL_SIZE` caps the pool at each position's
+      "startable" top tier (top-12 QB, top-24 RB/WR, top-12 TE) — exactly
+      the players a waiver-wire tool has no reason to recommend. Built an
+      uncapped pool instead (any player who played the target week with
+      ≥6 prior played games), still paired adjacent-rank by season-to-date
+      average through the prior week (same basis `pairing.ts` already
+      uses, just without the cap) so pairs stay comparable in current
+      role without leaking the trend signal itself into pair selection.
+      `opportunityTrend` = Δ in `getVolumeStat` (recent 3 played games vs.
+      the 3 before that); `pointsTrend` = Δ in PPR points, the same
+      windows. Pooled 2022-2025, nflverse-only pipeline (temporary
+      diagnostic route, deleted after recording numbers — same precedent
+      as every other one-off analysis in this document).
+    - **First result: statistically indistinguishable from each other,
+      and both clearly weaker than just using absolute level.** Pooled
+      (n=5283/5392): `opportunityTrend` 52.3%, `pointsTrend` 52.2% — a
+      0.08pp gap, well within noise. A sanity control graded on the same
+      pool/pairing — `absoluteVolumeLevel` (recent volume, no trend at
+      all, the same signal already shipped as the `recentVolume`
+      baseline) — came in at **54.9%**, confirming the harness was sound
+      (it landed right where `recentVolume`'s already-documented numbers
+      would predict) while showing trend adds nothing: level alone beats
+      both trend variants by a real ~2.6pp. By season, `opportunityTrend`
+      edges `pointsTrend` in 3 of 4 years (2023/2024/2025) but only by
+      ~1pp each; 2022 goes the other way by 2.7pp — no decisive pattern.
+    - **Followed up with a real 6-combo sweep before accepting the
+      rejection** — window size (2/3/4 played games) × baseline
+      definition (trend vs. the immediately-prior window, or trend vs.
+      season-to-date average before the recent window), same "don't judge
+      on one untuned point" discipline as every weight sweep in this
+      document:
+
+      | combo | `opportunityTrend` | `pointsTrend` |
+      |---|---|---|
+      | 2-game, vs. prior window | 51.8% | 51.5% |
+      | 2-game, vs. season avg | 53.4% | 54.1% |
+      | 3-game, vs. prior window | 52.3% | 52.2% |
+      | 3-game, vs. season avg | 53.8% | 53.0% |
+      | 4-game, vs. prior window | 54.4% | 54.1% |
+      | 4-game, vs. season avg | 53.9% | 53.2% |
+
+      The single biggest number (4-game-vs-prior-window) doesn't hold up
+      decomposed: 2024 alone is +3.6pp (58.5% vs. 54.9%) while 2023 goes
+      the other way (53.0% vs. 55.3%) and TE loses outright (50.3% vs.
+      52.7%) — the same isolated-peak shape rejected elsewhere in this
+      document (items 9, 20, 38). The one combo where `opportunityTrend`
+      beat `pointsTrend` at every position AND every season
+      (3-game-vs-season-average) still only won by 0.2-2.5pp each time,
+      and its pooled number (53.8%) still trailed the very first
+      control (absolute level, 54.9%). **No trend definition tested
+      cleanly beat absolute recent volume level.**
+    - **Decision: reframed the whole feature around absolute
+      opportunity, not trend** — surfacing players whose CURRENT recent
+      volume is high relative to their CURRENT recent points, not
+      whether either one is rising. This is a ranking composition of an
+      already-validated primitive (recent volume beats recent points as
+      a forward signal — the strongest standalone predictor found across
+      this whole app's backtesting history, items 6-13), not an
+      independent predictive claim requiring its own separate backtest —
+      flagged as such rather than presented as freshly validated. See
+      the Waiver Wire tool description below and Conventions'
+      `src/lib/waivers/` entry.
+    - **Shipped as a third live tool, `/waivers`**: `rankCandidates.ts`
+      does a bulk, whole-active-player-pool scan (deliberately NOT
+      running the full `buildComparisonInput`/`scorePlayer` pipeline
+      per player — that's reserved for the handful of candidates
+      actually surfaced) ranking each position by the gap between a
+      player's recent-volume rank and recent-points rank (self-relative
+      floor: only ranks within the top half of the position's own
+      recent-volume distribution, not a guessed absolute cutoff).
+      `buildWaiverReport.ts` then runs the real engine
+      (`buildComparisonInput`/`scorePlayer`) for just those top
+      candidates, reusing `PlayerScoreBreakdown.notes` verbatim (same
+      "one source of truth for reasoning text" as `ComparisonResult.tsx`/
+      `TradeResult.tsx`) rather than inventing new copy — one exception:
+      `scorePlayer`'s own WR-only handcuff note is filtered out and
+      replaced with a plain roster-context line, since that note always
+      reads "worth roughly 0.0 extra points" (`TEAMMATE_OUT_BUMP_WEIGHT_
+      WR` is zeroed, item 35) and read as a direct contradiction sitting
+      under this feature's own "may be opening up extra opportunity"
+      line — caught live, in the browser, not assumed. `suggestDrop.ts`
+      reuses the Trade Analyzer's `evaluateTrade`/`projectRestOfSeason`/
+      `toTradePlayerResult` verbatim — a same-position "drop X, add Y" is
+      literally a 1-for-1 trade evaluation, not a new comparison
+      mechanism. Roster marking (`useRosteredPlayers.ts`) is
+      localStorage-only, mirroring `useScoringFormat.ts` — no real league
+      integration, consistent with this app's "no persistence" scope.
+    - **Verified live end-to-end**, not just the backtest: ran a real
+      `/api/waivers` request with two rostered players (Bijan Robinson,
+      RB; CeeDee Lamb, WR), confirmed real candidates surfaced per
+      position with correct gap labels (e.g. "RB8 by volume" / "RB38 by
+      points"), correct same-position-only drop suggestions (RB pickups
+      suggested dropping Bijan Robinson, WR pickups suggested dropping
+      CeeDee Lamb, TE pickups showed no suggestion since none was
+      rostered there — graceful degradation), the handcuff-note dedup
+      fix rendering cleanly, and the "Already rostered" dismiss button
+      correctly both hiding a card immediately and adding it to the
+      roster list for future runs. No console errors, both light and
+      dark mode.
+
+59. **Reworked the Waiver Wire tool's roster input after real usage
+    feedback: manual one-by-one marking was unrealistic, and re-adding a
+    whole roster every session was the actual complaint** (item 58
+    shipped "mark players as rostered" as the only mechanism). Two
+    fixes, one small and one a real new integration.
+    - **First, a UI bug caught in the same pass**: the "Already rostered"
+      pill on `WaiverResult.tsx`'s candidate cards overflowed past the
+      card's own right edge for longer player names (confirmed visually
+      — Aaron Rodgers' pill sat flush against/past the border while
+      Brady Cook's had normal padding). Root cause: the avatar+name flex
+      wrapper had no `min-w-0` of its own — only its inner text div did —
+      so the browser's automatic flex-item sizing wouldn't let the
+      wrapper shrink below its natural content width to make room for
+      the non-shrinking button, even though the inner truncate was
+      correctly configured. Standard fix: add `min-w-0` to the
+      *outer* wrapper too, not just the div actually doing the
+      truncating. Verified at both desktop (two-column grid) and mobile
+      (375px, single column) widths.
+    - **The real fix: Sleeper league import**, not a bigger manual-entry
+      UI. Confirmed live against Sleeper's real public API (no auth
+      needed — verified directly with `curl` before writing any code,
+      including the "user not found" case, which returns HTTP 200 with a
+      JSON `null` body rather than a 404) that a user's real roster is
+      fully fetchable in three calls: username → user_id
+      (`/user/{username}`), user_id + season → leagues
+      (`/user/{id}/leagues/nfl/{season}`), league → rosters
+      (`/league/{id}/rosters`, `owner_id`/`co_owners` identify which
+      roster is the user's own). A separate, heavily-cached call
+      (`/players/nfl`, ~12k entries) maps Sleeper's own player_ids to
+      real names — Sleeper's docs ask callers not to hit it more than
+      once a day, so it's cached 24h, same TTL discipline as nflverse's
+      heavy CSV releases.
+    - **New `src/lib/sleeper/`**: `client.ts` (same in-process TTL cache
+      pattern as `sportsdata/client.ts`/`nflverse/client.ts`, no API key
+      needed), `api.ts` (`getSleeperUser`/`getSleeperLeagues`/
+      `getSleeperRosters`/`getSleeperPlayers`), `resolveRoster.ts` — a
+      THIRD name-based player join (Sleeper has no ID shared with
+      SportsDataIO either), deliberately reusing nflverse/playerMatch.ts's
+      `normalizePlayerName`/`buildSdioPlayerIdByNormalizedName` rather
+      than a third hand-rolled normalization scheme. Team-defense and
+      kicker roster slots are skipped (confirmed live that Sleeper's
+      player map returns `position: "DEF"` with `full_name: null` for
+      those, e.g. `"CLE"`) — this app has no D/ST or K support. A genuine
+      name-mismatch is returned as an `unmatched` name, not silently
+      dropped, same honesty discipline as every other name-join in this
+      project.
+    - **New routes**: `GET /api/sleeper/leagues?username=X` (queries
+      both the last-completed and upcoming season in parallel, so a
+      not-yet-reset redraft league and an already-rolled-over dynasty
+      league both show up without guessing which one applies) and
+      `GET /api/sleeper/roster?leagueId=X&userId=Y`.
+    - **Frontend**: `SleeperImport.tsx` (username → league picker →
+      import, or once connected, a one-click "Sync roster" /
+      "Change league") plus `useSleeperConnection.ts` (localStorage,
+      mirrors `useScoringFormat.ts`'s pattern — remembers username/
+      league so returning to the page never requires re-entering
+      either). Imported players merge into the existing roster list via
+      the same `addRostered` the manual `PlayerSearchInput` already
+      used (already dedup-safe) — sync never silently removes a
+      manually-added player, only adds. The manual search box stays
+      alongside it for one-off additions Sleeper doesn't have (kept, not
+      replaced).
+    - **Verified live end-to-end against a real, live Sleeper account
+      with real current-season leagues** (found via Sleeper's own
+      documented example league ID, which happens to still resolve to a
+      live user with real 2025/2026 leagues — confirmed independently
+      with `curl` before any UI testing, so the API-shape assumptions
+      going into the code were never guessed): username → 6 real leagues
+      resolved correctly (both 2025 and 2026 shown) → picking a league
+      imported 12 real roster players with **zero unmatched names** →
+      connection and full roster survived a hard page reload → running
+      "Find waiver targets" correctly excluded every rostered player and
+      suggested realistic same-position drops (varied verdicts, "Bad
+      trade" and "Fair trade" both appeared depending on the pair) →
+      "Change league" correctly cleared the connection while leaving the
+      already-imported roster untouched. No console errors, light and
+      dark mode both checked. (One session-specific note: this app's
+      Browser-pane pointer-click tool had a coordinate-dispatch issue
+      unrelated to the app itself during this verification pass — worked
+      around by driving clicks/input via `document.querySelector(...)`
+      + `.click()`/native-setter value assignment instead; every
+      interaction was still exercised through the real rendered DOM and
+      real event handlers, not mocked.)
+
+60. **Fixed a real gap in item 59's Sleeper import, caught by the user
+    immediately after trying it: it only excluded the user's OWN
+    roster, not players already owned by opponents in the same league.**
+    A genuine waiver-wire candidate has to be unrostered LEAGUE-WIDE —
+    recommending a player someone else already drafted isn't a usable
+    pickup, it's just wrong. Sleeper's rosters endpoint already returns
+    every team's roster for a league in one call
+    (`GET /league/{id}/rosters`), not just the requesting user's — the
+    gap was that `resolveRoster.ts` only ever looked at the one roster
+    matching `owner_id`/`co_owners` and discarded the other ~11+ teams'
+    rosters it had already fetched.
+    - **`resolveSleeperRoster` now resolves every roster in the league in
+      one pass** (not the user's roster, then a second separate
+      resolution) and returns both: `players`/`unmatched` (the user's
+      own roster, unchanged) and a new `leagueRosteredPlayerIds: number[]`
+      — the union of every SportsDataIO-resolved player across ALL
+      rosters in the league, including the user's own. Deliberately IDs
+      only, not full `PlayerSummary` objects, since these are never
+      individually displayed — only used to exclude candidates.
+    - **Kept as a genuinely separate concept from `rostered`, not
+      merged into it**, since the two get used for different things:
+      `/api/waivers` unions `rostered` + `leagueRostered` for the
+      ranking-pool exclusion (anyone owned by anyone is not a waiver
+      candidate), but `suggestDrops` still receives `rostered` alone
+      (only the user's OWN players are ever valid drop candidates — you
+      can't drop an opponent's player).
+    - **Threaded through the frontend**: `SleeperConnection` gained
+      `leagueRosteredPlayerIds`, refreshed on every "Sync roster" (not
+      just the initial import) so it can't go stale relative to the
+      real league. Connection state was lifted from `SleeperImport.tsx`
+      into `WaiverTool.tsx` (which now owns the single
+      `useSleeperConnection()` call and passes `connection`/
+      `onConnectionChange` down as props) — two separate hook instances
+      each syncing their own copy of the same localStorage key would not
+      have seen each other's updates within a render, and `WaiverTool.tsx`
+      is the component that actually needs the value to build the
+      `/api/waivers` request. A small transparency line ("Also excluding
+      N players already rostered by other teams in this league") shows
+      whenever a league is connected, so the exclusion isn't silent.
+    - **Verified against the real, live league already used for item
+      59's verification**: the league's real roster count came back at
+      152 total rostered players (12-team league) — confirmed the
+      user's own 12 are a strict subset of that 152 (`resolveTeam` isn't
+      double-counting or diverging between the two code paths), then ran
+      a real `/api/waivers` request with all 152 IDs in `leagueRostered`
+      and confirmed **zero overlap** between the 24 surfaced candidates
+      and the excluded set, checked programmatically against the raw
+      response JSON, not just eyeballed. Verified a real drop suggestion
+      still worked correctly off the user's own (unaffected) roster
+      subset. No console errors, dark mode checked.
+
+61. **Two follow-up polish requests on the Waiver Wire tool, both from
+    direct user feedback after trying items 59-60.**
+    - **"Trade" → "move" in the drop-suggestion panel.** A drop+add
+      isn't a trade between two sides — there's no trade partner, just
+      swapping one roster spot — but `WaiverResult.tsx`'s
+      `DropSuggestion` was rendering `evaluateTrade()`'s own
+      `evaluation.headline` verbatim ("Good/Bad/Fair trade..."), since
+      `suggestDrop.ts` reuses that function's verdict math directly
+      (item 58's whole point). Rather than touch `evaluateTrade()`
+      itself — shared with the real Trade Analyzer, where "trade" is
+      the correct word — added a small `moveHeadline()` in
+      `WaiverResult.tsx` that rebuilds the same phrasing from
+      `evaluation.verdict`/`evaluation.netValue` (both already exposed
+      on `TradeEvaluation`) with "move" wording instead. The verdict
+      *logic* (threshold, good/bad/fair decision) stays single-sourced
+      in `evaluateTrade()`; only this presentation-layer string differs
+      per caller. Verified live: all three variants ("Good/Bad/Fair
+      move...") render correctly, confirmed `evaluateTrade.ts`/
+      `TradeResult.tsx` byte-unchanged (no risk to the real Trade
+      Analyzer, which still correctly says "trade").
+    - **"Already rostered" button: hide once Sleeper-connected, and
+      reposition it so it never competes with the player name.** Two
+      separate problems the user's question surfaced:
+      1. The button always called `addRostered` (the user's OWN
+         roster), but a surfaced candidate excluded by the item 60 fix
+         could be on an OPPONENT's roster — clicking it in that case
+         would have incorrectly added someone else's player to the
+         user's own roster (and made them eligible as a future
+         drop-candidate). Once Sleeper is connected, the league-wide
+         sync already covers the normal case, and the rare remaining
+         gaps (a name-match miss, or a stale sync) are better handled by
+         "Sync roster" than by this button. Resolved by hiding it
+         entirely when `sleeperConnection` is set — `WaiverResult`
+         gained a `showRosteredButton` prop, `WaiverTool.tsx` passes
+         `!sleeperConnection`. Manual-mode users (no Sleeper connection)
+         keep the button unchanged, since it's still their only way to
+         build the exclusion list at all.
+      2. Independent of the above, the button was still living inside
+         the avatar+name header row, fighting the name for space (the
+         reason item 58's original `min-w-0` overflow bug existed at
+         all). Moved it out of that row entirely — the header is now
+         just avatar + name + position/team, always full width. First
+         pass put it at the end of the badges row via `ml-auto`
+         (right-aligned, wrapping to its own line on narrow cards); a
+         same-session follow-up request moved it again, to its own row
+         directly below the badges, left-aligned flush with the
+         "`{positionLabel}` by volume" pill rather than floated right —
+         the final, shipped placement.
+    - **Verified live**: with Sleeper connected, confirmed via
+      `document.querySelectorAll` that zero "Already rostered" buttons
+      render anywhere on the page, and every card's name displays in
+      full (no truncation, nothing to compete with). Clicked "Change
+      league" to disconnect without reloading and confirmed the
+      *already-rendered* results re-render with the button now present
+      (a live prop, not baked into the stale response — no re-fetch
+      needed) in its shipped position, its own row under the badges.
+      Clicked it for a real candidate (Brady Cook) and confirmed it was
+      added to the roster chips and disappeared from the QB results,
+      same dismiss behavior as before. No console errors.
+
+### Open items (as of item 61 — pick up here)
 Everything through e2943cb ("Add weekly roster status (RES/IR) as a
 backtest injury signal") is committed and pushed (`git log`), including
 item 46's real, permanent code (`nflverse/depthCharts.ts`, the
@@ -3015,7 +3345,16 @@ explicitly dropped — no code was shipped for either, only these doc
 entries. Both item 56 and item 57 were confirmed to have zero effect on
 the live tool (`buildInput.ts`/`nflverseLive.ts` untouched by either —
 the live tool already has real-time injury/roster status straight from
-SportsDataIO). Nothing below is started or fixed yet:
+SportsDataIO). Item 58's Waiver Wire tool (`lib/waivers/`, the
+`/waivers` page, `useRosteredPlayers.ts`, `/api/waivers`), item 59's
+Sleeper league import (`lib/sleeper/`, `SleeperImport.tsx`,
+`useSleeperConnection.ts`, `/api/sleeper/*`), item 60's leaguewide-
+rostered-players fix (`resolveRoster.ts`'s `leagueRosteredPlayerIds`,
+threaded through the same files), and item 61's two polish fixes
+(`WaiverResult.tsx`'s `moveHeadline`/`showRosteredButton`) are all
+written and verified live but not yet committed as of this writing —
+check `git status` before assuming any of it has landed. Nothing below
+is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -3091,6 +3430,16 @@ SportsDataIO). Nothing below is started or fixed yet:
    average as a standalone signal — since standalone accuracy this low
    doesn't say much about what happens once it's blended with season
    average and run through the rest of the pipeline.
+9. **The Waiver Wire tool's gap ranking (item 58) has never itself been
+   directly backtested as a ranking heuristic** — only its underlying
+   primitive (recent volume beats recent points as a forward signal) has
+   validated numbers behind it. Whether "biggest volume-rank-minus-
+   points-rank gap" specifically predicts a genuine breakout better than,
+   say, volume rank alone, hasn't been checked. Also: `suggestDrop.ts`'s
+   drop-candidate suggestion is same-position only — no flex-spot
+   cross-position logic (mirrors the same scoping decision the Trade
+   Analyzer itself never needed to make, since it's user-driven there).
+   Both are candidates for a dedicated pass if this tool gets real usage.
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
@@ -3212,6 +3561,54 @@ SportsDataIO). Nothing below is started or fixed yet:
   `recommendation/config.ts` for the good/fair/bad threshold rather than
   a separately-tuned one — there's no backtest ground truth to tune a
   trade-specific threshold against yet.
+- `src/lib/waivers/` — the Waiver Wire tool's evaluation layer (item 58).
+  `rankCandidates.ts` does a cheap, bulk pass across the whole active
+  player pool (NOT the full `buildComparisonInput`/`scorePlayer`
+  pipeline — that's reserved for the few candidates actually surfaced),
+  ranking each position by the gap between a player's recent-volume rank
+  and recent-points rank; a real backtest found trend/delta framing adds
+  nothing over this absolute-level gap (see item 58), so this is
+  deliberately NOT a trend signal. `buildWaiverReport.ts` runs the real
+  engine for just the surfaced top-N candidates, reusing
+  `PlayerScoreBreakdown.notes` verbatim rather than inventing new copy
+  (same discipline as `ComparisonResult.tsx`/`TradeResult.tsx`), with one
+  filtered exception — `scorePlayer`'s WR-only handcuff note is dropped
+  in favor of a plain roster-context line, since the shipped note always
+  reads "worth roughly 0.0 extra points" (`TEAMMATE_OUT_BUMP_WEIGHT_WR`
+  is zeroed, item 35) and reads as self-contradictory next to this
+  feature's own context line. `suggestDrop.ts` reuses `lib/trade/`'s
+  `evaluateTrade`/`toTradePlayerResult` and
+  `recommendation/restOfSeason.ts`'s `projectRestOfSeason` verbatim — a
+  same-position "drop X, add Y" suggestion is a 1-for-1 trade evaluation,
+  not a new comparison mechanism.
+- `src/lib/sleeper/` — server-only client for Sleeper's free, no-auth
+  public API (item 59), the real-roster-import path that replaced
+  manual one-by-one roster marking as the primary way to populate the
+  Waiver Wire tool's roster. `client.ts`/`api.ts` mirror `sportsdata/
+  client.ts`'s in-process TTL cache pattern (`getSleeperUser` returns
+  null for a nonexistent username — Sleeper returns HTTP 200 with a
+  JSON `null` body, not a 404, confirmed live — rather than throwing).
+  `resolveRoster.ts` resolves EVERY roster in the league in one pass
+  (`getSleeperRosters` already returns all of them, not just the
+  requesting user's), skipping team-defense/kicker slots (this app has
+  no D/ST or K support) and joining each remaining Sleeper player to a
+  SportsDataIO PlayerID by name — reusing nflverse/playerMatch.ts's
+  `normalizePlayerName`/`buildSdioPlayerIdByNormalizedName` rather than
+  a third hand-rolled scheme, since it's the same kind of join (Sleeper
+  has no ID shared with SportsDataIO either) already solved once for
+  nflverse. Returns two genuinely different things from that one pass:
+  the requesting user's own roster (`players`/`unmatched`, matching
+  `owner_id` OR `co_owners`) and `leagueRosteredPlayerIds` — every
+  player owned by ANY team in the league, IDs only. Item 59 originally
+  shipped with only the former; item 60 added the latter after the user
+  immediately caught that recommending an opponent's already-rostered
+  player is a real correctness bug, not an edge case — a waiver
+  candidate has to be unowned league-wide, not just off the requesting
+  user's own team. Genuine name-match misses on the user's own roster
+  come back as `unmatched` names rather than being silently dropped
+  (not tracked per-opponent-roster — a miss there just means that one
+  obscure bench player isn't excluded, an accepted, honest gap at the
+  same ~99% match rate every other name-join in this app already has).
 - `src/lib/nflverse/` — server-only client for the free, no-auth
   nflverse-data GitHub releases (`client.ts`: fetch + parse + the same
   in-process TTL cache pattern as `sportsdata/client.ts`, since these
@@ -3370,6 +3767,23 @@ SportsDataIO). Nothing below is started or fixed yet:
   next-opponent/weather display feature — see Overview and Conventions'
   `buildInput.ts` entry) using the identical season-rollforward pattern
   `trade` already established, rather than a second copy of that logic.
+  `src/app/api/waivers` (item 58) orchestrates `lib/waivers/`'s
+  ranking/report/drop-suggestion layers, same error-handling shape as
+  `trade`. Two distinct query params, not one, as of item 60: `rostered`
+  (comma-separated PlayerIDs, the user's own roster) excludes those
+  players from the ranking pool AND supplies the drop-candidate pool;
+  `leagueRostered` (every player owned by any OTHER team in a connected
+  Sleeper league) also excludes from the ranking pool but is never
+  passed to the drop-candidate step — you can't drop a player you don't
+  own. `src/app/api/sleeper/leagues` and `src/app/api/sleeper/roster`
+  (item 59) orchestrate `lib/sleeper/` — `leagues` resolves a username
+  to its real leagues (querying both the last-completed and upcoming
+  season, since a redraft league might not have reset yet while a
+  dynasty league might already exist for next season), `roster`
+  resolves one league+user into the requesting user's own SportsDataIO
+  players (ready to feed straight into the same roster state the manual
+  `PlayerSearchInput` flow already populates) plus, as of item 60,
+  `leagueRosteredPlayerIds` for every team in that league.
   `src/app/api/backtest/pair`,
   `src/app/api/backtest/broad` (also `scoringFormat`-aware, item 50),
   `src/app/api/backtest/broad-nflverse`,
@@ -3393,7 +3807,25 @@ SportsDataIO). Nothing below is started or fixed yet:
   owned by `src/lib/useScoringFormat.ts`, a small localStorage-backed
   hook — no backend/account system, consistent with this app's "no
   persistence" scope — so the choice carries across both live tools
-  within a session), and
+  within a session), `WaiverTool.tsx`/`WaiverResult.tsx` (live Waiver
+  Wire mode, at `/waivers`, item 58 — `WaiverTool.tsx` also reuses
+  `PlayerSearchInput.tsx` for one-off manual roster additions, backed by
+  `src/lib/useRosteredPlayers.ts`, a localStorage hook mirroring
+  `useScoringFormat.ts`'s pattern; `WaiverResult.tsx`'s "Already
+  rostered" button both dismisses a candidate from the current view
+  instantly via local state and adds it to the roster list for future
+  runs), `SleeperImport.tsx` (item 59 — the primary way to populate that
+  same roster state now: username → real league picker → one-click
+  import, or once connected, "Sync roster"/"Change league"; persisted
+  via `src/lib/useSleeperConnection.ts` so the username/league never
+  needs re-entering — the connection object itself is owned by
+  `WaiverTool.tsx`, not this component, since item 60's leaguewide
+  exclusion needs `connection.leagueRosteredPlayerIds` for the
+  `/api/waivers` request; `SleeperImport.tsx` receives
+  `connection`/`onConnectionChange` as props rather than calling
+  `useSleeperConnection()` itself, which would create a second
+  independent copy of the same localStorage-synced state that wouldn't
+  see this component's own updates), and
   `BacktestTool.tsx`/`BacktestWeekTable.tsx`/`BacktestSummary.tsx`/
   `BacktestCaveatNote.tsx`/`TradeBacktestTable.tsx` (backtest mode, at
   `/backtest` — `BacktestTool.tsx` has three modes, Single pair/Broad/
