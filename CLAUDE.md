@@ -3324,9 +3324,12 @@ single-season numbers for those specific constants.
       same dismiss behavior as before. No console errors.
 
 ### Open items (as of item 61 — pick up here)
-Everything through e2943cb ("Add weekly roster status (RES/IR) as a
-backtest injury signal") is committed and pushed (`git log`), including
-item 46's real, permanent code (`nflverse/depthCharts.ts`, the
+Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
+league import") is committed and pushed (`git log`; confirmed live via
+GitHub's own commit-status check, which shows Vercel's deployment for
+that commit as `"state": "success"` / "Deployment has completed" —
+checked directly against the GitHub API, not assumed from the push
+alone), including item 46's real, permanent code (`nflverse/depthCharts.ts`, the
 `depthChartByPlayerIdWeek` plumbing, and the new `pickByDepthChart`
 baseline), items 47-49's real, permanent code (`lib/trade/`,
 `lib/recommendation/restOfSeason.ts`, `lib/backtest/tradeBacktest.ts`,
@@ -3351,10 +3354,9 @@ Sleeper league import (`lib/sleeper/`, `SleeperImport.tsx`,
 `useSleeperConnection.ts`, `/api/sleeper/*`), item 60's leaguewide-
 rostered-players fix (`resolveRoster.ts`'s `leagueRosteredPlayerIds`,
 threaded through the same files), and item 61's two polish fixes
-(`WaiverResult.tsx`'s `moveHeadline`/`showRosteredButton`) are all
-written and verified live but not yet committed as of this writing —
-check `git status` before assuming any of it has landed. Nothing below
-is started or fixed yet:
+(`WaiverResult.tsx`'s `moveHeadline`/`showRosteredButton`) are all part
+of that same 80f6c70 commit — landed and deployed together, not a
+separate pending batch. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
