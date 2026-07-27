@@ -74,14 +74,27 @@ export const POINTS_PER_VOLUME_UNIT: Record<ScoringFormat, Record<"QB" | "RB" | 
  *
  * Re-checked against the pooled 2022-2025 sample (n=2437) as part of a
  * broader re-check of every already-shipped blend weight — confirmed,
- * not changed: pooled accuracy climbs to a plateau across 0.85-1.0
- * (55.6-56.1%), with 0.9 (55.8%) sitting inside it, close behind the
- * nominal peak at 0.95 (56.1%) and ahead of the 1.0 boundary (55.9%).
- * See CLAUDE.md's four-season re-sweep (which also caught and fixed a
- * real bug in the first version of that re-sweep's harness — see there
- * for what it was).
+ * not changed for PPR: pooled accuracy climbs to a plateau across
+ * 0.85-1.0 (55.6-56.1%), with 0.9 (55.8%) sitting inside it, close
+ * behind the nominal peak at 0.95 (56.1%) and ahead of the 1.0 boundary
+ * (55.9%). See CLAUDE.md's four-season re-sweep (which also caught and
+ * fixed a real bug in the first version of that re-sweep's harness —
+ * see there for what it was).
+ *
+ * Per-format re-sweep (once baseline grading was format-aware
+ * everywhere, item 51): Half-PPR's curve is flat/noisy across the whole
+ * 0-1 range (54.8-55.5%, no real preference — kept at 0.9). Standard's
+ * is genuinely different — accuracy climbs steadily toward the w=1
+ * boundary rather than peaking mid-range, and a joint grid search with
+ * SNAP_SHARE_BLEND_WEIGHT_TE confirmed w=1.0 as part of a real,
+ * every-season-improving optimum for Standard specifically — see
+ * CLAUDE.md's per-format weight re-sweep for the full story.
  */
-export const VOLUME_BLEND_WEIGHT = 0.9;
+export const VOLUME_BLEND_WEIGHT: Record<ScoringFormat, number> = {
+  ppr: 0.9,
+  half_ppr: 0.9,
+  standard: 1.0,
+};
 
 /**
  * Empirically-derived PPR points per red-zone touch for RB (rush
@@ -165,13 +178,28 @@ export const POINTS_PER_SNAP_SHARE_UNIT_TE: Record<ScoringFormat, number> = {
  *
  * Re-swept against the pooled 2022-2025 sample (n=405, ~4x the original)
  * as part of a broader re-check of every already-shipped blend weight —
- * see CLAUDE.md's four-season re-sweep. Confirmed, not changed: 0.4 is
- * now the genuine pooled peak (57.5%, up from 54.8-56.5% on either side —
- * 0.35 gives 57.0%, 0.45 gives 56.3%), a cleaner result than the original
- * 2025-only sweep found. Reasonably solid across seasons too (2022 56.4%,
- * 2023 54.9%, 2024 57.4%, 2025 61.4%).
+ * see CLAUDE.md's four-season re-sweep. Confirmed, not changed for PPR:
+ * 0.4 is the genuine pooled peak (57.5%, up from 54.8-56.5% on either
+ * side — 0.35 gives 57.0%, 0.45 gives 56.3%), a cleaner result than the
+ * original 2025-only sweep found. Reasonably solid across seasons too
+ * (2022 56.4%, 2023 54.9%, 2024 57.4%, 2025 61.4%).
+ *
+ * Per-format re-sweep (item 51's baseline-grading fix made this
+ * possible): Half-PPR's TE curve actually declines as this weight
+ * increases from 0 (58.5% standalone at w=0, falling to 54.3% by w=0.9)
+ * — but TE's pool is thin/noisy (this project's chronic weak spot for
+ * clean signals) and the whole-model impact of that shift is under
+ * 0.5pp either way, so it was left at 0.4 rather than chased. Standard's
+ * curve genuinely prefers a higher point (0.5, not 0.4) — confirmed via
+ * a joint grid search with VOLUME_BLEND_WEIGHT as part of a real,
+ * every-season-improving combined optimum — see CLAUDE.md's per-format
+ * weight re-sweep.
  */
-export const SNAP_SHARE_BLEND_WEIGHT_TE = 0.4;
+export const SNAP_SHARE_BLEND_WEIGHT_TE: Record<ScoringFormat, number> = {
+  ppr: 0.4,
+  half_ppr: 0.4,
+  standard: 0.5,
+};
 
 /**
  * Empirically-derived PPR points per QB rushing attempt (total QB PPR

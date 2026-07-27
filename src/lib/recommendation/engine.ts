@@ -118,8 +118,9 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
       recentVolumeAvg = average(volumeValues);
       const pointsPerUnit = POINTS_PER_VOLUME_UNIT[format][position as keyof (typeof POINTS_PER_VOLUME_UNIT)[ScoringFormat]];
       const expectedPointsFromVolume = recentVolumeAvg * pointsPerUnit;
+      const volumeBlendWeight = VOLUME_BLEND_WEIGHT[format];
       const blendedWithVolume =
-        (1 - VOLUME_BLEND_WEIGHT) * blendedScore + VOLUME_BLEND_WEIGHT * expectedPointsFromVolume;
+        (1 - volumeBlendWeight) * blendedScore + volumeBlendWeight * expectedPointsFromVolume;
       volumeModifier = blendedWithVolume - blendedScore;
       const unitLabel = position === "QB" ? "pass attempts" : position === "RB" ? "touches" : "targets";
       notes.push(
@@ -146,8 +147,9 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
   if (blendedScore != null && position === "TE" && snapShareAvg != null) {
     const runningScore = blendedScore + matchupModifier + volumeModifier + redZoneModifier;
     const expectedPointsFromSnapShare = snapShareAvg * POINTS_PER_SNAP_SHARE_UNIT_TE[format];
+    const snapShareBlendWeight = SNAP_SHARE_BLEND_WEIGHT_TE[format];
     const blendedWithSnapShare =
-      (1 - SNAP_SHARE_BLEND_WEIGHT_TE) * runningScore + SNAP_SHARE_BLEND_WEIGHT_TE * expectedPointsFromSnapShare;
+      (1 - snapShareBlendWeight) * runningScore + snapShareBlendWeight * expectedPointsFromSnapShare;
     snapShareModifier = blendedWithSnapShare - runningScore;
     notes.push(
       `Snap share of ${(snapShareAvg * 100).toFixed(0)}% recently — worth roughly ${expectedPointsFromSnapShare.toFixed(1)} points at this position's typical rate.`
