@@ -2765,11 +2765,70 @@ single-season numbers for those specific constants.
       the pipeline. Temporary diagnostic route deleted after recording
       these numbers, same precedent as every other one-off analysis in
       this document.
+55. **Investigated sourcing aggregated expert consensus rankings (e.g.
+    FantasyPros) for historical weeks, to test blending them with the
+    engine's own recommendation as a tiebreaker/blend factor** — a
+    genuinely new *kind* of candidate signal (a third-party human/expert
+    opinion aggregate, not derived from box scores or play-by-play the
+    way every other signal in this document is). Investigated and
+    dropped before any code was written — a research-and-decide task,
+    not a backtest.
+    - **A free, no-auth source does exist and was verified live, not
+      assumed**: `dynastyprocess/data` on GitHub (a community open-data
+      project, unaffiliated with FantasyPros itself) publishes
+      `db_fpecr.csv.gz` — a ~100MB gzipped CSV of scraped FantasyPros
+      Expert Consensus Rankings, fetchable the same static-file way every
+      nflverse release already used in this project is. Confirmed by
+      downloading and inspecting the real file (not just its docs): a
+      `wp` ("weekly position") row type is exactly the "who's ranked
+      where this week, by position" signal a blend/tiebreaker would need,
+      with real, comparably-dense coverage for 2022 (13.5K rows), 2023
+      (13.2K), and 2024 (12.2K).
+    - **A real, disqualifying-for-2025 gap was found**: the file has
+      ZERO `wp` rows for 2025, and the GitHub commit history (checked via
+      the GitHub API directly, not summarized docs) shows the repo's
+      automated FantasyPros scrape hasn't produced a new commit since
+      August 8, 2025 — the archive appears to have stopped updating
+      entirely roughly a year before this investigation. So this source
+      could validate ECR as a standalone signal against 2022-2024 (three
+      real seasons, the same scale this project already trusts for other
+      nflverse-only backtests) but could never be checked against 2025 —
+      the season the live tool and primary backtest pipeline actually
+      run on.
+    - **No SportsDataIO PlayerID join available either**: the file's
+      `sportsdata_id` column (despite the name) is populated for some
+      other ranking types but blank on the `wp` rows specifically —
+      integrating this would need the same name-normalization join
+      `playerMatch.ts` already built for nflverse, a solved but real
+      extra step, not free.
+    - **The official FantasyPros API was also checked**: real historical/
+      bulk access requires a paid subscription tier, not a free path.
+    - **A follow-up question — "is the Sleeper API worth using instead,
+      since it's free?" — was checked and rejected on its own merits**,
+      not just deferred: Sleeper's public API is genuinely free and
+      no-auth (confirmed against its own docs), but it does not expose
+      rankings or ADP as an endpoint at all. The "Sleeper ADP" shown on
+      third-party sites (FTN, YAFSB, ADPWire) is those sites scraping and
+      aggregating thousands of individual public Sleeper league drafts
+      themselves, not something Sleeper's API hands you directly —
+      replicating it would be a bigger scraping project than the
+      FantasyPros file, for a *different* kind of signal besides (a
+      once-a-year preseason draft-position snapshot, not a week-by-week
+      in-season ranking), and it wouldn't close the 2025 gap regardless,
+      since Sleeper has no bulk historical archive either.
+    - **Dropped, per user request, rather than pursued further** — the
+      free path's 2022-2024-only ceiling was judged disqualifying enough
+      not to justify the ingestion/name-join work for a signal that could
+      never be checked against the season that actually matters most
+      right now. No code was written; this write-up is the only lasting
+      artifact. Worth revisiting only if either the free archive resumes
+      updating with 2025+ data, or a paid FantasyPros API subscription
+      becomes worth acquiring for other reasons.
 
-### Open items (as of item 54 — pick up here)
-Everything through 39afb85 ("Add a TE-only ensemble stage blending
-finalScore with recentVolume") is committed and pushed (`git log`),
-including item 46's real, permanent code (`nflverse/depthCharts.ts`, the
+### Open items (as of item 55 — pick up here)
+Everything through 22d1872 ("Cross-reference the next-opponent/weather
+feature in Conventions") is committed and pushed (`git log`), including
+item 46's real, permanent code (`nflverse/depthCharts.ts`, the
 `depthChartByPlayerIdWeek` plumbing, and the new `pickByDepthChart`
 baseline), items 47-49's real, permanent code (`lib/trade/`,
 `lib/recommendation/restOfSeason.ts`, `lib/backtest/tradeBacktest.ts`,
@@ -2779,10 +2838,12 @@ real, permanent code (`getFantasyPoints`/`ScoringFormat`/
 `config.ts` constants, `ScoringFormatToggle.tsx`, `useScoringFormat.ts`),
 item 51's format-threading work (`baselines.ts`, `runBacktest.ts`,
 `runBacktestNflverseOnly.ts`, and the three `*-nflverse*` routes), item
-52's per-format `VOLUME_BLEND_WEIGHT`/`SNAP_SHARE_BLEND_WEIGHT_TE`, and
-item 53's `ENSEMBLE_VOLUME_BLEND_RATIO`. Item 54 (EWMA recent-average)
-was investigated and explicitly dropped — no code was shipped, only this
-doc entry. Nothing below is started or fixed yet:
+52's per-format `VOLUME_BLEND_WEIGHT`/`SNAP_SHARE_BLEND_WEIGHT_TE`, item
+53's `ENSEMBLE_VOLUME_BLEND_RATIO`, and the next-opponent/weather display
+feature (see Overview). Items 54 (EWMA recent-average) and 55 (FantasyPros
+ECR) were both investigated and explicitly dropped — no code was shipped
+for either, only these doc entries. Nothing below is started or fixed
+yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
