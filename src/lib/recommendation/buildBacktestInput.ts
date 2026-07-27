@@ -20,14 +20,25 @@ import { EMPTY_NFLVERSE_SIGNALS, type PlayerComparisonInput } from "./types";
  * week's games. Fully synchronous — `weekSlice` is pre-fetched/pre-sliced
  * by the caller (see lib/backtest/weekData.ts).
  *
- * Deliberately does NOT read `InjuryStatus` from the target week's own
- * game row, even though that field exists in the archive: it only ever
- * contains None/Out/Probable and Out correlates 1:1 with that week's
- * Played===0, meaning using it would be circular with the very outcome
- * this backtest grades against, not a genuine pregame signal. Historical
- * pregame injury uncertainty (Questionable/Doubtful) simply isn't
- * preserved in this data source, so injury status is always modeled as
- * unknown here — see the plan's Context section for the full rationale.
+ * Deliberately does NOT read `InjuryStatus` from SportsDataIO's own
+ * target-week game row: that field only ever contains None/Out/Probable
+ * archived retroactively, and `Out` correlates 1:1 with that week's
+ * `Played===0` — using it would be circular with the very outcome this
+ * backtest grades against, not a genuine pregame signal.
+ *
+ * Instead reads the real weekly injury report from nflverse's `injuries`
+ * release (`weekSlice.nflverseStatForWeek`) — actual pregame
+ * Questionable/Doubtful/Out designations, published days before kickoff,
+ * so this is a legitimate historical fact rather than leakage (unlike
+ * `Played`/points, which are only known after the game). This was
+ * previously wired into the backtest harness only as a standalone
+ * diagnostic baseline (`pickByInjuryStatus`) — see CLAUDE.md item 18 —
+ * never into the actual recommendation engine, so a player already
+ * ruled out days before their game would still get recommended,
+ * something even a naive human with that week's injury report wouldn't
+ * do. `comparePlayers` already excludes `Out`/`Doubtful` candidates when
+ * a healthy alternative exists (see engine.ts) — this just gives that
+ * existing filter real, non-leaky data to work with in backtest mode too.
  */
 export function buildBacktestComparisonInput(
   playerId: number,
@@ -70,7 +81,7 @@ export function buildBacktestComparisonInput(
     Status: anyPlayer.Status,
     PhotoUrl: anyPlayer.PhotoUrl,
     ByeWeek: anyPlayer.ByeWeek,
-    InjuryStatus: null,
+    InjuryStatus: weekSlice.nflverseStatForWeek(playerId, targetWeek)?.injuryStatus ?? null,
   };
 
   const seasonStat = weekSlice.seasonToDateTable.get(playerId) ?? null;

@@ -163,13 +163,22 @@ knowable that far ahead from this data source.
 - Historical `InjuryStatus` (on `PlayerGameStatsByWeek` rows) only ever
   contains `None`/`Out`/`Probable` — never `Questionable`/`Doubtful` —
   and `Out` correlates 1:1 with `Played===0`. Pregame injury uncertainty
-  isn't reconstructable from **SportsDataIO's** data, which is why
-  backtest mode's grading logic still treats injury status as unknown by
-  default. nflverse's `injuries` release *does* have the real weekly
+  isn't reconstructable from **SportsDataIO's** data, so
+  `buildBacktestComparisonInput` never reads this field. nflverse's
+  `injuries` release *does* have the real weekly pregame
   Questionable/Doubtful/Out designations (see "Backtesting & Tuning
-  History" item 18) and is used there for one standalone baseline test —
-  but that's a backtest-only trial, not a change to how the live tool's
-  own (already-real-time) injury flag works.
+  History" item 18) — originally used only for one standalone baseline
+  test, but as of item 56 it's also wired into the actual backtest
+  recommendation (`comparePlayers`' existing Out/Doubtful exclusion now
+  gets real data in backtest mode, not just live mode). Not a change to
+  how the live tool's own (already-real-time) injury flag works, since
+  that was already correct.
+  **Known gap**: nflverse's weekly report only captures week-to-week
+  Questionable/Doubtful/Out — a player who transitions to longer-term
+  injured reserve typically drops off that report entirely (no
+  `report_status` row at all, confirmed live for a 2025 case), so
+  IR-length absences aren't caught by this fix the way a normal weekly
+  "Out" tag is.
 - **2024 (and presumably earlier) season data is NOT accessible via
   SportsDataIO on this plan** — confirmed directly: any 2024 request
   (e.g. `PlayerSeasonStats/2024`, `PlayerGameStatsByWeek/2024REG/1`)
@@ -2824,11 +2833,77 @@ single-season numbers for those specific constants.
       artifact. Worth revisiting only if either the free archive resumes
       updating with 2025+ data, or a paid FantasyPros API subscription
       becomes worth acquiring for other reasons.
+56. **Wired nflverse's real weekly injury report into backtest mode's
+    recommendation logic** — prompted by a user report that a real,
+    known-out player (Mahomes, out weeks 16-18 of the 2025 season) was
+    still being recommended in Single Pair mode. Confirmed the report
+    with a real backtest run before touching any code (`/api/backtest/
+    pair?ids=18890,21693&season=2025&weeks=14,15,16,17,18` — Mahomes vs.
+    Burrow): the model recommended Mahomes in weeks 16-18 despite
+    `Played=false`/0 actual points every time, grading "incorrect" all
+    three weeks.
+    - **Root cause confirmed, not assumed**: `buildBacktestInput.ts`'s
+      `buildBacktestComparisonInput` hardcoded `InjuryStatus: null` on
+      every backtest player — deliberately, since SportsDataIO's archived
+      `InjuryStatus` is retroactive and correlates 1:1 with that week's
+      `Played` (using it would be circular with the outcome being
+      graded). But nflverse's `injuries` release already has the real,
+      *pregame* Questionable/Doubtful/Out designations — published days
+      before kickoff, so using it is a genuine historical fact, not
+      leakage — and it was already flowing into
+      `weekSlice.nflverseStatForWeek()` for the standalone
+      `pickByInjuryStatus` baseline (item 18), just never connected to
+      the actual recommendation engine.
+    - **Fix**: `buildBacktestComparisonInput` now reads
+      `weekSlice.nflverseStatForWeek(playerId, targetWeek)?.injuryStatus`
+      instead of hardcoding `null`. No new exclusion logic was needed —
+      `comparePlayers` already excludes `Out`/`Doubtful` candidates when
+      a healthy alternative exists (`engine.ts`, pre-existing code shared
+      with the live tool); this just gives that existing filter real,
+      non-leaky data in backtest mode too. Both backtest pipelines
+      (primary SportsDataIO and nflverse-only) already load
+      `getInjuryReports` into the same shared `nflversePlayerWeekTable`,
+      so the fix applies to both with no pipeline-specific code.
+    - **Re-verified live with a real "Out" case, since the Mahomes
+      example itself didn't fully confirm the fix**: pulled nflverse's
+      real `injuries_2025.csv` directly and found Mahomes has NO
+      `report_status` at all for weeks 16-18 (blank for every 2025 row,
+      in fact) — nflverse's weekly injury report drops a player from its
+      practice-participation-based reporting once they're on longer-term
+      injured reserve, so it structurally can't capture "on IR" the way
+      it captures a week-to-week Out/Doubtful/Questionable tag. This is a
+      real, separate data limitation, not a bug in the fix — confirmed by
+      finding a genuine `Out`-tagged skill player instead (Alvin Kamara,
+      out weeks 14-18 with a knee injury) and re-running
+      `/api/backtest/pair?ids=18878,19045&season=2025&weeks=14,15,16,17,18`
+      (Kamara vs. Aaron Jones): weeks 14-17 now correctly recommend Jones
+      ("nobody else in this comparison is currently available"), and week
+      18 — where Jones was *also* out — correctly falls back to comparing
+      both rather than refusing to pick, exactly matching `comparePlayers`'
+      existing "only filter if a healthy alternative exists" logic.
+    - **Confirmed zero effect on Broad mode's own accuracy, on purpose,
+      not by oversight**: re-ran the primary pipeline (all 3 formats) and
+      the pooled nflverse-only multiseason route before/after (via
+      `git stash`) and got byte-identical numbers every time (PPR 57.5%/
+      56.5%, Half-PPR 55.2%, Standard 56.5%, pooled by-position/by-season
+      all unchanged). This makes sense once traced through: Broad mode's
+      candidate pool (`pairing.ts`) already filters to
+      `targetWeekRows.filter(r => r.Played === 1)` before any pairing
+      happens, so a genuinely-out player was never in the pool to begin
+      with — this fix only changes behavior in **Single Pair mode**,
+      where a user manually names two specific players and the tool has
+      no pool-level filter to fall back on. That's exactly the mode the
+      original report came from.
+    - **Not a scoring-weight tradeoff like most items in this document**
+      — no sweep, no user decision needed, since it's a straightforward
+      "use real, already-available, non-leaky data instead of null" fix
+      with a verified-safe (zero-effect) blast radius on the one mode
+      that has an aggregate accuracy number to protect.
 
-### Open items (as of item 55 — pick up here)
-Everything through 22d1872 ("Cross-reference the next-opponent/weather
-feature in Conventions") is committed and pushed (`git log`), including
-item 46's real, permanent code (`nflverse/depthCharts.ts`, the
+### Open items (as of item 56 — pick up here)
+Everything through 4b6bded ("Document the FantasyPros ECR investigation
+and drop it") is committed and pushed (`git log`), including item 46's
+real, permanent code (`nflverse/depthCharts.ts`, the
 `depthChartByPlayerIdWeek` plumbing, and the new `pickByDepthChart`
 baseline), items 47-49's real, permanent code (`lib/trade/`,
 `lib/recommendation/restOfSeason.ts`, `lib/backtest/tradeBacktest.ts`,
@@ -2840,10 +2915,12 @@ item 51's format-threading work (`baselines.ts`, `runBacktest.ts`,
 `runBacktestNflverseOnly.ts`, and the three `*-nflverse*` routes), item
 52's per-format `VOLUME_BLEND_WEIGHT`/`SNAP_SHARE_BLEND_WEIGHT_TE`, item
 53's `ENSEMBLE_VOLUME_BLEND_RATIO`, and the next-opponent/weather display
-feature (see Overview). Items 54 (EWMA recent-average) and 55 (FantasyPros
-ECR) were both investigated and explicitly dropped — no code was shipped
-for either, only these doc entries. Nothing below is started or fixed
-yet:
+feature (see Overview). Items 54 (EWMA recent-average) and 55
+(FantasyPros ECR) were both investigated and explicitly dropped — no
+code was shipped for either, only these doc entries. Item 56's
+`buildBacktestInput.ts` injury-status fix is done and verified but **not
+yet committed** — next step after this doc update is committing and
+pushing it. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -3091,9 +3168,12 @@ yet:
   `recentNflverseByPlayer()` (averaged over the recent-weeks window,
   same as player recent-form); injury status is the one exception —
   it's a current-week fact, not a trailing tendency to average, so it's
-  read via the separate `nflverseStatForWeek()` accessor instead (used
-  by the `injuryStatus` backtest baseline only — not integrated into the
-  live engine, which already has real-time injury status; see item 18).
+  read via the separate `nflverseStatForWeek()` accessor instead. Used by
+  the `injuryStatus` backtest baseline (item 18) and, as of item 56, by
+  `buildBacktestInput.ts` itself — real, pregame Out/Doubtful status now
+  reaches `comparePlayers`' existing exclusion filter in backtest mode
+  too, not just live mode (which already had real-time injury status
+  from SportsDataIO directly, unaffected by this change).
   `gameLog.ts`/`schedules.ts` are the two files that make nflverse usable
   as a *primary* data source, not just a supplement — `gameLog.ts` builds
   a full `PlayerGameStat[][]` game log from `stats_player`, and
