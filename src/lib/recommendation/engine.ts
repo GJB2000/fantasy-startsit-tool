@@ -2,6 +2,7 @@ import {
   CLOSE_CALL_ABS_POINTS,
   CLOSE_CALL_RELATIVE_PCT,
   DROP_RATE_BLEND_WEIGHT,
+  ENSEMBLE_VOLUME_BLEND_RATIO,
   MATCHUP_MODIFIER_CAP,
   MATCHUP_MODIFIER_SCALE,
   POINTS_PER_DROP_RATE_UNIT,
@@ -262,7 +263,7 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
     );
   }
 
-  const finalScore =
+  const preEnsembleFinalScore =
     blendedScore == null
       ? null
       : blendedScore +
@@ -277,6 +278,23 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
         rbEpaModifier +
         dropRateModifier +
         teammateOutBumpModifier;
+
+  // Final ensemble stage: shrink the fully-computed score toward a pure
+  // recent-volume estimate — see ENSEMBLE_VOLUME_BLEND_RATIO's comment
+  // in config.ts for why this is structurally different from every
+  // modifier above (it dilutes all of them proportionally, not just
+  // volume) and the CLAUDE.md item documenting the per-position/format
+  // sweep behind these ratios.
+  let finalScore = preEnsembleFinalScore;
+  if (preEnsembleFinalScore != null && position && position in POINTS_PER_VOLUME_UNIT[format]) {
+    const skillPosition = position as keyof (typeof POINTS_PER_VOLUME_UNIT)[ScoringFormat];
+    const volumeImpliedScore =
+      recentVolumeAvg != null ? recentVolumeAvg * POINTS_PER_VOLUME_UNIT[format][skillPosition] : null;
+    if (volumeImpliedScore != null) {
+      const ratio = ENSEMBLE_VOLUME_BLEND_RATIO[format][skillPosition];
+      finalScore = ratio * preEnsembleFinalScore + (1 - ratio) * volumeImpliedScore;
+    }
+  }
 
   const injuryStatus = input.player?.InjuryStatus ?? null;
   if (injuryStatus === "Questionable") {

@@ -2609,26 +2609,95 @@ single-season numbers for those specific constants.
       real Travis Kelce vs. Mark Andrews comparison in Standard format
       showed the new snap-share modifier note computing correctly
       (89% × 5.788 ≈ 5.1 points), no console errors, sensible rendering.
+53. **Tested a simple ensemble: blending the engine's own `finalScore`
+    with the standalone `recentVolume` baseline**, to see whether
+    shrinking toward a simple, robust signal beats the fully-tuned score
+    alone — the classic bias/variance tradeoff argument for ensembling,
+    never tried in this project before (every prior "blend" tuned how
+    much ONE signal contributes; this dilutes the WHOLE score). Original
+    ask specifically named QB, on the premise that `recentVolume` "beats
+    us on 2025" — that premise didn't hold: the current engine clearly
+    beats `recentVolume` at QB (pooled 57.8% vs. 52.9%, and 57.8% vs.
+    55.9% in 2025 specifically) — the real 2025 QB gap (item 30a) was
+    already closed by item 41's `QB_RUSH_EPA_BLEND_WEIGHT`. QB showed
+    zero ensemble benefit at any ratio tested, in any format — a clean
+    negative control, not a data problem.
+    - **Found and fixed a real bug in the test harness before trusting
+      any Half-PPR/Standard result**: v1 paired players using PPR-based
+      adjacent-rank pairing for every format (to save compute), scoring
+      those PPR-chosen pairs in the target format — but the real API
+      re-pairs players PER format (item 50: which players count as
+      "adjacent rank" genuinely shifts by format). Caught by cross-
+      checking the harness's own r=1.0 baseline against the real API for
+      every format, not just PPR (a real process gap — PPR alone had
+      been checked initially) — Half-PPR RB's r=1.0 baseline read 55.2%
+      in the buggy harness vs. the real API's 53.6%. Rebuilt v2 pairing
+      AND scoring in the same target format throughout; re-verified
+      exactly against the real API for all three formats before
+      re-sweeping anything.
+    - **The re-swept (correct) picture, pooled 2022-2025**: RB showed no
+      real signal in either non-PPR format once correctly paired (the
+      original "RB gain" was entirely a bug artifact). WR and TE both
+      showed real, broadly-positive, near-zero-decline gains in Half-PPR
+      and Standard (TE: 3 seasons up/1 flat/0 down in both formats — the
+      cleanest results of the whole investigation).
+    - **A second, harder test was needed beyond the usual pooled-sweep-
+      then-by-season-check: does it transfer to the PRIMARY (SportsDataIO,
+      live) pipeline** — this signal turned out to be sensitive enough to
+      exact `recentVolumeAvg` values that pooled nflverse-only validation
+      wasn't sufficient on its own, unlike every individual weight tuned
+      earlier in this document. **WR failed this test decisively**: every
+      ratio large enough to move the primary pipeline at all moved it the
+      WRONG way, consistently, across three separate format/ratio tests
+      (PPR -0.5pp, Half-PPR -0.5pp, Standard -2.4pp) — confirmed via raw
+      pick counts, not just rounded percentages, and confirmed the
+      mechanism itself works correctly (an aggressive test ratio did flip
+      picks, just in the losing direction). **TE never regressed** on the
+      primary pipeline — either a real gain (when tested at a nearby
+      ratio) or exactly zero measured effect (plausible small-sample
+      discreteness on TE's ~100-pair single-season pool, confirmed
+      harmless rather than assumed: an aggressive test ratio did flip
+      picks on the same pool, just not at the shipped ratio specifically).
+    - **Shipped**: `ENSEMBLE_VOLUME_BLEND_RATIO` in `config.ts`
+      (`Record<ScoringFormat, Record<SkillPosition, number>>`, 1.0 =
+      pure engine/no-op), applied as a final stage in `scorePlayer` after
+      every existing modifier — TE only, Half-PPR and Standard only, both
+      at 0.7. PPR, QB (all formats), RB (all formats), and WR (all
+      formats) all stay 1.0. Verified against the real production API
+      after shipping: PPR is byte-identical on both pipelines; Half-PPR/
+      Standard gain +0.2-0.3pp pooled with TE moving as predicted, and
+      show zero measured change on the primary 2025-only pipeline (not
+      harmful, just below this season's pick-flip threshold). Verified
+      live end-to-end: a real Kelce vs. Andrews Half-PPR comparison
+      rendered correctly, no console errors.
+    - **Process note for future signal-hunting**: this is the first
+      candidate in this whole document that passed pooled multi-season
+      validation cleanly but still needed a THIRD check — direct
+      confirmation against the primary pipeline — before it was safe to
+      trust. Worth keeping as standard practice for any future signal
+      that operates on the full score (an ensemble/shrinkage step) rather
+      than one modifier, since those seem to be more sensitive to
+      pipeline-specific data differences than the individual-weight
+      tuning this document has mostly done.
 
-### Open items (as of item 52 — pick up here)
-Everything through 18a2414 ("Make the nflverse-only backtest and
-baseline pickers scoring-format-aware") is committed and pushed
-(`git log`), including item 46's real, permanent code
-(`nflverse/depthCharts.ts`, the `depthChartByPlayerIdWeek` plumbing, and
-the new `pickByDepthChart` baseline), items 47-49's real, permanent code
-(`lib/trade/`, `lib/recommendation/restOfSeason.ts`,
-`lib/backtest/tradeBacktest.ts`, the `/trade` page, and the new
-`/api/backtest/trade*` routes), item 50's real, permanent code
-(`getFantasyPoints`/`ScoringFormat`/`parseScoringFormat` in
-`sportsdata/types.ts`, the per-format `config.ts` constants,
-`ScoringFormatToggle.tsx`, `useScoringFormat.ts`), and item 51's
-format-threading work (`baselines.ts`, `runBacktest.ts`,
-`runBacktestNflverseOnly.ts`, and the three `*-nflverse*` routes). Item
-52's weight changes (`config.ts`'s `VOLUME_BLEND_WEIGHT`/
-`SNAP_SHARE_BLEND_WEIGHT_TE` becoming per-format, `engine.ts`'s two
-lookups) are done and verified but **not yet committed** — next step
-after this doc update is committing and pushing them. Nothing below is
-started or fixed yet:
+### Open items (as of item 53 — pick up here)
+Everything through aff6a84 ("Give Standard format its own volume and TE
+snap-share blend weights") is committed and pushed (`git log`),
+including item 46's real, permanent code (`nflverse/depthCharts.ts`, the
+`depthChartByPlayerIdWeek` plumbing, and the new `pickByDepthChart`
+baseline), items 47-49's real, permanent code (`lib/trade/`,
+`lib/recommendation/restOfSeason.ts`, `lib/backtest/tradeBacktest.ts`,
+the `/trade` page, and the new `/api/backtest/trade*` routes), item 50's
+real, permanent code (`getFantasyPoints`/`ScoringFormat`/
+`parseScoringFormat` in `sportsdata/types.ts`, the per-format
+`config.ts` constants, `ScoringFormatToggle.tsx`, `useScoringFormat.ts`),
+item 51's format-threading work (`baselines.ts`, `runBacktest.ts`,
+`runBacktestNflverseOnly.ts`, and the three `*-nflverse*` routes), and
+item 52's per-format `VOLUME_BLEND_WEIGHT`/`SNAP_SHARE_BLEND_WEIGHT_TE`.
+Item 53's ensemble stage (`config.ts`'s `ENSEMBLE_VOLUME_BLEND_RATIO`,
+`engine.ts`'s final blend step) is done and verified but **not yet
+committed** — next step after this doc update is committing and pushing
+it. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -2745,12 +2814,24 @@ started or fixed yet:
   teammate-bump) were deliberately left as plain PPR-only numbers, since
   a dormant constant doesn't need per-format recalibration.
   `VOLUME_BLEND_WEIGHT`/`SNAP_SHARE_BLEND_WEIGHT_TE` are *also*
-  `Record<ScoringFormat, number>` as of item 52, the only two blend
-  *weights* (as opposed to conversion factors) found to have a real,
+  `Record<ScoringFormat, number>` as of item 52, the only two per-position
+  blend *weights* (as opposed to conversion factors) found to have a real,
   every-season-validated per-format optimum — Standard runs higher on
   both (1.0/0.5 vs. PPR/Half-PPR's shared 0.9/0.4); every other weight
   (RB red-zone/EPA, WR drop rate, both QB rushing terms) showed no
-  format-specific case and stayed a plain shared scalar. `volume.ts`'s
+  format-specific case and stayed a plain shared scalar.
+  `ENSEMBLE_VOLUME_BLEND_RATIO` (item 53) is a different kind of thing
+  entirely — a final stage in `scorePlayer`, applied AFTER every modifier
+  above, that shrinks the whole `finalScore` toward a simple
+  `recentVolumeAvg`-implied estimate (a variance-reduction ensemble
+  technique, not a new football signal). `Record<ScoringFormat,
+  Record<SkillPosition, number>>`, 1.0 = no-op; only TE in Half-PPR/
+  Standard is non-1.0 (0.7) — QB/RB/WR all stay 1.0 in every format after
+  a real generalization gap surfaced between the pooled nflverse-only
+  sample and the primary SportsDataIO pipeline (see "Backtesting &
+  Tuning History" item 53 for the full investigation, including a
+  harness bug that was caught before it could ship a false RB signal).
+  `volume.ts`'s
   `getVolumeStat()` reads `ReceivingTargets`/`RushingAttempts`/
   `PassingAttempts` off `PlayerGameStat` — these fields were already
   present in every SportsDataIO response but unused until the volume

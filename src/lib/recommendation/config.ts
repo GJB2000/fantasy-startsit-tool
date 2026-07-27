@@ -1,7 +1,7 @@
 // Tunable weights for the rules-based recommendation engine.
 // Adjust these as the recommendation logic gets tuned over time.
 
-import type { ScoringFormat } from "@/lib/sportsdata/types";
+import type { ScoringFormat, SkillPosition } from "@/lib/sportsdata/types";
 
 /** Base weight given to recent-4-week form vs. season average, before scaling by sample size. */
 export const RECENT_WEIGHT_BASE = 0.35;
@@ -499,3 +499,61 @@ export const POINTS_PER_QB_RUSH_EPA: Record<ScoringFormat, number> = {
  * See CLAUDE.md's QB-rushing-EPA follow-up to item 40 for the full sweep.
  */
 export const QB_RUSH_EPA_BLEND_WEIGHT = 0.2;
+
+/**
+ * Final ensemble stage — blends `scorePlayer`'s fully-computed
+ * `finalScore` (every modifier above already applied) with a "pure
+ * recent volume" estimate (`recentVolumeAvg * POINTS_PER_VOLUME_UNIT`,
+ * the exact same basis the standalone `recentVolume` backtest baseline
+ * uses — see `baselines.ts`'s `pickByRecentVolume`). Structurally
+ * different from every other weight in this file: those each tune how
+ * much ONE signal contributes to the running score; this one shrinks
+ * the ENTIRE finalScore (matchup, snap share, drop rate, QB rushing
+ * terms, all of it) proportionally toward a single simple baseline — a
+ * standard variance-reduction technique (ensembling a tuned model with
+ * a robust simple one), not a new football signal. 1.0 = pure engine
+ * (no-op); lower = more weight on the simple volume estimate.
+ *
+ * QB showed ZERO benefit at any ratio, in any format, standalone — the
+ * engine already clearly beats the `recentVolume` baseline there (a
+ * real premise correction: this *was* a real 2025 QB gap per item 30a,
+ * but was closed when item 41 shipped `QB_RUSH_EPA_BLEND_WEIGHT`) — so
+ * QB stays 1.0 everywhere.
+ *
+ * The other three positions needed a THIRD validation step beyond the
+ * usual pooled-sweep-then-by-season-check: this signal is sensitive
+ * enough to exact recentVolumeAvg values that it doesn't reliably
+ * transfer from the nflverse-only pooled sample to the PRIMARY
+ * (SportsDataIO, live-2025) pipeline, even when both agree the
+ * underlying data source is "the same season" — the two pipelines
+ * compute/join volume and pair players differently enough (item 24) to
+ * matter for a signal this marginal, something individual weight
+ * tuning elsewhere in this file never surfaced. **RB and WR were
+ * dropped after this check, not before**: RB's pooled gain (discovered
+ * via a since-fixed harness bug that used PPR-based pairing for every
+ * format) never reappeared once re-swept correctly. WR showed a real
+ * pooled gain that DID reproduce, but every ratio large enough to move
+ * the primary pipeline at all moved it the WRONG way, consistently,
+ * across three separate format/ratio tests (PPR -0.5pp, Half-PPR
+ * -0.5pp, Standard -2.4pp) — WR's signal apparently doesn't generalize
+ * to the live data source at all. **TE is the only position that
+ * survived**: strong, broad, near-zero-decline gains pooled (Half-PPR:
+ * 3 seasons up, 1 flat, none down; Standard: 3 up, 1 flat, none down),
+ * and on the primary pipeline specifically, TE never regressed —
+ * either a real gain (confirmed at a nearby ratio tested alongside a
+ * since-reverted RB change) or exactly zero measured effect (plausible
+ * small-sample discreteness on TE's ~100-pair single-season pool, not
+ * harm — confirmed harmless by testing a much more aggressive ratio and
+ * watching picks actually flip in the expected direction). PPR TE was
+ * tested and separately rejected on its own pooled evidence — its
+ * curve was jagged/non-monotonic with ±2-3pp season swings in both
+ * directions before the pipeline question even arose.
+ *
+ * See CLAUDE.md's ensemble item for the full investigation, including
+ * the harness bug and how it was caught.
+ */
+export const ENSEMBLE_VOLUME_BLEND_RATIO: Record<ScoringFormat, Record<SkillPosition, number>> = {
+  ppr: { QB: 1.0, RB: 1.0, WR: 1.0, TE: 1.0 },
+  half_ppr: { QB: 1.0, RB: 1.0, WR: 1.0, TE: 0.7 },
+  standard: { QB: 1.0, RB: 1.0, WR: 1.0, TE: 0.7 },
+};
