@@ -173,12 +173,17 @@ knowable that far ahead from this data source.
   gets real data in backtest mode, not just live mode). Not a change to
   how the live tool's own (already-real-time) injury flag works, since
   that was already correct.
-  **Known gap**: nflverse's weekly report only captures week-to-week
-  Questionable/Doubtful/Out — a player who transitions to longer-term
-  injured reserve typically drops off that report entirely (no
-  `report_status` row at all, confirmed live for a 2025 case), so
-  IR-length absences aren't caught by this fix the way a normal weekly
-  "Out" tag is.
+  **Gap closed in item 57**: nflverse's weekly injury report only
+  captures week-to-week Questionable/Doubtful/Out — a player who
+  transitions to longer-term injured reserve typically drops off that
+  report entirely (no `report_status` row at all, confirmed live). The
+  `weekly_rosters` release's `status` column (`RES` = reserve/injured)
+  fills that gap instead — see `nflverse/rosters.ts` and item 57's
+  quantified before/after numbers. One remaining, deliberately
+  unaddressed gap: game-day-inactive (`INA`) status isn't surfaced,
+  since it's announced ~90 minutes before kickoff — close enough to game
+  time to be a meaningfully different, murkier leakage question from an
+  IR move announced days out.
 - **2024 (and presumably earlier) season data is NOT accessible via
   SportsDataIO on this plan** — confirmed directly: any 2024 request
   (e.g. `PlayerSeasonStats/2024`, `PlayerGameStatsByWeek/2024REG/1`)
@@ -2899,11 +2904,59 @@ single-season numbers for those specific constants.
       "use real, already-available, non-leaky data instead of null" fix
       with a verified-safe (zero-effect) blast radius on the one mode
       that has an aggregate accuracy number to protect.
+57. **Followed up on item 56's own open thread — the fix didn't fully
+    cover the original Mahomes report, since nflverse's weekly injury
+    report structurally can't capture longer-term injured reserve.**
+    User asked directly: would real IR data actually move accuracy, or
+    is this a narrow edge case not worth chasing? Answered with a real
+    test, not speculation.
+    - **Found a genuine, previously-unused source for this specific
+      gap**: nflverse's `weekly_rosters` release (confirmed live,
+      available for all of 2022-2025) has a per-player-per-week `status`
+      column — `RES` (reserve/injured) correctly flags Mahomes for
+      exactly weeks 16-18, the weeks the injury report couldn't see.
+    - **Quantified the value before shipping anything**: rebuilt
+      broad-mode-style pairing deliberately *without* the `Played===1`
+      pool filter (to simulate the real exposure Single Pair mode has,
+      since Broad mode's own tracked number is permanently insulated
+      from any injury signal by that filter — see item 56). Graded three
+      ways on the full 2025 season: no injury signal at all (61.9%/
+      59.0%/57.8% across PPR/Half-PPR/Standard), the already-shipped
+      weekly injury report alone (65.0%/61.9%/61.8%), and injury report
+      + roster `RES` status together (**69.8%/69.2%/67.3%**). The `RES`
+      signal's own marginal contribution (+4.8 to +7.3pp) was larger than
+      the injury report's own — on 82-87 exposed pairs across the season,
+      not a rare edge case. TE gained the most (66.7%→77.4% in PPR),
+      plausibly because TE's shallow pool makes one IR'd starter a bigger
+      pool-composition problem than at deeper positions.
+    - **Shipped**: new `nflverse/rosters.ts` (`getReserveStatusReports`,
+      filtering the release to `status === "RES"` only — deliberately not
+      surfacing `INA` (game-day inactive), since that's announced ~90
+      minutes before kickoff, a meaningfully different and murkier
+      leakage question from an IR move announced days out, not tested
+      here). `NflverseWeekStat` gained a `rosterStatus` field
+      (`weekTable.ts`), populated by both backtest pipelines
+      (`loadRun.ts`/`loadRunNflverseOnly.ts`) the same way `injuryStatus`
+      already was; `NflverseSourceRows.rosterRows` is optional so live
+      mode's `nflverseLive.ts` needed no changes (it already has
+      real-time roster/injury status from SportsDataIO directly).
+      `buildBacktestInput.ts` now treats `rosterStatus === "RES"` as
+      equivalent to `"Out"`, taking priority over the injury-report
+      status when both are present (a confirmed IR move is a stronger
+      fact than a Questionable/Doubtful practice tag).
+    - **Verified against real data, not just the pooled sweep**: re-ran
+      the exact original report (Mahomes vs. Burrow, 2025 weeks 14-18)
+      and confirmed weeks 16-18 now correctly recommend Burrow ("nobody
+      else in this comparison is currently available"), fully resolving
+      the case that prompted this whole investigation. Re-ran Broad mode
+      on both pipelines, all three formats, before/after — byte-identical
+      in every case, confirming the zero-effect-on-Broad-mode prediction
+      from item 56 held for this signal too.
 
-### Open items (as of item 56 — pick up here)
-Everything through 4b6bded ("Document the FantasyPros ECR investigation
-and drop it") is committed and pushed (`git log`), including item 46's
-real, permanent code (`nflverse/depthCharts.ts`, the
+### Open items (as of item 57 — pick up here)
+Everything through d878994 ("Wire real nflverse injury status into
+backtest recommendations") is committed and pushed (`git log`), including
+item 46's real, permanent code (`nflverse/depthCharts.ts`, the
 `depthChartByPlayerIdWeek` plumbing, and the new `pickByDepthChart`
 baseline), items 47-49's real, permanent code (`lib/trade/`,
 `lib/recommendation/restOfSeason.ts`, `lib/backtest/tradeBacktest.ts`,
@@ -2914,13 +2967,13 @@ real, permanent code (`getFantasyPoints`/`ScoringFormat`/
 item 51's format-threading work (`baselines.ts`, `runBacktest.ts`,
 `runBacktestNflverseOnly.ts`, and the three `*-nflverse*` routes), item
 52's per-format `VOLUME_BLEND_WEIGHT`/`SNAP_SHARE_BLEND_WEIGHT_TE`, item
-53's `ENSEMBLE_VOLUME_BLEND_RATIO`, and the next-opponent/weather display
-feature (see Overview). Items 54 (EWMA recent-average) and 55
-(FantasyPros ECR) were both investigated and explicitly dropped — no
-code was shipped for either, only these doc entries. Item 56's
-`buildBacktestInput.ts` injury-status fix is done and verified but **not
-yet committed** — next step after this doc update is committing and
-pushing it. Nothing below is started or fixed yet:
+53's `ENSEMBLE_VOLUME_BLEND_RATIO`, the next-opponent/weather display
+feature (see Overview), and item 56's weekly-injury-report fix. Items 54
+(EWMA recent-average) and 55 (FantasyPros ECR) were both investigated and
+explicitly dropped — no code was shipped for either, only these doc
+entries. Item 57's `nflverse/rosters.ts`/`rosterStatus` code is done and
+verified but **not yet committed** — next step after this doc update is
+committing and pushing it. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -3173,7 +3226,12 @@ pushing it. Nothing below is started or fixed yet:
   `buildBacktestInput.ts` itself — real, pregame Out/Doubtful status now
   reaches `comparePlayers`' existing exclusion filter in backtest mode
   too, not just live mode (which already had real-time injury status
-  from SportsDataIO directly, unaffected by this change).
+  from SportsDataIO directly, unaffected by this change). `NflverseWeekStat`
+  also carries `rosterStatus` (item 57, `nflverse/rosters.ts`) — a
+  separate current-week fact from `injuryStatus`, since it comes from the
+  weekly roster release rather than the injury report; `buildBacktestInput.ts`
+  treats a `"RES"` `rosterStatus` as equivalent to `"Out"`, taking priority
+  over `injuryStatus` when both are present.
   `gameLog.ts`/`schedules.ts` are the two files that make nflverse usable
   as a *primary* data source, not just a supplement — `gameLog.ts` builds
   a full `PlayerGameStat[][]` game log from `stats_player`, and

@@ -53,6 +53,15 @@ export interface InjuryReportRow {
   reportStatus: string;
 }
 
+export interface RosterStatusRow {
+  season: number;
+  week: number;
+  playerDisplayName: string;
+  team: string;
+  /** Always "RES" (reserve/injured — the only status this reader keeps) — see rosters.ts. */
+  status: string;
+}
+
 export interface RedZoneTouchRow {
   season: number;
   week: number;

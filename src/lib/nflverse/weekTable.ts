@@ -6,6 +6,7 @@ import type {
   NgsRushingRow,
   PlayerWeekStatRow,
   RedZoneTouchRow,
+  RosterStatusRow,
   SnapCountRow,
 } from "./types";
 
@@ -21,6 +22,8 @@ export interface NflverseWeekStat {
   rushYardsOverExpectedPerAtt: number | null;
   /** "Questionable" | "Doubtful" | "Out" | null (no injury report that week). Not part of the recent-weeks averaging the other fields get — this is a current-week fact, looked up directly via weekData.ts's nflverseStatForWeek(). */
   injuryStatus: string | null;
+  /** "RES" (reserve/injured) | null — a separate, current-week roster-status fact from injuryStatus (see rosters.ts for why); buildBacktestInput.ts treats this as equivalent to "Out" when present, taking priority over injuryStatus. */
+  rosterStatus: string | null;
   /** Real zeros are meaningful here (played, zero red-zone touches) — see playByPlay.ts. Left null only when the player has no PlayerGameStat row for that week at all. */
   redZoneRushAttempts: number | null;
   redZoneTargets: number | null;
@@ -47,6 +50,8 @@ export interface NflverseSourceRows {
   ngsRushingRows: NgsRushingRow[];
   injuryRows: InjuryReportRow[];
   redZoneRows: RedZoneTouchRow[];
+  /** Optional — only the backtest pipelines fetch this (see rosters.ts); live mode already has real-time roster/injury status from SportsDataIO directly. */
+  rosterRows?: RosterStatusRow[];
 }
 
 /**
@@ -80,6 +85,7 @@ export function buildNflversePlayerWeekTable(
         avgYacAboveExpectation: null,
         rushYardsOverExpectedPerAtt: null,
         injuryStatus: null,
+        rosterStatus: null,
         redZoneRushAttempts: null,
         redZoneTargets: null,
         goalLineRushAttempts: null,
@@ -142,6 +148,12 @@ export function buildNflversePlayerWeekTable(
     const playerId = playerIdFor(row.playerDisplayName);
     if (playerId == null) continue;
     getOrCreate(playerId, row.week).injuryStatus = row.reportStatus;
+  }
+
+  for (const row of sources.rosterRows ?? []) {
+    const playerId = playerIdFor(row.playerDisplayName);
+    if (playerId == null) continue;
+    getOrCreate(playerId, row.week).rosterStatus = row.status;
   }
 
   for (const row of sources.redZoneRows) {

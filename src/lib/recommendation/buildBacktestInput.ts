@@ -39,6 +39,23 @@ import { EMPTY_NFLVERSE_SIGNALS, type PlayerComparisonInput } from "./types";
  * do. `comparePlayers` already excludes `Out`/`Doubtful` candidates when
  * a healthy alternative exists (see engine.ts) — this just gives that
  * existing filter real, non-leaky data to work with in backtest mode too.
+ *
+ * Also folds in nflverse's weekly roster `status` (rosters.ts) — a
+ * player on longer-term injured reserve ("RES") typically drops off the
+ * injury report's practice-participation tracking entirely (no
+ * `report_status` row at all, confirmed live for a real 2025 case), so
+ * the injury report alone can't catch every real absence. `rosterStatus`
+ * takes priority over `injuryStatus` when both are present, since a
+ * confirmed IR designation is a stronger, more certain fact than a
+ * Questionable/Doubtful practice-report tag. Standalone-quantified
+ * before shipping (not assumed): on a pool deliberately built *without*
+ * the broad-mode Played===1 protection (to simulate Single Pair mode's
+ * real exposure), adding this on top of the injury report alone gained
+ * +4.8 to +7.3pp across all three scoring formats on the 2025 season —
+ * a bigger jump than the injury report's own contribution. Confirmed
+ * separately that Broad mode's own tracked accuracy is untouched by
+ * either signal, since its pool already excludes non-players by
+ * construction (see CLAUDE.md's items on both signals).
  */
 export function buildBacktestComparisonInput(
   playerId: number,
@@ -72,6 +89,9 @@ export function buildBacktestComparisonInput(
   const team = weekRow?.Team ?? anyPlayer.Team;
   const position = weekRow?.Position ?? anyPlayer.Position;
 
+  const weekStat = weekSlice.nflverseStatForWeek(playerId, targetWeek);
+  const injuryStatus = weekStat?.rosterStatus === "RES" ? "Out" : (weekStat?.injuryStatus ?? null);
+
   const player: Player = {
     PlayerID: anyPlayer.PlayerID,
     Team: team,
@@ -81,7 +101,7 @@ export function buildBacktestComparisonInput(
     Status: anyPlayer.Status,
     PhotoUrl: anyPlayer.PhotoUrl,
     ByeWeek: anyPlayer.ByeWeek,
-    InjuryStatus: weekSlice.nflverseStatForWeek(playerId, targetWeek)?.injuryStatus ?? null,
+    InjuryStatus: injuryStatus,
   };
 
   const seasonStat = weekSlice.seasonToDateTable.get(playerId) ?? null;

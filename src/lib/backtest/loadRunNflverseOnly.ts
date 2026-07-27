@@ -1,6 +1,7 @@
 import { getDepthChartByNormalizedNameWeek } from "@/lib/nflverse/depthCharts";
 import { getNflverseGameLog } from "@/lib/nflverse/gameLog";
 import { getInjuryReports } from "@/lib/nflverse/injuries";
+import { getReserveStatusReports } from "@/lib/nflverse/rosters";
 import { getNgsPassing, getNgsReceiving, getNgsRushing } from "@/lib/nflverse/nextGenStats";
 import { getRedZoneTouches } from "@/lib/nflverse/playByPlay";
 import { getPlayerWeekStats } from "@/lib/nflverse/playerStats";
@@ -70,6 +71,7 @@ export async function loadNflverseOnlyRunData(season: number, maxWeek: number): 
     ngsReceiving,
     ngsRushing,
     injuryReports,
+    reserveStatusReports,
   ] = await Promise.all([
     getNflverseByes(season, maxWeek),
     // Same underlying schedules/games.csv fetch as getNflverseByes above —
@@ -86,6 +88,7 @@ export async function loadNflverseOnlyRunData(season: number, maxWeek: number): 
     loadNflverse("NGS receiving", () => getNgsReceiving(season)),
     loadNflverse("NGS rushing", () => getNgsRushing(season)),
     loadNflverse("injury reports", () => getInjuryReports(season)),
+    loadNflverse("reserve status reports", () => getReserveStatusReports(season)),
   ]);
 
   const redZoneTouches = await loadNflverse("red zone touches", () => getRedZoneTouches(season));
@@ -110,6 +113,7 @@ export async function loadNflverseOnlyRunData(season: number, maxWeek: number): 
       ngsRushingRows: ngsRushing,
       injuryRows: injuryReports,
       redZoneRows: redZoneTouches,
+      rosterRows: reserveStatusReports,
     },
     gameLog.playerIdByNormalizedName
   );

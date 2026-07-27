@@ -1,4 +1,5 @@
 import { getInjuryReports } from "@/lib/nflverse/injuries";
+import { getReserveStatusReports } from "@/lib/nflverse/rosters";
 import { getNgsPassing, getNgsReceiving, getNgsRushing } from "@/lib/nflverse/nextGenStats";
 import { getRedZoneTouches } from "@/lib/nflverse/playByPlay";
 import { buildSdioPlayerIdByNormalizedName } from "@/lib/nflverse/playerMatch";
@@ -90,6 +91,7 @@ export async function loadBacktestRunData(
     ngsRushing,
     injuryReports,
     redZoneTouches,
+    reserveStatusReports,
   ] = await Promise.all([
     Promise.all(weeks.map((week) => getPlayerGameStatsByWeek(apiSeason, week))),
     Promise.all(weeks.map((week) => getTeamGameStatsByWeek(apiSeason, week))),
@@ -102,6 +104,7 @@ export async function loadBacktestRunData(
     loadNflverse("NGS rushing", () => getNgsRushing(season)),
     loadNflverse("injury reports", () => getInjuryReports(season)),
     loadNflverse("red zone touches", () => getRedZoneTouches(season)),
+    loadNflverse("reserve status reports", () => getReserveStatusReports(season)),
   ]);
 
   const byesByTeam = new Map<string, number>(byes.map((b) => [b.Team, b.Week]));
@@ -114,6 +117,7 @@ export async function loadBacktestRunData(
       ngsRushingRows: ngsRushing,
       injuryRows: injuryReports,
       redZoneRows: redZoneTouches,
+      rosterRows: reserveStatusReports,
     },
     buildSdioPlayerIdByNormalizedName(allPlayers)
   );
