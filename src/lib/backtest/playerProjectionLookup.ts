@@ -76,7 +76,15 @@ export async function runPlayerProjectionLookup(
         runData.byesByTeam
       );
       const breakdown = scorePlayer(input, format);
-      const predicted = breakdown.finalScore;
+      // A player who didn't play that week (bye, inactive, etc.) has
+      // nothing to project against — scorePlayer() will still compute a
+      // finalScore from their recent form regardless, since it has no
+      // notion of "there's no game this week," but showing that number
+      // next to an "actual" of Bye/DNP reads as a real, gradeable
+      // projection when it isn't one. Suppressing it here doesn't change
+      // any MAE/RMSE/bias number — those already require both predicted
+      // AND actual to be non-null, and actual was already null here.
+      const predicted = weekRow ? breakdown.finalScore : null;
 
       metaByPlayer.set(playerId, {
         displayName: breakdown.displayName,
