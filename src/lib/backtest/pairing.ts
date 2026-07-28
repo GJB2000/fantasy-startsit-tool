@@ -8,29 +8,36 @@ export interface CandidatePair {
   playerIds: [number, number];
 }
 
+export interface RankedPoolEntry {
+  playerId: number;
+  avgPoints: number;
+}
+
 /**
- * Broad-mode pairing for one position/week: rank players who actually
- * played that week by season-to-date average (through the prior week
- * only, in the requested scoring format — which players count as
- * "adjacent rank" genuinely shifts by format, since reception-heavy
- * players rank differently under PPR vs. Standard), restrict to a
- * realistic "startable" depth, then pair ADJACENT ranks. This produces
- * genuinely close, realistic start/sit dilemmas rather than random
- * blowout pairings that would trivially inflate accuracy.
+ * The "realistic startable pool" for one position/week: players who
+ * actually played that week, ranked by season-to-date average (through
+ * the prior week only, in the requested scoring format — which players
+ * count as "adjacent rank" genuinely shifts by format, since
+ * reception-heavy players rank differently under PPR vs. Standard),
+ * restricted to BROAD_MODE_POOL_SIZE depth. Extracted out of
+ * buildPairsForWeek (which just pairs this same ranked list adjacent)
+ * so other consumers — e.g. the projection-accuracy backtest, which
+ * grades every pool member individually rather than pairing them —
+ * can reuse the identical pool definition without re-deriving it.
  *
  * Requiring Played===1 in the target week is a test-set eligibility
  * choice (we need a real outcome to grade against) — it uses hindsight
  * on PARTICIPATION only, never on performance, so it doesn't leak
  * predictive information into the comparison itself.
  */
-export function buildPairsForWeek(
+export function buildRankedPoolForWeek(
   weekSlice: BacktestWeekSlice,
   position: SkillPosition,
   format: ScoringFormat = "ppr"
-): CandidatePair[] {
+): RankedPoolEntry[] {
   const pool = weekSlice.targetWeekRows.filter((r) => r.Played === 1 && r.Position === position);
 
-  const ranked = pool
+  return pool
     .map((r) => ({ playerId: r.PlayerID, seasonToDate: weekSlice.seasonToDateTable.get(r.PlayerID) }))
     .filter((p) => p.seasonToDate != null && p.seasonToDate.Played > 0)
     .map((p) => ({
@@ -39,6 +46,20 @@ export function buildPairsForWeek(
     }))
     .sort((a, b) => b.avgPoints - a.avgPoints)
     .slice(0, BROAD_MODE_POOL_SIZE[position]);
+}
+
+/**
+ * Broad-mode pairing for one position/week: the ranked pool above,
+ * paired adjacent-rank. This produces genuinely close, realistic
+ * start/sit dilemmas rather than random blowout pairings that would
+ * trivially inflate accuracy.
+ */
+export function buildPairsForWeek(
+  weekSlice: BacktestWeekSlice,
+  position: SkillPosition,
+  format: ScoringFormat = "ppr"
+): CandidatePair[] {
+  const ranked = buildRankedPoolForWeek(weekSlice, position, format);
 
   const pairs: CandidatePair[] = [];
   for (let i = 0; i + 1 < ranked.length; i += 2) {

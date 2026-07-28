@@ -7,15 +7,21 @@ import type {
   ConfidenceBreakdown,
   WeekGradeResult,
 } from "@/lib/backtest/grading";
+import type { ProjectionSummary as ProjectionSummaryData } from "@/lib/backtest/projectionGrading";
+import type { PlayerProjectionDetail } from "@/lib/backtest/playerProjectionLookup";
+import type { PlayerProjectionSummary } from "@/lib/backtest/runProjectionBacktest";
 import type { PlayerSummary } from "@/lib/sportsdata/types";
 import type { TradeGradeResult } from "@/lib/backtest/tradeBacktest";
 import { BacktestCaveatNote } from "./BacktestCaveatNote";
 import { BacktestSummaryView } from "./BacktestSummary";
 import { BacktestWeekTable } from "./BacktestWeekTable";
 import { PlayerSearchInput } from "./PlayerSearchInput";
+import { ProjectionPlayerDetailView } from "./ProjectionPlayerDetail";
+import { ProjectionPlayerTable } from "./ProjectionPlayerTable";
+import { ProjectionSummaryView } from "./ProjectionSummary";
 import { TradeBacktestTable } from "./TradeBacktestTable";
 
-type Mode = "pair" | "broad" | "trade";
+type Mode = "pair" | "broad" | "trade" | "projection";
 // Every season but 2025 runs against nflverse-only data, for every mode —
 // see runBacktest()'s route selection. Single-pair mode resolves the
 // SportsDataIO player selection into that season's nflverse name space
@@ -55,6 +61,15 @@ interface TradeResponse {
   results: TradeGradeResult[];
 }
 
+interface ProjectionResponse {
+  overall: ProjectionSummaryData | null;
+  byPosition: Record<string, ProjectionSummaryData> | null;
+  baselineOverall: ProjectionSummaryData | null;
+  baselineByPosition: Record<string, ProjectionSummaryData> | null;
+  byPlayer: PlayerProjectionSummary[] | null;
+  playerDetail: PlayerProjectionDetail[] | null;
+}
+
 export function BacktestTool() {
   const [mode, setMode] = useState<Mode>("pair");
   const [season, setSeason] = useState<Season>("2025");
@@ -71,6 +86,8 @@ export function BacktestTool() {
   const [broadResultSeason, setBroadResultSeason] = useState<Season>("2025");
   const [tradeResult, setTradeResult] = useState<TradeResponse | null>(null);
   const [tradeResultSeason, setTradeResultSeason] = useState<Season>("2025");
+  const [projectionResult, setProjectionResult] = useState<ProjectionResponse | null>(null);
+  const [lookupPlayers, setLookupPlayers] = useState<PlayerSummary[]>([]);
 
   function addPlayer(player: PlayerSummary) {
     setPlayers((prev) => (prev.length >= 2 ? prev : [...prev, player]));
@@ -80,6 +97,18 @@ export function BacktestTool() {
   function removePlayer(playerId: number) {
     setPlayers((prev) => prev.filter((p) => p.playerId !== playerId));
     setPairResult(null);
+  }
+
+  const MAX_LOOKUP_PLAYERS = 4;
+
+  function addLookupPlayer(player: PlayerSummary) {
+    setLookupPlayers((prev) => (prev.length >= MAX_LOOKUP_PLAYERS ? prev : [...prev, player]));
+    setProjectionResult(null);
+  }
+
+  function removeLookupPlayer(playerId: number) {
+    setLookupPlayers((prev) => prev.filter((p) => p.playerId !== playerId));
+    setProjectionResult(null);
   }
 
   function togglePosition(position: string) {
@@ -94,11 +123,28 @@ export function BacktestTool() {
     setPairResult(null);
     setBroadResult(null);
     setTradeResult(null);
+    setProjectionResult(null);
 
     const weeks = `${weekFrom}-${weekTo}`;
 
     try {
-      if (mode === "pair") {
+      if (mode === "projection") {
+        if (positions.length === 0 && lookupPlayers.length === 0) {
+          setError("Select at least one position, or search for a player.");
+          return;
+        }
+        const query = new URLSearchParams({ weeks, positions: positions.join(",") });
+        if (lookupPlayers.length > 0) {
+          query.set("ids", lookupPlayers.map((p) => p.playerId).join(","));
+        }
+        const res = await fetch(`/api/backtest/projection?${query}`);
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error ?? "Something went wrong.");
+          return;
+        }
+        setProjectionResult(data);
+      } else if (mode === "pair") {
         if (players.length !== 2) {
           setError("Select two players to backtest.");
           return;
@@ -195,31 +241,88 @@ export function BacktestTool() {
         >
           Trade analyzer
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            setMode("projection");
+            setSeason("2025");
+          }}
+          className={`rounded-md px-3 py-1.5 ${
+            mode === "projection"
+              ? "bg-foreground text-background"
+              : "border border-zinc-300 dark:border-zinc-700"
+          }`}
+        >
+          Projection accuracy
+        </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-zinc-500">Season</span>
-        {SEASON_OPTIONS.map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => {
-              setSeason(s);
-              setPairResult(null);
-              setBroadResult(null);
-              setTradeResult(null);
-            }}
-            className={`rounded-md px-3 py-1.5 ${
-              season === s ? "bg-foreground text-background" : "border border-zinc-300 dark:border-zinc-700"
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-        <span className="text-xs text-zinc-500">
-          {season === "2025" ? "primary, tuned" : "out-of-sample validation (nflverse-only)"}
-        </span>
-      </div>
+      {mode === "projection" ? (
+        <>
+          <p className="text-xs text-zinc-500">
+            2025 season only, PPR only, for now — how close the engine&apos;s own score comes to real points
+            scored, not just whether it picked the right player.
+          </p>
+          <div className="space-y-2">
+            <span className="text-sm text-zinc-500">Look up specific players (optional)</span>
+            <div className="space-y-2">
+              {lookupPlayers.map((player) => (
+                <div
+                  key={player.playerId}
+                  className="flex items-center justify-between rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2"
+                >
+                  <span className="text-sm">
+                    {player.name}{" "}
+                    <span className="text-zinc-500">
+                      {player.position}
+                      {player.team ? ` · ${player.team}` : ""}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeLookupPlayer(player.playerId)}
+                    className="text-sm text-zinc-500 hover:text-foreground"
+                    aria-label={`Remove ${player.name}`}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {lookupPlayers.length < MAX_LOOKUP_PLAYERS && (
+                <PlayerSearchInput
+                  onSelect={addLookupPlayer}
+                  excludeIds={lookupPlayers.map((p) => p.playerId)}
+                  placeholder="Search a player…"
+                />
+              )}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-zinc-500">Season</span>
+          {SEASON_OPTIONS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => {
+                setSeason(s);
+                setPairResult(null);
+                setBroadResult(null);
+                setTradeResult(null);
+              }}
+              className={`rounded-md px-3 py-1.5 ${
+                season === s ? "bg-foreground text-background" : "border border-zinc-300 dark:border-zinc-700"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+          <span className="text-xs text-zinc-500">
+            {season === "2025" ? "primary, tuned" : "out-of-sample validation (nflverse-only)"}
+          </span>
+        </div>
+      )}
 
       {mode === "pair" && (
         <div className="space-y-3">
@@ -264,7 +367,7 @@ export function BacktestTool() {
         </div>
       )}
 
-      {(mode === "broad" || mode === "trade") && (
+      {(mode === "broad" || mode === "trade" || mode === "projection") && (
         <>
           <div className="flex flex-wrap gap-2 text-sm">
             {ALL_POSITIONS.map((position) => (
@@ -416,6 +519,38 @@ export function BacktestTool() {
           </p>
           <BacktestSummaryView summary={tradeResult.overall} byPosition={tradeResult.byPosition} />
           <TradeBacktestTable results={tradeResult.results} />
+        </div>
+      )}
+
+      {projectionResult && (
+        <div className="space-y-4">
+          <p className="text-xs font-medium text-zinc-500">Showing 2025 results (SportsDataIO, PPR)</p>
+
+          {projectionResult.playerDetail && projectionResult.playerDetail.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Player lookup — projected vs. actual by week
+              </h3>
+              <ProjectionPlayerDetailView players={projectionResult.playerDetail} />
+            </div>
+          )}
+
+          {projectionResult.overall && (
+            <>
+              <ProjectionSummaryView
+                overall={projectionResult.overall}
+                byPosition={projectionResult.byPosition ?? undefined}
+                baselineOverall={projectionResult.baselineOverall ?? undefined}
+                baselineByPosition={projectionResult.baselineByPosition ?? undefined}
+              />
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  By player (worst MAE first)
+                </h3>
+                <ProjectionPlayerTable players={projectionResult.byPlayer ?? []} />
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

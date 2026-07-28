@@ -103,8 +103,21 @@ the old single top NavBar (shared across all pages) was replaced by a
 persistent sidebar shell, and a new **Home** page (`/` — Start/Sit
 moved to `/start-sit` to make room) now serves as a real navigational
 hub across all four tools, plus a "recent comparisons" panel showing
-genuine session history rather than placeholder content. Out of scope
-so far:
+genuine session history rather than placeholder content. The Backtest
+page gained a fourth mode next, **Projection accuracy** (item 65) — a
+fundamentally different question from every other backtest number in
+this app: not "did the engine pick the right player" (every prior
+backtest) but "how close does the engine's own score come to real
+points scored." Ships with an engine-vs-naive-baseline comparison
+(MAE/RMSE/bias), a per-player breakdown, and a player-search mode
+showing week-by-week projected/actual/diff — the last of which
+surfaced a real, unresolved calibration problem (see "Backtesting &
+Tuning History" item 65 and Open Items): the engine systematically
+*under-projects* at least one real player (Matthew Stafford, wrong in
+the same direction all 16 graded weeks) and can produce *negative*
+point projections in-season, neither of which has been investigated
+yet. Scoped to 2025/PPR/skill-positions-only for this first pass. Out
+of scope so far:
 database/persistence, auth. Upcoming-schedule/next-opponent
 lookup — previously fully out of scope — is now partially built (see
 below): the live start/sit tool's own matchup modifier still looks up
@@ -3680,7 +3693,283 @@ single-season numbers for those specific constants.
       Analyzer's own backtest (`tradeBacktest.ts` stays skill-only,
       unchanged).
 
-### Open items (as of item 63 — pick up here)
+64. **Reworked the app's top-level navigation from a single top NavBar
+    into a persistent sidebar shell, plus a new Home page** — the app
+    had grown to four real tools (Start/Sit, Trade Analyzer, Waivers,
+    Backtest), each still built as its own isolated, centered
+    marketing-style page with a big hero. Explored two mockups first
+    (a general "dashboard" concept and the same treatment applied to
+    Start/Sit specifically) before building anything real, then shipped
+    on direct request — with one explicit change from the mockups: the
+    landing page is called **Home**, not "Dashboard," throughout (nav
+    label, route, page title).
+    - **New `AppShell.tsx`** replaces `NavBar.tsx` (deleted) as the root
+      layout's chrome — a persistent sidebar, deliberately kept a fixed
+      dark navy in BOTH light and dark mode (unlike every other surface
+      in this app, which follows the theme toggle) as a "broadcast
+      desk" nod to the app's existing Prime Time navy/electric-blue
+      branding. Collapses to a horizontal scrolling bar below the `md`
+      breakpoint instead of a hamburger menu, since the 5-link list
+      stays usable that way. Shows the user's current scoring format
+      (read live from `useScoringFormat`) in its footer — real state,
+      not a static label.
+    - **New `PageHeader.tsx`** replaces each page's old full-bleed hero
+      (large centered headline + `.hero-glow` gradient blur, now
+      deleted from `globals.css` as dead CSS) with a compact, left-
+      aligned title/subtitle — the hero made sense when every page was
+      an isolated screen but wasted the sidebar layout's width and read
+      as inconsistent once a persistent nav is always on screen.
+    - **Routing changed**: `/` is now Home, not Start/Sit — Start/Sit
+      moved to `/start-sit`. This is the one real breaking change in
+      this item (old bookmarks/links to `/` now land on Home, not a
+      redirect); no other route moved. Verified via a real `next build`
+      that both routes generate correctly as separate static pages.
+    - **Home page** (`src/app/page.tsx`) is a real navigational hub, not
+      a data dashboard — deliberately, given this project's own
+      standing "no dummy/placeholder data" rule (see Things to Avoid).
+      The mockup's illustrative widgets (a pre-filled "quick compare,"
+      a fake "latest trade verdict," hardcoded accuracy numbers) don't
+      have an honest real-data source without either a slow live fetch
+      on every page load (backtest accuracy) or a persistence layer
+      this app doesn't have (a "latest trade," since trades aren't
+      saved anywhere) — so Home shipped as 4 real tool-launch cards
+      (real copy, real links, no numbers) plus one genuinely live
+      widget: recent Start/Sit comparisons (see below), which needed no
+      fake data to populate because it's real session history.
+    - **New `useRecentComparisons.ts`** (localStorage, no backend —
+      same "no persistence" scope as `useRosteredPlayers.ts`/
+      `useScoringFormat.ts`) records up to 5 real Start/Sit results the
+      user has actually run this browser. `StartSitTool.tsx` writes to
+      it after every successful `/api/compare` call; a new
+      `StartSitRail.tsx` (`RecentComparisonsPanel`, exported for reuse)
+      renders it both on the Start/Sit page and, via a thin client
+      wrapper (`RecentComparisonsHomeCard.tsx`, needed so the Home page
+      itself can stay a server component), on Home.
+    - **Start/Sit's content got the fuller redesign** the mockup showed
+      (the other three tools' internal content is deliberately
+      untouched this pass — just re-homed under the new shell/header,
+      per the same "port everything to the shell, redesign what was
+      actually mocked up" scoping this item's own mockup conversation
+      already set expectations for). `StartSitTool.tsx` now lays out as
+      a 2-column grid: search panel + `ComparisonResult.tsx` (itself
+      unchanged — its existing squircle-card styling already matched
+      the dashboard treatment closely, see the earlier Apple-inspired
+      redesign) on the left, `StartSitRail.tsx` on the right. The rail's
+      other panel, **matchup context**, is built entirely from data the
+      API response already carries (`PlayerScoreBreakdown.matchupContext`,
+      already populated for skill positions) — no new fetch, and it
+      degrades to nothing for D/ST/K (which don't have this field) the
+      same way the rest of the app treats fields those positions lack.
+    - **New `--surface-sunken` design token** added to `globals.css`
+      (light `#f4f6fa` / dark `#0c111a`) for the slightly-recessed
+      panel backgrounds (player chips, etc.) the new layout needed — a
+      real, permanent addition to the token system alongside
+      `--surface`, not a one-off inline color.
+    - **Verified live end-to-end, not just `tsc`/lint**: a real
+      Bijan Robinson vs. Jonathan Taylor comparison on the redesigned
+      `/start-sit` rendered the real headline, real "Why" reasoning,
+      real player-card stats, a real matchup-context rail (correctly
+      labeling one matchup "roughly average" and the other "tough
+      matchup" from the actual `diffFromAverage` sign), and the real
+      comparison appearing in "Recent comparisons" immediately after.
+      Confirmed Home, Trade Analyzer, Waivers, and Backtest all render
+      correctly under the new shell with zero console errors, in both
+      light and dark mode (sidebar staying dark in both, main content
+      switching), and at mobile width (sidebar collapsing to a
+      horizontal bar, cards stacking single-column). `next build`
+      clean; `npx tsc --noEmit -p .` and `npm run lint` both clean.
+
+65. **Added a "Projection accuracy" mode to the Backtest page — a
+    fundamentally different question from every other backtest number in
+    this document.** Every existing backtest grades PAIRWISE PICK
+    accuracy (given two players, did the engine recommend whoever
+    actually scored more) — that's a ranking question, and a model can
+    answer it correctly while still being wildly wrong about EACH
+    player's actual point total, since only the relative order matters.
+    This item asks the other question directly, on explicit request:
+    how close does the engine's own `finalScore` come to real points
+    scored? Deliberately scoped simple, per that same request: 2025
+    season only (the primary, tuned SportsDataIO pipeline), PPR only,
+    skill positions only (QB/RB/WR/TE — D/ST/K deferred, see Open Items).
+    - **Key architectural insight, not a new signal**: `finalScore` was
+      already denominated in fantasy points the whole time — it's built
+      entirely from point-denominated terms (`blendedScore` is a
+      recent/season PPR-point blend; every modifier stacked on top,
+      `matchupModifier`/`volumeModifier`/etc., is itself an "expected
+      points from X" term). It had just never been *graded* as a point
+      estimate before, only ever compared relatively within a pair. That
+      means testing this needed no new scoring logic, only a new grading
+      layer on top of the existing, unmodified `scorePlayer`.
+    - **New population, reused rather than rebuilt**: extracted
+      `buildRankedPoolForWeek` out of `pairing.ts`'s existing
+      `buildPairsForWeek` (a pure refactor — `buildPairsForWeek` now
+      just pairs that same ranked list adjacent, no behavior change) so
+      this tests the identical "realistic startable pool"
+      (`BROAD_MODE_POOL_SIZE`) every pick-accuracy backtest already
+      uses, rather than the full player universe — projecting a
+      replacement-level bench player's points is a noisier, less
+      meaningful test, the same reasoning that motivated the pool cap
+      in the first place (items 6-13).
+    - **New `projectionGrading.ts`** (`ProjectionGradeResult`/
+      `summarizeProjectionErrors`) computes MAE (mean absolute error —
+      the headline "how many points off, on average" number), RMSE
+      (penalizes big individual misses more than MAE), and bias (mean
+      *signed* error — positive means the model systematically
+      over-projects, negative means it under-projects) — mirrors
+      `grading.ts`'s summarizer discipline (one reusable pure function,
+      not duplicated per call site) but for continuous error instead of
+      correct/incorrect/push/no_pick, since this is a magnitude
+      question, not a binary one.
+    - **New `runProjectionBacktest.ts`** walks every week/position,
+      grades every pool member's `finalScore` against their real actual
+      points that week, AND grades a naive "season-to-date average"
+      baseline the identical way on the identical player-weeks (free to
+      compute, since that average is already the pool's own ranking
+      basis) — so the engine's projection has a naive number to beat,
+      the same "never report an accuracy number without a naive
+      baseline" discipline this whole document has followed since item
+      2. New route `/api/backtest/projection`; new `Mode` on
+      `BacktestTool.tsx` ("Projection accuracy," season toggle hidden
+      and forced to 2025 for this mode, position checkboxes reused with
+      no D/ST/K entries); new `ProjectionSummaryView` component
+      mirroring `BacktestSummaryView`'s plain banner-row layout rather
+      than introducing a new visual language.
+    - **Real result, full 2025 season (weeks 1-18), PPR, n=1224
+      pool-member-weeks**:
+
+      | | engine `finalScore` | naive season-avg baseline |
+      |---|---|---|
+      | Overall | MAE 6.8, RMSE 8.8, bias -0.6 | MAE 6.9, RMSE 8.6, bias +1.9 |
+      | QB (n=204) | MAE 8.0, RMSE 10.3, bias -1.8 | MAE 7.4, RMSE 9.4, bias +3.1 |
+      | RB (n=408) | MAE 6.7, RMSE 8.5, bias +0.2 | MAE 6.6, RMSE 8.5, bias +0.9 |
+      | WR (n=408) | MAE 7.0, RMSE 9.0, bias -0.6 | MAE 7.2, RMSE 8.7, bias +2.5 |
+      | TE (n=204) | MAE 5.5, RMSE 7.5, bias -1.0 | MAE 6.0, RMSE 7.7, bias +1.4 |
+
+    - **Honest read of this table — a mixed result on raw error, but a
+      clear and consistent one on bias.** MAE is close between the two
+      everywhere (the engine wins overall and at WR/TE, the baseline
+      wins narrowly at QB/RB) — the engine's dozen blended signals don't
+      buy a dramatically smaller average miss than just "how many points
+      has this player been averaging." **Bias tells a real, different
+      story**: the naive baseline is *systematically optimistic* at
+      every position (+0.2 to +3.1, worst at QB), while the engine's
+      bias sits near zero or mildly negative everywhere (-1.8 to +0.2).
+      Best-guess explanation, not confirmed further: a player's
+      inclusion in this ranked pool is itself conditioned on a strong
+      season average, so using that same average to predict the *next*
+      week is partly predicting on the noise that got them into the
+      pool in the first place (a regression-to-the-mean effect) — the
+      engine's recent-form/matchup blend pulls the estimate back down
+      from that optimism, at the real cost of sometimes overcorrecting
+      (QB's -1.8 bias is the single largest miss in either direction on
+      this table).
+    - **This is a genuinely new kind of finding for this document** —
+      every prior item asked "does the engine pick the right player,"
+      and this is the first evidence on "does the engine's own number
+      mean anything as a point estimate." The answer is a qualified yes:
+      not dramatically more accurate in raw MAE than the simplest
+      possible baseline, but meaningfully better-calibrated (less
+      systematically biased), which is exactly the kind of thing pick
+      accuracy alone could never have surfaced, since two well-ranked
+      but badly-calibrated numbers still produce a correct pick.
+    - **Verified live, not just via the API response**: ran the real
+      `/backtest` page end-to-end (mode → position checkboxes → real
+      fetch → rendered banners) and got the exact numbers in the table
+      above; confirmed the season toggle correctly hides for this mode,
+      zero console errors, `npx tsc --noEmit -p .` and `npm run lint`
+      both clean.
+    - **Added a per-player breakdown immediately after, on direct
+      follow-up request** ("I want to see if for individual players
+      too") — the position-level table above pools every player-week
+      together, which can hide real variance: a model could be
+      well-calibrated on average while being consistently wrong about
+      specific players. `runProjectionBacktest.ts` already computed
+      every individual `ProjectionGradeResult`; this just groups them by
+      `playerId` before pooling (a genuine "was this data already
+      there" reuse, not new scoring or fetching) into a new
+      `PlayerProjectionSummary[]`, sorted worst-MAE-first so the biggest
+      misses are the first thing visible rather than buried in an
+      average. New `ProjectionPlayerTable.tsx` (mirrors
+      `BacktestWeekTable.tsx`'s plain `overflow-x-auto` table styling).
+    - **Real result confirms the expected shape, not a surprise**: the
+      worst-MAE players are overwhelmingly `n=1`-`2` small-sample
+      outliers (e.g. a QB who played a single partial game) — exactly
+      what you'd expect, since a single bad week dominates a mean with
+      no other games to average against. But a handful of well-sampled
+      players (`n=12-16`, nearly a full season) also show real, sizable
+      misses — Matthew Stafford (n=12, MAE 18.2) stood out enough to be
+      worth a dedicated look if this gets picked up again: MAE, RMSE,
+      and `|bias|` were nearly identical for him, which by the power-mean
+      inequality (RMSE ≥ MAE, with equality only when every error has
+      the same magnitude) implies unusually *consistent* same-direction
+      misses across his 12 games, not just a large average one — flagged
+      here as an observation, not confirmed further (see Open Items).
+    - **Added player search with a week-by-week table, on direct
+      follow-up request** ("I want to be able to search for a player...
+      see projected points, actual points and the difference") — the
+      per-player breakdown above still pools across weeks into one MAE
+      number; this shows the actual week-by-week detail behind it for
+      whichever specific player(s) the user searches, the same way
+      Single Pair mode already lets a user search specific players
+      rather than only ever seeing the broad-mode pool.
+      New `playerProjectionLookup.ts`
+      (`runPlayerProjectionLookup`) is a genuinely separate function
+      from `runProjectionBacktest.ts`, not a thin wrapper around it —
+      deliberately NOT restricted to the "realistic startable pool"
+      (`buildRankedPoolForWeek`) the aggregate uses, since a user
+      searching for one player wants that exact player's history
+      regardless of whether they'd have ranked inside the pool every
+      week. This means the same player's numbers can legitimately
+      *differ* between the two views — confirmed live: Stafford's
+      pool-restricted `byPlayer` entry (n=12, MAE 18.2) only counts the
+      12 weeks he ranked inside the top-12 QB pool, while the
+      unrestricted lookup (n=16) grades all 16 weeks he played, and
+      lands on a materially different MAE (20.5) — a real, honest
+      difference in what's being measured, not a bug, but one worth
+      being aware of if comparing the two tables side by side.
+      `/api/backtest/projection` gained an optional `ids` param
+      (comma-separated player IDs); `positions` and `ids` are
+      independent and either can be empty — the route distinguishes "no
+      `positions` param" (every other caller's existing "give me all
+      skill positions" default) from "empty `positions` param" (this
+      route's own "the user wants a player-only lookup, run zero pool
+      positions" case) by checking the raw query value before deciding
+      whether to invoke `parsePositionsParam` at all, rather than
+      changing that shared function's default behavior for every other
+      caller. New `ProjectionPlayerDetailView`/`ProjectionPlayerDetail.tsx`
+      renders Week/Projected/Actual/Diff per searched player, reusing
+      the "Look up specific players" chip-list + `PlayerSearchInput`
+      pattern Single Pair mode already established (capped at 4 players,
+      mirroring Start/Sit's `MAX_PLAYERS`).
+    - **The week-by-week detail surfaced a second, sharper version of
+      the Stafford finding**: not just "similar-magnitude misses" but
+      literally the *same-signed* miss in all 16 graded weeks — the
+      model under-projected him every single week, no exceptions. It
+      also surfaced something else worth flagging honestly: several of
+      his early-season `predicted` values are *negative*
+      (e.g. week 2: -3.5, week 6: -13.6) — `finalScore` has no floor at
+      zero, so a real QB's projection going negative is possible today
+      given enough stacked negative modifiers, which reads as
+      implausible on its face (a real NFL starter's fantasy floor isn't
+      meaningfully negative) even though it isn't new behavior this
+      item introduced — `scorePlayer` has always been able to produce
+      this, it just was never visible at this granularity before. Not
+      investigated or fixed here — flagged in Open Items.
+    - **Verified live end-to-end**: a real Matthew Stafford lookup
+      (weeks 1-18, no positions checked) rendered the exact week-by-week
+      table above via the real UI, confirmed a combined request
+      (positions AND `ids` both set) returns both sections' data
+      correctly via a direct API check, zero console errors, `npx tsc
+      --noEmit -p .` and `npm run lint` both clean.
+    - **Deliberately out of scope for this pass** (see Open Items):
+      D/ST and K (would need `scoreExtendedPlayerBacktest` instead of
+      `scorePlayer` directly, plus D/ST's own synthetic-row actual-score
+      lookup — both already exist from items 62-63, just not wired into
+      this new grading path), Half-PPR/Standard formats, the 2022-2024
+      nflverse-only seasons, and any correlation/R² statistic beyond
+      MAE/RMSE/bias.
+
+### Open items (as of item 65 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -3713,23 +4002,23 @@ rostered-players fix (`resolveRoster.ts`'s `leagueRosteredPlayerIds`,
 threaded through the same files), and item 61's two polish fixes
 (`WaiverResult.tsx`'s `moveHeadline`/`showRosteredButton`) are all part
 of that same 80f6c70 commit — landed and deployed together, not a
-separate pending batch. **Item 62's D/ST and K support (live tools
-only) is committed separately, as `a86cc8b`** — real, working,
-live-verified code (`scoreDefense.ts`/`scoreKicker.ts`/
-`scoreExtended.ts`/`scoreExtendedShared.ts`, `sportsdata/defense.ts`/
-`defenseTeams.ts`, `waivers/rankExtendedCandidates.ts`, and the
-`ExtendedPosition`/`compareBreakdowns` changes to existing files),
-pushed to `main` after the user explicitly asked. **Item 63's Backtest-
-page D/ST and K support is NOT yet committed** — real, working,
-live-verified code (`loadRun.ts`'s new fetches, `pairing.ts`'s
-`buildDstPairsForWeek`/`buildKickerPairsForWeek`, the new
-`buildBacktestDstInput`/`buildBacktestKickerInput`/
-`scoreExtendedBacktest.ts`, `runBacktest.ts`'s rewritten
-`runPairBacktest`/`runBroadBacktest`, `params.ts`'s
-`parseExtendedPositionsParam`, and `BacktestTool.tsx`'s new checkboxes)
-sitting uncommitted as of this writing — commit only once the user
-explicitly asks, per this project's standing rule. Nothing below is
-started or fixed yet:
+separate pending batch. Item 62's D/ST and K support (live tools only)
+is committed separately, as `a86cc8b`; item 63's Backtest-page D/ST and
+K support as `f7f2e8b`; item 64's sidebar-shell/Home redesign as
+`927e237` — all pushed to `main` after the user explicitly asked each
+time. **Item 65's "Projection accuracy" mode (including its two
+same-session follow-ups — the per-player breakdown and the player
+search/week-by-week lookup — all still item 65, not separate items) is
+NOT yet committed** —
+real, working, live-verified code (`pairing.ts`'s extracted
+`buildRankedPoolForWeek`, the new `projectionGrading.ts`/
+`runProjectionBacktest.ts`/`playerProjectionLookup.ts`,
+`/api/backtest/projection`, and `BacktestTool.tsx`'s new mode +
+`ProjectionSummary.tsx`/`ProjectionPlayerTable.tsx`/
+`ProjectionPlayerDetail.tsx`) sitting
+uncommitted as of this writing — commit only once the user explicitly
+asks, per this project's standing rule. Nothing below is started or
+fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -3847,92 +4136,40 @@ started or fixed yet:
       already built, just needs its own rest-of-season grading logic
       (mirroring `projectFromHistory`'s relationship to
       `restOfSeason.ts` for skill positions).
-
-64. **Reworked the app's top-level navigation from a single top NavBar
-    into a persistent sidebar shell, plus a new Home page** — the app
-    had grown to four real tools (Start/Sit, Trade Analyzer, Waivers,
-    Backtest), each still built as its own isolated, centered
-    marketing-style page with a big hero. Explored two mockups first
-    (a general "dashboard" concept and the same treatment applied to
-    Start/Sit specifically) before building anything real, then shipped
-    on direct request — with one explicit change from the mockups: the
-    landing page is called **Home**, not "Dashboard," throughout (nav
-    label, route, page title).
-    - **New `AppShell.tsx`** replaces `NavBar.tsx` (deleted) as the root
-      layout's chrome — a persistent sidebar, deliberately kept a fixed
-      dark navy in BOTH light and dark mode (unlike every other surface
-      in this app, which follows the theme toggle) as a "broadcast
-      desk" nod to the app's existing Prime Time navy/electric-blue
-      branding. Collapses to a horizontal scrolling bar below the `md`
-      breakpoint instead of a hamburger menu, since the 5-link list
-      stays usable that way. Shows the user's current scoring format
-      (read live from `useScoringFormat`) in its footer — real state,
-      not a static label.
-    - **New `PageHeader.tsx`** replaces each page's old full-bleed hero
-      (large centered headline + `.hero-glow` gradient blur, now
-      deleted from `globals.css` as dead CSS) with a compact, left-
-      aligned title/subtitle — the hero made sense when every page was
-      an isolated screen but wasted the sidebar layout's width and read
-      as inconsistent once a persistent nav is always on screen.
-    - **Routing changed**: `/` is now Home, not Start/Sit — Start/Sit
-      moved to `/start-sit`. This is the one real breaking change in
-      this item (old bookmarks/links to `/` now land on Home, not a
-      redirect); no other route moved. Verified via a real `next build`
-      that both routes generate correctly as separate static pages.
-    - **Home page** (`src/app/page.tsx`) is a real navigational hub, not
-      a data dashboard — deliberately, given this project's own
-      standing "no dummy/placeholder data" rule (see Things to Avoid).
-      The mockup's illustrative widgets (a pre-filled "quick compare,"
-      a fake "latest trade verdict," hardcoded accuracy numbers) don't
-      have an honest real-data source without either a slow live fetch
-      on every page load (backtest accuracy) or a persistence layer
-      this app doesn't have (a "latest trade," since trades aren't
-      saved anywhere) — so Home shipped as 4 real tool-launch cards
-      (real copy, real links, no numbers) plus one genuinely live
-      widget: recent Start/Sit comparisons (see below), which needed no
-      fake data to populate because it's real session history.
-    - **New `useRecentComparisons.ts`** (localStorage, no backend —
-      same "no persistence" scope as `useRosteredPlayers.ts`/
-      `useScoringFormat.ts`) records up to 5 real Start/Sit results the
-      user has actually run this browser. `StartSitTool.tsx` writes to
-      it after every successful `/api/compare` call; a new
-      `StartSitRail.tsx` (`RecentComparisonsPanel`, exported for reuse)
-      renders it both on the Start/Sit page and, via a thin client
-      wrapper (`RecentComparisonsHomeCard.tsx`, needed so the Home page
-      itself can stay a server component), on Home.
-    - **Start/Sit's content got the fuller redesign** the mockup showed
-      (the other three tools' internal content is deliberately
-      untouched this pass — just re-homed under the new shell/header,
-      per the same "port everything to the shell, redesign what was
-      actually mocked up" scoping this item's own mockup conversation
-      already set expectations for). `StartSitTool.tsx` now lays out as
-      a 2-column grid: search panel + `ComparisonResult.tsx` (itself
-      unchanged — its existing squircle-card styling already matched
-      the dashboard treatment closely, see the earlier Apple-inspired
-      redesign) on the left, `StartSitRail.tsx` on the right. The rail's
-      other panel, **matchup context**, is built entirely from data the
-      API response already carries (`PlayerScoreBreakdown.matchupContext`,
-      already populated for skill positions) — no new fetch, and it
-      degrades to nothing for D/ST/K (which don't have this field) the
-      same way the rest of the app treats fields those positions lack.
-    - **New `--surface-sunken` design token** added to `globals.css`
-      (light `#f4f6fa` / dark `#0c111a`) for the slightly-recessed
-      panel backgrounds (player chips, etc.) the new layout needed — a
-      real, permanent addition to the token system alongside
-      `--surface`, not a one-off inline color.
-    - **Verified live end-to-end, not just `tsc`/lint**: a real
-      Bijan Robinson vs. Jonathan Taylor comparison on the redesigned
-      `/start-sit` rendered the real headline, real "Why" reasoning,
-      real player-card stats, a real matchup-context rail (correctly
-      labeling one matchup "roughly average" and the other "tough
-      matchup" from the actual `diffFromAverage` sign), and the real
-      comparison appearing in "Recent comparisons" immediately after.
-      Confirmed Home, Trade Analyzer, Waivers, and Backtest all render
-      correctly under the new shell with zero console errors, in both
-      light and dark mode (sidebar staying dark in both, main content
-      switching), and at mobile width (sidebar collapsing to a
-      horizontal bar, cards stacking single-column). `next build`
-      clean; `npx tsc --noEmit -p .` and `npm run lint` both clean.
+12. **"Projection accuracy" mode (item 65) is scoped to 2025/PPR/skill
+    positions only** — three real gaps, not oversights:
+    - **D/ST and K aren't graded.** `runProjectionBacktest.ts` calls
+      `buildBacktestComparisonInput`/`scorePlayer` directly rather than
+      the extended dispatcher (`scoreExtendedPlayerBacktest`) items
+      62-63 already built — wiring it in would need D/ST's own
+      actual-score lookup (mirroring `toDstActualRows` in
+      `runBacktest.ts`) since D/ST has no row in `allWeeklyRows`, but
+      the rest of the plumbing already exists.
+    - **Half-PPR/Standard aren't tested** — `runProjectionBacktest`
+      takes a `format` parameter and would work unchanged, this just
+      hasn't been run/reported yet.
+    - **The 2022-2024 nflverse-only seasons aren't covered** — would
+      need a second orchestration function pointed at
+      `loadRunNflverseOnly.ts`, the same pattern every other
+      out-of-sample check in this document already follows.
+    Also worth a dedicated pass if picked up again: item 65's own
+    "regression to the mean" explanation for the baseline's positive
+    bias was reasoned through, not confirmed with a direct test (e.g.
+    checking whether bias correlates with how far above the position's
+    own average a pool member's season average sits). Separately, the
+    per-player breakdown surfaced a real, unexplained case worth
+    digging into on its own — Matthew Stafford's unusually consistent
+    same-direction miss across 12 real games (item 65) — no minimum
+    sample-size filter exists yet either, so the "worst MAE" table is
+    currently dominated by `n=1`-`2` outliers rather than the
+    well-sampled misses that are more likely to mean something. The
+    week-by-week player lookup (also item 65) sharpened this into a
+    concrete, reproducible case: Stafford's `finalScore` under-projected
+    him in literally all 16 graded weeks, and several early-season
+    projections were negative — worth a real investigation (which
+    modifier(s) are driving it, and whether `finalScore` should have a
+    floor at all) rather than the "flagged, not confirmed" state it's
+    in now.
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
@@ -4362,6 +4599,28 @@ started or fixed yet:
   cutoff walk (mirroring `collectBroadResultsForSeason`'s role in
   `runBacktestNflverseOnly.ts`), shared by the single-cutoff
   `runTradeBacktest` and the pooled `runTradeBacktestMultiSeason`.
+  `projectionGrading.ts`/`runProjectionBacktest.ts` (item 65) are a
+  third parallel feature alongside `tradeBacktest.ts` — grading
+  `finalScore` itself as a continuous point projection (MAE/RMSE/bias)
+  rather than a binary pairwise pick, on the same "realistic startable
+  pool" `pairing.ts`'s `buildRankedPoolForWeek` (extracted out of
+  `buildPairsForWeek` for this reuse, no behavior change to the
+  existing pairing) already defines. `runProjectionBacktest`'s
+  `byPlayer` result groups the same already-computed
+  `ProjectionGradeResult`s by `playerId` (no new scoring/fetching) into
+  a `PlayerProjectionSummary[]`, sorted worst-MAE-first. Scoped to the
+  primary 2025
+  SportsDataIO pipeline, PPR, and skill positions only for now — see
+  Open Items for the D/ST/K, other-format, and other-season extensions.
+  `playerProjectionLookup.ts` (item 65) is a genuinely separate function
+  from `runProjectionBacktest.ts`, not a thin wrapper — grades
+  specific, user-searched players week-by-week (`PlayerWeekProjection[]`
+  per player) without restricting to `buildRankedPoolForWeek`'s pool,
+  since a searched player's own history matters regardless of pool
+  membership that week; the same player can legitimately show different
+  summary numbers between this and `runProjectionBacktest`'s `byPlayer`
+  as a result (see item 65's Stafford example) — a real methodology
+  difference, not a bug.
 - `src/app/api/players` (item 62: now calls `searchActiveExtendedPlayers`
   instead of the skill-only `searchActivePlayers`, so D/ST and K appear
   in the shared `PlayerSearchInput.tsx` search box everywhere it's used),
@@ -4409,7 +4668,14 @@ started or fixed yet:
   `src/app/api/backtest/trade`, `src/app/api/backtest/trade-nflverse`,
   `src/app/api/backtest/trade-nflverse-multiseason` (the trade-backtest
   trio is items 48-49; the other nflverse-suffixed routes are items
-  24/36/39 — all out-of-sample validation only) — Route Handlers that
+  24/36/39 — all out-of-sample validation only), `src/app/api/backtest/
+  projection` (item 65 — MAE/RMSE/bias grading, 2025/PPR/skill-only for
+  now; `positions` and an optional `ids` param are independent — the
+  route reads `positions` off the raw query value directly rather than
+  through `parsePositionsParam`'s own default-to-all-positions
+  behavior, specifically so an empty `positions` param can mean "run
+  zero pool positions," not "give me everything," when the request is
+  really just a player-specific lookup) — Route Handlers that
   orchestrate the lib layers above and return trimmed JSON (never proxy
   raw upstream payloads, never leak the API key).
 - `src/components/` — `AppShell.tsx` (item 64 — the persistent sidebar
@@ -4458,15 +4724,32 @@ started or fixed yet:
   independent copy of the same localStorage-synced state that wouldn't
   see this component's own updates), and
   `BacktestTool.tsx`/`BacktestWeekTable.tsx`/`BacktestSummary.tsx`/
-  `BacktestCaveatNote.tsx`/`TradeBacktestTable.tsx` (backtest mode, at
-  `/backtest` — `BacktestTool.tsx` has three modes, Single pair/Broad/
-  Trade analyzer, the last added in item 48; `TradeBacktestTable.tsx` is
+  `BacktestCaveatNote.tsx`/`TradeBacktestTable.tsx`/`ProjectionSummary.tsx`/
+  `ProjectionPlayerTable.tsx`/`ProjectionPlayerDetail.tsx`
+  (backtest mode, at
+  `/backtest` — `BacktestTool.tsx` has four modes, Single pair/Broad/
+  Trade analyzer/Projection accuracy, the last two added in items 48/65
+  respectively; `TradeBacktestTable.tsx` is
   its per-trade detail table, mirroring `BacktestWeekTable.tsx`'s role
   for the other two modes. As of item 63, Broad mode's position
   checkboxes also include D/ST and K, gated to `season === "2025"` — no
   UI change was needed in `BacktestSummary.tsx` for the new by-position
   rows to render, since `byPosition` was already a plain
-  `Record<string, ...>` iterated generically). Restyled in an Apple-inspired pass,
+  `Record<string, ...>` iterated generically. `ProjectionSummary.tsx`
+  (item 65) deliberately mirrors that same plain banner-row layout —
+  MAE/RMSE/bias instead of an accuracy percentage — rather than
+  introducing a new visual language for the backtest page's secondary/
+  internal tool; Projection accuracy mode hides the season toggle
+  entirely and forces 2025, since `runProjectionBacktest` only supports
+  the primary pipeline so far. `ProjectionPlayerTable.tsx` (item 65,
+  added on direct follow-up request) renders the same per-player
+  breakdown as a plain table, mirroring `BacktestWeekTable.tsx`'s
+  `overflow-x-auto` styling rather than a third layout convention.
+  `ProjectionPlayerDetail.tsx` (item 65, second follow-up request) adds
+  the "Look up specific players" chip-list + search UI and renders
+  `playerProjectionLookup.ts`'s week-by-week Projected/Actual/Diff table
+  per searched player, same table styling again).
+  Restyled in an Apple-inspired pass,
   superseding the original indigo-accent design: `globals.css` defines
   a real token system via Tailwind v4's `@theme inline` — `--accent`
   (teal, brand/UI-chrome only: nav, buttons, focus rings) plus
