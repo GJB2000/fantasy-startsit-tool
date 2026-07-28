@@ -91,6 +91,14 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
   } else if (seasonPprAvg != null) {
     blendedScore = seasonPprAvg;
     notes.push("No games in the recent-form window — using season average only.");
+  } else if (input.priorSeasonPprAvg != null) {
+    // Last resort: no games at all yet this season (week 1, most
+    // commonly, but also a rookie call-up or a player back from a long
+    // absence). Every modifier below this point still applies normally —
+    // matchup, volume, etc. — this only substitutes for the recent/season
+    // blend itself, which otherwise has nothing to work with.
+    blendedScore = input.priorSeasonPprAvg;
+    notes.push("No games played yet this season — using last season's per-game average as a starting point.");
   }
 
   if (gamesUsedForRecent > 0 && gamesUsedForRecent < RECENT_WEEK_COUNT) {

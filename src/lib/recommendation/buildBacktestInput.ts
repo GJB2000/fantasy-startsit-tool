@@ -12,6 +12,7 @@ import {
 import { getMatchupContext } from "@/lib/sportsdata/positionDefense";
 import { isSkillPosition, type Player } from "@/lib/sportsdata/types";
 import type { BacktestWeekSlice } from "@/lib/backtest/weekData";
+import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
 import { EMPTY_NFLVERSE_SIGNALS, type PlayerComparisonInput } from "./types";
 
 /**
@@ -62,7 +63,8 @@ export function buildBacktestComparisonInput(
   anyPlayer: Player | null,
   targetWeek: number,
   weekSlice: BacktestWeekSlice,
-  byesByTeam: Map<string, number>
+  byesByTeam: Map<string, number>,
+  priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map()
 ): PlayerComparisonInput {
   if (!anyPlayer) {
     return {
@@ -71,6 +73,7 @@ export function buildBacktestComparisonInput(
       playerLabel: null,
       seasonStat: null,
       recentGames: [],
+      priorSeasonPprAvg: null,
       byeWeek: null,
       isOnByeThisWeek: false,
       matchupContext: null,
@@ -138,12 +141,19 @@ export function buildBacktestComparisonInput(
 
   const hasLimitedTeammate = team ? weekSlice.hasLimitedTeammate(team, position, playerId, targetWeek) : false;
 
+  const priorSeasonPprAvg =
+    recentGames.length === 0 && seasonStat == null
+      ? (priorSeasonPprAvgByNormalizedName.get(normalizePlayerName(`${anyPlayer.FirstName} ${anyPlayer.LastName}`)) ??
+        null)
+      : null;
+
   return {
     requestedPlayerId: playerId,
     player,
     playerLabel: `${anyPlayer.FirstName} ${anyPlayer.LastName}`,
     seasonStat,
     recentGames,
+    priorSeasonPprAvg,
     byeWeek,
     isOnByeThisWeek,
     matchupContext,

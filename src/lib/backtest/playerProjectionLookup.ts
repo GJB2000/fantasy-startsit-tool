@@ -1,6 +1,7 @@
 import { buildBacktestComparisonInput } from "@/lib/recommendation/buildBacktestInput";
 import { scorePlayer } from "@/lib/recommendation/engine";
 import { RECENT_WEEK_COUNT } from "@/lib/recommendation/config";
+import { getPriorSeasonPprAveragesByNormalizedName } from "@/lib/nflverse/priorSeasonAverage";
 import { getFantasyPoints, type ScoringFormat } from "@/lib/sportsdata/types";
 import { loadBacktestRunData } from "./loadRun";
 import { summarizeProjectionErrors, type ProjectionSummary } from "./projectionGrading";
@@ -37,6 +38,13 @@ export interface PlayerProjectionDetail {
  * Items) — a D/ST or K search degrades gracefully (buildBacktestComparisonInput
  * already returns a "not found" shape for any ID outside allPlayers)
  * rather than crashing, but won't produce a meaningful projection.
+ *
+ * Unlike runProjectionBacktest.ts's pool (which requires season-to-date
+ * data to exist at all, structurally excluding week 1 from ever being
+ * pool-eligible), this lookup walks every requested week directly — so
+ * week 1 (and any other week where a player genuinely has zero games yet
+ * this season) is real, reachable territory here. That's exactly the gap
+ * priorSeasonPprAvg (see buildBacktestComparisonInput/engine.ts) fills.
  */
 export async function runPlayerProjectionLookup(
   playerIds: number[],
@@ -46,7 +54,10 @@ export async function runPlayerProjectionLookup(
   format: ScoringFormat = "ppr"
 ): Promise<PlayerProjectionDetail[]> {
   const maxWeek = Math.max(...weeks);
-  const runData = await loadBacktestRunData(season, apiSeason, maxWeek);
+  const [runData, priorSeasonPprAvgByNormalizedName] = await Promise.all([
+    loadBacktestRunData(season, apiSeason, maxWeek),
+    getPriorSeasonPprAveragesByNormalizedName(season - 1, format),
+  ]);
   const anyPlayerById = new Map(runData.allPlayers.map((p) => [p.PlayerID, p]));
 
   const weeksByPlayer = new Map<number, PlayerWeekProjection[]>(playerIds.map((id) => [id, []]));
@@ -73,7 +84,8 @@ export async function runPlayerProjectionLookup(
         anyPlayerById.get(playerId) ?? null,
         week,
         weekSlice,
-        runData.byesByTeam
+        runData.byesByTeam,
+        priorSeasonPprAvgByNormalizedName
       );
       const breakdown = scorePlayer(input, format);
       // A player who didn't play that week (bye, inactive, etc.) has

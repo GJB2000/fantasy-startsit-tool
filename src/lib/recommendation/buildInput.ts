@@ -17,6 +17,7 @@ import { isSkillPosition } from "@/lib/sportsdata/types";
 import { getRecentGameStatsForPlayer } from "@/lib/sportsdata/weeklyStats";
 import type { SeasonContext } from "@/lib/sportsdata/timeframes";
 import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
+import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
 import type { NflversePlayerWeekTable } from "./nflverseLive";
 import { toNflverseTeam, toSdioTeam } from "./restOfSeason";
 import { EMPTY_NFLVERSE_SIGNALS, type NextOpponent, type PlayerComparisonInput } from "./types";
@@ -29,7 +30,8 @@ export async function buildComparisonInput(
   positionDefenseTable: PositionDefenseTable,
   nflversePlayerWeekTable: NflversePlayerWeekTable,
   remainingOpponentsByTeam: Map<string, RemainingGame[]> = new Map(),
-  teamWeatherByTeamWeek: Map<string, GameWeather> = new Map()
+  teamWeatherByTeamWeek: Map<string, GameWeather> = new Map(),
+  priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map()
 ): Promise<PlayerComparisonInput> {
   const player = await getActivePlayerById(playerId).catch(() => null);
 
@@ -42,6 +44,7 @@ export async function buildComparisonInput(
       playerLabel,
       seasonStat: null,
       recentGames: [],
+      priorSeasonPprAvg: null,
       byeWeek: null,
       isOnByeThisWeek: false,
       matchupContext: null,
@@ -112,12 +115,18 @@ export async function buildComparisonInput(
     qbRushEpaPerPlay: averageQbRushEpa(recentNflverseStats, player.Position),
   };
 
+  const priorSeasonPprAvg =
+    recentGames.length === 0 && seasonStat == null
+      ? (priorSeasonPprAvgByNormalizedName.get(normalizePlayerName(`${player.FirstName} ${player.LastName}`)) ?? null)
+      : null;
+
   return {
     requestedPlayerId: playerId,
     player,
     playerLabel: `${player.FirstName} ${player.LastName}`,
     seasonStat,
     recentGames,
+    priorSeasonPprAvg,
     byeWeek,
     isOnByeThisWeek,
     matchupContext,

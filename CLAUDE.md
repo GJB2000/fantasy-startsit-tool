@@ -4064,6 +4064,140 @@ single-season numbers for those specific constants.
       wasn't worth reopening a different weight's own tradeoff history
       for a marginal MAE gain (see above).
 
+67. **Two follow-up fixes to the "Projection accuracy" feature, both from
+    direct user feedback after trying item 66's fix live: a real display
+    bug, and a genuinely new capability (prior-season fallback for
+    week 1) — plus a cross-position calibration investigation that
+    deliberately did NOT ship anything further.**
+    - **Fixed a real display bug in the per-player week-by-week
+      lookup**: `ProjectionPlayerDetail.tsx`'s "Actual" column already
+      correctly showed "Bye/DNP" for weeks with no played row, but the
+      "Projected" column right next to it still showed a computed
+      number — `playerProjectionLookup.ts` set `predicted =
+      breakdown.finalScore` unconditionally, since `scorePlayer()` has
+      no notion of "there's no game this week" and will happily project
+      a bye week from recent form. Fixed by gating `predicted` on
+      `weekRow` the same way `actual` already was. **Doesn't change any
+      MAE/RMSE/bias number** — those already require both `predicted`
+      and `actual` to be non-null, and `actual` was already null on
+      these weeks, so they were already excluded from grading. Purely a
+      display-honesty fix. Verified live: Matthew Stafford's week 8 bye
+      now shows "—" in Projected instead of a number next to "Bye/DNP".
+    - **Investigated whether other positions have the same kind of
+      systematic miscalibration item 66 found for QB** — built a
+      temporary diagnostic (`/api/debug-position-calibration`, deleted
+      after recording numbers, same precedent as every other one-off
+      analysis in this document) that zeroed out each position-specific
+      modifier independently against the full 2025 pool and measured the
+      resulting MAE/RMSE/bias, the same methodology as item 66's QB
+      sweep. **Post-item-66 baseline**: QB bias +0.01 (fixed), RB +0.21,
+      WR -0.57, TE -1.04 — TE is now clearly the worst-calibrated
+      position, RB's MAE is barely better than the naive baseline at all
+      though its bias is small.
+      - **TE's `snapShareModifier` is a real, sizeable drag** (~-1.75pts
+        average contribution — removing it flips bias from -1.04 to
+        +0.71) — but swept against `SNAP_SHARE_BLEND_WEIGHT_TE`, this is
+        a genuine MAE-vs-bias TRADEOFF, not a clean win like QB's EPA
+        term was: MAE keeps improving as the weight scales UP past its
+        current value (1.25x scale: MAE 5.45 vs. current 5.53) even as
+        bias gets worse (-1.48), while scaling DOWN toward zero-bias
+        (~0.4-0.5x scale) costs real MAE (5.76-5.92 vs. 5.53). Unlike
+        `QB_RUSH_EPA_BLEND_WEIGHT`, `SNAP_SHARE_BLEND_WEIGHT_TE=0.4` is a
+        carefully cross-season-validated PICK-ACCURACY weight (item 43's
+        documented 4-season pooled peak, 57.5%) — touching it for a
+        modest, tradeoff-y calibration gain on a single season's small
+        TE sample (n=204, this project's chronic noisiest position) risks
+        giving up real, hard-won validated accuracy for an ambiguous
+        gain. **Not touched — flagged as a genuine judgment call, not
+        resolved unilaterally**, same precedent as items 30/33/41/44.
+      - **WR's `dropRateModifier` looked like a cleaner win at first** —
+        scaling it to ~0.5x its current weight improved BOTH MAE
+        (7.05→6.93) and bias (-0.57→+0.23) in the calibration sweep.
+        Tested it for real before shipping (same due diligence as item
+        66): set `DROP_RATE_BLEND_WEIGHT=0.1` and re-ran the real broad
+        pick-accuracy backtest. **Real, non-trivial cost on the primary
+        2025 pipeline**: WR accuracy 58.3%→55.9% (-2.45pp) — the pooled
+        4-season number barely moved (54.31%→54.06%) because 2024/2025
+        (nflverse) improved while 2022/2023 declined, but the PRIMARY
+        pipeline (the one both live tools actually run on) took a real
+        hit. **Reverted** — same "the primary-pipeline check is not
+        optional for anything touching a whole position's weight"
+        discipline item 53 established for the ensemble ratio. Both
+        findings are flagged here as open, unresolved judgment calls
+        (see Open Items) rather than silently dropped.
+    - **Built a real prior-season fallback for the "zero games at all
+      this season" case** (week 1 most commonly, but also a rookie
+      call-up or a player back from a long absence) — the literal gap
+      the user asked about ("why can't you project week one"). Confirmed
+      first that this is a BACKTEST-specific structural gap, not really
+      a live-tool one: the live tool's `SeasonContext`
+      (`getSeasonContext()`) naturally keeps pointing at the prior
+      season's fully-completed data until the new season's own week 1
+      actually finishes, so by the time `recentWeeks` ever includes a
+      new-season week, that week's game (and thus its stat row) already
+      exists — the live tool only hits true "zero games" for a player
+      who's specifically missed everything so far this season (rookie
+      debut, long injury return), not for the tool/calendar itself.
+      Backtest mode has no such fallback at all, since
+      `loadBacktestRunData` only ever loads the single season under
+      test — week 1 of that season genuinely has nothing before it.
+      - **New `nflverse/priorSeasonAverage.ts`**
+        (`getPriorSeasonPprAveragesByNormalizedName`) — full prior-season
+        per-game scoring average by normalized player name, reading
+        nflverse's `stats_player` release (SportsDataIO has no accessible
+        season before the current one on this plan — see Data Source
+        Notes) and reusing `getFantasyPoints()`/`normalizePlayerName()`
+        rather than a new computation or join scheme. Degrades to an
+        empty map on fetch failure, same "optional signal, fail open"
+        discipline as every other nflverse source in this app.
+      - **New `PlayerComparisonInput.priorSeasonPprAvg` field**, and a
+        third `else if` branch in `scorePlayer`'s existing recent/season
+        blendedScore fallback chain (`engine.ts`) — fires ONLY when both
+        `recentPprAvg` and `seasonPprAvg` are null, i.e. strictly the
+        "nothing at all this season" case; never blended against real
+        current-season data, and every downstream modifier
+        (matchup/volume/etc.) still applies normally on top of it.
+        Deliberately the narrowest possible fix — extending this into a
+        blended component for weeks 2-4 (thin-but-nonzero samples) would
+        touch the already-validated `RECENT_WEIGHT` formula and need its
+        own real backtest sweep, out of scope for "why can't you project
+        week 1" specifically. A useful, unplanned side effect: since this
+        downgrades `dataQuality` from "insufficient" (no projection at
+        all) to "limited" (a real projection, just thin), a live-mode
+        week-1 comparison using this fallback automatically gets the
+        already-existing, already-validated "though we have limited
+        recent data" framing (item 23) for free — no new confidence
+        mechanism needed.
+      - **Threading was deliberately selective, not blanket** — added as
+        an optional parameter (default empty map) on both
+        `buildBacktestComparisonInput` and `buildComparisonInput`, so
+        every existing call site keeps working unchanged unless
+        explicitly wired. Wired into `playerProjectionLookup.ts` (the
+        actual reported gap — this function walks every requested week
+        directly, no pool filter). **Deliberately NOT wired into
+        `runProjectionBacktest.ts`** — checked first and found
+        `buildRankedPoolForWeek` already requires
+        `seasonToDate.Played > 0` for pool eligibility, which
+        structurally excludes week 1 from that function's pooled/
+        by-position grading regardless (confirmed: QB's n=204 was
+        already exactly 17 weeks × 12 pool size, not 18) — wiring it in
+        there would have been a real fetch cost for zero behavioral
+        effect, so it was left out rather than added as dead plumbing.
+        **Also deliberately NOT wired into the live tool's three routes**
+        (compare/trade/waivers, via `scoreExtendedPlayer`) in this pass —
+        `buildComparisonInput`'s new parameter exists and defaults safely
+        to a no-op, so this is cheap to wire in later, but doing it live
+        needs its own fetch-and-thread work across three route files that
+        wasn't part of what was asked this round. See Open Items.
+      - **Verified live end-to-end**: re-ran Matthew Stafford's real
+        week-by-week lookup — week 1 now shows a real projection (13.4
+        vs. actual 13.6, nearly exact) instead of "—", `n` correctly grew
+        from 16 to 17 graded weeks, MAE/bias shifted accordingly (8.6→8.1
+        MAE, -6.7→-6.4 bias — a small improvement, not the main point of
+        this fix, which was making week 1 show *something honest* rather
+        than nothing). Confirmed via the real UI, zero console errors.
+        `npx tsc --noEmit -p .` and `npm run lint` both clean.
+
 ### Open items (as of item 65 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
@@ -4101,19 +4235,21 @@ separate pending batch. Item 62's D/ST and K support (live tools only)
 is committed separately, as `a86cc8b`; item 63's Backtest-page D/ST and
 K support as `f7f2e8b`; item 64's sidebar-shell/Home redesign as
 `927e237` — all pushed to `main` after the user explicitly asked each
-time. **Item 65's "Projection accuracy" mode (including its two
+time. Item 65's "Projection accuracy" mode (including its two
 same-session follow-ups — the per-player breakdown and the player
 search/week-by-week lookup — all still item 65, not separate items) is
-NOT yet committed** —
-real, working, live-verified code (`pairing.ts`'s extracted
-`buildRankedPoolForWeek`, the new `projectionGrading.ts`/
-`runProjectionBacktest.ts`/`playerProjectionLookup.ts`,
-`/api/backtest/projection`, and `BacktestTool.tsx`'s new mode +
-`ProjectionSummary.tsx`/`ProjectionPlayerTable.tsx`/
-`ProjectionPlayerDetail.tsx`) sitting
-uncommitted as of this writing — commit only once the user explicitly
-asks, per this project's standing rule. Nothing below is started or
-fixed yet:
+committed as `33eb5a3`. Item 66's QB rushing-EPA calibration fix
+(`QB_RUSH_EPA_BLEND_WEIGHT` reverted to 0) is committed as `488f441`.
+Item 67's bye/DNP display fix (`playerProjectionLookup.ts`'s `predicted`
+gating) is committed separately as `e02fede`. **The rest of item 67 —
+the cross-position calibration investigation (no code shipped, TE
+snap-share and WR drop-rate both left as documented, unresolved
+tradeoffs) and the prior-season-fallback feature
+(`nflverse/priorSeasonAverage.ts`, `PlayerComparisonInput.priorSeasonPprAvg`,
+the new `scorePlayer` fallback branch, and the `playerProjectionLookup.ts`
+wiring) — is NOT yet committed** as of this writing — commit only once
+the user explicitly asks, per this project's standing rule. Nothing below
+is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -4266,6 +4402,48 @@ fixed yet:
     WR/TE modifier in `engine.ts`) remains an open, unaddressed
     structural question — item 66 fixed the one modifier proven to
     misbehave this badly, not the general absence of bounds elsewhere.
+13. **TE's `snapShareModifier` and WR's `dropRateModifier` both showed a
+    real calibration cost in item 67's investigation, but neither was
+    touched** — genuine judgment calls, not oversights. TE:
+    `SNAP_SHARE_BLEND_WEIGHT_TE` (0.4) is a real MAE-vs-bias tradeoff
+    (scaling it down toward zero-bias costs real MAE; scaling it UP
+    improves MAE further while worsening bias), sitting on top of an
+    already-validated 4-season pick-accuracy peak (item 43) — no weight
+    tested cleanly wins on every axis the way item 66's QB fix did. WR:
+    `DROP_RATE_BLEND_WEIGHT` at half its current value (0.1) DID clearly
+    improve both MAE and bias in the calibration sweep, but cost real
+    pick accuracy when checked against the actual primary-pipeline
+    backtest (58.3%→55.9%, -2.45pp) — a bigger cost than the calibration
+    gain looked like it was worth, so it was reverted rather than shipped.
+    Both are documented, open decisions if picked up again — see item 67
+    for the full sweep numbers.
+14. **The prior-season fallback (item 67) is only wired into the
+    backtest's per-player lookup, not the live tool.**
+    `buildComparisonInput` (`buildInput.ts`) already accepts the new
+    `priorSeasonPprAvgByNormalizedName` parameter and defaults it safely
+    to a no-op empty map — the live-tool gap this would close is
+    narrower than the backtest one (per item 67's own analysis,
+    `SeasonContext` already carries last season's data forward until the
+    new season's week 1 actually completes), but a rookie call-up or a
+    player back from a long in-season absence would still benefit.
+    Wiring it in needs: fetching
+    `getPriorSeasonPprAveragesByNormalizedName(context.lastCompletedSeason
+    - 1, format)` once per request (mirroring how `remainingOpponentsByTeam`/
+    `teamWeatherByTeamWeek` are already fetched once and shared across
+    every player in a comparison) and threading it through
+    `scoreExtendedPlayer` (`scoreExtended.ts`) into all three live
+    routes (`/api/compare`, `/api/trade`, `/api/waivers`) — not attempted
+    this pass since it wasn't part of what was asked.
+15. **The prior-season fallback is skill-positions-only and PPR-derived
+    only where it's actually used** (matches the `buildRankedPoolForWeek`/
+    "Projection accuracy" scope it was built for — see item 12 above for
+    the broader D/ST/K and format gaps already on this list). Also
+    untested: whether the fallback should ever partially blend into
+    weeks 2-4 (thin-but-nonzero current-season samples) rather than only
+    firing on a strict zero — item 67 deliberately scoped this to the
+    narrowest fix that answers "why can't you project week 1," not a
+    reweighting of the `RECENT_WEIGHT` formula, which would need its own
+    real backtest sweep.
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
@@ -4539,7 +4717,16 @@ fixed yet:
   player ID of its own, joined onto `playByPlay.ts`'s pbp rows by
   `game_id`/`play_id`). `playerMatch.ts` does the
   name-normalization join onto SportsDataIO `PlayerID`s (see Data Source
-  Notes for the validation story); `weekTable.ts` combines every source
+  Notes for the validation story). `priorSeasonAverage.ts` (item 67,
+  `getPriorSeasonPprAveragesByNormalizedName`) is a small, standalone
+  reader over the same `stats_player` release used by `gameLog.ts` —
+  full prior-season per-game scoring average by normalized name, the
+  `blendedScore` fallback of last resort for a player with zero games at
+  all yet this season (week 1 most commonly); see
+  `PlayerComparisonInput.priorSeasonPprAvg` and `engine.ts`'s
+  `scorePlayer` for how narrowly this is scoped (only fires when
+  `recentPprAvg`/`seasonPprAvg` are BOTH null, never blended against real
+  current-season data). `weekTable.ts` combines every source
   above into one `PlayerID -> week -> stat` table, built by both
   `backtest/loadRun.ts` (batch, one call for the whole season) and
   `recommendation/nflverseLive.ts` (live, one call per comparison

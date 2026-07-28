@@ -53,6 +53,17 @@ export interface PlayerComparisonInput {
   playerLabel: string | null;
   seasonStat: PlayerSeasonStat | null;
   recentGames: PlayerGameStat[];
+  /**
+   * Prior-season per-game average (nflverse, name-joined — see
+   * priorSeasonAverage.ts), used ONLY as a last-resort blendedScore
+   * fallback when a player has zero games in BOTH recentGames and
+   * seasonStat this season (week 1 most commonly, but also a rookie
+   * call-up or a player returning from a long absence at any point
+   * in-season). Never blended against real current-season data — see
+   * engine.ts's scorePlayer for why that's a deliberate scope limit, not
+   * an oversight.
+   */
+  priorSeasonPprAvg: number | null;
   byeWeek: number | null;
   isOnByeThisWeek: boolean;
   matchupContext: MatchupContext | null;
