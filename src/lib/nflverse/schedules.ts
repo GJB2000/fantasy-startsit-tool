@@ -75,6 +75,39 @@ export async function getRemainingOpponentsByTeam(
   return byTeam;
 }
 
+/**
+ * Per-team, per-week implied point total, derived from the `schedules`
+ * release's own `spread_line`/`total_line` columns (closing lines) —
+ * confirmed live against SportsDataIO's GameOddsByWeek for the same
+ * real game (MIN@CLE, 2025 week 5: total 35.5, home spread -3.5 in both
+ * sources once sign conventions are reconciled) before trusting the
+ * formula. nflverse's convention is `spread_line` = points the HOME
+ * team is favored by (positive = home favored, negative = home
+ * underdog), so:
+ *   home implied = total_line / 2 + spread_line / 2
+ *   away implied = total_line / 2 - spread_line / 2
+ * Free and multi-season (2022-2025 all 100% populated for completed
+ * games, confirmed live) — the only genuinely new *kind* of data this
+ * app uses (betting lines), needed for D/ST (opponent implied total)
+ * and K (team implied total) candidate signals. Blank for games that
+ * haven't had lines set yet (future weeks close to the present).
+ */
+export async function getImpliedTeamTotalsByTeamWeek(season: number): Promise<Map<string, number>> {
+  const rows = await fetchNflverseCsv("schedules", "games.csv", REVALIDATE_SECONDS);
+  const regSeasonRows = rows.filter((r) => Number(r.season) === season && r.game_type === "REG");
+
+  const impliedByTeamWeek = new Map<string, number>();
+  for (const r of regSeasonRows) {
+    if (r.spread_line === "" || r.total_line === "") continue;
+    const week = Number(r.week);
+    const total = Number(r.total_line);
+    const spread = Number(r.spread_line);
+    impliedByTeamWeek.set(`${r.home_team}/${week}`, total / 2 + spread / 2);
+    impliedByTeamWeek.set(`${r.away_team}/${week}`, total / 2 - spread / 2);
+  }
+  return impliedByTeamWeek;
+}
+
 export interface GameWeather {
   roof: string;
   temp: number | null;

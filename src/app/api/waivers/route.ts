@@ -1,10 +1,16 @@
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
-import { getRemainingOpponentsByTeam, type RemainingGame } from "@/lib/nflverse/schedules";
+import {
+  getGameWeatherByTeamWeek,
+  getImpliedTeamTotalsByTeamWeek,
+  getRemainingOpponentsByTeam,
+  type RemainingGame,
+} from "@/lib/nflverse/schedules";
 import { getPositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat, SKILL_POSITIONS } from "@/lib/sportsdata/types";
 import { buildWaiverCandidateDetails, type WaiverCandidate } from "@/lib/waivers/buildWaiverReport";
 import { rankWaiverCandidates } from "@/lib/waivers/rankCandidates";
+import { rankExtendedWaiverCandidates } from "@/lib/waivers/rankExtendedCandidates";
 import { suggestDrops } from "@/lib/waivers/suggestDrop";
 
 // Same margin as /api/compare and /api/trade — a cold nflverse cache
@@ -55,13 +61,26 @@ export async function GET(request: Request) {
       );
     }
 
-    const ranksByPosition = await rankWaiverCandidates(
-      context,
-      format,
-      new Set([...rosteredIds, ...leagueRosteredIds])
-    );
+    const excludeIds = new Set([...rosteredIds, ...leagueRosteredIds]);
 
-    const detailsByPosition = await Promise.all(
+    const [teamWeatherByTeamWeek, impliedTotalsByTeamWeek] = await Promise.all([
+      getGameWeatherByTeamWeek(scheduleSeason).catch(() => new Map()),
+      getImpliedTeamTotalsByTeamWeek(scheduleSeason).catch(() => new Map()),
+    ]);
+
+    const [ranksByPosition, extendedCandidates] = await Promise.all([
+      rankWaiverCandidates(context, format, excludeIds),
+      rankExtendedWaiverCandidates(
+        context,
+        format,
+        excludeIds,
+        remainingOpponentsByTeam,
+        teamWeatherByTeamWeek,
+        impliedTotalsByTeamWeek
+      ),
+    ]);
+
+    const skillDetailsByPosition = await Promise.all(
       SKILL_POSITIONS.map(async (position) => {
         const details = await buildWaiverCandidateDetails(
           ranksByPosition[position],
@@ -74,6 +93,12 @@ export async function GET(request: Request) {
       })
     );
 
+    const detailsByPosition = [
+      ...skillDetailsByPosition,
+      ["DST", extendedCandidates.DST] as const,
+      ["K", extendedCandidates.K] as const,
+    ];
+
     const allCandidates: WaiverCandidate[] = detailsByPosition.flatMap(([, details]) => details);
 
     const dropSuggestions = await suggestDrops(
@@ -83,7 +108,9 @@ export async function GET(request: Request) {
       format,
       positionDefenseTable,
       nflversePlayerWeekTable,
-      remainingOpponentsByTeam
+      remainingOpponentsByTeam,
+      teamWeatherByTeamWeek,
+      impliedTotalsByTeamWeek
     );
 
     const candidatesByPosition = Object.fromEntries(

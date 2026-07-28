@@ -1,10 +1,10 @@
 import type { TradeEvaluation, TradeVerdict } from "@/lib/trade/evaluateTrade";
-import type { ScoringFormat, SkillPosition } from "@/lib/sportsdata/types";
+import type { ExtendedPosition, ScoringFormat } from "@/lib/sportsdata/types";
 
 export interface WaiverCandidateResponse {
   playerId: number;
   displayName: string;
-  position: SkillPosition;
+  position: ExtendedPosition;
   team: string | null;
   recentVolumeAvg: number;
   recentPprAvg: number;
@@ -17,14 +17,18 @@ export interface WaiverCandidateResponse {
 }
 
 interface WaiverResultProps {
-  candidatesByPosition: Record<SkillPosition, WaiverCandidateResponse[]>;
+  candidatesByPosition: Record<ExtendedPosition, WaiverCandidateResponse[]>;
   scoringFormat: ScoringFormat;
   onMarkRostered: (playerId: number, displayName: string, position: string, team: string | null) => void;
   /** Only meaningful in manual mode — once a Sleeper league is connected, the whole league's rosters are already excluded automatically, and this button's "add to my roster" behavior isn't correct for a candidate who actually turns out to be on an opponent's team. */
   showRosteredButton: boolean;
 }
 
-const POSITION_ORDER: SkillPosition[] = ["QB", "RB", "WR", "TE"];
+// D/ST and K last — they're a different kind of signal (this week's
+// matchup vs. season rank, not opportunity vs. production), so they're
+// visually the "also worth a look" tail of the page, not mixed into the
+// skill-position flow.
+const POSITION_ORDER: ExtendedPosition[] = ["QB", "RB", "WR", "TE", "DST", "K"];
 
 const FORMAT_LABEL: Record<ScoringFormat, string> = {
   ppr: "PPR",
@@ -41,6 +45,11 @@ const VERDICT_DOT: Record<TradeVerdict, string> = {
   fair: "bg-caution",
   unknown: "bg-info",
 };
+
+/** D/ST and K use a "this week vs. this season" gap (real streaming logic), not skill positions' "volume vs. points" opportunity gap — see rankExtendedCandidates.ts. */
+function isStreamingPosition(position: ExtendedPosition): boolean {
+  return position === "DST" || position === "K";
+}
 
 function initials(name: string) {
   return name
@@ -124,10 +133,10 @@ function WaiverCandidateCard({
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         <span className="rounded-full bg-good/12 px-2.5 py-1 text-[11px] font-semibold text-good">
-          {candidate.positionLabel} by volume
+          {candidate.positionLabel} {isStreamingPosition(candidate.position) ? "this week" : "by volume"}
         </span>
         <span className="rounded-full bg-foreground/8 px-2.5 py-1 text-[11px] font-medium text-foreground/55">
-          {candidate.productionLabel} by points
+          {candidate.productionLabel} {isStreamingPosition(candidate.position) ? "this season" : "by points"}
         </span>
         {candidate.injuryStatus && (
           <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${injuryBadgeClasses(candidate.injuryStatus)}`}>

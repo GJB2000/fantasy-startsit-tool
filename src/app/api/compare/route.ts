@@ -1,10 +1,15 @@
 import { getPositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat } from "@/lib/sportsdata/types";
-import { buildComparisonInput } from "@/lib/recommendation/buildInput";
-import { comparePlayers } from "@/lib/recommendation/engine";
+import { compareBreakdowns } from "@/lib/recommendation/engine";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
-import { getGameWeatherByTeamWeek, getRemainingOpponentsByTeam, type RemainingGame } from "@/lib/nflverse/schedules";
+import { scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
+import {
+  getGameWeatherByTeamWeek,
+  getImpliedTeamTotalsByTeamWeek,
+  getRemainingOpponentsByTeam,
+  type RemainingGame,
+} from "@/lib/nflverse/schedules";
 
 // A cold nflverse cache means aggregating the full play-by-play release
 // for red-zone touches (~5-7s) on top of everything else this route
@@ -49,22 +54,27 @@ export async function GET(request: Request) {
         () => new Map<string, RemainingGame[]>()
       );
     }
-    const teamWeatherByTeamWeek = await getGameWeatherByTeamWeek(scheduleSeason).catch(() => new Map());
+    const [teamWeatherByTeamWeek, impliedTotalsByTeamWeek] = await Promise.all([
+      getGameWeatherByTeamWeek(scheduleSeason).catch(() => new Map()),
+      getImpliedTeamTotalsByTeamWeek(scheduleSeason).catch(() => new Map()),
+    ]);
 
-    const inputs = await Promise.all(
+    const breakdowns = await Promise.all(
       ids.map((id) =>
-        buildComparisonInput(
+        scoreExtendedPlayer(
           id,
           context,
+          format,
           positionDefenseTable,
           nflversePlayerWeekTable,
           remainingOpponentsByTeam,
-          teamWeatherByTeamWeek
+          teamWeatherByTeamWeek,
+          impliedTotalsByTeamWeek
         )
       )
     );
 
-    const result = comparePlayers(inputs, format);
+    const result = compareBreakdowns(breakdowns);
 
     return Response.json({
       result,

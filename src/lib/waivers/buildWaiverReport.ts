@@ -4,13 +4,14 @@ import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive"
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import type { PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import type { SeasonContext } from "@/lib/sportsdata/timeframes";
-import type { ScoringFormat, SkillPosition } from "@/lib/sportsdata/types";
+import type { ExtendedPosition, ScoringFormat, SkillPosition } from "@/lib/sportsdata/types";
 import type { WaiverCandidateRank } from "./rankCandidates";
 
 export interface WaiverCandidate {
   playerId: number;
   displayName: string;
-  position: SkillPosition;
+  /** ExtendedPosition, not SkillPosition — see rankExtendedCandidates.ts for the D/ST and K entries this same shape also carries. */
+  position: ExtendedPosition;
   team: string | null;
   recentVolumeAvg: number;
   recentPprAvg: number;

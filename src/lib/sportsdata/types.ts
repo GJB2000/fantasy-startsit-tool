@@ -6,6 +6,24 @@ export function isSkillPosition(position: string): position is SkillPosition {
   return (SKILL_POSITIONS as readonly string[]).includes(position);
 }
 
+/**
+ * D/ST and K, deliberately kept as a SEPARATE type from SkillPosition
+ * rather than folded into it — the whole skill-position engine
+ * (volume.ts, aggregate.ts, snap share/target share/etc.) is built
+ * around fields (targets, touches, pass attempts) that have no meaning
+ * for a team defense or a kicker. D/ST and K get their own, much
+ * simpler scorer (recommendation/scoreDefense.ts / scoreKicker.ts) —
+ * see CLAUDE.md's D/ST & K item for the backtest behind that split and
+ * why the two positions aren't treated symmetrically.
+ */
+export type ExtendedPosition = SkillPosition | "DST" | "K";
+
+export const EXTENDED_POSITIONS: readonly ExtendedPosition[] = [...SKILL_POSITIONS, "DST", "K"];
+
+export function isExtendedPosition(position: string): position is ExtendedPosition {
+  return (EXTENDED_POSITIONS as readonly string[]).includes(position);
+}
+
 export interface Player {
   PlayerID: number;
   Team: string | null;
@@ -30,7 +48,10 @@ export interface PlayerSummary {
 export function toPlayerSummary(player: Player): PlayerSummary {
   return {
     playerId: player.PlayerID,
-    name: `${player.FirstName} ${player.LastName}`,
+    // .trim() handles D/ST's synthetic entries, which have an empty
+    // FirstName (a team defense isn't a person) — a no-op for every
+    // real player, which always has a non-empty FirstName.
+    name: `${player.FirstName} ${player.LastName}`.trim(),
     position: player.Position,
     team: player.Team,
     injuryStatus: player.InjuryStatus,

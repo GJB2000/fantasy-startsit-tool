@@ -386,7 +386,22 @@ function buildReasoning(
 
 export function comparePlayers(inputs: PlayerComparisonInput[], format: ScoringFormat): ComparisonResult {
   const breakdowns = inputs.map((input) => scorePlayer(input, format));
+  return compareBreakdowns(breakdowns);
+}
 
+/**
+ * The actual comparison/ranking logic, extracted from comparePlayers so
+ * D/ST and K (see scoreDefense.ts/scoreKicker.ts) can reuse the exact
+ * same close-call/limited-data/headline logic on their own,
+ * differently-computed breakdowns — those positions never go through
+ * scorePlayer() at all (no volume/snap-share/etc. concept applies to a
+ * team defense or a kicker), but the "rank by finalScore, flag close
+ * calls, write a headline" logic underneath is genuinely
+ * position-agnostic. The WR-only tiebreaker below stays effectively a
+ * no-op for D/ST/K, since their breakdowns always have
+ * targetShare/separation null.
+ */
+export function compareBreakdowns(breakdowns: PlayerScoreBreakdown[]): ComparisonResult {
   const found = breakdowns.filter((b) => b.playerId !== null);
   const notFoundNames = breakdowns.filter((b) => b.playerId === null).map((b) => b.displayName);
 

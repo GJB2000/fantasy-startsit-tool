@@ -1,12 +1,15 @@
 import { getPositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat } from "@/lib/sportsdata/types";
-import { buildComparisonInput } from "@/lib/recommendation/buildInput";
-import { scorePlayer } from "@/lib/recommendation/engine";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
-import { projectRestOfSeason } from "@/lib/recommendation/restOfSeason";
-import { getRemainingOpponentsByTeam, type RemainingGame } from "@/lib/nflverse/schedules";
-import { evaluateTrade, toTradePlayerResult } from "@/lib/trade/evaluateTrade";
+import { projectExtendedRestOfSeason, scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
+import {
+  getGameWeatherByTeamWeek,
+  getImpliedTeamTotalsByTeamWeek,
+  getRemainingOpponentsByTeam,
+  type RemainingGame,
+} from "@/lib/nflverse/schedules";
+import { evaluateTrade, toTradePlayerResult, type TradePlayerResult } from "@/lib/trade/evaluateTrade";
 
 // Same margin as /api/compare — a cold nflverse cache means aggregating
 // the full play-by-play release (~5-7s) on top of everything else.
@@ -59,22 +62,32 @@ export async function GET(request: Request) {
       );
     }
 
-    const buildFor = (id: number) =>
-      buildComparisonInput(id, context, positionDefenseTable, nflversePlayerWeekTable);
-
-    const [giveInputs, getInputs] = await Promise.all([
-      Promise.all(giveIds.map(buildFor)),
-      Promise.all(getIds.map(buildFor)),
+    const [teamWeatherByTeamWeek, impliedTotalsByTeamWeek] = await Promise.all([
+      getGameWeatherByTeamWeek(scheduleSeason).catch(() => new Map()),
+      getImpliedTeamTotalsByTeamWeek(scheduleSeason).catch(() => new Map()),
     ]);
 
-    const toResult = (input: Awaited<ReturnType<typeof buildFor>>) => {
-      const breakdown = scorePlayer(input, format);
-      const projection = projectRestOfSeason(breakdown, remainingOpponentsByTeam, positionDefenseTable);
+    const scoreFor = async (id: number): Promise<TradePlayerResult> => {
+      const breakdown = await scoreExtendedPlayer(
+        id,
+        context,
+        format,
+        positionDefenseTable,
+        nflversePlayerWeekTable,
+        remainingOpponentsByTeam,
+        teamWeatherByTeamWeek,
+        impliedTotalsByTeamWeek
+      );
+      const projection = projectExtendedRestOfSeason(
+        breakdown,
+        remainingOpponentsByTeam,
+        impliedTotalsByTeamWeek,
+        positionDefenseTable
+      );
       return toTradePlayerResult(breakdown, projection);
     };
 
-    const give = giveInputs.map(toResult);
-    const get = getInputs.map(toResult);
+    const [give, get] = await Promise.all([Promise.all(giveIds.map(scoreFor)), Promise.all(getIds.map(scoreFor))]);
 
     const evaluation = evaluateTrade(give, get);
 

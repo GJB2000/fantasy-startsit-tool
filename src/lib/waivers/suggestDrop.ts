@@ -1,8 +1,6 @@
-import { buildComparisonInput } from "@/lib/recommendation/buildInput";
-import { scorePlayer } from "@/lib/recommendation/engine";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
-import { projectRestOfSeason } from "@/lib/recommendation/restOfSeason";
-import type { RemainingGame } from "@/lib/nflverse/schedules";
+import { projectExtendedRestOfSeason, scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
+import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
 import type { PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import type { SeasonContext } from "@/lib/sportsdata/timeframes";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
@@ -22,6 +20,9 @@ export interface DropSuggestion {
  * mechanism, just a 1-for-1 trade where one side is auto-selected.
  * Same-position only for v1 (no flex-spot cross-position logic) — the
  * simplest correct behavior for "which roster spot does this replace."
+ * Uses scoreExtendedPlayer/projectExtendedRestOfSeason (not the skill-
+ * only buildComparisonInput/scorePlayer/projectRestOfSeason) so a
+ * rostered D/ST or K is scored correctly too, not silently mishandled.
  */
 export async function suggestDrops(
   candidates: WaiverCandidate[],
@@ -30,19 +31,34 @@ export async function suggestDrops(
   format: ScoringFormat,
   positionDefenseTable: PositionDefenseTable,
   nflversePlayerWeekTable: NflversePlayerWeekTable,
-  remainingOpponentsByTeam: Map<string, RemainingGame[]>
+  remainingOpponentsByTeam: Map<string, RemainingGame[]>,
+  teamWeatherByTeamWeek: Map<string, GameWeather>,
+  impliedTotalsByTeamWeek: Map<string, number>
 ): Promise<Map<number, DropSuggestion>> {
   const suggestions = new Map<number, DropSuggestion>();
   if (rosteredPlayerIds.length === 0 || candidates.length === 0) return suggestions;
 
-  const rosteredInputs = await Promise.all(
-    rosteredPlayerIds.map((id) => buildComparisonInput(id, context, positionDefenseTable, nflversePlayerWeekTable))
+  const rosteredResults = await Promise.all(
+    rosteredPlayerIds.map(async (id) => {
+      const breakdown = await scoreExtendedPlayer(
+        id,
+        context,
+        format,
+        positionDefenseTable,
+        nflversePlayerWeekTable,
+        remainingOpponentsByTeam,
+        teamWeatherByTeamWeek,
+        impliedTotalsByTeamWeek
+      );
+      const projection = projectExtendedRestOfSeason(
+        breakdown,
+        remainingOpponentsByTeam,
+        impliedTotalsByTeamWeek,
+        positionDefenseTable
+      );
+      return toTradePlayerResult(breakdown, projection);
+    })
   );
-  const rosteredResults = rosteredInputs.map((input) => {
-    const breakdown = scorePlayer(input, format);
-    const projection = projectRestOfSeason(breakdown, remainingOpponentsByTeam, positionDefenseTable);
-    return toTradePlayerResult(breakdown, projection);
-  });
 
   for (const candidate of candidates) {
     const sameSpot = rosteredResults.filter((r) => r.position === candidate.position);
@@ -52,7 +68,12 @@ export async function suggestDrops(
       (r.restOfSeasonTotal ?? Infinity) < (min.restOfSeasonTotal ?? Infinity) ? r : min
     );
 
-    const pickupProjection = projectRestOfSeason(candidate.breakdown, remainingOpponentsByTeam, positionDefenseTable);
+    const pickupProjection = projectExtendedRestOfSeason(
+      candidate.breakdown,
+      remainingOpponentsByTeam,
+      impliedTotalsByTeamWeek,
+      positionDefenseTable
+    );
     const pickupResult = toTradePlayerResult(candidate.breakdown, pickupProjection);
 
     suggestions.set(candidate.playerId, { evaluation: evaluateTrade([worst], [pickupResult]) });

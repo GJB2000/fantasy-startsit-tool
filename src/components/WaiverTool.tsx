@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { PlayerSummary, SkillPosition } from "@/lib/sportsdata/types";
+import type { ExtendedPosition, PlayerSummary } from "@/lib/sportsdata/types";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { useSleeperConnection } from "@/lib/useSleeperConnection";
@@ -11,7 +11,7 @@ import { SleeperImport } from "./SleeperImport";
 import { WaiverResult, type WaiverCandidateResponse } from "./WaiverResult";
 
 interface WaiverResponse {
-  candidatesByPosition: Record<SkillPosition, WaiverCandidateResponse[]>;
+  candidatesByPosition: Record<ExtendedPosition, WaiverCandidateResponse[]>;
   context: { contextNote: string };
 }
 
@@ -80,7 +80,7 @@ export function WaiverTool() {
           position,
           candidates.filter((c) => !dismissedIds.has(c.playerId)),
         ])
-      ) as Record<SkillPosition, WaiverCandidateResponse[]>)
+      ) as Record<ExtendedPosition, WaiverCandidateResponse[]>)
     : null;
 
   return (

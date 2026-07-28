@@ -80,9 +80,17 @@ Both live tools also gained real PPR/Half-PPR/Standard scoring-format
 toggles — not just a relabeled display, the five active conversion
 factors were empirically re-tuned per format and the choice is threaded
 all the way through matchup tables, scoring, and the primary backtest's
-grading — see "Backtesting & Tuning History" item 50. Out of scope so
-far: database/
-persistence, auth, K/DEF positions. Upcoming-schedule/next-opponent
+grading — see "Backtesting & Tuning History" item 50. D/ST and K
+(kicker) support — previously explicitly out of scope — shipped after
+that, across all three live tools at once (Start/Sit, Trade Analyzer,
+Waivers), on a deliberately much simpler model than the skill-position
+engine: recent scoring blended with a single matchup signal (opponent's
+or the player's own team's Vegas-implied point total), rather than a
+dozen blended signals — see "Backtesting & Tuning History" item 62 for
+the full backtest and why D/ST's version of that signal turned out to
+be a real, strong predictor (63.8% standalone) while K's was weaker
+than just ranking kickers by season average. Out of scope so far:
+database/persistence, auth. Upcoming-schedule/next-opponent
 lookup — previously fully out of scope — is now partially built (see
 below): the live start/sit tool's own matchup modifier still looks up
 each player's most recent *completed* opponent, not a future one, but
@@ -3323,7 +3331,201 @@ single-season numbers for those specific constants.
       added to the roster chips and disappeared from the QB results,
       same dismiss behavior as before. No console errors.
 
-### Open items (as of item 61 — pick up here)
+62. **Built D/ST and K support — the first time this app has scored any
+    position outside QB/RB/WR/TE** — on a deliberately much simpler
+    model than the skill-position engine, per explicit instruction:
+    test standalone first, expect a lower ceiling than skill positions,
+    and don't over-invest if the first pass shows thin/noisy signal.
+    Candidate signals were named up front rather than discovered:
+    opponent implied team total + turnover/sack rate for D/ST, own-team
+    implied total + dome/wind for K.
+    - **Real data sources confirmed live before writing any scoring
+      code**, same discipline as every prior signal in this document.
+      D/ST: SportsDataIO's `FantasyDefenseByGame/{season}/{week}`
+      (previously unused by this app — team-level defensive stats,
+      `Sacks`/`Interceptions`/`FumblesRecovered`/`FantasyPoints` etc.,
+      confirmed live). K: no new source needed — `PlayerGameStatsByWeek`
+      already returns kicker rows (`Position: "K"`), just never
+      previously surfaced in player search. **Implied team total**
+      (both positions' shared matchup signal) comes from nflverse's
+      `schedules` release, already used for weather/byes/opponents (see
+      Data Source Notes) — `total_line`/`spread_line` combine as
+      `total/2 ± spread/2` per team. Confirmed the sign convention
+      live rather than assuming it, cross-checking nflverse's
+      `spread_line` against SportsDataIO's `GameOddsByWeek` for a real
+      game before trusting either the formula or which sign belongs to
+      the home vs. away team.
+    - **Standalone backtest results, full 2025 season** (temporary
+      diagnostic route, deleted after recording numbers — same
+      precedent as every other one-off analysis in this document):
+
+      | signal | position | pairwise accuracy | naive baseline |
+      |---|---|---|---|
+      | opponent implied total | D/ST | **63.8%** (n=226) | season avg 50.4% |
+      | recent turnover/sack rate | D/ST | 50.0% (n=226) | — (chance) |
+      | own-team implied total | K | 55.4% (n=201) | season avg **60.1%** |
+      | dome/wind | K | 51.4% (n=201) | — (near chance) |
+
+      **A genuine surprise, not the expected outcome**: D/ST's
+      implied-total signal came back clearly *stronger* than most
+      skill-position signals in this entire document (comparable to
+      recent-volume's 56.6% skill-position ceiling from item 7, and
+      well above it) — plausible given how directly a defense's
+      fantasy output depends on the opposing offense's success
+      (sacks/turnovers/points-allowed are all suppressed when the
+      opponent is expected to move the ball well). D/ST's own
+      turnover/sack-rate signal landed at exactly 50.0% — dead chance,
+      the same "no signal" result item 12's team-level game-script
+      baseline found. **K came back as expected — thin and weaker than
+      a naive baseline**: neither candidate signal cleanly beat simply
+      ranking kickers by season-to-date average, the outcome flagged as
+      the likely one going in. Per the explicit instruction not to
+      over-invest once this became clear, no further K signal
+      exploration was done (e.g. no attempt at red-zone trips, a more
+      standard kicker signal not tested here).
+    - **Shipped D/ST's implied-total signal as a real, meaningfully
+      weighted matchup modifier** — not a token gesture. Conversion
+      factor derived via OLS regression (`FantasyPoints ~ opponent
+      implied total`, full 2025 season, n=544 team-weeks, matching this
+      project's established regression discipline over "ratio of sums"
+      whenever a signal isn't naturally zero-anchored — see item 33's
+      RB EPA precedent): slope **-0.486** points lost per point of
+      opponent implied total above a 22.5-point league average, capped
+      at ±5.0 points. **Shipped K's implied-total signal too, but as a
+      deliberately modest, capped modifier** (slope +0.175, cap ±2.0) —
+      real and directionally correct, but small, reflecting that it's
+      the weaker of the two positions' signals and `blendedScore`
+      (recent-vs-season form) already captures most of what
+      `recentVolume`'s-analog (season average) would predict on its
+      own. **Turnover/sack rate and dome/wind are surfaced as
+      reasoning-note context only, never weighted into `finalScore`** —
+      the same "prove it before wiring it in" bar every other signal in
+      this document has had to clear, and both failed it outright (50.0%
+      and 51.4%).
+    - **Architecture: two new, deliberately simple scorers, not an
+      extension of the skill-position engine.** `scoreDefense.ts`/
+      `scoreKicker.ts` are self-contained — a recent-vs-season blend
+      (reusing `blendRecentAndSeason`/`dataQualityFor`, factored out
+      into a new shared `scoreExtendedShared.ts`) plus exactly one
+      additive matchup term — rather than routing D/ST/K through
+      `scorePlayer`'s dozen-signal skill-position pipeline with every
+      unused field defaulted to null. Keeps the already-validated skill
+      engine completely untouched (confirmed via `npx tsc --noEmit`
+      immediately after the one refactor `engine.ts` did need — see
+      below — with zero behavior change) and makes each position's
+      actual model size honest in the code itself, not just in a
+      comment. A new `scoreExtended.ts` dispatches by position
+      (`scoreExtendedPlayer`) so every call site (compare/trade/waivers
+      routes) has one entry point regardless of which of the three
+      scorers actually runs, plus a matching
+      `projectExtendedRestOfSeason` for the Trade Analyzer/waivers drop
+      suggestions. The one skill-engine change: `comparePlayers` in
+      `engine.ts` was split into itself (still `scorePlayer` on skill
+      inputs) plus a newly-exported `compareBreakdowns(breakdowns)` that
+      does the actual ranking/tiebreaker logic on an array of
+      already-scored `PlayerScoreBreakdown`s — a pure extraction with no
+      logic change, so `scoreExtendedPlayer`'s D/ST/K/skill breakdowns
+      can all be ranked together through the one shared comparison path
+      regardless of which scorer produced them.
+    - **D/ST needs a synthetic player identity that doesn't otherwise
+      exist** — SportsDataIO has no "player" record for a team defense.
+      New `sportsdata/defenseTeams.ts` mints one from the existing
+      `/Teams` endpoint: synthetic PlayerIDs via a `900000 + TeamID`
+      offset (guaranteed no collision with any real SportsDataIO
+      PlayerID), `FirstName: ""`/`LastName: "{Team} D/ST"`,
+      `Position: "DST"`. New `sportsdata/defense.ts` reads
+      `FantasyDefenseByGame` the same shape every other per-week reader
+      in this app uses. A new `ExtendedPosition = SkillPosition | "DST"
+      | "K"` type (`sportsdata/types.ts`) is used only where D/ST and K
+      genuinely need to flow through the same code as skill positions
+      (search, roster marking, waiver-candidate typing) — `SkillPosition`
+      itself is untouched, since it's deeply embedded in the validated
+      skill engine and changing it would have risked exactly the kind
+      of accidental behavior change this whole architecture was built
+      to avoid.
+    - **Scoped to "everywhere skill positions appear," per an explicit
+      choice put to the user rather than assumed** — the alternative
+      (Start/Sit only, since that's the tool the original ask was
+      framed around) was offered as the recommended, smaller-footprint
+      option; the user chose the broader scope. Wired into all three
+      live tools: `/api/compare` (`getImpliedTeamTotalsByTeamWeek`,
+      new in `nflverse/schedules.ts`, fetched alongside the existing
+      weather/opponent lookups), `/api/trade` (same fetches, plus
+      `projectExtendedRestOfSeason` for D/ST's and K's rest-of-season
+      values — mirroring skill positions' `restOfSeason.ts` but simpler:
+      implied totals are only ever known ~1 week out in practice, per
+      nflverse's own schedule data, so the projection naturally falls
+      back to a flat recent-form base rate for every farther-out week
+      rather than fabricating a matchup adjustment — an honest
+      simplification, not a bug, the same "can't know that far ahead"
+      precedent this app's weather-forecast display already
+      established), and `/api/waivers`.
+    - **Waivers needed a genuinely different ranking mechanism, not a
+      reuse of skill positions' opportunity-vs-production gap** — there's
+      no volume/opportunity concept for a team defense or a kicker.
+      New `rankExtendedCandidates.ts` instead ranks by how much a
+      player's *this-week* matchup-adjusted score outperforms their own
+      *season-to-date* rank — real streaming logic (the same shape
+      fantasy players already use to decide a Tuesday-night D/ST
+      pickup), not a forced analogy to skill positions' gap framing.
+      Surfaced in `WaiverResult.tsx` with position-appropriate badge
+      language (`isStreamingPosition()`: "this week"/"this season"
+      rather than skill positions' "by volume"/"by points").
+    - **Found and fixed a real reliability bug while building the
+      waivers ranking**, the same class of bug item 27 already fixed
+      once for the nflverse backtest pipeline: scanning all 32 D/ST
+      teams (and every active kicker) concurrently meant each one
+      independently re-fetched the same underlying per-week
+      `FantasyDefenseByGame`/`PlayerGameStatsByWeek` data before any
+      single request could populate the shared in-process cache —
+      confirmed live via a real `SportsDataError: Network error calling
+      /FantasyDefenseByGame/2025REG/8: fetch failed` under that load,
+      not a hypothetical. Fixed the same way item 27 did: pre-warm every
+      needed week's data once (sequenced, not `Promise.all`'d together,
+      for the same peak-connection-pressure reason), before the
+      per-entity fan-out. Verified the fix holds across 4 consecutive
+      cold dev-server restarts.
+    - **UI caveats calibrated per position's actual validated strength,
+      not a blanket disclaimer** — the original ask was for something
+      like "D/ST and K are inherently harder to predict than skill
+      positions," but the backtest showed that's only true for one of
+      the two. `scoreDst`'s first note instead reads "D/ST uses a
+      simpler model than skill positions... not a blend of a dozen
+      signals" (simpler, not necessarily less trustworthy — its own
+      signal backtested stronger than most skill-position signals);
+      `scoreKicker`'s first note keeps the originally-requested framing
+      verbatim ("Kickers are inherently harder to predict... treat this
+      as a rougher estimate"), since that one *is* accurate to what the
+      backtest found. Matches this project's standing discipline
+      (Recommendation Logic Philosophy: "when it's a close call
+      statistically, say so") extended to a whole position's confidence
+      level, not just a single comparison's.
+    - **Verified live end-to-end across all three tools, not just
+      backtest**: Start/Sit (a real Pittsburgh Steelers D/ST vs. Arizona
+      Cardinals D/ST comparison, correct recommendation with matchup
+      reasoning), Trade Analyzer (a real Jacksonville Jaguars D/ST-for-
+      Harrison Butker trade, correct "Fair trade" verdict with full
+      rest-of-season detail cards for both, including the season-
+      rollforward note when no current-season games remain), and
+      Waivers (both the D/ST and K sections rendering real streaming
+      candidates with correct badges/reasoning/matchup context, "Already
+      rostered" working normally). Checked in both dark and light mode,
+      zero console errors across all three tools with D/ST or K
+      involved. Full-project `npx tsc --noEmit -p .` and `npm run lint`
+      both clean after all of the above.
+    - **One known, deliberately unaddressed gap surfaced by this
+      work**: `sleeper/resolveRoster.ts` (item 59) still explicitly
+      skips D/ST and K slots when importing a Sleeper roster ("this app
+      has no D/ST or K support" — no longer accurate as of this item,
+      but not fixed here, since Sleeper import wasn't part of this
+      task's scope). Practical effect: a Sleeper-synced roster won't
+      include a user's own D/ST/K, so `suggestDrop.ts`'s drop-candidate
+      step will never suggest dropping one for a Sleeper-connected user
+      (manual roster marking via `PlayerSearchInput` still works for
+      both positions, same as any skill position). Left as an open item
+      below rather than silently patched as a side effect of this task.
+
+### Open items (as of item 62 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -3356,7 +3558,14 @@ rostered-players fix (`resolveRoster.ts`'s `leagueRosteredPlayerIds`,
 threaded through the same files), and item 61's two polish fixes
 (`WaiverResult.tsx`'s `moveHeadline`/`showRosteredButton`) are all part
 of that same 80f6c70 commit — landed and deployed together, not a
-separate pending batch. Nothing below is started or fixed yet:
+separate pending batch. **Item 62's D/ST and K support is NOT part of
+that commit** — it's real, working, live-verified code
+(`scoreDefense.ts`/`scoreKicker.ts`/`scoreExtended.ts`/
+`scoreExtendedShared.ts`, `sportsdata/defense.ts`/`defenseTeams.ts`,
+`waivers/rankExtendedCandidates.ts`, and the `ExtendedPosition`/
+`compareBreakdowns` changes to existing files) sitting uncommitted as
+of this writing — commit only once the user explicitly asks, per this
+project's standing rule. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -3442,6 +3651,19 @@ separate pending batch. Nothing below is started or fixed yet:
    cross-position logic (mirrors the same scoping decision the Trade
    Analyzer itself never needed to make, since it's user-driven there).
    Both are candidates for a dedicated pass if this tool gets real usage.
+10. **Sleeper roster import still skips D/ST and K** (item 62) —
+    `sleeper/resolveRoster.ts` explicitly filters out `position ===
+    "DEF"`/`"K"` Sleeper players, written back when this app genuinely
+    had no D/ST/K support (item 59); that's no longer true as of item
+    62, but the import path wasn't updated as part of that work. Fixing
+    it needs its own real join, not just deleting the filter: Sleeper
+    identifies team defenses by team abbreviation rather than a player
+    ID the way it does for every other position, so
+    `resolveRoster.ts`'s existing name-based join wouldn't directly
+    apply to the D/ST case the way it does for K. Until fixed, a
+    Sleeper-connected user's own D/ST/K never appears in their synced
+    roster (manual marking via `PlayerSearchInput` still works for
+    both).
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
@@ -3452,11 +3674,27 @@ separate pending batch. Nothing below is started or fixed yet:
 - `src/lib/sportsdata/` — low-level SportsDataIO fetch client and typed
   data-access functions (`client.ts`, `players.ts`, `seasonStats.ts`,
   `weeklyStats.ts`, `byes.ts`, `timeframes.ts`, `positionDefense.ts`,
-  `seasonToDatePlayerStats.ts`, `teamGameStats.ts`). `types.ts` itself
+  `seasonToDatePlayerStats.ts`, `teamGameStats.ts`, `defense.ts` — item
+  62, a thin typed reader over `FantasyDefenseByGame`, the same
+  per-week-reader shape as `weeklyStats.ts`). `defenseTeams.ts` (item
+  62) mints synthetic D/ST `Player` records from `/Teams` (SportsDataIO
+  has no real player identity for a team defense) — synthetic PlayerIDs
+  via a `900000 + TeamID` offset, guaranteed not to collide with any
+  real PlayerID. `types.ts` itself
   is NOT server-only (unlike the fetch/data-access files above) — it's
   imported from client components too (e.g. `ScoringFormatToggle.tsx`)
   for its plain types/pure functions, `ScoringFormat`/`getFantasyPoints`/
-  `parseScoringFormat` (item 50) included. `client.ts` and friends
+  `parseScoringFormat` (item 50) included, plus `ExtendedPosition` (item
+  62, `SkillPosition | "DST" | "K"` — used only where D/ST/K genuinely
+  need to flow through the same code as skill positions: search, roster
+  marking, waiver-candidate typing; `SkillPosition` itself stays
+  untouched, since it's deeply embedded in the validated skill engine).
+  `players.ts`'s `getActiveExtendedPlayers()`/`searchActiveExtendedPlayers()`
+  (item 62) are additive alongside the original skill-only
+  `getActivePlayers()`/`searchActivePlayers()`, not a replacement — internal
+  callers like waiver ranking and `hasLimitedTeammate` still depend on
+  skill-only semantics, so widening the originals would have been a
+  silent behavior change for them. `client.ts` and friends
   remain server-only (guarded via the `server-only` package) — never
   import those from a `"use client"` file. `client.ts`'s `sportsDataFetch()` supports two
   API hosts via `opts.base` (`API_BASES`): `"fantasy"` (default, most
@@ -3555,6 +3793,35 @@ separate pending batch. Nothing below is started or fixed yet:
   (`buildBacktestInput.ts`). Purely inert display data for
   `ComparisonResult.tsx` — never read by `scorePlayer`/`comparePlayers`,
   so it has zero effect on `finalScore` or any backtest number.
+  `comparePlayers` is now a thin wrapper: it maps skill inputs through
+  `scorePlayer` and hands the resulting breakdowns to a newly-exported
+  `compareBreakdowns(breakdowns)`, which does the actual ranking/
+  tiebreaker logic (item 62 — a pure extraction, no behavior change,
+  confirmed via `npx tsc --noEmit` immediately after) so D/ST and K
+  breakdowns from the two files below can be ranked through the same
+  shared comparison path without being forced through `scorePlayer`
+  itself. `scoreDefense.ts`/`scoreKicker.ts` (item 62) are D/ST's and
+  K's own scorers — deliberately NOT routed through `scorePlayer`'s
+  dozen-signal skill pipeline, since both positions ship on a
+  genuinely simpler model (recent-vs-season blend plus exactly one
+  additive matchup term, sourced from nflverse's Vegas-implied team
+  totals — see "Backtesting & Tuning History" item 62 for the full
+  backtest and why D/ST's version of that signal shipped at real
+  weight while K's shipped modest and capped). Both share
+  `blendRecentAndSeason`/`dataQualityFor`/`skillFieldDefaults`/`average`,
+  factored out into `scoreExtendedShared.ts` so the recent-form math
+  isn't duplicated a third time. `scoreExtended.ts` is the position-
+  family dispatcher every live call site actually calls —
+  `scoreExtendedPlayer(playerId, ...)` routes to `scoreDst`/
+  `scoreKicker`/`scorePlayer` by position, and
+  `projectExtendedRestOfSeason` does the same for the Trade Analyzer/
+  waivers rest-of-season projections (D/ST and K's own
+  `projectDstRestOfSeason`/`projectKickerRestOfSeason`, in
+  `scoreDefense.ts`/`scoreKicker.ts` respectively, fall back to a flat
+  recent-form base rate for any week whose implied total isn't known
+  yet — in practice, more than ~1 week out — the same honest
+  "can't know that far ahead" pattern this app's weather-forecast
+  display already established, not a bug).
 - `src/lib/trade/` — `evaluateTrade.ts` (item 47), the Trade Analyzer's
   evaluation layer. Deliberately thin: reuses `scorePlayer()`'s
   `finalScore` as a standalone per-player value (see item 47's
@@ -3582,7 +3849,25 @@ separate pending batch. Nothing below is started or fixed yet:
   `evaluateTrade`/`toTradePlayerResult` and
   `recommendation/restOfSeason.ts`'s `projectRestOfSeason` verbatim — a
   same-position "drop X, add Y" suggestion is a 1-for-1 trade evaluation,
-  not a new comparison mechanism.
+  not a new comparison mechanism. As of item 62, `suggestDrop.ts` scores
+  both rostered players and pickup candidates through
+  `scoreExtendedPlayer`/`projectExtendedRestOfSeason` instead of the
+  skill-only `buildComparisonInput`/`scorePlayer`/`projectRestOfSeason`
+  path, so a D/ST or K can be a valid drop suggestion too — needed two
+  new parameters (`teamWeatherByTeamWeek`/`impliedTotalsByTeamWeek`)
+  threaded in from the route, since D/ST/K's matchup modifier depends on
+  them the way skill positions' depends on `positionDefenseTable`.
+  `rankExtendedCandidates.ts` (item 62) is D/ST's and K's own ranking
+  module, deliberately separate from `rankCandidates.ts` rather than a
+  generalization of it — the mechanism itself is different (this week's
+  matchup-adjusted score vs. season-to-date rank, a real streaming
+  signal, not skill positions' volume-vs-points opportunity gap, which
+  has no D/ST/K analog). Pre-warms `FantasyDefenseByGame`/
+  `PlayerGameStatsByWeek` for every needed week before scanning all 32
+  teams/every active kicker, to avoid the same cache-stampede failure
+  item 27 already fixed once for the nflverse backtest pipeline
+  (confirmed live: this scan pattern reproduced a real
+  `SportsDataError: fetch failed` before the fix).
 - `src/lib/sleeper/` — server-only client for Sleeper's free, no-auth
   public API (item 59), the real-roster-import path that replaced
   manual one-by-one roster marking as the primary way to populate the
@@ -3592,8 +3877,13 @@ separate pending batch. Nothing below is started or fixed yet:
   JSON `null` body, not a 404, confirmed live — rather than throwing).
   `resolveRoster.ts` resolves EVERY roster in the league in one pass
   (`getSleeperRosters` already returns all of them, not just the
-  requesting user's), skipping team-defense/kicker slots (this app has
-  no D/ST or K support) and joining each remaining Sleeper player to a
+  requesting user's), skipping team-defense/kicker slots — a decision
+  made when this app genuinely had no D/ST or K support (item 59); item
+  62 added real D/ST/K support to all three live tools, but this filter
+  was NOT revisited as part of that work (out of scope for that task —
+  see Open Items), so a Sleeper-synced roster still never includes a
+  user's own D/ST/K even though the rest of the app can now score them
+  — and joining each remaining Sleeper player to a
   SportsDataIO PlayerID by name — reusing nflverse/playerMatch.ts's
   `normalizePlayerName`/`buildSdioPlayerIdByNormalizedName` rather than
   a third hand-rolled scheme, since it's the same kind of join (Sleeper
@@ -3682,7 +3972,13 @@ separate pending batch. Nothing below is started or fixed yet:
   (`getRemainingOpponentsByTeam` — item 47, live-mode-only; powers the
   Trade Analyzer's rest-of-season projection, not used by backtest mode,
   which derives the equivalent directly from its own already-fetched
-  historical box scores instead — see `tradeBacktest.ts` below) from the
+  historical box scores instead — see `tradeBacktest.ts` below), and
+  each team's Vegas-implied point total per week
+  (`getImpliedTeamTotalsByTeamWeek` — item 62, `total_line/2 ±
+  spread_line/2` from the same `games.csv` rows, sign confirmed live
+  against SportsDataIO's `GameOddsByWeek` for a real game before
+  trusting it — the shared matchup signal behind both D/ST's and K's
+  simplified scorers, see "Backtesting & Tuning History" item 62) from the
   `schedules` release's `games.csv` (no dedicated byes/schedule endpoint
   exists on either SportsDataIO or, for byes, nflverse). `depthCharts.ts`
   reads the
@@ -3761,7 +4057,10 @@ separate pending batch. Nothing below is started or fixed yet:
   cutoff walk (mirroring `collectBroadResultsForSeason`'s role in
   `runBacktestNflverseOnly.ts`), shared by the single-cutoff
   `runTradeBacktest` and the pooled `runTradeBacktestMultiSeason`.
-- `src/app/api/players`, `src/app/api/compare`, `src/app/api/trade`
+- `src/app/api/players` (item 62: now calls `searchActiveExtendedPlayers`
+  instead of the skill-only `searchActivePlayers`, so D/ST and K appear
+  in the shared `PlayerSearchInput.tsx` search box everywhere it's used),
+  `src/app/api/compare`, `src/app/api/trade`
   (item 47 — both `compare` and `trade` also accept an optional
   `scoringFormat` query param, `ppr`/`half_ppr`/`standard`, via
   `parseScoringFormat()`, item 50). `compare` also fetches
@@ -3769,9 +4068,20 @@ separate pending batch. Nothing below is started or fixed yet:
   next-opponent/weather display feature — see Overview and Conventions'
   `buildInput.ts` entry) using the identical season-rollforward pattern
   `trade` already established, rather than a second copy of that logic.
+  As of item 62, `compare`/`trade` also fetch
+  `getImpliedTeamTotalsByTeamWeek` and score every requested player
+  through `scoreExtendedPlayer`/`compareBreakdowns` (D/ST/K's dispatcher
+  and shared ranking path — see Conventions' `recommendation/` entry)
+  instead of calling `buildComparisonInput`/`scorePlayer`/
+  `comparePlayers` directly, so a request can freely mix skill positions
+  with D/ST or K.
   `src/app/api/waivers` (item 58) orchestrates `lib/waivers/`'s
   ranking/report/drop-suggestion layers, same error-handling shape as
-  `trade`. Two distinct query params, not one, as of item 60: `rostered`
+  `trade`. As of item 62, also fetches implied totals and calls
+  `rankExtendedWaiverCandidates` alongside the skill-only
+  `rankWaiverCandidates`, merging D/ST and K results into the same
+  `candidatesByPosition` response and passing weather/implied-totals
+  through to `suggestDrops` too. Two distinct query params, not one, as of item 60: `rostered`
   (comma-separated PlayerIDs, the user's own roster) excludes those
   players from the ranking pool AND supplies the drop-candidate pool;
   `leagueRostered` (every player owned by any OTHER team in a connected
