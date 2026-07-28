@@ -4198,6 +4198,96 @@ single-season numbers for those specific constants.
         than nothing). Confirmed via the real UI, zero console errors.
         `npx tsc --noEmit -p .` and `npm run lint` both clean.
 
+68. **Tested whether a separately-fit, MAE-minimizing regression (using
+    the same already-validated raw signals `finalScore` already reads,
+    but its own jointly-fit weights instead of the ranking-tuned blend)
+    would out-calibrate `finalScore` directly — a direct follow-up to
+    items 65/66/67's calibration work, on explicit request. Closed as a
+    documented negative finding: no code shipped.**
+    - **Design, deliberately mirroring items 38/42's methodology** (the
+      project's own prior "jointly-fit model vs. hand-tuned weights"
+      investigation, just for pick accuracy rather than calibration): one
+      linear model per position, fit via subgradient descent minimizing
+      mean absolute error (L1 loss, not OLS's squared error — a genuine
+      MAE-direct fit, per the explicit request) plus an L2 penalty on
+      weights, on standardized features. Features were `blendedScore`,
+      `matchupDiffRatio` (unclamped, unlike `matchupModifier`), and
+      `recentVolumeAvg` for every position, plus each position's own
+      already-computed raw signals regardless of their current `config.ts`
+      weight (QB: `recentQbRushAttemptsAvg`/`qbRushEpaAvg`/
+      `successRateAvg`/`goalLineTouchesAvg`; RB: `redZoneTouchesAvg`/
+      `epaPerPlayAvg`; WR/TE: `targetShare`/`separation`, plus
+      `dropRateAvg` for WR or `snapShareAvg` for TE) — `scorePlayer`
+      already computes every one of these regardless of whether its blend
+      weight is active, so no new data collection was needed beyond the
+      already-built pooled 2022-2025 nflverse-only pipeline (item 39).
+      Missing values mean-imputed (a minor, documented simplification —
+      the impute value is computed once over the full pooled sample
+      rather than per-fold, a small, low-impact leak relative to the
+      real question being tested).
+    - **Caught and fixed a real numerical-stability bug in the optimizer
+      before trusting the sweep** — a fixed learning rate safe at
+      `l2=0` diverged (NaN) at `l2≥100`, since the L2 penalty's gradient
+      isn't averaged by `n` the way the MAE gradient is, so the effective
+      step size at high `l2` needs a correspondingly smaller learning
+      rate. Fixed by scaling `lr` down by `1/(1+l2)`; re-verified finite,
+      stable results across the full `l2∈[0,500]` grid afterward.
+    - **Validation matched item 42's rigor exactly, for the same reason**:
+      in-sample (expected optimistic), 5-fold CV within the pooled
+      sample, AND leave-one-season-out CV (train on 3 seasons, test on
+      the 4th, repeated for each) — with the current engine's own
+      `finalScore` re-evaluated on the IDENTICAL rows for a fair
+      comparison, not quoted from elsewhere.
+    - **Pooled/LOSO numbers looked promising for two positions at first
+      glance** — RB improved MAE by a real, consistent ~3% (6.66→6.44,
+      LOSO) at low L2, and WR improved BOTH MAE (7.17→6.97, LOSO) and
+      bias (-0.83→-0.23) at a moderate L2 (~20-100) — but neither held up
+      once decomposed by season, which is the whole reason this document
+      insists on that decomposition rather than trusting a pooled number.
+    - **The real finding: bias improvements at the pooled/LOSO level were
+      substantially an artifact of season-to-season SIGN CANCELLATION,
+      not genuine per-season calibration.** For every position tested,
+      the current hand-tuned engine's own per-season bias is consistently
+      one sign across all four seasons (RB: consistently positive, +0.13
+      to +1.19; WR: consistently negative, -0.38 to -1.60; TE:
+      consistently negative, -0.45 to -1.04) — imperfect, but predictable.
+      The regression's per-season bias, in contrast, FLIPS sign as a
+      direct function of L2 (e.g. WR at l2=20: 2022 -0.20, 2023 -0.85,
+      2024 -0.85, but **2025 +0.95** — a real, meaningfully-sized flip in
+      the one season that's actually decision-relevant right now). The
+      pooled/LOSO bias number looks like it's approaching zero as L2
+      increases, but that's positive-in-one-season canceling
+      negative-in-others, not uniform improvement — exactly the kind of
+      illusion a pooled metric can hide and a by-season breakdown
+      exposes, the same lesson items 34/39's goal-line-rushing and
+      high-wind-WR re-tests already taught this document once before, now
+      showing up in a completely different kind of model.
+    - **RB's MAE win, unlike its bias story, WAS genuinely consistent
+      across all four seasons** at `l2=0` (each season individually
+      beats the corresponding engine-baseline season) — the honest
+      finding there isn't "illusory," it's a real, uniform MAE gain
+      traded against a real, uniform-direction bias cost (negative and
+      larger than the engine's own small positive bias) — a genuine,
+      unresolved tradeoff, not a false pooled number.
+    - **TE never beat the engine on MAE at any L2 that also helped
+      bias** — the one position where the regression showed no
+      redeeming case at all.
+    - **Verdict: not shipped, for any position.** QB shows no
+      meaningful difference either way (item 66 already fixed its real
+      calibration problem). RB is a genuine but unresolved MAE-vs-bias
+      tradeoff. WR's apparent win doesn't survive the by-season
+      decomposition specifically in 2025. TE shows no case for it at
+      all. This reinforces, rather than reverses, items 38/42's original
+      conclusion — the conservative, plateau-seeking, cross-season-
+      validated hand-tuning process this document has used throughout
+      continues to behave more predictably than a jointly-fit
+      alternative at this data scale, now confirmed for a genuinely
+      different modeling task (continuous MAE regression, not pairwise
+      classification) than items 38/42 tested. Temporary diagnostic route
+      (`/api/debug-projection-regression`) deleted after recording these
+      numbers, same precedent as every other one-off analysis in this
+      document — this write-up is the only lasting artifact.
+
 ### Open items (as of item 65 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
@@ -4241,15 +4331,17 @@ search/week-by-week lookup — all still item 65, not separate items) is
 committed as `33eb5a3`. Item 66's QB rushing-EPA calibration fix
 (`QB_RUSH_EPA_BLEND_WEIGHT` reverted to 0) is committed as `488f441`.
 Item 67's bye/DNP display fix (`playerProjectionLookup.ts`'s `predicted`
-gating) is committed separately as `e02fede`. **The rest of item 67 —
-the cross-position calibration investigation (no code shipped, TE
-snap-share and WR drop-rate both left as documented, unresolved
-tradeoffs) and the prior-season-fallback feature
-(`nflverse/priorSeasonAverage.ts`, `PlayerComparisonInput.priorSeasonPprAvg`,
-the new `scorePlayer` fallback branch, and the `playerProjectionLookup.ts`
-wiring) — is NOT yet committed** as of this writing — commit only once
-the user explicitly asks, per this project's standing rule. Nothing below
-is started or fixed yet:
+gating) is committed separately as `e02fede`. The rest of item 67 — the
+prior-season-fallback feature (`nflverse/priorSeasonAverage.ts`,
+`PlayerComparisonInput.priorSeasonPprAvg`, the new `scorePlayer` fallback
+branch, and the `playerProjectionLookup.ts` wiring) plus its
+cross-position calibration investigation write-up — is committed as
+`d69c8ed`. **Item 68's regression-vs-`finalScore` investigation shipped
+no code at all (a documented negative finding only, per its own writeup
+above) — the CLAUDE.md update recording it is the only change, not yet
+committed** as of this writing — commit only once the user explicitly
+asks, per this project's standing rule. Nothing below is started or
+fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
