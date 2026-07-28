@@ -1,8 +1,9 @@
+import type { BacktestWeekSlice } from "@/lib/backtest/weekData";
 import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
 import { getByeWeekForTeam } from "@/lib/sportsdata/byes";
 import { getActiveExtendedPlayerById } from "@/lib/sportsdata/players";
 import type { SeasonContext } from "@/lib/sportsdata/timeframes";
-import { getFantasyPoints, type PlayerGameStat, type ScoringFormat } from "@/lib/sportsdata/types";
+import { getFantasyPoints, type Player, type PlayerGameStat, type ScoringFormat } from "@/lib/sportsdata/types";
 import { getRecentGameStatsForPlayer } from "@/lib/sportsdata/weeklyStats";
 import { RECENT_WEEK_COUNT } from "./config";
 import { toNflverseTeam, toSdioTeam } from "./restOfSeason";
@@ -79,6 +80,59 @@ export async function buildKickerComparisonInput(
     isOnByeThisWeek: byeWeek !== null && byeWeek === context.lastCompletedWeek,
     nextOpponent,
     nextGameWeather,
+    teamImpliedTotal,
+  };
+}
+
+/**
+ * Backtest mode's synchronous equivalent of buildKickerComparisonInput
+ * — mirrors buildBacktestDstInput's relationship to
+ * buildDstComparisonInput exactly. Unlike D/ST (which has no per-player
+ * identity in allWeeklyRows), K's raw rows already live there
+ * (Position="K", confirmed live), so recentGames/seasonGames come from
+ * weekSlice's generic (non-skill-filtered) player lookups —
+ * recentGamesByPlayer already works for any position; seasonGamesByPlayer
+ * is the season-long counterpart, added alongside this feature since
+ * weekSlice.seasonToDateTable itself filters K out by design (it backs
+ * skill-position-only concepts, see pairing.ts's buildKickerPairsForWeek
+ * doc comment). Injury status reads nflverse's real pregame weekly
+ * report the same non-leaky way buildBacktestComparisonInput does for
+ * skill positions, rather than SportsDataIO's retroactive field.
+ */
+export function buildBacktestKickerInput(
+  playerId: number,
+  player: Player,
+  targetWeek: number,
+  weekSlice: BacktestWeekSlice,
+  byesByTeam: Map<string, number>
+): KickerComparisonInput {
+  const weekRow = weekSlice.targetWeekRows.find((r) => r.PlayerID === playerId);
+  const team = weekRow?.Team ?? player.Team;
+  const recentGames = weekSlice.recentGamesByPlayer(playerId);
+  const seasonGames = weekSlice.seasonGamesByPlayer(playerId);
+  const byeWeek = team ? (byesByTeam.get(team) ?? null) : null;
+
+  const weekStat = weekSlice.nflverseStatForWeek(playerId, targetWeek);
+  const injuryStatus = weekStat?.rosterStatus === "RES" ? "Out" : (weekStat?.injuryStatus ?? null);
+
+  let nextOpponent: NextOpponent | null = null;
+  let teamImpliedTotal: number | null = null;
+  if (weekRow && team) {
+    nextOpponent = { team: weekRow.Opponent, week: targetWeek };
+    const nflverseTeam = toNflverseTeam(team);
+    teamImpliedTotal = weekSlice.impliedTotalsByTeamWeek.get(`${nflverseTeam}/${targetWeek}`) ?? null;
+  }
+
+  return {
+    playerId,
+    displayName: `${player.FirstName} ${player.LastName}`.trim(),
+    team,
+    injuryStatus,
+    recentGames,
+    seasonGames,
+    isOnByeThisWeek: byeWeek !== null && byeWeek === targetWeek,
+    nextOpponent,
+    nextGameWeather: null,
     teamImpliedTotal,
   };
 }

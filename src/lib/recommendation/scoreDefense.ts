@@ -1,3 +1,4 @@
+import type { BacktestWeekSlice } from "@/lib/backtest/weekData";
 import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
 import { getByeWeekForTeam } from "@/lib/sportsdata/byes";
 import { getDstPlayerById, isDstPlayerId } from "@/lib/sportsdata/defenseTeams";
@@ -77,6 +78,51 @@ export async function buildDstComparisonInput(
     isOnByeThisWeek: byeWeek !== null && byeWeek === context.lastCompletedWeek,
     nextOpponent,
     nextGameWeather,
+    opponentImpliedTotal,
+  };
+}
+
+/**
+ * Backtest mode's synchronous equivalent of buildDstComparisonInput —
+ * reads from a pre-fetched weekSlice (see lib/backtest/weekData.ts)
+ * instead of making live fetches, mirroring exactly how
+ * buildBacktestInput.ts's buildBacktestComparisonInput relates to
+ * buildInput.ts's buildComparisonInput for skill positions. Unlike live
+ * mode's "next opponent" (forward-looking, hence null in
+ * buildBacktestComparisonInput to avoid any leakage risk), the target
+ * week's opponent here is a fully-known, already-played historical
+ * fact — the actual matchup being predicted, not speculative future
+ * data — so it's populated normally rather than nulled out.
+ */
+export function buildBacktestDstInput(
+  playerId: number,
+  team: string,
+  targetWeek: number,
+  weekSlice: BacktestWeekSlice,
+  byesByTeam: Map<string, number>
+): DstComparisonInput {
+  const row = weekSlice.targetWeekDefenseRows.find((r) => r.Team === team);
+  const recentGames = weekSlice.recentDefenseGamesByTeam(team);
+  const seasonGames = weekSlice.dstSeasonGamesByTeam(team);
+  const byeWeek = byesByTeam.get(team) ?? null;
+
+  let nextOpponent: NextOpponent | null = null;
+  let opponentImpliedTotal: number | null = null;
+  if (row) {
+    nextOpponent = { team: row.Opponent, week: targetWeek };
+    const nflverseOpponent = toNflverseTeam(row.Opponent);
+    opponentImpliedTotal = weekSlice.impliedTotalsByTeamWeek.get(`${nflverseOpponent}/${targetWeek}`) ?? null;
+  }
+
+  return {
+    playerId,
+    displayName: `${team} D/ST`,
+    team,
+    recentGames,
+    seasonGames,
+    isOnByeThisWeek: byeWeek !== null && byeWeek === targetWeek,
+    nextOpponent,
+    nextGameWeather: null,
     opponentImpliedTotal,
   };
 }

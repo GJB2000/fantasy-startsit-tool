@@ -24,6 +24,12 @@ type Mode = "pair" | "broad" | "trade";
 type Season = "2025" | "2024" | "2023" | "2022";
 const SEASON_OPTIONS = ["2025", "2024", "2023", "2022"] as const;
 const ALL_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
+// D/ST and K only have real backtest support on the primary 2025
+// SportsDataIO pipeline (Broad mode only, not Trade analyzer) — see
+// CLAUDE.md's D/ST & K backtest item. Kept as a separate list rather
+// than folded into ALL_POSITIONS so Trade analyzer mode (which shares
+// this same checkbox row) never renders them.
+const EXTENDED_ONLY_POSITIONS = ["DST", "K"] as const;
 const WEEK_OPTIONS = Array.from({ length: 18 }, (_, i) => i + 1);
 const AS_OF_WEEK_OPTIONS = Array.from({ length: 17 }, (_, i) => i + 1);
 
@@ -274,7 +280,29 @@ export function BacktestTool() {
                 {position}
               </label>
             ))}
+            {mode === "broad" &&
+              season === "2025" &&
+              EXTENDED_ONLY_POSITIONS.map((position) => (
+                <label
+                  key={position}
+                  className="flex items-center gap-1.5 rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                >
+                  <input
+                    type="checkbox"
+                    checked={positions.includes(position)}
+                    onChange={() => togglePosition(position)}
+                  />
+                  {position === "DST" ? "D/ST" : position}
+                </label>
+              ))}
           </div>
+          {mode === "broad" && season === "2025" && (
+            <p className="text-xs text-zinc-500">
+              D/ST and K run on a much simpler model than the skill positions — recent scoring plus one
+              matchup signal, not a blend of a dozen. D/ST&apos;s own signal backtested strong; K&apos;s was
+              weaker than just ranking kickers by season average. Only available on the 2025 season for now.
+            </p>
+          )}
         </>
       )}
 

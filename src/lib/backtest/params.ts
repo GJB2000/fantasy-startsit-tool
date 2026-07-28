@@ -1,4 +1,11 @@
-import { SKILL_POSITIONS, isSkillPosition, type SkillPosition } from "@/lib/sportsdata/types";
+import {
+  EXTENDED_POSITIONS,
+  SKILL_POSITIONS,
+  isExtendedPosition,
+  isSkillPosition,
+  type ExtendedPosition,
+  type SkillPosition,
+} from "@/lib/sportsdata/types";
 import { MAX_BACKTEST_WEEK } from "./config";
 
 /** Accepts a "1-18" range or a "3,5,9" comma list; clamps to 1..maxWeek. */
@@ -28,4 +35,20 @@ export function parsePositionsParam(raw: string | null): SkillPosition[] {
   const requested = raw.split(",").map((s) => s.trim().toUpperCase());
   const valid = requested.filter(isSkillPosition);
   return valid.length > 0 ? valid : [...SKILL_POSITIONS];
+}
+
+/**
+ * DST/K-aware version, used only by /api/backtest/broad — the one
+ * route with real D/ST and K backtest support (see loadRun.ts/
+ * runBacktest.ts). Deliberately NOT used by the nflverse-only
+ * (*-nflverse*) or trade-backtest routes, which stay skill-only
+ * (parsePositionsParam above) since neither pipeline has D/ST/K
+ * data or scoring wired in.
+ */
+export function parseExtendedPositionsParam(raw: string | null): ExtendedPosition[] {
+  if (!raw) return [...EXTENDED_POSITIONS];
+
+  const requested = raw.split(",").map((s) => s.trim().toUpperCase());
+  const valid = requested.filter(isExtendedPosition);
+  return valid.length > 0 ? valid : [...EXTENDED_POSITIONS];
 }

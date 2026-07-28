@@ -4,10 +4,12 @@ import { getNgsPassing, getNgsReceiving, getNgsRushing } from "@/lib/nflverse/ne
 import { getRedZoneTouches } from "@/lib/nflverse/playByPlay";
 import { buildSdioPlayerIdByNormalizedName } from "@/lib/nflverse/playerMatch";
 import { getPlayerWeekStats } from "@/lib/nflverse/playerStats";
-import type { GameWeather } from "@/lib/nflverse/schedules";
+import { getImpliedTeamTotalsByTeamWeek, type GameWeather } from "@/lib/nflverse/schedules";
 import { getSnapCounts } from "@/lib/nflverse/snapCounts";
 import { buildNflversePlayerWeekTable, type NflverseWeekStat } from "@/lib/nflverse/weekTable";
 import { getByes } from "@/lib/sportsdata/byes";
+import { getFantasyDefenseByWeek, type TeamDefenseGameStat } from "@/lib/sportsdata/defense";
+import { getAllDstPlayers } from "@/lib/sportsdata/defenseTeams";
 import { getAllPlayers } from "@/lib/sportsdata/players";
 import { getTeamGameStatsByWeek } from "@/lib/sportsdata/teamGameStats";
 import { getPlayerGameStatsByWeek } from "@/lib/sportsdata/weeklyStats";
@@ -49,6 +51,36 @@ export interface BacktestRunData {
    * to no_pick when unset, same as every other optional signal.
    */
   depthChartByPlayerIdWeek?: Map<number, Map<number, number>>;
+  /**
+   * Index 0 = week 1, index N-1 = week N — team-level D/ST fantasy stats
+   * (FantasyDefenseByGame), a separate endpoint/shape from
+   * allWeeklyRows/allTeamWeeklyRows since SportsDataIO models team
+   * defense as its own stat family, not a player. Only set by the
+   * primary SportsDataIO pipeline (loadRun.ts) — D/ST/K backtest support
+   * doesn't (yet) extend to the nflverse-only 2022-2024 pipeline, since
+   * that's not where D/ST/K's live scoring was tuned/validated (see
+   * CLAUDE.md's D/ST & K backtest item). Absent/undefined for
+   * loadRunNflverseOnly.ts, same optionality pattern as
+   * teamWeatherByTeamWeek/depthChartByPlayerIdWeek above.
+   */
+  allDefenseWeeklyRows?: TeamDefenseGameStat[][];
+  /** Team (SportsDataIO code) -> synthetic D/ST PlayerID, resolved once at load time so pairing/scoring stay synchronous rather than re-fetching /Teams per lookup. Only set alongside allDefenseWeeklyRows. */
+  dstPlayerIdByTeam?: Map<string, number>;
+  /** Synthetic D/ST Player entries (see sportsdata/defenseTeams.ts) — merged into runBacktest.ts's anyPlayerById alongside allPlayers so scoreExtendedPlayerBacktest can resolve a D/ST synthetic ID's team the same uniform way it resolves a real player's. */
+  dstPlayers?: Player[];
+  /**
+   * `${nflverseTeam}/${week}` -> Vegas-implied point total, from
+   * nflverse's schedules release — the shared matchup signal behind both
+   * scoreDefense.ts's and scoreKicker.ts's backtest scorers. For a past
+   * (already-played) week this is the real closing pregame line, a
+   * legitimate non-leaky historical fact, not a forecast. Only set by
+   * the primary pipeline, same scope note as allDefenseWeeklyRows above
+   * (K's own backtest scoring also depends on this, even though K's raw
+   * game rows already live in allWeeklyRows). Empty/absent on a fetch
+   * failure or on the nflverse-only pipeline, degrading D/ST's and K's
+   * matchup modifier to 0 rather than crashing.
+   */
+  impliedTotalsByTeamWeek?: Map<string, number>;
 }
 
 /**
@@ -82,8 +114,10 @@ export async function loadBacktestRunData(
   const [
     allWeeklyRows,
     allTeamWeeklyRows,
+    allDefenseWeeklyRows,
     byes,
     allPlayers,
+    dstPlayers,
     snapCounts,
     playerWeekStats,
     ngsPassing,
@@ -92,11 +126,14 @@ export async function loadBacktestRunData(
     injuryReports,
     redZoneTouches,
     reserveStatusReports,
+    impliedTotalsByTeamWeek,
   ] = await Promise.all([
     Promise.all(weeks.map((week) => getPlayerGameStatsByWeek(apiSeason, week))),
     Promise.all(weeks.map((week) => getTeamGameStatsByWeek(apiSeason, week))),
+    Promise.all(weeks.map((week) => getFantasyDefenseByWeek(apiSeason, week))),
     getByes(season),
     getAllPlayers(),
+    getAllDstPlayers(),
     loadNflverse("snap counts", () => getSnapCounts(season)),
     loadNflverse("player week stats", () => getPlayerWeekStats(season)),
     loadNflverse("NGS passing", () => getNgsPassing(season)),
@@ -105,7 +142,15 @@ export async function loadBacktestRunData(
     loadNflverse("injury reports", () => getInjuryReports(season)),
     loadNflverse("red zone touches", () => getRedZoneTouches(season)),
     loadNflverse("reserve status reports", () => getReserveStatusReports(season)),
+    getImpliedTeamTotalsByTeamWeek(season).catch((err) => {
+      console.error("Failed to load implied team totals:", err);
+      return new Map<string, number>();
+    }),
   ]);
+
+  const dstPlayerIdByTeam = new Map<string, number>(
+    dstPlayers.filter((p): p is Player & { Team: string } => p.Team != null).map((p) => [p.Team, p.PlayerID])
+  );
 
   const byesByTeam = new Map<string, number>(byes.map((b) => [b.Team, b.Week]));
   const nflversePlayerWeekTable = buildNflversePlayerWeekTable(
@@ -130,5 +175,9 @@ export async function loadBacktestRunData(
     byesByTeam,
     allPlayers,
     nflversePlayerWeekTable,
+    allDefenseWeeklyRows,
+    dstPlayerIdByTeam,
+    dstPlayers,
+    impliedTotalsByTeamWeek,
   };
 }

@@ -1,5 +1,6 @@
 import type { GameWeather } from "@/lib/nflverse/schedules";
 import type { NflverseWeekStat } from "@/lib/nflverse/weekTable";
+import type { TeamDefenseGameStat } from "@/lib/sportsdata/defense";
 import { buildPositionDefenseTableFromRows, type PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { buildSeasonToDatePlayerStatsFromRows } from "@/lib/sportsdata/seasonToDatePlayerStats";
 import { buildTeamPaceTableFromRows, type TeamPace } from "@/lib/sportsdata/teamGameStats";
@@ -29,6 +30,24 @@ export interface BacktestWeekSlice {
   teamWeatherByTeamWeek: Map<string, GameWeather>;
   /** PlayerID -> week -> depth-chart role (1=starter, 2=backup, ...). Empty unless the nflverse-only pipeline supplied it for a 2022-2024 season (see loadRunNflverseOnly.ts/nflverse/depthCharts.ts) — backs the RB/WR-only pickByDepthChart baseline; absent for the primary SportsDataIO pipeline and for 2025 even within the nflverse-only one. */
   depthChartByPlayerIdWeek: Map<number, Map<number, number>>;
+  /** This target week's D/ST box scores (all 32 teams, minus whoever's on bye) — empty on the nflverse-only pipeline, which has no D/ST support (see loadRun.ts). */
+  targetWeekDefenseRows: TeamDefenseGameStat[];
+  /** All of a team's D/ST games strictly BEFORE targetWeek — the season-to-date basis for pairing/scoring, same no-hindsight discipline as seasonToDateTable. */
+  dstSeasonGamesByTeam: (team: string) => TeamDefenseGameStat[];
+  /** Same recentWeekCount window as recentGamesByPlayer, for a team's D/ST games. */
+  recentDefenseGamesByTeam: (team: string) => TeamDefenseGameStat[];
+  /**
+   * All of a player's games strictly BEFORE targetWeek, regardless of
+   * position — unlike seasonToDateTable (built by
+   * buildSeasonToDatePlayerStatsFromRows), this does NOT filter to skill
+   * positions, since it also needs to work for kickers. Skill positions
+   * already have seasonToDateTable for this purpose; this exists
+   * specifically so K's backtest scorer/pairing has a season-average
+   * basis too.
+   */
+  seasonGamesByPlayer: (playerId: number) => PlayerGameStat[];
+  /** `${nflverseTeam}/${week}` -> Vegas-implied point total — see loadRun.ts. Empty on the nflverse-only pipeline. */
+  impliedTotalsByTeamWeek: Map<string, number>;
 }
 
 const LIMITED_INJURY_STATUSES = new Set(["Out", "Doubtful"]);
@@ -51,7 +70,9 @@ export function sliceWeekData(
   nflversePlayerWeekTable: Map<number, Map<number, NflverseWeekStat>> = new Map(),
   teamWeatherByTeamWeek: Map<string, GameWeather> = new Map(),
   depthChartByPlayerIdWeek: Map<number, Map<number, number>> = new Map(),
-  format: ScoringFormat = "ppr"
+  format: ScoringFormat = "ppr",
+  allDefenseWeeklyRows: TeamDefenseGameStat[][] = [],
+  impliedTotalsByTeamWeek: Map<string, number> = new Map()
 ): BacktestWeekSlice {
   const priorRows = allWeeklyRows.slice(0, targetWeek - 1); // weeks 1..targetWeek-1
   const targetWeekRows = allWeeklyRows[targetWeek - 1] ?? [];
@@ -84,6 +105,24 @@ export function sliceWeekData(
 
   function nflverseStatForWeek(playerId: number, week: number): NflverseWeekStat | undefined {
     return nflversePlayerWeekTable.get(playerId)?.get(week);
+  }
+
+  function seasonGamesByPlayer(playerId: number): PlayerGameStat[] {
+    return priorRows
+      .flatMap((rows) => rows.filter((r) => r.PlayerID === playerId && r.Played === 1))
+      .sort((a, b) => a.Week - b.Week);
+  }
+
+  const priorDefenseRows = allDefenseWeeklyRows.slice(0, targetWeek - 1);
+  const targetWeekDefenseRows = allDefenseWeeklyRows[targetWeek - 1] ?? [];
+  const recentDefenseRows = allDefenseWeeklyRows.slice(recentStart - 1, targetWeek - 1);
+
+  function dstSeasonGamesByTeam(team: string): TeamDefenseGameStat[] {
+    return priorDefenseRows.flatMap((rows) => rows.filter((r) => r.Team === team)).sort((a, b) => a.Week - b.Week);
+  }
+
+  function recentDefenseGamesByTeam(team: string): TeamDefenseGameStat[] {
+    return recentDefenseRows.flatMap((rows) => rows.filter((r) => r.Team === team)).sort((a, b) => a.Week - b.Week);
   }
 
   const rosterCandidatesByTeamPosition = new Map<string, Set<number>>();
@@ -120,5 +159,10 @@ export function sliceWeekData(
     hasLimitedTeammate,
     teamWeatherByTeamWeek,
     depthChartByPlayerIdWeek,
+    targetWeekDefenseRows,
+    dstSeasonGamesByTeam,
+    recentDefenseGamesByTeam,
+    seasonGamesByPlayer,
+    impliedTotalsByTeamWeek,
   };
 }

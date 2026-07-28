@@ -89,7 +89,11 @@ or the player's own team's Vegas-implied point total), rather than a
 dozen blended signals — see "Backtesting & Tuning History" item 62 for
 the full backtest and why D/ST's version of that signal turned out to
 be a real, strong predictor (63.8% standalone) while K's was weaker
-than just ranking kickers by season average. Out of scope so far:
+than just ranking kickers by season average. That same D/ST and K
+support was extended to the Backtest page's Broad and Single Pair modes
+next (item 63) — real, permanent by-position accuracy numbers (D/ST
+65.0%, K 52.0%, on the primary 2025 season), not just item 62's one-off
+diagnostic. Out of scope so far:
 database/persistence, auth. Upcoming-schedule/next-opponent
 lookup — previously fully out of scope — is now partially built (see
 below): the live start/sit tool's own matchup modifier still looks up
@@ -3525,7 +3529,147 @@ single-season numbers for those specific constants.
       both positions, same as any skill position). Left as an open item
       below rather than silently patched as a side effect of this task.
 
-### Open items (as of item 62 — pick up here)
+63. **Added real D/ST and K support to the Backtest page** — item 62
+    validated D/ST's and K's simplified scoring model with a temporary,
+    one-off diagnostic route; this item wires that validation into the
+    permanent, user-facing Backtest UI (Broad mode's by-position accuracy
+    breakdown, plus Single Pair mode), on direct request: "I want to see
+    their accuracy metrics."
+    - **New data loading in `loadRun.ts`**: `allDefenseWeeklyRows`
+      (`FantasyDefenseByGame` for every week, mirroring how
+      `allTeamWeeklyRows` already batch-fetches `TeamGameStatsByWeek`),
+      `impliedTotalsByTeamWeek` (nflverse's Vegas-implied totals, same
+      source item 62's live scorers already use, wrapped in the same
+      degrade-to-empty-map-on-failure pattern as every other nflverse
+      fetch in this pipeline), and `dstPlayers`/`dstPlayerIdByTeam`
+      (from `getAllDstPlayers()`, resolved once so pairing/scoring stay
+      synchronous rather than re-fetching `/Teams` per lookup). All four
+      are optional fields on `BacktestRunData`, following the exact
+      precedent `teamWeatherByTeamWeek`/`depthChartByPlayerIdWeek`
+      already set for primary-pipeline-only data — deliberately NOT
+      extended to `loadRunNflverseOnly.ts`'s 2022-2024 pipeline in this
+      pass, since that's not where D/ST/K's live scoring was tuned or
+      validated (see Open Items).
+    - **A real architectural obstacle, found and worked around rather
+      than hit blindly**: `buildPositionDefenseTableFromRows`/
+      `buildSeasonToDatePlayerStatsFromRows` (the tables backing
+      skill-position pairing/matchup context) both filter to
+      `isSkillPosition(row.Position)` BY DESIGN — confirmed by reading
+      both functions before writing any new code, not assumed. That
+      meant the tempting shortcut ("just merge D/ST/K rows into
+      `allWeeklyRows` and let the existing pipeline handle them") would
+      have silently dropped both positions from every season-to-date
+      lookup, since neither `"DST"` nor `"K"` is a `SkillPosition`. Kept
+      D/ST entirely separate (its own `allDefenseWeeklyRows` array,
+      never merged into `allWeeklyRows`) and added a new
+      position-agnostic `weekSlice.seasonGamesByPlayer()` helper
+      specifically so K — whose raw rows already DO live in
+      `allWeeklyRows`, confirmed live via a direct
+      `PlayerGameStatsByWeek` fetch showing real `Position: "K"` rows
+      with correct `FantasyPoints` — has a season-average basis the
+      existing skill-filtered `seasonToDateTable` can't provide.
+    - **New pairing functions in `pairing.ts`**:
+      `buildDstPairsForWeek` (team-level, ranks all ~31 non-bye teams
+      by season-to-date D/ST points, adjacent-rank pairs, deliberately
+      uncapped unlike skill positions' `BROAD_MODE_POOL_SIZE` — with
+      only 32 teams total, the whole universe is already "realistic
+      depth," unlike WR/RB's much deeper bench pools) and
+      `buildKickerPairsForWeek` (player-level, same shape as skill
+      pairing but sourced from the new `seasonGamesByPlayer` rather
+      than the skill-filtered table). `CandidatePair.position` widened
+      from `SkillPosition` to `ExtendedPosition` to carry `"DST"`/`"K"`
+      pairs — required one small, targeted cast in `tradeBacktest.ts`
+      (`pair.position as SkillPosition`, with a comment explaining why
+      it's safe: that file only ever calls the skill-only
+      `buildAllPairsForWeek`, never the new extended one).
+    - **New backtest-mode input builders**: `buildBacktestDstInput`
+      (`scoreDefense.ts`) and `buildBacktestKickerInput`
+      (`scoreKicker.ts`) are the synchronous, weekSlice-driven
+      counterparts to item 62's live `buildDstComparisonInput`/
+      `buildKickerComparisonInput` — same relationship
+      `buildBacktestInput.ts` already has to `buildInput.ts` for skill
+      positions. One deliberate departure from skill positions'
+      backtest precedent: `nextOpponent`/`opponentImpliedTotal` are
+      populated normally here, not nulled out — skill positions null
+      this in backtest mode specifically to avoid leaking an unknowable
+      *future* opponent, but D/ST's and K's "opponent this week" in a
+      backtest is the target week's real, already-played, fully-known
+      historical matchup, so there's no leakage risk to guard against.
+      Both builders read injury status from nflverse's real weekly
+      report (`weekSlice.nflverseStatForWeek`), the same non-leaky
+      discipline `buildBacktestComparisonInput` already established for
+      skill positions, rather than a circular SportsDataIO field.
+    - **New dispatcher, `scoreExtendedBacktest.ts`**:
+      `scoreExtendedPlayerBacktest` mirrors item 62's live
+      `scoreExtendedPlayer` dispatch (synthetic D/ST ID -> K -> skill)
+      but returns a `PlayerScoreBreakdown` synchronously. Both
+      `runPairBacktest` and `runBroadBacktest` (`runBacktest.ts`) now
+      call this plus the already-existing `compareBreakdowns` (the pure
+      ranking function item 62 already extracted out of `comparePlayers`
+      for exactly this kind of mixed-position-family use) instead of
+      `buildBacktestComparisonInput`+`comparePlayers` directly.
+    - **Grading D/ST required one small, well-scoped workaround**: D/ST
+      has no row in `allWeeklyRows` at all (SportsDataIO models it as a
+      team stat), so `gradeOutcome`'s `PlayerGameStat`-based actual-score
+      lookup can't grade it directly. Rather than widen that
+      well-tested, widely-shared function, `runBacktest.ts` builds a
+      small, request-scoped array of `PlayerGameStat`-SHAPED rows from
+      that week's real D/ST box scores (`toDstActualRows` — synthetic
+      PlayerID via `dstPlayerIdByTeam`, `FantasyPoints` copied into both
+      the PPR and standard fields since D/ST doesn't vary by scoring
+      format) — just enough for `gradeWeek` to run completely unchanged.
+      Never merged into `allWeeklyRows`/`seasonToDateTable` themselves,
+      which stay skill-position-only by design, per the obstacle above.
+    - **Baseline grading (naive-strategy comparison) is deliberately
+      skipped for D/ST and K pairs**, in both Broad and Single Pair
+      mode — every `baselines.ts` picker was built and validated against
+      skill-position signals (volume, snap share, target share, etc.)
+      that don't exist for these two positions; testing confirmed most
+      would just report `no_pick` for a D/ST or K pair (since they read
+      the skill-filtered `seasonToDateTable`), but a few (team pace,
+      prior-week points) would still produce a real-looking but
+      essentially coincidental number — team-level pass/rush rate has no
+      real relationship to a kicker's own scoring, for instance. Skipping
+      entirely, rather than shipping baselines that produce numbers
+      without a coherent naive-strategy story behind them, follows this
+      document's own "don't report a number without a real story"
+      discipline (see items 12/17's own precedent for reporting a
+      negative/non-result honestly rather than a shaky positive one).
+    - **This also fixed a real, previously-latent bug, not a
+      hypothetical one**: since item 62 already widened `/api/players`
+      search to include D/ST and K, a user could ALREADY select two
+      kickers (or two defenses) in Single Pair mode before this item
+      shipped — and the old skill-only `runPairBacktest` would have
+      either produced nonsense (K, silently run through the
+      skill-position engine it was never tuned for) or an outright
+      wrong/broken result (D/ST, whose synthetic ID was never in
+      `allWeeklyRows`/`allPlayers` at all). This item closes that gap as
+      a side effect of building real Broad-mode support, not a
+      separately-scoped fix.
+    - **Verified live end-to-end, not just via `tsc`**: Broad mode with
+      only D/ST and K checked returned real, sane numbers — **D/ST
+      65.0%** (160-86, 10 push) and **K 52.0%** (116-107, 25 push),
+      both consistent with item 62's standalone diagnostic (63.8%/
+      55.4%) — with baselines correctly showing no data rather than
+      crashing. Single Pair mode verified with a real D/ST-vs-D/ST
+      comparison (San Francisco vs. Cleveland, 62.5% with a sensible
+      week-1 no-pick before any season-to-date data exists, real
+      week-by-week fantasy point totals matching realistic box scores)
+      and a real K-vs-K comparison (Chris Boswell vs. Jake Bates,
+      58.8%). Confirmed the season/mode guard conditions work
+      correctly: D/ST/K checkboxes render only in Broad mode on the
+      2025 season, and stay hidden for 2024/2023/2022 (no nflverse-only
+      D/ST support) and for Trade analyzer mode (no trade-backtest
+      support). Zero console errors across every check. Full-project
+      `npx tsc --noEmit -p .` and `npm run lint` both clean.
+    - **Deliberately out of scope for this item** (see Open Items):
+      extending D/ST/K backtest support to the nflverse-only 2022-2024
+      pipeline (would need confirming nflverse has an equivalent
+      team-defense data source, not yet checked) or to the Trade
+      Analyzer's own backtest (`tradeBacktest.ts` stays skill-only,
+      unchanged).
+
+### Open items (as of item 63 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -3558,14 +3702,23 @@ rostered-players fix (`resolveRoster.ts`'s `leagueRosteredPlayerIds`,
 threaded through the same files), and item 61's two polish fixes
 (`WaiverResult.tsx`'s `moveHeadline`/`showRosteredButton`) are all part
 of that same 80f6c70 commit — landed and deployed together, not a
-separate pending batch. **Item 62's D/ST and K support is NOT part of
-that commit** — it's real, working, live-verified code
-(`scoreDefense.ts`/`scoreKicker.ts`/`scoreExtended.ts`/
-`scoreExtendedShared.ts`, `sportsdata/defense.ts`/`defenseTeams.ts`,
-`waivers/rankExtendedCandidates.ts`, and the `ExtendedPosition`/
-`compareBreakdowns` changes to existing files) sitting uncommitted as
-of this writing — commit only once the user explicitly asks, per this
-project's standing rule. Nothing below is started or fixed yet:
+separate pending batch. **Item 62's D/ST and K support (live tools
+only) is committed separately, as `a86cc8b`** — real, working,
+live-verified code (`scoreDefense.ts`/`scoreKicker.ts`/
+`scoreExtended.ts`/`scoreExtendedShared.ts`, `sportsdata/defense.ts`/
+`defenseTeams.ts`, `waivers/rankExtendedCandidates.ts`, and the
+`ExtendedPosition`/`compareBreakdowns` changes to existing files),
+pushed to `main` after the user explicitly asked. **Item 63's Backtest-
+page D/ST and K support is NOT yet committed** — real, working,
+live-verified code (`loadRun.ts`'s new fetches, `pairing.ts`'s
+`buildDstPairsForWeek`/`buildKickerPairsForWeek`, the new
+`buildBacktestDstInput`/`buildBacktestKickerInput`/
+`scoreExtendedBacktest.ts`, `runBacktest.ts`'s rewritten
+`runPairBacktest`/`runBroadBacktest`, `params.ts`'s
+`parseExtendedPositionsParam`, and `BacktestTool.tsx`'s new checkboxes)
+sitting uncommitted as of this writing — commit only once the user
+explicitly asks, per this project's standing rule. Nothing below is
+started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -3664,6 +3817,25 @@ project's standing rule. Nothing below is started or fixed yet:
     Sleeper-connected user's own D/ST/K never appears in their synced
     roster (manual marking via `PlayerSearchInput` still works for
     both).
+11. **D/ST and K's Backtest-page support (item 63) is scoped to the
+    primary 2025 SportsDataIO pipeline and to Broad/Single Pair mode
+    only** — two real gaps, not oversights:
+    - **The nflverse-only 2022-2024 pipeline has no D/ST/K support at
+      all.** Extending it would first need confirming nflverse has an
+      equivalent team-defense data source to SportsDataIO's
+      `FantasyDefenseByGame` (not yet checked) — K might be closer to
+      free, since `stats_player`/`gameLog.ts` likely already carries
+      kicker rows the same way `PlayerGameStatsByWeek` does, but this
+      wasn't verified before deferring the work.
+    - **The Trade Analyzer's own backtest (`tradeBacktest.ts`) stays
+      skill-only.** D/ST and K already work in the *live* Trade
+      Analyzer (item 62's `projectExtendedRestOfSeason`), so extending
+      the backtest to validate that projection is a real, coherent next
+      step if picked up — it would reuse the same
+      `buildDstPairsForWeek`/`buildKickerPairsForWeek` pairing this item
+      already built, just needs its own rest-of-season grading logic
+      (mirroring `projectFromHistory`'s relationship to
+      `restOfSeason.ts` for skill positions).
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
@@ -3821,7 +3993,15 @@ project's standing rule. Nothing below is started or fixed yet:
   recent-form base rate for any week whose implied total isn't known
   yet — in practice, more than ~1 week out — the same honest
   "can't know that far ahead" pattern this app's weather-forecast
-  display already established, not a bug).
+  display already established, not a bug). As of item 63,
+  `scoreDefense.ts`/`scoreKicker.ts` each also export a synchronous
+  backtest-mode input builder (`buildBacktestDstInput`/
+  `buildBacktestKickerInput`) — the same live-vs-backtest split every
+  skill-position bridging file already has (`buildInput.ts` vs.
+  `buildBacktestInput.ts`) — and `scoreExtendedBacktest.ts` mirrors
+  `scoreExtended.ts`'s dispatcher for backtest mode
+  (`scoreExtendedPlayerBacktest`), consumed by `lib/backtest/
+  runBacktest.ts` for the Backtest page's D/ST and K support.
 - `src/lib/trade/` — `evaluateTrade.ts` (item 47), the Trade Analyzer's
   evaluation layer. Deliberately thin: reuses `scorePlayer()`'s
   `finalScore` as a standalone per-player value (see item 47's
@@ -3990,11 +4170,20 @@ project's standing rule. Nothing below is started or fixed yet:
   the primary 2025 backtest.
 - `src/lib/backtest/` — the backtesting feature: `loadRun.ts` (the only
   network I/O — fetches every needed week once per request, both
-  player-level and team-level rows, plus the nflverse tables above),
+  player-level and team-level rows, plus the nflverse tables above; as
+  of item 63, also `allDefenseWeeklyRows`/`dstPlayerIdByTeam`/
+  `dstPlayers`/`impliedTotalsByTeamWeek` — D/ST's and K's own backtest
+  data, primary-pipeline-only, same optionality pattern as
+  `teamWeatherByTeamWeek`/`depthChartByPlayerIdWeek`),
   `weekData.ts` (pure per-week slicing/aggregation from that batch —
   team pace and the nflverse stats use the same *recent*-weeks window
   as player recent-form, not full season-to-date, since team/player
-  tendencies can shift within a season), `grading.ts`
+  tendencies can shift within a season; item 63 added
+  `targetWeekDefenseRows`/`dstSeasonGamesByTeam`/
+  `recentDefenseGamesByTeam` for D/ST and a position-agnostic
+  `seasonGamesByPlayer` — deliberately NOT reusing
+  `seasonToDateTable`, which is skill-position-filtered by design, see
+  "Backtesting & Tuning History" item 63), `grading.ts`
   (correct/incorrect/push/no_pick outcomes + accuracy summary, plus
   `summarizeByCloseCall` for confidence-calibration checks — as of item
   50, `gradeOutcome`/`gradeWeek` take an optional `ScoringFormat`,
@@ -4022,14 +4211,33 @@ project's standing rule. Nothing below is started or fixed yet:
   pairing methodology — `buildPairsForWeek`/`buildAllPairsForWeek` also
   take an optional `ScoringFormat`, default `"ppr"`, as of item 50,
   since which players count as "adjacent rank" genuinely shifts by
-  format), `runBacktest.ts` (orchestration — `runPairBacktest`/
+  format; item 63 added `buildDstPairsForWeek`/`buildKickerPairsForWeek`
+  plus the dispatching `buildAllExtendedPairsForWeek`, all skill-only
+  `buildPairsForWeek`/`buildAllPairsForWeek` left completely unchanged —
+  `CandidatePair.position` is now `ExtendedPosition`, which needed one
+  targeted cast in `tradeBacktest.ts` since that file only ever produces
+  skill-only pairs but the shared type widened under it), `runBacktest.ts`
+  (orchestration — `runPairBacktest`/
   `runBroadBacktest` are format-aware as of item 50, and
   `gradeBaselinesForPair` itself gained a `format` parameter in item 51
   after both call sites were found to be silently dropping the
   already-in-scope `format` variable; `runBacktestNflverseOnly.ts` is
   fully format-aware too as of item 51 — only `tradeBacktest.ts` still
-  calls everything with `"ppr"` hardcoded, per Open Item 6), `config.ts`/
-  `params.ts` (tunables, query parsing). The engine's own grading logic
+  calls everything with `"ppr"` hardcoded, per Open Item 6. As of item
+  63, both `runPairBacktest`/`runBroadBacktest` score every player
+  through `scoreExtendedPlayerBacktest`/`compareBreakdowns` instead of
+  `buildBacktestComparisonInput`/`comparePlayers` directly, so a request
+  can freely mix skill positions with D/ST or K; `toDstActualRows` builds
+  a small, request-scoped array of `PlayerGameStat`-shaped rows from
+  that week's real D/ST box scores so `gradeWeek` can grade a D/ST pair
+  without D/ST ever needing a row in `allWeeklyRows` itself. Baseline
+  grading is skipped entirely for D/ST/K pairs in both functions — see
+  item 63 for why), `config.ts`/
+  `params.ts` (tunables, query parsing — item 63 added
+  `parseExtendedPositionsParam`, used only by `/api/backtest/broad`;
+  every other position-param route, including the nflverse-only and
+  trade-backtest ones, still uses the original skill-only
+  `parsePositionsParam`). The engine's own grading logic
   still always treats injury status as unknown — the `injuryStatus`
   baseline above is the only place in backtest mode that reads real
   historical designations, and only as a standalone trial (see Data
@@ -4143,7 +4351,11 @@ project's standing rule. Nothing below is started or fixed yet:
   `/backtest` — `BacktestTool.tsx` has three modes, Single pair/Broad/
   Trade analyzer, the last added in item 48; `TradeBacktestTable.tsx` is
   its per-trade detail table, mirroring `BacktestWeekTable.tsx`'s role
-  for the other two modes). Restyled in an Apple-inspired pass,
+  for the other two modes. As of item 63, Broad mode's position
+  checkboxes also include D/ST and K, gated to `season === "2025"` — no
+  UI change was needed in `BacktestSummary.tsx` for the new by-position
+  rows to render, since `byPosition` was already a plain
+  `Record<string, ...>` iterated generically). Restyled in an Apple-inspired pass,
   superseding the original indigo-accent design: `globals.css` defines
   a real token system via Tailwind v4's `@theme inline` — `--accent`
   (teal, brand/UI-chrome only: nav, buttons, focus rings) plus

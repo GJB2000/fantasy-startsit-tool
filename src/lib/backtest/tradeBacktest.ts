@@ -172,7 +172,13 @@ function collectTradeResultsForSeason(
       }
 
       results.push({
-        position: pair.position,
+        // CandidatePair.position is ExtendedPosition (pairing.ts also
+        // produces "DST"/"K" pairs for the broad-mode backtest), but
+        // buildAllPairsForWeek above was only ever called with
+        // SkillPosition[], so its output is guaranteed to be one too —
+        // the trade backtest doesn't support D/ST/K (see CLAUDE.md's
+        // D/ST & K backtest item).
+        position: pair.position as SkillPosition,
         give: { playerId: giveId, displayName: breakdowns[0].displayName, projectedTotal: projected[0], actualTotal: actual[0] },
         get: { playerId: getId, displayName: breakdowns[1].displayName, projectedTotal: projected[1], actualTotal: actual[1] },
         predictedWinnerId,

@@ -1,7 +1,9 @@
 import { RECENT_WEEK_COUNT } from "@/lib/recommendation/config";
-import { buildBacktestComparisonInput } from "@/lib/recommendation/buildBacktestInput";
-import { comparePlayers } from "@/lib/recommendation/engine";
-import type { PlayerGameStat, ScoringFormat, SkillPosition } from "@/lib/sportsdata/types";
+import { compareBreakdowns } from "@/lib/recommendation/engine";
+import { scoreExtendedPlayerBacktest } from "@/lib/recommendation/scoreExtendedBacktest";
+import { isDstPlayerId } from "@/lib/sportsdata/defenseTeams";
+import type { TeamDefenseGameStat } from "@/lib/sportsdata/defense";
+import type { ExtendedPosition, Player, PlayerGameStat, ScoringFormat } from "@/lib/sportsdata/types";
 import { BASELINE_PICKERS, type BaselineId } from "./baselines";
 import {
   gradeOutcome,
@@ -15,8 +17,52 @@ import {
   type WeekGradeResult,
 } from "./grading";
 import { loadBacktestRunData } from "./loadRun";
-import { buildAllPairsForWeek } from "./pairing";
+import { buildAllExtendedPairsForWeek } from "./pairing";
 import { sliceWeekData, type BacktestWeekSlice } from "./weekData";
+
+/**
+ * D/ST has no row in allWeeklyRows (SportsDataIO models it as a team
+ * stat, not a player — see loadRun.ts), so gradeOutcome/getActualScore's
+ * PlayerGameStat-based lookup can't grade it directly. Rather than widen
+ * that well-tested, widely-shared grading code, this builds a small,
+ * request-scoped array of PlayerGameStat-SHAPED rows from that week's
+ * real D/ST box scores (synthetic PlayerID via dstPlayerIdByTeam,
+ * FantasyPoints copied into both the PPR and standard fields since D/ST
+ * doesn't vary by scoring format) — just enough for gradeWeek to work
+ * completely unchanged. Never merged into allWeeklyRows/seasonToDateTable
+ * itself, which stay skill-position-only by design.
+ */
+function toDstActualRows(defenseRows: TeamDefenseGameStat[], dstPlayerIdByTeam: Map<string, number>): PlayerGameStat[] {
+  const rows: PlayerGameStat[] = [];
+  for (const r of defenseRows) {
+    const playerId = dstPlayerIdByTeam.get(r.Team);
+    if (playerId == null) continue;
+    rows.push({
+      PlayerID: playerId,
+      Season: r.Season,
+      Week: r.Week,
+      Team: r.Team,
+      Opponent: r.Opponent,
+      Position: "DST",
+      Played: 1,
+      Started: 1,
+      FantasyPoints: r.FantasyPoints,
+      FantasyPointsPPR: r.FantasyPoints,
+      InjuryStatus: null,
+      ReceivingTargets: 0,
+      RushingAttempts: 0,
+      PassingAttempts: 0,
+      Receptions: 0,
+    });
+  }
+  return rows;
+}
+
+function buildAnyPlayerById(allPlayers: Player[], dstPlayers: Player[] | undefined): Map<number, Player> {
+  const map = new Map(allPlayers.map((p) => [p.PlayerID, p]));
+  for (const p of dstPlayers ?? []) map.set(p.PlayerID, p);
+  return map;
+}
 
 export const BASELINE_IDS = Object.keys(BASELINE_PICKERS) as BaselineId[];
 
@@ -74,7 +120,16 @@ export async function runPairBacktest(
 ): Promise<PairBacktestResult> {
   const maxWeek = Math.max(...weeks);
   const runData = await loadBacktestRunData(season, apiSeason, maxWeek);
-  const anyPlayerById = new Map(runData.allPlayers.map((p) => [p.PlayerID, p]));
+  const anyPlayerById = buildAnyPlayerById(runData.allPlayers, runData.dstPlayers);
+  const isDstPair = playerIds.some((id) => isDstPlayerId(id));
+  // Skip baseline grading for D/ST and K pairs, matching runBroadBacktest
+  // below — most baselines read skill-position-only tables (season-to-date,
+  // recent volume, nflverse signals) that simply don't cover these two
+  // positions, and the few that don't (team pace, prior-week points) would
+  // still be grading a team-level or coincidental signal against a kicker/
+  // defense, not a meaningful comparison. D/ST additionally has no row in
+  // targetWeekRows at all (see toDstActualRows above).
+  const skipBaselines = isDstPair || playerIds.some((id) => anyPlayerById.get(id)?.Position === "K");
 
   const baselineOutcomes = emptyBaselineOutcomes();
 
@@ -87,16 +142,23 @@ export async function runPairBacktest(
       runData.nflversePlayerWeekTable,
       runData.teamWeatherByTeamWeek,
       runData.depthChartByPlayerIdWeek,
-      format
+      format,
+      runData.allDefenseWeeklyRows,
+      runData.impliedTotalsByTeamWeek
     );
-    const inputs = playerIds.map((id) =>
-      buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
+    const breakdowns = playerIds.map((id) =>
+      scoreExtendedPlayerBacktest(id, week, weekSlice, runData.byesByTeam, anyPlayerById, format)
     );
-    const result = comparePlayers(inputs, format);
-    const graded = gradeWeek(week, result, playerIds, weekSlice.targetWeekRows, format);
+    const result = compareBreakdowns(breakdowns);
+    const actualRows = isDstPair
+      ? toDstActualRows(weekSlice.targetWeekDefenseRows, runData.dstPlayerIdByTeam ?? new Map())
+      : weekSlice.targetWeekRows;
+    const graded = gradeWeek(week, result, playerIds, actualRows, format);
 
-    const baselineGrades = gradeBaselinesForPair(weekSlice, playerIds, weekSlice.targetWeekRows, format);
-    for (const id of BASELINE_IDS) baselineOutcomes[id].push(baselineGrades[id]);
+    if (!skipBaselines) {
+      const baselineGrades = gradeBaselinesForPair(weekSlice, playerIds, weekSlice.targetWeekRows, format);
+      for (const id of BASELINE_IDS) baselineOutcomes[id].push(baselineGrades[id]);
+    }
 
     return graded;
   });
@@ -121,12 +183,13 @@ export async function runBroadBacktest(
   season: number,
   apiSeason: string,
   weeks: number[],
-  positions: SkillPosition[],
+  positions: ExtendedPosition[],
   format: ScoringFormat = "ppr"
 ): Promise<BroadBacktestResult> {
   const maxWeek = Math.max(...weeks);
   const runData = await loadBacktestRunData(season, apiSeason, maxWeek);
-  const anyPlayerById = new Map(runData.allPlayers.map((p) => [p.PlayerID, p]));
+  const anyPlayerById = buildAnyPlayerById(runData.allPlayers, runData.dstPlayers);
+  const dstPlayerIdByTeam = runData.dstPlayerIdByTeam ?? new Map<string, number>();
 
   const byWeekResults: Record<number, WeekGradeResult[]> = {};
   const byPositionResults: Record<string, WeekGradeResult[]> = {};
@@ -142,23 +205,29 @@ export async function runBroadBacktest(
       runData.nflversePlayerWeekTable,
       runData.teamWeatherByTeamWeek,
       runData.depthChartByPlayerIdWeek,
-      format
+      format,
+      runData.allDefenseWeeklyRows,
+      runData.impliedTotalsByTeamWeek
     );
-    const pairs = buildAllPairsForWeek(weekSlice, positions, format);
+    const pairs = buildAllExtendedPairsForWeek(weekSlice, positions, format, dstPlayerIdByTeam);
+    const dstActualRows = toDstActualRows(weekSlice.targetWeekDefenseRows, dstPlayerIdByTeam);
 
     const weekResults: WeekGradeResult[] = [];
     for (const pair of pairs) {
-      const inputs = pair.playerIds.map((id) =>
-        buildBacktestComparisonInput(id, anyPlayerById.get(id) ?? null, week, weekSlice, runData.byesByTeam)
+      const breakdowns = pair.playerIds.map((id) =>
+        scoreExtendedPlayerBacktest(id, week, weekSlice, runData.byesByTeam, anyPlayerById, format)
       );
-      const result = comparePlayers(inputs, format);
-      const graded = gradeWeek(week, result, pair.playerIds, weekSlice.targetWeekRows, format);
+      const result = compareBreakdowns(breakdowns);
+      const actualRows = pair.position === "DST" ? dstActualRows : weekSlice.targetWeekRows;
+      const graded = gradeWeek(week, result, pair.playerIds, actualRows, format);
       weekResults.push(graded);
       allResults.push(graded);
       (byPositionResults[pair.position] ??= []).push(graded);
 
-      const baselineGrades = gradeBaselinesForPair(weekSlice, pair.playerIds, weekSlice.targetWeekRows, format);
-      for (const id of BASELINE_IDS) baselineOutcomes[id].push(baselineGrades[id]);
+      if (pair.position !== "DST" && pair.position !== "K") {
+        const baselineGrades = gradeBaselinesForPair(weekSlice, pair.playerIds, weekSlice.targetWeekRows, format);
+        for (const id of BASELINE_IDS) baselineOutcomes[id].push(baselineGrades[id]);
+      }
     }
     byWeekResults[week] = weekResults;
   }

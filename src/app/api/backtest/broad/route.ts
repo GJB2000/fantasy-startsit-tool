@@ -1,6 +1,6 @@
 import { BASELINE_LABELS } from "@/lib/backtest/baselines";
 import { DEFAULT_BACKTEST_API_SEASON, DEFAULT_BACKTEST_SEASON, MAX_BACKTEST_WEEK } from "@/lib/backtest/config";
-import { parsePositionsParam, parseWeeksParam } from "@/lib/backtest/params";
+import { parseExtendedPositionsParam, parseWeeksParam } from "@/lib/backtest/params";
 import { runBroadBacktest } from "@/lib/backtest/runBacktest";
 import { parseScoringFormat } from "@/lib/sportsdata/types";
 
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const season = Number(url.searchParams.get("season") ?? DEFAULT_BACKTEST_SEASON);
   const apiSeason = url.searchParams.get("apiSeason") ?? DEFAULT_BACKTEST_API_SEASON;
   const weeks = parseWeeksParam(url.searchParams.get("weeks"), MAX_BACKTEST_WEEK);
-  const positions = parsePositionsParam(url.searchParams.get("positions"));
+  const positions = parseExtendedPositionsParam(url.searchParams.get("positions"));
   const format = parseScoringFormat(url.searchParams.get("scoringFormat"));
 
   if (weeks.length === 0) {
