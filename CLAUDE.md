@@ -76,6 +76,11 @@ scoped to the live start/sit and trade pages; the Backtest page's own
 internal chrome (mode buttons, season toggle, table) was left on the
 prior zinc/rounded-md styling both times, since it's the secondary/
 internal validation tool, not a page newsletter readers use directly.
+(The accent has since moved off teal to the navy/electric-blue "Prime
+Time" palette, and — as of item 64 — the top nav itself was replaced
+by a persistent sidebar shell with a real Home landing page; both of
+those are separate, later changes from the pass described in this
+paragraph, kept here as the original historical record.)
 Both live tools also gained real PPR/Half-PPR/Standard scoring-format
 toggles — not just a relabeled display, the five active conversion
 factors were empirically re-tuned per format and the choice is threaded
@@ -93,7 +98,13 @@ than just ranking kickers by season average. That same D/ST and K
 support was extended to the Backtest page's Broad and Single Pair modes
 next (item 63) — real, permanent by-position accuracy numbers (D/ST
 65.0%, K 52.0%, on the primary 2025 season), not just item 62's one-off
-diagnostic. Out of scope so far:
+diagnostic. The app's overall navigation was reworked next (item 64):
+the old single top NavBar (shared across all pages) was replaced by a
+persistent sidebar shell, and a new **Home** page (`/` — Start/Sit
+moved to `/start-sit` to make room) now serves as a real navigational
+hub across all four tools, plus a "recent comparisons" panel showing
+genuine session history rather than placeholder content. Out of scope
+so far:
 database/persistence, auth. Upcoming-schedule/next-opponent
 lookup — previously fully out of scope — is now partially built (see
 below): the live start/sit tool's own matchup modifier still looks up
@@ -3836,6 +3847,92 @@ started or fixed yet:
       already built, just needs its own rest-of-season grading logic
       (mirroring `projectFromHistory`'s relationship to
       `restOfSeason.ts` for skill positions).
+
+64. **Reworked the app's top-level navigation from a single top NavBar
+    into a persistent sidebar shell, plus a new Home page** — the app
+    had grown to four real tools (Start/Sit, Trade Analyzer, Waivers,
+    Backtest), each still built as its own isolated, centered
+    marketing-style page with a big hero. Explored two mockups first
+    (a general "dashboard" concept and the same treatment applied to
+    Start/Sit specifically) before building anything real, then shipped
+    on direct request — with one explicit change from the mockups: the
+    landing page is called **Home**, not "Dashboard," throughout (nav
+    label, route, page title).
+    - **New `AppShell.tsx`** replaces `NavBar.tsx` (deleted) as the root
+      layout's chrome — a persistent sidebar, deliberately kept a fixed
+      dark navy in BOTH light and dark mode (unlike every other surface
+      in this app, which follows the theme toggle) as a "broadcast
+      desk" nod to the app's existing Prime Time navy/electric-blue
+      branding. Collapses to a horizontal scrolling bar below the `md`
+      breakpoint instead of a hamburger menu, since the 5-link list
+      stays usable that way. Shows the user's current scoring format
+      (read live from `useScoringFormat`) in its footer — real state,
+      not a static label.
+    - **New `PageHeader.tsx`** replaces each page's old full-bleed hero
+      (large centered headline + `.hero-glow` gradient blur, now
+      deleted from `globals.css` as dead CSS) with a compact, left-
+      aligned title/subtitle — the hero made sense when every page was
+      an isolated screen but wasted the sidebar layout's width and read
+      as inconsistent once a persistent nav is always on screen.
+    - **Routing changed**: `/` is now Home, not Start/Sit — Start/Sit
+      moved to `/start-sit`. This is the one real breaking change in
+      this item (old bookmarks/links to `/` now land on Home, not a
+      redirect); no other route moved. Verified via a real `next build`
+      that both routes generate correctly as separate static pages.
+    - **Home page** (`src/app/page.tsx`) is a real navigational hub, not
+      a data dashboard — deliberately, given this project's own
+      standing "no dummy/placeholder data" rule (see Things to Avoid).
+      The mockup's illustrative widgets (a pre-filled "quick compare,"
+      a fake "latest trade verdict," hardcoded accuracy numbers) don't
+      have an honest real-data source without either a slow live fetch
+      on every page load (backtest accuracy) or a persistence layer
+      this app doesn't have (a "latest trade," since trades aren't
+      saved anywhere) — so Home shipped as 4 real tool-launch cards
+      (real copy, real links, no numbers) plus one genuinely live
+      widget: recent Start/Sit comparisons (see below), which needed no
+      fake data to populate because it's real session history.
+    - **New `useRecentComparisons.ts`** (localStorage, no backend —
+      same "no persistence" scope as `useRosteredPlayers.ts`/
+      `useScoringFormat.ts`) records up to 5 real Start/Sit results the
+      user has actually run this browser. `StartSitTool.tsx` writes to
+      it after every successful `/api/compare` call; a new
+      `StartSitRail.tsx` (`RecentComparisonsPanel`, exported for reuse)
+      renders it both on the Start/Sit page and, via a thin client
+      wrapper (`RecentComparisonsHomeCard.tsx`, needed so the Home page
+      itself can stay a server component), on Home.
+    - **Start/Sit's content got the fuller redesign** the mockup showed
+      (the other three tools' internal content is deliberately
+      untouched this pass — just re-homed under the new shell/header,
+      per the same "port everything to the shell, redesign what was
+      actually mocked up" scoping this item's own mockup conversation
+      already set expectations for). `StartSitTool.tsx` now lays out as
+      a 2-column grid: search panel + `ComparisonResult.tsx` (itself
+      unchanged — its existing squircle-card styling already matched
+      the dashboard treatment closely, see the earlier Apple-inspired
+      redesign) on the left, `StartSitRail.tsx` on the right. The rail's
+      other panel, **matchup context**, is built entirely from data the
+      API response already carries (`PlayerScoreBreakdown.matchupContext`,
+      already populated for skill positions) — no new fetch, and it
+      degrades to nothing for D/ST/K (which don't have this field) the
+      same way the rest of the app treats fields those positions lack.
+    - **New `--surface-sunken` design token** added to `globals.css`
+      (light `#f4f6fa` / dark `#0c111a`) for the slightly-recessed
+      panel backgrounds (player chips, etc.) the new layout needed — a
+      real, permanent addition to the token system alongside
+      `--surface`, not a one-off inline color.
+    - **Verified live end-to-end, not just `tsc`/lint**: a real
+      Bijan Robinson vs. Jonathan Taylor comparison on the redesigned
+      `/start-sit` rendered the real headline, real "Why" reasoning,
+      real player-card stats, a real matchup-context rail (correctly
+      labeling one matchup "roughly average" and the other "tough
+      matchup" from the actual `diffFromAverage` sign), and the real
+      comparison appearing in "Recent comparisons" immediately after.
+      Confirmed Home, Trade Analyzer, Waivers, and Backtest all render
+      correctly under the new shell with zero console errors, in both
+      light and dark mode (sidebar staying dark in both, main content
+      switching), and at mobile width (sidebar collapsing to a
+      horizontal bar, cards stacking single-column). `next build`
+      clean; `npx tsc --noEmit -p .` and `npm run lint` both clean.
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
@@ -4315,11 +4412,25 @@ started or fixed yet:
   24/36/39 — all out-of-sample validation only) — Route Handlers that
   orchestrate the lib layers above and return trimmed JSON (never proxy
   raw upstream payloads, never leak the API key).
-- `src/components/` — `NavBar.tsx` (shared sticky nav, all pages),
+- `src/components/` — `AppShell.tsx` (item 64 — the persistent sidebar
+  shell wrapping every page from `layout.tsx`, replacing the old
+  `NavBar.tsx`, now deleted) and `PageHeader.tsx` (item 64 — the compact
+  title/subtitle every page uses in place of its old full-bleed hero),
   `StartSitTool.tsx`/`PlayerSearchInput.tsx`/`ComparisonResult.tsx` (live
-  start/sit mode — `ComparisonResult.tsx`'s player cards also show each
+  start/sit mode, at `/start-sit` as of item 64 (previously `/`) —
+  `ComparisonResult.tsx`'s player cards also show each
   player's next opponent/weather, display-only; see Overview and the
-  `buildInput.ts` Conventions entry), `TradeAnalyzer.tsx`/`TradeResult.tsx` (live Trade
+  `buildInput.ts` Conventions entry). As of item 64, `StartSitTool.tsx`
+  lays out as a 2-column grid with a new `StartSitRail.tsx` alongside
+  `ComparisonResult.tsx` — a matchup-context panel (built from
+  `PlayerScoreBreakdown.matchupContext`, already present in the API
+  response, no new fetch) and a `RecentComparisonsPanel` (exported for
+  reuse) backed by `src/lib/useRecentComparisons.ts`, a localStorage
+  hook mirroring `useRosteredPlayers.ts`'s pattern that records real
+  Start/Sit results the user has actually run this session.
+  `RecentComparisonsHomeCard.tsx` is a thin "use client" wrapper around
+  that same panel so the (server-rendered) Home page can show it too
+  without itself needing to be a client component. `TradeAnalyzer.tsx`/`TradeResult.tsx` (live Trade
   Analyzer mode, at `/trade`, item 47 — `TradeAnalyzer.tsx` reuses
   `PlayerSearchInput.tsx` for both sides of a trade), `ScoringFormatToggle.tsx`
   (item 50 — the PPR/Half-PPR/Standard segmented control, shared by
@@ -4368,9 +4479,10 @@ started or fixed yet:
   is applied via a `font-rounded` utility class to every stat numeral in
   `ComparisonResult.tsx`/`TradeResult.tsx`, echoing how Apple Health/
   Fitness renders its own numeric displays — replacing the prior
-  `font-mono`/Geist Mono usage there. `NavBar.tsx` is a frosted
-  `backdrop-blur` glass bar with a real segmented control tied to the
-  actual routes. One real bug caught before shipping: a template-
+  `font-mono`/Geist Mono usage there. (This paragraph predates item 64's
+  sidebar rework — `NavBar.tsx`'s frosted `backdrop-blur` glass bar has
+  since been replaced by `AppShell.tsx`'s sidebar; see that item for the
+  current nav treatment.) One real bug caught before shipping: a template-
   literal Tailwind class (`` `bg-${token}/12` ``) doesn't work — Tailwind's
   static scanner only resolves complete literal class strings, so
   verdict-to-badge-color mapping must go through a lookup object

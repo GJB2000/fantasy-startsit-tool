@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { NavBar } from "@/components/NavBar";
+import { AppShell } from "@/components/AppShell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Start/Sit — Fantasy Football Lineup Helper",
-  description: "Compare two players competing for the same roster spot and get a clear, explained start/sit call.",
+  title: "Legitfootball — Fantasy Football Tools",
+  description: "Start/sit calls, trade grades, and waiver targets — real data, a straight answer, and the reasoning behind it.",
 };
 
 export default function RootLayout({
@@ -14,9 +14,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full flex flex-col font-sans">
-        <NavBar />
-        {children}
+      <body className="min-h-full font-sans">
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

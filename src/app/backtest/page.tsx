@@ -1,16 +1,14 @@
 import { BacktestTool } from "@/components/BacktestTool";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function BacktestPage() {
   return (
-    <main className="flex-1 bg-background px-6 py-12 font-sans text-foreground sm:py-16">
-      <div className="mx-auto max-w-2xl text-center">
-        <h1 className="text-2xl font-semibold sm:text-3xl">Backtest the recommendation engine</h1>
-        <p className="mt-2 text-sm text-zinc-500">
-          Replay the engine against the completed 2025 season, using only data that
-          would have been known before each week&apos;s games, and see how often it
-          called it right.
-        </p>
-      </div>
+    <main className="bg-background px-6 py-10 font-sans text-foreground sm:px-10 sm:py-12">
+      <PageHeader
+        eyebrow="Legitfootball · Validation"
+        title="Backtest the recommendation engine"
+        description="Replay the engine against a completed season, using only data that would have been known before each week's games, and see how often it called it right."
+      />
       <BacktestTool />
     </main>
   );

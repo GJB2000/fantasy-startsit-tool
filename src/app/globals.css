@@ -5,6 +5,7 @@
   --foreground: #0b1220;
   --surface: #ffffff;
   --surface-glass: rgba(255, 255, 255, 0.78);
+  --surface-sunken: #f4f6fa;
   --accent: #1552c9;
   --accent-ink: #ffffff;
   --good: #268a4a;
@@ -18,6 +19,7 @@
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
   --color-surface-glass: var(--surface-glass);
+  --color-surface-sunken: var(--surface-sunken);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-good: var(--good);
@@ -39,6 +41,7 @@
     --foreground: #eef1f8;
     --surface: #10161f;
     --surface-glass: rgba(16, 22, 31, 0.68);
+    --surface-sunken: #0c111a;
     --accent: #2f7dff;
     --accent-ink: #061024;
     --good: #3ee06a;
@@ -56,12 +59,4 @@ body {
 
 ::selection {
   background: color-mix(in srgb, var(--accent) 30%, transparent);
-}
-
-.hero-glow {
-  background: radial-gradient(
-    closest-side,
-    color-mix(in srgb, var(--accent) 14%, transparent),
-    transparent 70%
-  );
 }
