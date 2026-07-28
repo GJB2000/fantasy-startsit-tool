@@ -48,6 +48,8 @@ export interface BacktestWeekSlice {
   seasonGamesByPlayer: (playerId: number) => PlayerGameStat[];
   /** `${nflverseTeam}/${week}` -> Vegas-implied point total — see loadRun.ts. Empty on the nflverse-only pipeline. */
   impliedTotalsByTeamWeek: Map<string, number>;
+  /** PlayerID -> week -> FantasyPros weekly consensus rank/r2p_pts (see loadRun.ts). Empty unless the nflverse-only pipeline supplied it — backs the pickByExpertConsensus baseline; absent for the primary SportsDataIO pipeline. */
+  expertConsensusByPlayerIdWeek: Map<number, Map<number, { rank: number; r2pPts: number | null }>>;
 }
 
 const LIMITED_INJURY_STATUSES = new Set(["Out", "Doubtful"]);
@@ -72,7 +74,8 @@ export function sliceWeekData(
   depthChartByPlayerIdWeek: Map<number, Map<number, number>> = new Map(),
   format: ScoringFormat = "ppr",
   allDefenseWeeklyRows: TeamDefenseGameStat[][] = [],
-  impliedTotalsByTeamWeek: Map<string, number> = new Map()
+  impliedTotalsByTeamWeek: Map<string, number> = new Map(),
+  expertConsensusByPlayerIdWeek: Map<number, Map<number, { rank: number; r2pPts: number | null }>> = new Map()
 ): BacktestWeekSlice {
   const priorRows = allWeeklyRows.slice(0, targetWeek - 1); // weeks 1..targetWeek-1
   const targetWeekRows = allWeeklyRows[targetWeek - 1] ?? [];
@@ -164,5 +167,6 @@ export function sliceWeekData(
     recentDefenseGamesByTeam,
     seasonGamesByPlayer,
     impliedTotalsByTeamWeek,
+    expertConsensusByPlayerIdWeek,
   };
 }

@@ -303,6 +303,26 @@ knowable that far ahead from this data source.
   filtering; Sleeper's own docs ask callers not to hit it more than
   once a day, so it's cached 24h in-process, same TTL discipline this
   app already uses for nflverse's heavy CSV releases.
+- **`dynastyprocess/data` (GitHub, free, no-auth) has TWO separate
+  FantasyPros-rankings files with very different update behavior** —
+  confirmed live (item 68/69), correcting item 55's own earlier
+  conclusion. `files/db_fpecr.csv.gz` (what item 55 checked) really did
+  stop receiving weekly rows around August 2025. `files/fp_latest_weekly.csv`
+  is a SEPARATE file, driven by a different "Daily FP scrape" workflow,
+  still actively committing at a roughly-daily cadence through the
+  2025 season (and further back — real history confirmed to December
+  2021). It only ever holds the single most recent snapshot (each daily
+  commit overwrites it), so a past week's rankings are reconstructed by
+  fetching the file's content at whichever commit was current just
+  before that week's games started — git history used as a de facto
+  time-series archive (`src/lib/fantasypros/`). GitHub's unauthenticated
+  REST API caps at 60 req/hour; the commit-history LIST is the only call
+  site that matters for that limit, so it's fetched once (paginated) and
+  cached, with per-week date-matching done locally afterward rather than
+  one API call per week. Raw file content at a specific commit isn't
+  subject to that limit and is immutable once committed, so it's cached
+  far longer (30 days) than the commit index itself (24h, since new
+  commits keep landing).
 
 ## Recommendation Logic Philosophy
 This is the most important section — the "brain" of the tool.
@@ -4288,6 +4308,120 @@ single-season numbers for those specific constants.
       numbers, same precedent as every other one-off analysis in this
       document — this write-up is the only lasting artifact.
 
+69. **Shipped a real, permanent standalone baseline for FantasyPros'
+    weekly expert-consensus rankings (`pickByExpertConsensus`) — a
+    genuinely new KIND of signal for this document (human/market-
+    informed, not derived from box scores or play-by-play), and one of
+    the strongest, most consistent standalone signals found in this
+    entire investigation.**
+    - **Corrected item 55's own prior "dropped" conclusion, on direct
+      follow-up ("what if we take into account expert projections?").**
+      Item 55 checked `dynastyprocess/data`'s `db_fpecr.csv.gz` release
+      file and correctly found it had stopped receiving weekly (`wp`-type)
+      rows around August 2025 — but that repo has a SECOND, separate file
+      (`files/fp_latest_weekly.csv`) that item 55 never discovered, driven
+      by a different, still-actively-running "Daily FP scrape" workflow.
+      Confirmed live: real commits at a roughly-daily cadence covering
+      2022 through the 2025 season's finale (and further back — verified
+      history exists to December 2021). The file itself only ever holds
+      the SINGLE most recent snapshot (each daily commit overwrites it),
+      so a past week's rankings only exist by fetching the file's content
+      at whichever commit was current just before that week's games
+      started — git history as a de facto, if unintentional, time-series
+      archive.
+    - **Two rounds of standalone validation before touching any real
+      code**, matching this document's standing discipline: a small
+      8-week spot-check first (confirmed the git-history-mining approach
+      actually works, confirmed real player-name matching via a ~99%
+      real match rate once genuinely-injured/inactive players are
+      excluded — e.g. CeeDee Lamb's 2025 weeks 3-6 miss was confirmed as
+      a real absence, not a join bug), then a full pooled 2022-2025
+      standalone script (18 weeks × 4 seasons, ~19,900 matched
+      player-weeks) checking two separable questions: does
+      `r2p_pts` (dynastyprocess's own rank-to-points conversion — not
+      officially documented, best-effort interpreted from the column
+      name and behavior) calibrate well as a point estimate, and does
+      the rank ORDER itself predict pairwise outcomes. The standalone
+      script's own ad hoc pairing (adjacent by FantasyPros' OWN rank
+      order) found calibration real and consistent (r2p_pts MAE beat the
+      engine's on QB/RB/WR, tied on TE, no season sign-flips — unlike
+      item 68's regression) but pick accuracy only real for TE (56.7%
+      pooled, every season above chance) — QB/RB looked like pure chance,
+      WR mixed.
+    - **The REAL harness result, once actually wired in, was
+      substantially stronger than the standalone script suggested** —
+      because the standalone script's pairing (adjacent by FantasyPros'
+      OWN rank) tests a different, harder question than this project's
+      standard methodology (adjacent by OUR OWN season-to-date rank,
+      exactly how every other baseline/signal in this document is
+      tested). Once graded through the real `buildAllPairsForWeek`
+      pairing and the real multi-season harness: **QB 57.4%, RB 59.3%,
+      WR 60.3%, TE 57.7% pooled — all four positions clear 57%, one of
+      the strongest and most consistent results in this entire
+      document's history.** By-season breakdown (the item 68 lesson,
+      applied here too): RB is the standout for consistency (58.3-60.9%
+      every single season, tightest range of any position tested in this
+      whole document); WR is strong every season (55.2-64.3%); QB is
+      strong in 3 of 4 seasons but drops to exactly 50.0% in 2024 (a
+      real, if modest, inconsistency); TE is positive every season but
+      widest range (52.5-66.3%), consistent with TE's chronic noisiness
+      throughout this document.
+    - **New infrastructure — genuinely different in kind from every
+      other data source in this app**: `src/lib/fantasypros/client.ts`
+      (a small GitHub REST + raw-content client, NOT the nflverse-data
+      release-asset shape every other external source here uses — this
+      one needs the commits API to find historical snapshots, then
+      raw.githubusercontent.com for content at a specific commit) and
+      `weeklyConsensus.ts` (orchestrates: get the season's real week-start
+      dates via a new `nflverse/schedules.ts` `getWeekStartDates` reader,
+      find the latest commit strictly before each week's kickoff — a
+      real, non-leaky historical fact, not a forecast — fetch that
+      commit's snapshot, normalize names via the same `playerMatch.ts`
+      join every other external source here uses). Two different cache
+      TTLs, deliberately: the commit INDEX (24h, since new commits land
+      roughly daily) vs. a specific commit's file CONTENT (30 days,
+      since it's immutable by git's own design once committed).
+      GitHub's unauthenticated REST API is rate-limited to 60 req/hour —
+      the one call site that matters (`fetchCommitHistory`) fetches the
+      WHOLE paginated history ONCE and matches dates locally afterward,
+      rather than one API call per week, so a full 4-season backtest run
+      costs a small, fixed number of these calls regardless of how many
+      weeks/seasons it covers. Raw content fetches aren't subject to
+      that same limit.
+    - **Threaded through the nflverse-only pipeline exactly like
+      `depthChartByPlayerIdWeek`/`teamWeatherByTeamWeek`** (item 39/46's
+      precedent): a new optional `BacktestRunData.expertConsensusByPlayerIdWeek`
+      field, resolved onto the pipeline's synthetic PlayerIDs at load
+      time via `gameLog.playerIdByNormalizedName`, threaded through
+      `sliceWeekData`/`BacktestWeekSlice`, absent/no-op on the primary
+      SportsDataIO pipeline (verified live: 612/612 no_pick, zero crash).
+      Fetched as its own sequential step in `loadRunNflverseOnly.ts`,
+      AFTER the main batch — same "one heavy, many-request source at a
+      time" discipline item 27 established for red-zone touches, since
+      this one is a genuinely different shape of "heavy" (not one big
+      file, but up to ~18 sequential per-week fetches plus a paginated
+      commit lookup).
+    - **Deliberately unscoped across all four positions for this first
+      real-harness pass** (`pickByExpertConsensus` in `baselines.ts`) —
+      same discovery-phase treatment wind/depthChart originally got
+      (items 34→39, 37→46) before being scoped down to where they
+      actually held up. Given how consistently strong all four positions
+      came back here, there's a real case this one doesn't need scoping
+      down at all — a genuine first in this document's history of
+      position-scoped signals — but that's a decision for a follow-up
+      pass, not assumed here.
+    - **Not integrated into `finalScore` or engine.ts** — a real,
+      permanent, validated standalone baseline only, same status as
+      `injuryStatus`/`wind`/`depthChart` before it. The calibration
+      angle (`r2p_pts` as an MAE-competitive point estimate — the
+      original motivating question, "what if we take into account
+      expert projections," was about projection accuracy specifically,
+      not pick accuracy) was validated in the standalone script but has
+      no equivalent real-harness path yet — "Projection accuracy" mode
+      only compares `finalScore` against one hardcoded naive baseline
+      today (item 65), not an arbitrary external one. Both are real,
+      well-scoped follow-ups, not started here — see Open Items.
+
 ### Open items (as of item 65 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
@@ -4336,12 +4470,17 @@ prior-season-fallback feature (`nflverse/priorSeasonAverage.ts`,
 `PlayerComparisonInput.priorSeasonPprAvg`, the new `scorePlayer` fallback
 branch, and the `playerProjectionLookup.ts` wiring) plus its
 cross-position calibration investigation write-up — is committed as
-`d69c8ed`. **Item 68's regression-vs-`finalScore` investigation shipped
-no code at all (a documented negative finding only, per its own writeup
-above) — the CLAUDE.md update recording it is the only change, not yet
-committed** as of this writing — commit only once the user explicitly
-asks, per this project's standing rule. Nothing below is started or
-fixed yet:
+`d69c8ed`. Item 68's regression-vs-`finalScore` investigation shipped no
+code at all (a documented negative finding only) — its CLAUDE.md
+write-up is committed as `6fefc74`. **Item 69's FantasyPros
+expert-consensus baseline — real, permanent, working code
+(`src/lib/fantasypros/`, the `nflverse/schedules.ts` `getWeekStartDates`
+addition, the `BacktestRunData.expertConsensusByPlayerIdWeek`
+plumbing through `loadRunNflverseOnly.ts`/`weekData.ts`, and the new
+`pickByExpertConsensus` baseline in `baselines.ts`) plus this CLAUDE.md
+write-up — is NOT yet committed** as of this writing — commit only once
+the user explicitly asks, per this project's standing rule. Nothing below
+is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -4536,6 +4675,43 @@ fixed yet:
     narrowest fix that answers "why can't you project week 1," not a
     reweighting of the `RECENT_WEIGHT` formula, which would need its own
     real backtest sweep.
+16. **`pickByExpertConsensus` (item 69) validated exceptionally strong
+    (57-60% pooled, every position) but is still just a standalone
+    baseline — three real follow-ups, not started:**
+    - **Integration into `finalScore` itself hasn't been tried.** Given
+      how much stronger and more consistent this result is than most
+      signals that DID get integrated (items 20/30/33/41), it's a real
+      candidate — but every integration in this document went through
+      its own weight sweep against real pick-accuracy/calibration
+      numbers first (not just "the standalone number is good, ship it"),
+      and that hasn't been done here yet.
+    - **The calibration angle (`r2p_pts` as an MAE-competitive point
+      estimate) was validated in item 69's standalone script but has no
+      real-harness path.** "Projection accuracy" mode (item 65) only
+      ever compares `finalScore` against ONE hardcoded naive
+      season-average baseline — extending it to compare against an
+      arbitrary second baseline (this one) would need a real change to
+      `runProjectionBacktest.ts`'s shape, not just new data plumbing.
+      This is the more direct answer to the question that started this
+      whole investigation ("what if we take into account expert
+      projections," asked in the context of improving projection
+      accuracy specifically) — pick accuracy was validated first only
+      because that's what "start with a standalone baseline" means in
+      this document's established vocabulary.
+    - **Live-tool integration is a bigger lift than any other external
+      source in this app has needed.** Every other live signal
+      (nflverse, Sleeper, weather/schedules) is a direct current-state
+      fetch. This one would need `fantasypros/client.ts`'s SEPARATE
+      "current HEAD snapshot" path (not git-history mining — the live
+      tool only ever needs THIS week's rankings, already sitting at the
+      file's current content) — not built yet, since this pass only
+      needed the historical/backtest path.
+    - Also worth a dedicated look if picked up again: whether
+      `pickByExpertConsensus` genuinely doesn't need position-scoping
+      (unlike every other signal in this document, all four positions
+      cleared the bar convincingly here) or whether 2024 QB's exact-50%
+      season and TE's wide season-to-season range (52.5-66.3%) are early
+      warning signs that would show up with more scrutiny.
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
@@ -4877,6 +5053,32 @@ fixed yet:
   `depthChart` baseline. All of these are used only by
   `backtest/loadRunNflverseOnly.ts` (item 24), never by the live tool or
   the primary 2025 backtest.
+- `src/lib/fantasypros/` — server-only client for `dynastyprocess/data`
+  (item 68/69), a free, no-auth GitHub repo, but a genuinely different
+  fetch SHAPE from every other external source in this app: not a
+  release asset (nflverse's pattern) or a REST endpoint (Sleeper's), but
+  a file whose past state has to be reconstructed from git commit
+  history (see Data Source Notes for why). `client.ts` has its own small
+  GitHub REST + raw-content fetcher and its own quote-aware CSV parser
+  (duplicated from, not shared with, `nflverse/client.ts`'s — different
+  host/URL shape, and this file is small enough that none of that
+  parser's column-filtering-at-scale concerns apply) — `fetchCommitHistory()`
+  (paginated, 24h cache) and `fetchSnapshotAtCommit(sha)` (30-day cache,
+  content is immutable once committed). `weeklyConsensus.ts`'s
+  `getExpertConsensusByNormalizedNameWeek(season, maxWeek)` orchestrates:
+  get the season's real week-start dates (`nflverse/schedules.ts`'s
+  `getWeekStartDates`, reusing that file's own already-cached `games.csv`
+  fetch), find the latest commit strictly before each week's kickoff
+  (local date-matching against the one cached commit list — no
+  per-week API calls), fetch+parse that commit's snapshot, normalize
+  names via the same `nflverse/playerMatch.ts` join every other external
+  source here uses. Fetches weeks sequentially (not `Promise.all`) —
+  same politeness-toward-a-many-request-source discipline as
+  `loadRunNflverseOnly.ts`'s own sequential staging (item 27). Used only
+  by `backtest/loadRunNflverseOnly.ts`, same scope as the nflverse-only
+  sources above — resolved onto the pipeline's synthetic PlayerIDs at
+  load time, backs the (deliberately unscoped across all four positions)
+  `pickByExpertConsensus` baseline.
 - `src/lib/backtest/` — the backtesting feature: `loadRun.ts` (the only
   network I/O — fetches every needed week once per request, both
   player-level and team-level rows, plus the nflverse tables above; as
@@ -4906,9 +5108,11 @@ fixed yet:
   `yacAboveExpectation`/`rushYoe`/`receivingComposite`/`qbRushingAttempts`/
   `goalLineTouches`/`epaPerPlay`/`successRate`/`createdReceptionRate`/
   `teammateOutBump` (never shipped into the engine), `injuryStatus`/
-  `wind`/`depthChart` (real, permanent, current-week-fact baselines —
-  items 18/39/46 — not engine-integrated but not "unshipped" either,
-  just standalone), and `redZoneTouches`/`dropRate` (both WERE shipped
+  `wind`/`depthChart`/`expertConsensus` (real, permanent,
+  current-week-fact baselines — items 18/39/46/69 — not engine-integrated
+  but not "unshipped" either, just standalone; `expertConsensus` is
+  external/human-sourced rather than derived from box scores or
+  play-by-play like the other three), and `redZoneTouches`/`dropRate` (both WERE shipped
   into the engine at some point — `dropRate` still is, WR-only;
   `redZoneTouches`'s engine weight was later zeroed, item 44, though the
   baseline itself still runs — every picker in `baselines.ts` is format-

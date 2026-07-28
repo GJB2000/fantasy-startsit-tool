@@ -81,6 +81,18 @@ export interface BacktestRunData {
    * matchup modifier to 0 rather than crashing.
    */
   impliedTotalsByTeamWeek?: Map<string, number>;
+  /**
+   * PlayerID -> week -> FantasyPros weekly consensus rank + dynastyprocess's
+   * rank-to-points estimate, reconstructed from dynastyprocess/data's git
+   * history (see lib/fantasypros/weeklyConsensus.ts for why this needs
+   * git-history mining rather than a normal CSV fetch). Only set by
+   * loadRunNflverseOnly.ts, same optionality pattern as
+   * teamWeatherByTeamWeek/depthChartByPlayerIdWeek above — the primary
+   * SportsDataIO pipeline doesn't carry this data. Backs the
+   * `pickByExpertConsensus` baseline (baselines.ts); degrades to no_pick
+   * when unset, same as every other optional signal.
+   */
+  expertConsensusByPlayerIdWeek?: Map<number, Map<number, { rank: number; r2pPts: number | null }>>;
 }
 
 /**

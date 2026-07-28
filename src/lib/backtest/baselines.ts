@@ -27,7 +27,8 @@ export type BaselineId =
   | "createdReceptionRate"
   | "teammateOutBump"
   | "wind"
-  | "depthChart";
+  | "depthChart"
+  | "expertConsensus";
 
 export const BASELINE_LABELS: Record<BaselineId, string> = {
   priorWeek: "Prior week's points",
@@ -54,6 +55,7 @@ export const BASELINE_LABELS: Record<BaselineId, string> = {
   teammateOutBump: "Same-position teammate Out/Doubtful this week (\"handcuff\" bump)",
   wind: "Avoid the high-wind player (WR only, nflverse schedules)",
   depthChart: "Higher on the official depth chart (RB/WR only, nflverse depth_charts, 2022-2024 only)",
+  expertConsensus: "Higher FantasyPros weekly expert consensus rank (dynastyprocess/data)",
 };
 
 function average(values: number[]): number {
@@ -547,6 +549,33 @@ export function pickByDepthChart(weekSlice: BacktestWeekSlice, playerIds: [numbe
   return depths[0] < depths[1] ? playerIds[0] : playerIds[1];
 }
 
+/**
+ * Naive baseline: pick whoever FantasyPros' weekly expert-consensus
+ * rankings ranked higher for that week — a genuinely different KIND of
+ * signal from everything else in this file, human/market-informed rather
+ * than derived from box scores or play-by-play (see CLAUDE.md item 68's
+ * multi-season standalone validation). Deliberately unscoped across all
+ * four skill positions for this first pass through the real harness —
+ * same discovery-phase treatment wind/depthChart originally got before
+ * being scoped down to where they actually held up (items 34→39, 37→46)
+ * — the by-position breakdown from this run is what decides any
+ * eventual scoping, not assumed in advance from the standalone script
+ * that motivated building this.
+ *
+ * `weekSlice.expertConsensusByPlayerIdWeek` is reconstructed from
+ * dynastyprocess/data's git history (see fantasypros/weeklyConsensus.ts)
+ * — only ever populated by the nflverse-only pipeline, same optionality
+ * as depthChart/wind above; no_pick on the primary SportsDataIO
+ * pipeline.
+ */
+export function pickByExpertConsensus(weekSlice: BacktestWeekSlice, playerIds: [number, number]): number | null {
+  const ranks = playerIds.map(
+    (id) => weekSlice.expertConsensusByPlayerIdWeek.get(id)?.get(weekSlice.targetWeek)?.rank ?? null
+  );
+  if (ranks[0] == null || ranks[1] == null || ranks[0] === ranks[1]) return null;
+  return ranks[0] < ranks[1] ? playerIds[0] : playerIds[1];
+}
+
 // Every picker besides pickPriorWeek/pickSeasonAvg ignores the format
 // param (their signals — volume, share, EPA, injury status, etc. — aren't
 // points-denominated) — TS permits assigning a function with fewer
@@ -579,4 +608,5 @@ export const BASELINE_PICKERS: Record<
   teammateOutBump: pickByTeammateOutBump,
   wind: pickByWind,
   depthChart: pickByDepthChart,
+  expertConsensus: pickByExpertConsensus,
 };

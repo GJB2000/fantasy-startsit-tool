@@ -1,4 +1,5 @@
 import { getDepthChartByNormalizedNameWeek } from "@/lib/nflverse/depthCharts";
+import { getExpertConsensusByNormalizedNameWeek } from "@/lib/fantasypros/weeklyConsensus";
 import { getNflverseGameLog } from "@/lib/nflverse/gameLog";
 import { getInjuryReports } from "@/lib/nflverse/injuries";
 import { getReserveStatusReports } from "@/lib/nflverse/rosters";
@@ -93,6 +94,25 @@ export async function loadNflverseOnlyRunData(season: number, maxWeek: number): 
 
   const redZoneTouches = await loadNflverse("red zone touches", () => getRedZoneTouches(season));
 
+  // Fetched alone, after everything else — same "one heavy, many-request
+  // source at a time" discipline as redZoneTouches above (see CLAUDE.md
+  // item 27). This one is a genuinely different shape of "heavy": not one
+  // big file, but up to ~18 sequential per-week fetches plus a paginated
+  // commit-history lookup, so it belongs in its own step rather than
+  // racing the main batch's concurrent fetches for connections.
+  const expertConsensusByNormalizedNameWeek = await getExpertConsensusByNormalizedNameWeek(season, maxWeek).catch(
+    (err) => {
+      console.error(`Failed to load FantasyPros weekly consensus (${season} nflverse-only backtest):`, err);
+      return new Map<string, Map<number, { rank: number; r2pPts: number | null }>>();
+    }
+  );
+  const expertConsensusByPlayerIdWeek = new Map<number, Map<number, { rank: number; r2pPts: number | null }>>();
+  for (const [normalizedName, byWeek] of expertConsensusByNormalizedNameWeek) {
+    const playerId = gameLog.playerIdByNormalizedName.get(normalizedName);
+    if (playerId == null) continue;
+    expertConsensusByPlayerIdWeek.set(playerId, byWeek);
+  }
+
   // Resolve depth_charts' own normalized-name keys onto this pipeline's
   // synthetic PlayerIDs — same join gameLog.playerIdByNormalizedName
   // already does for nflversePlayerWeekTable below, just done here
@@ -129,5 +149,6 @@ export async function loadNflverseOnlyRunData(season: number, maxWeek: number): 
     gameLogPlayerIdByNormalizedName: gameLog.playerIdByNormalizedName,
     teamWeatherByTeamWeek,
     depthChartByPlayerIdWeek,
+    expertConsensusByPlayerIdWeek,
   };
 }

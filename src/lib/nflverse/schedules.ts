@@ -108,6 +108,28 @@ export async function getImpliedTeamTotalsByTeamWeek(season: number): Promise<Ma
   return impliedByTeamWeek;
 }
 
+/**
+ * Earliest game date per week, for a season — reuses the same
+ * `schedules` release games.csv fetch every other reader here does (free
+ * once cached). Used to resolve "which of dynastyprocess/data's daily
+ * FantasyPros-rankings commits represents this week's pregame
+ * consensus" (see fantasypros/weeklyConsensus.ts) — the latest commit
+ * strictly BEFORE a week's earliest kickoff is the correct, non-leaky
+ * snapshot to use.
+ */
+export async function getWeekStartDates(season: number): Promise<Map<number, string>> {
+  const rows = await fetchNflverseCsv("schedules", "games.csv", REVALIDATE_SECONDS);
+  const regSeasonRows = rows.filter((r) => Number(r.season) === season && r.game_type === "REG");
+
+  const startByWeek = new Map<number, string>();
+  for (const r of regSeasonRows) {
+    const week = Number(r.week);
+    const existing = startByWeek.get(week);
+    if (!existing || r.gameday < existing) startByWeek.set(week, r.gameday);
+  }
+  return startByWeek;
+}
+
 export interface GameWeather {
   roof: string;
   temp: number | null;
