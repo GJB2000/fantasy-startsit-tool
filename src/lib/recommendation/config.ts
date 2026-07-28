@@ -486,19 +486,42 @@ export const POINTS_PER_QB_RUSH_EPA: Record<ScoringFormat, number> = {
  * 0-0.5 against the full 2022-2025 pooled sample: pooled QB accuracy
  * peaked at 58.1% (w=0.2, up from the 57.1% baseline), but 2024 declined
  * MONOTONICALLY at every nonzero weight tested (55.9%→50.0%) while 2022/
- * 2023/2025 improved or held roughly flat. At the whole-model level (all
- * four positions, not just QB) the effect is much smaller — 55.77%→55.93%
- * at w=0.2, since QB is only one of four position pools — and every
- * individual season still beat the simple recentVolume baseline at w=0.2,
- * including 2025 (currently the one season that narrowly loses to it at
- * w=0, and flips to winning at w=0.2). Shipped at 0.2 as a deliberate,
- * user-confirmed judgment call given that whole-model framing — a small
- * but real overall gain, accepting 2024's QB-specific decline as the
- * tradeoff, the same kind of explicit tradeoff decision as
- * QB_RUSH_BLEND_WEIGHT (item 30) and DROP_RATE_BLEND_WEIGHT (item 33).
- * See CLAUDE.md's QB-rushing-EPA follow-up to item 40 for the full sweep.
+ * 2023/2025 improved or held roughly flat. Shipped at 0.2 for a while on
+ * that whole-model pick-accuracy framing (small overall gain, accepting
+ * 2024's QB-specific decline) — see CLAUDE.md item 41 for the original
+ * sweep.
+ *
+ * **Disabled (reverted to 0) after the "Projection accuracy" backtest
+ * mode (item 65) found this term was badly miscalibrated as a POINT
+ * estimate**, a question pick-accuracy backtesting can't see (two
+ * players both mis-projected in the same direction can still rank
+ * correctly). Root cause: `qbRushEpaAvg` is an unweighted mean of
+ * per-GAME EPA-per-rush rates, each computed over however many rush
+ * attempts that QB happened to have that week — often just 1-4 for a
+ * low-mobility passer. `POINTS_PER_QB_RUSH_EPA` (45.814) is a huge
+ * multiplier because it was derived from a population-level EPA-per-rush
+ * average that sits very close to zero — so any individual player's
+ * small-sample average, even a modest one, gets blown up into an absurd
+ * "expected points" figure (as extreme as -70 points seen in real 2025
+ * data) with no cap to bound it (unlike matchupModifier's ±2.5 cap).
+ * Low-mobility QBs are hit hardest and hit systematically: their rare
+ * rush attempts are almost always low-value situations (broken pockets,
+ * kneels), so `qbRushEpaAvg` comes back negative nearly every week,
+ * dragging the whole score down even though rushing is a trivial part of
+ * their actual fantasy value. Confirmed via a real diagnostic sweep
+ * against every 2025 QB pool-week (n=204): disabling this term alone
+ * took QB projection bias from -1.81 to +0.01 (i.e., from a real,
+ * systematic under-projection to essentially perfectly calibrated) and
+ * MAE from 7.96 to 6.93 — while every tested alternative (capping the
+ * modifier, gating it below a minimum attempt count, scaling the weight
+ * down partially) landed strictly between those two points on both
+ * metrics, never matching disabling it outright on bias. Also reverts
+ * the 2024 pick-accuracy cost this term always carried (see above) as a
+ * side effect, not the primary reason. `POINTS_PER_QB_RUSH_EPA` above is
+ * kept, not deleted, same precedent as every other zeroed-out signal in
+ * this file.
  */
-export const QB_RUSH_EPA_BLEND_WEIGHT = 0.2;
+export const QB_RUSH_EPA_BLEND_WEIGHT = 0;
 
 /**
  * Final ensemble stage — blends `scorePlayer`'s fully-computed

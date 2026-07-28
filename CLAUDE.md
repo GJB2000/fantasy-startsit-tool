@@ -336,13 +336,23 @@ This is the most important section — the "brain" of the tool.
     tradeoff rather than a clean win: every nonzero weight costs some
     2025 accuracy in exchange for 2024 accuracy — see "Backtesting &
     Tuning History" item 30 for the full sweep and why 0.3 was chosen.
-  - QB rushing EPA-per-play, a third QB signal stacked after the two
-    above (`QB_RUSH_EPA_BLEND_WEIGHT`/`POINTS_PER_QB_RUSH_EPA` in
+  - **QB rushing EPA-per-play was tried as a third QB signal, shipped,
+    then later disabled** (`QB_RUSH_EPA_BLEND_WEIGHT` back to `0` in
     `config.ts`) — rushing *quality*, not volume, and notably more
     stable across all four backtest seasons than any prior QB-rushing
-    signal. Shipped at a deliberately balanced 0.2 after another
-    real, user-confirmed tradeoff (whole-model gain, one season's
-    QB accuracy declines) — see item 41.
+    signal on pick accuracy alone (shipped at a deliberately balanced
+    0.2 after a real, user-confirmed tradeoff — see item 41). Reverted
+    after the "Projection accuracy" backtest mode (item 65) found it was
+    badly miscalibrated as a point estimate for low-mobility QBs — an
+    unweighted per-game average over as few as 1-4 rush attempts,
+    multiplied by a huge conversion factor, produced modifiers as
+    extreme as -31 points in real 2025 data and a systematic
+    under-projection bias, invisible to pick-accuracy backtesting since
+    two similarly-penalized QBs still rank correctly relative to each
+    other. `POINTS_PER_QB_RUSH_EPA` is kept, not deleted — see item 66
+    for the full diagnosis and the empirical sweep that confirmed
+    disabling it outright beat every capping/gating alternative on
+    calibration.
   - WR drop rate (FTN Charting, `DROP_RATE_BLEND_WEIGHT`/
     `POINTS_PER_DROP_RATE_UNIT` in `config.ts`) — WR only, not TE (TE's
     standalone result was too noisy to trust at any weight tested). A
@@ -3969,6 +3979,91 @@ single-season numbers for those specific constants.
       nflverse-only seasons, and any correlation/R² statistic beyond
       MAE/RMSE/bias.
 
+66. **Root-caused and fixed the Stafford/QB calibration bug item 65
+    surfaced — a real, systemic miscalibration, not a Stafford-specific
+    anomaly.** Root cause: `qbRushEpaModifier`
+    (`QB_RUSH_EPA_BLEND_WEIGHT`/`POINTS_PER_QB_RUSH_EPA`, item 41)
+    blends the player's ENTIRE running score toward
+    `qbRushEpaAvg * 45.814`, and `qbRushEpaAvg` is an unweighted mean of
+    per-GAME EPA-per-rush rates — each computed over however many rush
+    attempts that QB happened to have that week, often just 1-4 for a
+    low-mobility passer. `POINTS_PER_QB_RUSH_EPA`'s huge multiplier
+    (45.814) was derived from a population-level average that sits very
+    close to zero, so any individual player's small-sample rate — even a
+    modest one — gets blown up into an absurd "expected points" figure,
+    with no cap to bound it (unlike `matchupModifier`'s ±2.5 cap).
+    Confirmed via real 2025 play-by-play data this isn't a kneel-counting
+    bug specifically (Stafford's kneel EPA ≈ -0.93, non-kneel scramble
+    EPA ≈ -0.94, nearly identical) — it's that a genuinely low-mobility
+    passer's rare rush attempts are almost always low-value situations
+    (broken pockets, kneels, desperate scrambles), so the rate comes back
+    negative nearly every week with nothing to offset it. Pulled
+    Stafford's real week-by-week breakdown: `qbRushEpaModifier` was
+    negative in all 17 of his graded weeks, ranging -2.4 to **-31.2**
+    points in a single week. Cross-checked against Joe Burrow (another
+    pocket passer, same negative pattern, less extreme) and Lamar Jackson
+    (real dual-threat: `qbRushEpaAvg` mostly small and *positive*,
+    modifiers a sane single digits to low-teens) — confirms this is a
+    position-wide bias against low-mobility QBs, not one player's data
+    glitch. Never caught by any pick-accuracy backtest because two
+    pocket passers being compared both get a similarly-shaped penalty,
+    so relative ranking survives even though the absolute numbers are
+    nonsense — exactly item 65's own "ranking vs. calibration" insight,
+    playing out concretely.
+    - **Found the fix empirically, not by guessing** — built a temporary
+      diagnostic route (`/api/debug-qb-rush-epa`, deleted after recording
+      these numbers, same precedent as every other one-off analysis in
+      this document) that recomputed every 2025 QB pool-week's projection
+      under a grid of candidate fixes — capping the modifier at various
+      thresholds, gating it below a minimum rush-attempt count, scaling
+      the blend weight down, and disabling it outright — and graded each
+      against real MAE/RMSE/bias. **Disabling the term entirely won
+      clearly on bias** (baseline -1.81 → +0.01, i.e. from a real,
+      systematic under-projection to essentially perfectly calibrated)
+      while landing within ~0.1 MAE point of every other candidate's
+      best result (baseline MAE 7.96 → 6.93; the single best MAE found
+      anywhere in the grid, jointly scaling down `QB_RUSH_BLEND_WEIGHT`
+      too, only reached 6.79 — a difference judged not worth reopening
+      that separately-negotiated weight, per item 30's own cross-season
+      tradeoff, for a ~0.14-point MAE gain). Verified the sanity
+      relationship (`finalScore = runningScoreBeforeEpa +
+      qbRushEpaModifier` exactly, since every other QB modifier
+      downstream of it is currently zero-weighted) held for all 204 rows
+      before trusting the sweep.
+    - **Shipped: `QB_RUSH_EPA_BLEND_WEIGHT` reverted from 0.2 to 0** —
+      same "disabled but not deleted" precedent as every other
+      zeroed-out signal in this file (`POINTS_PER_QB_RUSH_EPA` itself is
+      untouched). This is a real reversal of item 41's original ship
+      decision, made with the benefit of a metric (point calibration)
+      item 41 didn't have access to at the time.
+    - **Verified against the real engine, not just the sweep harness**:
+      re-ran Projection accuracy mode for QB and got an exact match to
+      the sweep's prediction (MAE 6.93, bias +0.01, n=204) — and the
+      engine now clearly beats the naive season-average baseline on both
+      metrics (baseline MAE 7.45, bias +3.13), which it did not before.
+      Re-ran Stafford's own week-by-week player lookup: no more negative
+      projected-point weeks, and the diffs are now a mix of over/under
+      rather than under-projecting all 16 graded weeks — the original
+      reported symptom is gone.
+    - **This also reopens item 41's own documented pick-accuracy
+      tradeoff, in reverse — flagged honestly, not glossed over.**
+      Re-ran both pick-accuracy backtests after the change: primary 2025
+      pipeline QB 56.9%→52.9% (whole-model 57.5%→56.9%); pooled
+      2022-2025 nflverse-only QB 57.8%→57.1% pooled, with 2024
+      specifically *improving* 52.0%→55.9% (recovering the exact decline
+      item 41 originally accepted as that ship's tradeoff) while
+      2023/2025(nflverse) give back a few points each. Net effect is a
+      modest pick-accuracy cost, the mirror image of item 41's original
+      modest gain — a real, known tradeoff, not a free fix, made on the
+      explicit instruction to optimize for projection calibration over
+      pick accuracy for this specific term.
+    - **Deliberately did not touch `QB_RUSH_BLEND_WEIGHT`** (item 30's
+      separately-negotiated cross-season tradeoff, still at 0.3) — the
+      sweep showed it contributes a much smaller, less systematically
+      biased miscalibration than the EPA term, and jointly re-tuning it
+      wasn't worth reopening a different weight's own tradeoff history
+      for a marginal MAE gain (see above).
+
 ### Open items (as of item 65 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
@@ -4156,20 +4251,21 @@ fixed yet:
     "regression to the mean" explanation for the baseline's positive
     bias was reasoned through, not confirmed with a direct test (e.g.
     checking whether bias correlates with how far above the position's
-    own average a pool member's season average sits). Separately, the
-    per-player breakdown surfaced a real, unexplained case worth
-    digging into on its own — Matthew Stafford's unusually consistent
-    same-direction miss across 12 real games (item 65) — no minimum
+    own average a pool member's season average sits). No minimum
     sample-size filter exists yet either, so the "worst MAE" table is
     currently dominated by `n=1`-`2` outliers rather than the
-    well-sampled misses that are more likely to mean something. The
-    week-by-week player lookup (also item 65) sharpened this into a
-    concrete, reproducible case: Stafford's `finalScore` under-projected
-    him in literally all 16 graded weeks, and several early-season
-    projections were negative — worth a real investigation (which
-    modifier(s) are driving it, and whether `finalScore` should have a
-    floor at all) rather than the "flagged, not confirmed" state it's
-    in now.
+    well-sampled misses that are more likely to mean something.
+    **Matthew Stafford's own systematic miss — item 65's most concrete
+    finding — was root-caused and fixed in item 66**
+    (`QB_RUSH_EPA_BLEND_WEIGHT` reverted to 0); no other well-sampled
+    player-level miscalibration case has been checked for since. Whether
+    `finalScore` should have a hard floor at all (item 65 also flagged
+    real negative projected-point weeks, now gone for Stafford
+    specifically post-fix, but the underlying "no modifier is capped
+    except matchupModifier" pattern is still true of every other QB/RB/
+    WR/TE modifier in `engine.ts`) remains an open, unaddressed
+    structural question — item 66 fixed the one modifier proven to
+    misbehave this badly, not the general absence of bounds elsewhere.
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
