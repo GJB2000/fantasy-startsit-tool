@@ -27,8 +27,10 @@ interface WaiverResultProps {
 // D/ST and K last — they're a different kind of signal (this week's
 // matchup vs. season rank, not opportunity vs. production), so they're
 // visually the "also worth a look" tail of the page, not mixed into the
-// skill-position flow.
-const POSITION_ORDER: ExtendedPosition[] = ["QB", "RB", "WR", "TE", "DST", "K"];
+// skill-position flow. Exported so the Home page's compact waiver widget
+// can pick the same "best" candidate this page would show first, rather
+// than re-deriving its own priority order.
+export const POSITION_ORDER: ExtendedPosition[] = ["QB", "RB", "WR", "TE", "DST", "K"];
 
 const FORMAT_LABEL: Record<ScoringFormat, string> = {
   ppr: "PPR",
@@ -46,8 +48,8 @@ const VERDICT_DOT: Record<TradeVerdict, string> = {
   unknown: "bg-info",
 };
 
-/** D/ST and K use a "this week vs. this season" gap (real streaming logic), not skill positions' "volume vs. points" opportunity gap — see rankExtendedCandidates.ts. */
-function isStreamingPosition(position: ExtendedPosition): boolean {
+/** D/ST and K use a "this week vs. this season" gap (real streaming logic), not skill positions' "volume vs. points" opportunity gap — see rankExtendedCandidates.ts. Exported for reuse by the Home page's compact waiver widget. */
+export function isStreamingPosition(position: ExtendedPosition): boolean {
   return position === "DST" || position === "K";
 }
 
@@ -72,9 +74,11 @@ function injuryBadgeClasses(status: string) {
  * netValue rather than reusing its "trade"-worded headline string
  * verbatim. Deliberately doesn't touch evaluateTrade() itself: that
  * function (and its headline) is shared with the real Trade Analyzer,
- * where "trade" is the correct word.
+ * where "trade" is the correct word. Exported for reuse by the Home
+ * page's compact waiver widget, which surfaces the same drop suggestion
+ * in miniature rather than re-deriving its own headline text.
  */
-function moveHeadline(evaluation: TradeEvaluation): string {
+export function moveHeadline(evaluation: TradeEvaluation): string {
   if (evaluation.verdict === "unknown" || evaluation.netValue == null) {
     return "Not enough data to grade this move.";
   }

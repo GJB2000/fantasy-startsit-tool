@@ -21,6 +21,13 @@ export interface SleeperRoster {
   players: string[] | null;
 }
 
+/** One league member — used to resolve a roster's owner_id to a real display/team name for the trade-suggestion widget (see resolveRoster.ts's otherTeams). */
+export interface SleeperLeagueUser {
+  user_id: string;
+  display_name: string;
+  metadata: { team_name?: string } | null;
+}
+
 export interface SleeperPlayer {
   player_id: string;
   full_name?: string;

@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { HomeLineupWidget } from "@/components/HomeLineupWidget";
+import { HomeTradeWidget } from "@/components/HomeTradeWidget";
+import { HomeWaiverWidget } from "@/components/HomeWaiverWidget";
 import { PageHeader } from "@/components/PageHeader";
 import { RecentComparisonsHomeCard } from "@/components/RecentComparisonsHomeCard";
 
@@ -73,6 +76,16 @@ export default function HomePage() {
         description="Five tools, one engine — start/sit calls, trade grades, waiver targets, full-lineup optimization, and the backtested accuracy behind all of it."
       />
 
+      <div className="mb-8">
+        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-foreground/40">This week</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <HomeLineupWidget />
+          <HomeWaiverWidget />
+          <HomeTradeWidget />
+          <RecentComparisonsHomeCard />
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {TOOLS.map((tool) => (
           <Link
@@ -98,10 +111,6 @@ export default function HomePage() {
             </span>
           </Link>
         ))}
-      </div>
-
-      <div className="mt-4 max-w-sm">
-        <RecentComparisonsHomeCard />
       </div>
     </main>
   );

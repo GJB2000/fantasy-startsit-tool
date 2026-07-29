@@ -1,10 +1,11 @@
 import { sleeperFetch } from "./client";
-import type { SleeperLeague, SleeperPlayer, SleeperRoster, SleeperUser } from "./types";
+import type { SleeperLeague, SleeperLeagueUser, SleeperPlayer, SleeperRoster, SleeperUser } from "./types";
 
 const REVALIDATE = {
   user: 60 * 60,
   leagues: 60 * 60,
   rosters: 5 * 60,
+  users: 60 * 60,
   // Sleeper's own docs ask callers not to hit this endpoint more than
   // once a day — it's a ~5MB dump of every NFL player in their database.
   players: 24 * 60 * 60,
@@ -29,6 +30,11 @@ export async function getSleeperLeagues(userId: string, season: number): Promise
 
 export async function getSleeperRosters(leagueId: string): Promise<SleeperRoster[]> {
   return sleeperFetch<SleeperRoster[]>(`/league/${leagueId}/rosters`, REVALIDATE.rosters);
+}
+
+/** Every member of a league — used to resolve a roster's owner_id into a real team/display name for the trade-suggestion widget (see resolveRoster.ts). */
+export async function getSleeperLeagueUsers(leagueId: string): Promise<SleeperLeagueUser[]> {
+  return sleeperFetch<SleeperLeagueUser[]>(`/league/${leagueId}/users`, REVALIDATE.users);
 }
 
 /** The full Sleeper player database, keyed by Sleeper player_id — see REVALIDATE.players for why this is cached hard. */

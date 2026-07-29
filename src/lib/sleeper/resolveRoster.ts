@@ -2,7 +2,15 @@ import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
 import { toSdioTeam } from "@/lib/recommendation/restOfSeason";
 import { getActiveExtendedPlayers } from "@/lib/sportsdata/players";
 import { toPlayerSummary, type PlayerSummary } from "@/lib/sportsdata/types";
-import { getSleeperPlayers, getSleeperRosters } from "./api";
+import { getSleeperLeagueUsers, getSleeperPlayers, getSleeperRosters } from "./api";
+
+/** One OTHER team's real, resolved roster — the per-team breakdown the league-wide union (leagueRosteredPlayerIds) deliberately discards, needed for the trade-suggestion widget's cross-team surplus/need matching (see lib/trade/suggestLeagueTrade.ts). */
+export interface OtherLeagueTeam {
+  rosterId: number;
+  /** The league member's team name (Sleeper's `metadata.team_name`) if set, else their display name, else a generic fallback — never fabricated. */
+  teamName: string;
+  players: PlayerSummary[];
+}
 
 export interface ResolvedSleeperRoster {
   /** The requesting user's own roster. */
@@ -11,6 +19,8 @@ export interface ResolvedSleeperRoster {
   unmatched: string[];
   /** Every player rostered by ANY team in the league (including the user's own) — a genuine waiver-wire candidate has to be unowned league-wide, not just off the user's own team. IDs only (not full detail) since these are never displayed, only used to exclude candidates. */
   leagueRosteredPlayerIds: number[];
+  /** Every OTHER team's real roster, resolved the same way as the user's own — powers the trade-suggestion widget's cross-team matching. Excludes the requesting user's own team. */
+  otherTeams: OtherLeagueTeam[];
 }
 
 interface ResolvedTeam {
@@ -49,11 +59,14 @@ interface ResolvedTeam {
  * to its input unchanged for any code it doesn't recognize.
  */
 export async function resolveSleeperRoster(leagueId: string, userId: string): Promise<ResolvedSleeperRoster> {
-  const [rosters, sleeperPlayers, allSdioPlayers] = await Promise.all([
+  const [rosters, sleeperPlayers, allSdioPlayers, leagueUsers] = await Promise.all([
     getSleeperRosters(leagueId),
     getSleeperPlayers(),
     getActiveExtendedPlayers(),
+    getSleeperLeagueUsers(leagueId),
   ]);
+
+  const teamNameByUserId = new Map(leagueUsers.map((u) => [u.user_id, u.metadata?.team_name || u.display_name]));
 
   const sdioIdByNormalizedName = new Map<string, number>();
   const dstIdByTeam = new Map<string, number>();
@@ -105,18 +118,25 @@ export async function resolveSleeperRoster(leagueId: string, userId: string): Pr
 
   const leagueRosteredPlayerIds = new Set<number>();
   let myTeam: ResolvedTeam = { matched: [], unmatched: [] };
+  const otherTeams: OtherLeagueTeam[] = [];
 
   for (const roster of rosters) {
     const resolved = resolveTeam(roster.players ?? []);
     for (const p of resolved.matched) leagueRosteredPlayerIds.add(p.playerId);
 
     const isMine = roster.owner_id === userId || (roster.co_owners ?? []).includes(userId);
-    if (isMine) myTeam = resolved;
+    if (isMine) {
+      myTeam = resolved;
+    } else if (resolved.matched.length > 0) {
+      const teamName = (roster.owner_id && teamNameByUserId.get(roster.owner_id)) || `Team ${roster.roster_id}`;
+      otherTeams.push({ rosterId: roster.roster_id, teamName, players: resolved.matched });
+    }
   }
 
   return {
     players: myTeam.matched,
     unmatched: myTeam.unmatched,
     leagueRosteredPlayerIds: [...leagueRosteredPlayerIds],
+    otherTeams,
   };
 }
