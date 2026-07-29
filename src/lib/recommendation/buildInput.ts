@@ -45,6 +45,7 @@ export async function buildComparisonInput(
       seasonStat: null,
       recentGames: [],
       priorSeasonPprAvg: null,
+      expertConsensusR2pPts: null,
       byeWeek: null,
       isOnByeThisWeek: false,
       matchupContext: null,
@@ -127,6 +128,11 @@ export async function buildComparisonInput(
     seasonStat,
     recentGames,
     priorSeasonPprAvg,
+    // No live "current snapshot" fetch path exists yet (see CLAUDE.md item
+    // 69's Open Items) — always null in live mode, same as
+    // nextOpponent/nextGameWeather being backtest-null in the reverse
+    // direction. buildBacktestComparisonInput is the only populated path.
+    expertConsensusR2pPts: null,
     byeWeek,
     isOnByeThisWeek,
     matchupContext,

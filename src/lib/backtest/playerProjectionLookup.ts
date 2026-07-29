@@ -72,7 +72,10 @@ export async function runPlayerProjectionLookup(
       runData.nflversePlayerWeekTable,
       runData.teamWeatherByTeamWeek,
       runData.depthChartByPlayerIdWeek,
-      format
+      format,
+      runData.allDefenseWeeklyRows,
+      runData.impliedTotalsByTeamWeek,
+      runData.expertConsensusByPlayerIdWeek
     );
 
     for (const playerId of playerIds) {

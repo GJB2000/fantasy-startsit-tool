@@ -66,6 +66,8 @@ interface ProjectionResponse {
   byPosition: Record<string, ProjectionSummaryData> | null;
   baselineOverall: ProjectionSummaryData | null;
   baselineByPosition: Record<string, ProjectionSummaryData> | null;
+  expertConsensusOverall: ProjectionSummaryData | null;
+  expertConsensusByPosition: Record<string, ProjectionSummaryData> | null;
   byPlayer: PlayerProjectionSummary[] | null;
   playerDetail: PlayerProjectionDetail[] | null;
 }
@@ -542,6 +544,8 @@ export function BacktestTool() {
                 byPosition={projectionResult.byPosition ?? undefined}
                 baselineOverall={projectionResult.baselineOverall ?? undefined}
                 baselineByPosition={projectionResult.baselineByPosition ?? undefined}
+                expertConsensusOverall={projectionResult.expertConsensusOverall ?? undefined}
+                expertConsensusByPosition={projectionResult.expertConsensusByPosition ?? undefined}
               />
               <div className="space-y-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">

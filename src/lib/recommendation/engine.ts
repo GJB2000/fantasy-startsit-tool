@@ -3,6 +3,7 @@ import {
   CLOSE_CALL_RELATIVE_PCT,
   DROP_RATE_BLEND_WEIGHT,
   ENSEMBLE_VOLUME_BLEND_RATIO,
+  EXPERT_CONSENSUS_BLEND_WEIGHT,
   MATCHUP_MODIFIER_CAP,
   MATCHUP_MODIFIER_SCALE,
   POINTS_PER_DROP_RATE_UNIT,
@@ -17,6 +18,7 @@ import {
   QB_GOAL_LINE_BLEND_WEIGHT,
   QB_RUSH_BLEND_WEIGHT,
   QB_RUSH_EPA_BLEND_WEIGHT,
+  QB_RUSH_MIN_ATTEMPTS_THRESHOLD,
   QB_SUCCESS_RATE_BLEND_WEIGHT,
   RB_EPA_BLEND_WEIGHT,
   RB_EPA_PPR_AT_ZERO,
@@ -171,14 +173,16 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
     const rushValues = input.recentGames.map(getQbRushAttemptStat).filter((v): v is number => v != null);
     if (rushValues.length > 0) {
       recentQbRushAttemptsAvg = average(rushValues);
-      const runningScore = blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier;
-      const expectedPointsFromQbRush = recentQbRushAttemptsAvg * POINTS_PER_QB_RUSH_ATTEMPT[format];
-      const blendedWithQbRush =
-        (1 - QB_RUSH_BLEND_WEIGHT) * runningScore + QB_RUSH_BLEND_WEIGHT * expectedPointsFromQbRush;
-      qbRushModifier = blendedWithQbRush - runningScore;
-      notes.push(
-        `Averaging ${recentQbRushAttemptsAvg.toFixed(1)} rushing attempts/game over their last ${rushValues.length} game${rushValues.length === 1 ? "" : "s"} — worth roughly ${expectedPointsFromQbRush.toFixed(1)} points at this position's typical rate.`
-      );
+      if (recentQbRushAttemptsAvg >= QB_RUSH_MIN_ATTEMPTS_THRESHOLD) {
+        const runningScore = blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier;
+        const expectedPointsFromQbRush = recentQbRushAttemptsAvg * POINTS_PER_QB_RUSH_ATTEMPT[format];
+        const blendedWithQbRush =
+          (1 - QB_RUSH_BLEND_WEIGHT) * runningScore + QB_RUSH_BLEND_WEIGHT * expectedPointsFromQbRush;
+        qbRushModifier = blendedWithQbRush - runningScore;
+        notes.push(
+          `Averaging ${recentQbRushAttemptsAvg.toFixed(1)} rushing attempts/game over their last ${rushValues.length} game${rushValues.length === 1 ? "" : "s"} — worth roughly ${expectedPointsFromQbRush.toFixed(1)} points at this position's typical rate.`
+        );
+      }
     }
   }
 
@@ -271,6 +275,39 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
     );
   }
 
+  // Blends the running score toward FantasyPros' own weekly consensus
+  // point estimate — unlike every modifier above, this signal is already
+  // points-denominated (no POINTS_PER_X conversion factor needed) and is
+  // deliberately position-agnostic (universal across QB/RB/WR/TE), since
+  // the standalone pickByExpertConsensus baseline validated strong at
+  // every position (57-60% pooled pick accuracy, 2022-2025) rather than
+  // needing the usual per-position scoping — see CLAUDE.md item 69/70.
+  // Backtest-only for now: input.expertConsensusR2pPts is always null in
+  // live mode (no current-snapshot fetch path built yet), so this is
+  // structurally a no-op for the live tool regardless of the weight below.
+  let expertConsensusModifier = 0;
+  if (blendedScore != null && input.expertConsensusR2pPts != null) {
+    const runningScore =
+      blendedScore +
+      matchupModifier +
+      volumeModifier +
+      redZoneModifier +
+      snapShareModifier +
+      qbRushModifier +
+      qbGoalLineModifier +
+      qbSuccessRateModifier +
+      qbRushEpaModifier +
+      rbEpaModifier +
+      dropRateModifier +
+      teammateOutBumpModifier;
+    const blendedWithExpertConsensus =
+      (1 - EXPERT_CONSENSUS_BLEND_WEIGHT) * runningScore + EXPERT_CONSENSUS_BLEND_WEIGHT * input.expertConsensusR2pPts;
+    expertConsensusModifier = blendedWithExpertConsensus - runningScore;
+    notes.push(
+      `FantasyPros' weekly consensus projects roughly ${input.expertConsensusR2pPts.toFixed(1)} points this week — blended in at this position's typical rate.`
+    );
+  }
+
   const preEnsembleFinalScore =
     blendedScore == null
       ? null
@@ -285,7 +322,8 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
         qbRushEpaModifier +
         rbEpaModifier +
         dropRateModifier +
-        teammateOutBumpModifier;
+        teammateOutBumpModifier +
+        expertConsensusModifier;
 
   // Final ensemble stage: shrink the fully-computed score toward a pure
   // recent-volume estimate — see ENSEMBLE_VOLUME_BLEND_RATIO's comment
@@ -347,6 +385,8 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
     qbRushEpaAvg,
     qbRushEpaModifier,
     teammateOutBumpModifier,
+    expertConsensusR2pPts: input.expertConsensusR2pPts,
+    expertConsensusModifier,
     targetShare: input.nflverse.targetShare,
     separation: input.nflverse.separation,
     finalScore,

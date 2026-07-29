@@ -245,6 +245,22 @@ export const POINTS_PER_QB_RUSH_ATTEMPT: Record<ScoringFormat, number> = {
 export const QB_RUSH_BLEND_WEIGHT = 0.3;
 
 /**
+ * Minimum recent rush-attempts/game a QB needs before `qbRushModifier`
+ * applies at all — 0 means "no gate, apply to everyone" (the original
+ * shipped behavior). Added after a real user report (Matthew Stafford's
+ * 2025 projections) traced to the same architectural flaw as the
+ * already-fixed `qbRushEpaModifier` bug (item 66), just milder
+ * per-instance since this signal uses real attempt counts, not a noisy
+ * per-game EPA rate: blending a low-mobility passer's ENTIRE score
+ * toward "expected points from rush attempts alone" systematically
+ * drags it down, since that implied value is always far below a real
+ * passer's actual (passing-driven) worth. Confirmed not
+ * Stafford-specific — Baker Mayfield showed the identical pattern.
+ * Being swept — see CLAUDE.md item 72 for the sweep and the decision.
+ */
+export const QB_RUSH_MIN_ATTEMPTS_THRESHOLD = 0;
+
+/**
  * Empirically-derived PPR points per QB goal-line rush attempt
  * (yardline_100<=5, vs. red zone's <=20 — same "ratio of sums" method:
  * total QB PPR points ÷ total QB goal-line rush attempts across every
@@ -580,3 +596,47 @@ export const ENSEMBLE_VOLUME_BLEND_RATIO: Record<ScoringFormat, Record<SkillPosi
   half_ppr: { QB: 1.0, RB: 1.0, WR: 1.0, TE: 0.7 },
   standard: { QB: 1.0, RB: 1.0, WR: 1.0, TE: 0.7 },
 };
+
+/**
+ * How much weight FantasyPros' weekly expert-consensus point estimate
+ * (`r2p_pts`, dynastyprocess/data — see fantasypros/weeklyConsensus.ts)
+ * carries against the running score, blended in last, after every other
+ * modifier above. Unlike every conversion-factor-based signal in this
+ * file, this one is already points-denominated — no POINTS_PER_X factor
+ * needed, just a direct blend toward their own estimate. Deliberately
+ * universal across all four skill positions rather than position-scoped
+ * — the standalone `pickByExpertConsensus` baseline (item 69) validated
+ * strong and consistent at every position (57.4-60.3% pooled pick
+ * accuracy, 2022-2025), unlike almost every other signal in this
+ * document, which needed scoping down to where it actually held up.
+ *
+ * Swept 0-1.0 against pooled 2022-2025 nflverse-only pick accuracy: a
+ * real, well-behaved plateau across w=0.6-0.9 (58.0-58.2% overall, every
+ * season improving or flat, no season dropping toward chance). But
+ * because this modifier can touch a large fraction of the WHOLE score
+ * (at w=1.0 it fully replaces the engine's own estimate with theirs),
+ * item 53's ensemble-investigation precedent required a real check
+ * against the PRIMARY SportsDataIO pipeline too, not just the pooled
+ * nflverse-only number — so `loadRun.ts` was extended to fetch this
+ * signal as well (previously only `loadRunNflverseOnly.ts` did). That
+ * check found a genuine split: pooled nflverse-only data keeps improving
+ * through w=0.7-0.9, but on the primary 2025 pipeline specifically, WR
+ * accuracy is unchanged through w=0.5 (58.3%, identical to baseline) and
+ * then declines as weight increases further (57.4% at 0.7, 53.4% at
+ * 0.9) — every other position (QB especially: +8.8 to +10.8pp on the
+ * primary pipeline) improves or holds flat across the whole range
+ * tested. **Shipped at 0.5 as a deliberate, user-confirmed choice** —
+ * captures nearly all of the overall gain (primary pipeline: 56.9%→58.7%
+ * overall) with zero measured WR cost, rather than the pooled-data-
+ * optimal 0.7-0.9 region, which trades a little more overall gain for a
+ * real WR cost on the pipeline that actually matters for the live tool.
+ * w=0.7 is a documented, deliberately-not-chosen alternative, not a
+ * rejected one — see CLAUDE.md item 70's Open Items if this gets
+ * revisited with more data.
+ *
+ * `input.expertConsensusR2pPts` is only ever non-null in backtest mode
+ * right now — no live "current snapshot" fetch path exists yet (see
+ * Open Items), so this is a structural no-op for the live tool
+ * regardless of this value until that's built.
+ */
+export const EXPERT_CONSENSUS_BLEND_WEIGHT = 0.5;

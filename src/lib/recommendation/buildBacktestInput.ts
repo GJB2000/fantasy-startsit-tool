@@ -74,6 +74,7 @@ export function buildBacktestComparisonInput(
       seasonStat: null,
       recentGames: [],
       priorSeasonPprAvg: null,
+      expertConsensusR2pPts: null,
       byeWeek: null,
       isOnByeThisWeek: false,
       matchupContext: null,
@@ -147,6 +148,8 @@ export function buildBacktestComparisonInput(
         null)
       : null;
 
+  const expertConsensusR2pPts = weekSlice.expertConsensusByPlayerIdWeek.get(playerId)?.get(targetWeek)?.r2pPts ?? null;
+
   return {
     requestedPlayerId: playerId,
     player,
@@ -154,6 +157,7 @@ export function buildBacktestComparisonInput(
     seasonStat,
     recentGames,
     priorSeasonPprAvg,
+    expertConsensusR2pPts,
     byeWeek,
     isOnByeThisWeek,
     matchupContext,

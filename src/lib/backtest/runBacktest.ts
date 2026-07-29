@@ -144,7 +144,8 @@ export async function runPairBacktest(
       runData.depthChartByPlayerIdWeek,
       format,
       runData.allDefenseWeeklyRows,
-      runData.impliedTotalsByTeamWeek
+      runData.impliedTotalsByTeamWeek,
+      runData.expertConsensusByPlayerIdWeek
     );
     const breakdowns = playerIds.map((id) =>
       scoreExtendedPlayerBacktest(id, week, weekSlice, runData.byesByTeam, anyPlayerById, format)
@@ -207,7 +208,8 @@ export async function runBroadBacktest(
       runData.depthChartByPlayerIdWeek,
       format,
       runData.allDefenseWeeklyRows,
-      runData.impliedTotalsByTeamWeek
+      runData.impliedTotalsByTeamWeek,
+      runData.expertConsensusByPlayerIdWeek
     );
     const pairs = buildAllExtendedPairsForWeek(weekSlice, positions, format, dstPlayerIdByTeam);
     const dstActualRows = toDstActualRows(weekSlice.targetWeekDefenseRows, dstPlayerIdByTeam);

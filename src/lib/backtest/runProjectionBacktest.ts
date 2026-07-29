@@ -22,6 +22,21 @@ export interface ProjectionBacktestResult {
   /** Naive "season-to-date average" projection, graded the identical way, on the identical player-weeks — the baseline the engine's own projection has to beat to be worth trusting as a point estimate, not just a ranking. */
   baselineOverall: ProjectionSummary;
   baselineByPosition: Record<string, ProjectionSummary>;
+  /**
+   * FantasyPros' own weekly consensus point estimate (`r2p_pts`,
+   * dynastyprocess/data — see fantasypros/weeklyConsensus.ts), graded the
+   * identical way, on the SAME pool — the real-harness answer to the
+   * question that originally motivated items 68-70 ("what if we take
+   * into account expert projections," asked about projection accuracy
+   * specifically, not pick accuracy). A separate `n` from `overall`
+   * above is unavoidable and expected: unlike the naive season-average
+   * baseline (which is guaranteed to exist for every pool member, since
+   * pool membership itself requires season-to-date data), FantasyPros'
+   * weekly snapshot doesn't rank every single pool player every week —
+   * coverage gaps here are real missing data, not a bug.
+   */
+  expertConsensusOverall: ProjectionSummary;
+  expertConsensusByPosition: Record<string, ProjectionSummary>;
   /** Same engine-projection error, broken out per player rather than pooled — sorted worst (highest MAE) first, so the players the model struggles most with are the first thing visible, not buried in a position-level average. */
   byPlayer: PlayerProjectionSummary[];
 }
@@ -33,7 +48,11 @@ export interface ProjectionBacktestResult {
  * a genuinely different, magnitude-sensitive question that pick
  * accuracy can't answer: a model can correctly rank two players while
  * being off by 10 points on both, and pairwise grading would never
- * notice. Deliberately scoped simple for a first pass, per direct
+ * notice. As of item 71, also grades FantasyPros' own weekly consensus
+ * point estimate (`r2p_pts`) on the identical pool/weeks — the direct
+ * real-harness answer to "what if we take into account expert
+ * projections," which items 69-70 only answered for pick accuracy.
+ * Deliberately scoped simple for a first pass, per direct
  * request: 2025 season only (the primary, tuned pipeline), one scoring
  * format, skill positions only (QB/RB/WR/TE — D/ST/K excluded for now,
  * see CLAUDE.md Open Items).
@@ -58,8 +77,10 @@ export async function runProjectionBacktest(
 
   const byPositionResults: Record<string, ProjectionGradeResult[]> = {};
   const byPositionBaseline: Record<string, ProjectionGradeResult[]> = {};
+  const byPositionExpertConsensus: Record<string, ProjectionGradeResult[]> = {};
   const allResults: ProjectionGradeResult[] = [];
   const allBaseline: ProjectionGradeResult[] = [];
+  const allExpertConsensus: ProjectionGradeResult[] = [];
   const byPlayerResults = new Map<number, ProjectionGradeResult[]>();
   const playerMeta = new Map<number, { displayName: string; position: string; team: string | null }>();
 
@@ -72,7 +93,10 @@ export async function runProjectionBacktest(
       runData.nflversePlayerWeekTable,
       runData.teamWeatherByTeamWeek,
       runData.depthChartByPlayerIdWeek,
-      format
+      format,
+      runData.allDefenseWeeklyRows,
+      runData.impliedTotalsByTeamWeek,
+      runData.expertConsensusByPlayerIdWeek
     );
 
     for (const position of positions) {
@@ -107,6 +131,20 @@ export async function runProjectionBacktest(
           playerMeta.set(entry.playerId, { displayName: breakdown.displayName, position, team: breakdown.team });
         }
 
+        const r2pPts = weekSlice.expertConsensusByPlayerIdWeek.get(entry.playerId)?.get(week)?.r2pPts;
+        if (r2pPts != null) {
+          const expertConsensusGraded: ProjectionGradeResult = {
+            week,
+            playerId: entry.playerId,
+            position,
+            predicted: r2pPts,
+            actual,
+            error: r2pPts - actual,
+          };
+          (byPositionExpertConsensus[position] ??= []).push(expertConsensusGraded);
+          allExpertConsensus.push(expertConsensusGraded);
+        }
+
         const baselineGraded: ProjectionGradeResult = {
           week,
           playerId: entry.playerId,
@@ -129,6 +167,10 @@ export async function runProjectionBacktest(
   for (const [position, results] of Object.entries(byPositionBaseline)) {
     baselineByPosition[position] = summarizeProjectionErrors(results);
   }
+  const expertConsensusByPosition: Record<string, ProjectionSummary> = {};
+  for (const [position, results] of Object.entries(byPositionExpertConsensus)) {
+    expertConsensusByPosition[position] = summarizeProjectionErrors(results);
+  }
 
   const byPlayer: PlayerProjectionSummary[] = [];
   for (const [playerId, results] of byPlayerResults) {
@@ -148,6 +190,8 @@ export async function runProjectionBacktest(
     byPosition,
     baselineOverall: summarizeProjectionErrors(allBaseline),
     baselineByPosition,
+    expertConsensusOverall: summarizeProjectionErrors(allExpertConsensus),
+    expertConsensusByPosition,
     byPlayer,
   };
 }

@@ -1,3 +1,4 @@
+import { getExpertConsensusByNormalizedNameWeek } from "@/lib/fantasypros/weeklyConsensus";
 import { getInjuryReports } from "@/lib/nflverse/injuries";
 import { getReserveStatusReports } from "@/lib/nflverse/rosters";
 import { getNgsPassing, getNgsReceiving, getNgsRushing } from "@/lib/nflverse/nextGenStats";
@@ -85,12 +86,18 @@ export interface BacktestRunData {
    * PlayerID -> week -> FantasyPros weekly consensus rank + dynastyprocess's
    * rank-to-points estimate, reconstructed from dynastyprocess/data's git
    * history (see lib/fantasypros/weeklyConsensus.ts for why this needs
-   * git-history mining rather than a normal CSV fetch). Only set by
-   * loadRunNflverseOnly.ts, same optionality pattern as
-   * teamWeatherByTeamWeek/depthChartByPlayerIdWeek above — the primary
-   * SportsDataIO pipeline doesn't carry this data. Backs the
-   * `pickByExpertConsensus` baseline (baselines.ts); degrades to no_pick
-   * when unset, same as every other optional signal.
+   * git-history mining rather than a normal CSV fetch). Unlike
+   * teamWeatherByTeamWeek/depthChartByPlayerIdWeek above, this one IS set
+   * by both pipelines — item 53's ensemble investigation established that
+   * any signal touching a large fraction of the whole score needs a real
+   * primary-pipeline check before shipping, not just nflverse-only
+   * validation, so loadBacktestRunData fetches and resolves this too
+   * (via buildSdioPlayerIdByNormalizedName, the same join direction every
+   * other primary-pipeline nflverse signal uses). Backs the
+   * `pickByExpertConsensus` baseline (baselines.ts) on both pipelines,
+   * and (as of item 70) `EXPERT_CONSENSUS_BLEND_WEIGHT`'s additive
+   * modifier in engine.ts. Degrades to an empty map on fetch failure,
+   * same as every other optional signal.
    */
   expertConsensusByPlayerIdWeek?: Map<number, Map<number, { rank: number; r2pPts: number | null }>>;
 }
@@ -179,6 +186,26 @@ export async function loadBacktestRunData(
     buildSdioPlayerIdByNormalizedName(allPlayers)
   );
 
+  // Fetched alone, after the main batch — same "one heavy, many-request
+  // source at a time" discipline loadRunNflverseOnly.ts uses for this
+  // exact same source (see CLAUDE.md item 27/69): up to ~18 sequential
+  // per-week fetches plus a paginated commit-history lookup, not one big
+  // file, so it doesn't belong racing the Promise.all above for
+  // connections.
+  const expertConsensusByNormalizedNameWeek = await getExpertConsensusByNormalizedNameWeek(season, maxWeek).catch(
+    (err) => {
+      console.error("Failed to load FantasyPros weekly consensus:", err);
+      return new Map<string, Map<number, { rank: number; r2pPts: number | null }>>();
+    }
+  );
+  const sdioPlayerIdByNormalizedName = buildSdioPlayerIdByNormalizedName(allPlayers);
+  const expertConsensusByPlayerIdWeek = new Map<number, Map<number, { rank: number; r2pPts: number | null }>>();
+  for (const [normalizedName, byWeek] of expertConsensusByNormalizedNameWeek) {
+    const playerId = sdioPlayerIdByNormalizedName.get(normalizedName);
+    if (playerId == null) continue;
+    expertConsensusByPlayerIdWeek.set(playerId, byWeek);
+  }
+
   return {
     season,
     apiSeason,
@@ -191,5 +218,6 @@ export async function loadBacktestRunData(
     dstPlayerIdByTeam,
     dstPlayers,
     impliedTotalsByTeamWeek,
+    expertConsensusByPlayerIdWeek,
   };
 }

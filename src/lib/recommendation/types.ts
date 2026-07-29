@@ -64,6 +64,18 @@ export interface PlayerComparisonInput {
    * an oversight.
    */
   priorSeasonPprAvg: number | null;
+  /**
+   * FantasyPros' weekly consensus rank-to-points estimate for this
+   * player/week, when available — see fantasypros/weeklyConsensus.ts.
+   * Backtest-only for now (nflverse-only pipeline; see
+   * loadRunNflverseOnly.ts) — always null in live mode, since the live
+   * "current snapshot" fetch path hasn't been built yet (see CLAUDE.md
+   * item 69's Open Items). A standalone baseline built on the same
+   * signal (`pickByExpertConsensus`, baselines.ts) validated
+   * exceptionally strong (57-60% pooled pick accuracy across all four
+   * skill positions) before this field was added — see item 69/70.
+   */
+  expertConsensusR2pPts: number | null;
   byeWeek: number | null;
   isOnByeThisWeek: boolean;
   matchupContext: MatchupContext | null;
@@ -113,6 +125,8 @@ export interface PlayerScoreBreakdown {
   qbRushEpaAvg: number | null;
   qbRushEpaModifier: number;
   teammateOutBumpModifier: number;
+  expertConsensusR2pPts: number | null;
+  expertConsensusModifier: number;
   targetShare: number | null;
   separation: number | null;
   finalScore: number | null;

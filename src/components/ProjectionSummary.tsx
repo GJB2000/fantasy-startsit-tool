@@ -35,6 +35,8 @@ interface ProjectionSummaryViewProps {
   byPosition?: Record<string, ProjectionSummaryData>;
   baselineOverall?: ProjectionSummaryData;
   baselineByPosition?: Record<string, ProjectionSummaryData>;
+  expertConsensusOverall?: ProjectionSummaryData;
+  expertConsensusByPosition?: Record<string, ProjectionSummaryData>;
 }
 
 /**
@@ -44,7 +46,14 @@ interface ProjectionSummaryViewProps {
  * plain banner-row layout rather than introducing a new visual language,
  * since this is still the internal/secondary validation tool.
  */
-export function ProjectionSummaryView({ overall, byPosition, baselineOverall, baselineByPosition }: ProjectionSummaryViewProps) {
+export function ProjectionSummaryView({
+  overall,
+  byPosition,
+  baselineOverall,
+  baselineByPosition,
+  expertConsensusOverall,
+  expertConsensusByPosition,
+}: ProjectionSummaryViewProps) {
   return (
     <div className="space-y-5">
       <div className="space-y-2">
@@ -64,6 +73,19 @@ export function ProjectionSummaryView({ overall, byPosition, baselineOverall, ba
           <ProjectionRow label="Overall" summary={baselineOverall} />
           {baselineByPosition &&
             Object.entries(baselineByPosition).map(([position, summary]) => (
+              <ProjectionRow key={position} label={position} summary={summary} />
+            ))}
+        </div>
+      )}
+
+      {expertConsensusOverall && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            vs. FantasyPros&apos; weekly consensus estimate (same player-weeks, own coverage)
+          </h3>
+          <ProjectionRow label="Overall" summary={expertConsensusOverall} />
+          {expertConsensusByPosition &&
+            Object.entries(expertConsensusByPosition).map(([position, summary]) => (
               <ProjectionRow key={position} label={position} summary={summary} />
             ))}
         </div>

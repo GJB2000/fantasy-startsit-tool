@@ -109,6 +109,8 @@ export function skillFieldDefaults(): Omit<
     qbRushEpaAvg: null,
     qbRushEpaModifier: 0,
     teammateOutBumpModifier: 0,
+    expertConsensusR2pPts: null,
+    expertConsensusModifier: 0,
     targetShare: null,
     separation: null,
     matchupContext: null,

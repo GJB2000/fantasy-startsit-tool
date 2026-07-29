@@ -52,6 +52,8 @@ export async function GET(request: Request) {
       byPosition: poolResult?.byPosition ?? null,
       baselineOverall: poolResult?.baselineOverall ?? null,
       baselineByPosition: poolResult?.baselineByPosition ?? null,
+      expertConsensusOverall: poolResult?.expertConsensusOverall ?? null,
+      expertConsensusByPosition: poolResult?.expertConsensusByPosition ?? null,
       byPlayer: poolResult?.byPlayer ?? null,
       playerDetail,
       context: {
@@ -60,7 +62,7 @@ export async function GET(request: Request) {
         weeks,
         positions,
         scoringFormat: format,
-        note: "MAE/RMSE are in fantasy points. Bias is signed (predicted minus actual) — positive means the engine over-projects on average, negative means it under-projects. Pool-based numbers are graded against the same realistic startable pool Broad mode uses; player lookups are for the exact player searched, regardless of pool membership.",
+        note: "MAE/RMSE are in fantasy points. Bias is signed (predicted minus actual) — positive means the engine over-projects on average, negative means it under-projects. Pool-based numbers are graded against the same realistic startable pool Broad mode uses; player lookups are for the exact player searched, regardless of pool membership. The expert-consensus comparison (FantasyPros' own weekly point estimate) has its own, typically smaller n — it isn't guaranteed to cover every pool player every week the way the naive baseline is.",
       },
     });
   } catch (err) {
