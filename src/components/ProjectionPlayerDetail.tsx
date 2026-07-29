@@ -12,6 +12,37 @@ function sumColumn(weeks: PlayerWeekProjection[], pick: (w: PlayerWeekProjection
   return values.reduce((total, v) => total + v, 0);
 }
 
+interface CloserCounts {
+  engine: number;
+  fantasyPros: number;
+  tie: number;
+  graded: number;
+}
+
+/**
+ * "Got it right" for a single-player projection table means "was closer
+ * to the real score that week" — a smaller absolute error wins, not a
+ * pairwise pick the way every other backtest accuracy number in this app
+ * works (there's only one player here, not two to rank against each
+ * other). Only counts weeks where BOTH projections and a real actual
+ * score exist — a bye week or a week either source has no data for
+ * can't be judged either way.
+ */
+function countCloserWeeks(weeks: PlayerWeekProjection[]): CloserCounts {
+  let engine = 0;
+  let fantasyPros = 0;
+  let tie = 0;
+  for (const w of weeks) {
+    if (w.diff == null || w.fantasyProsDiff == null) continue;
+    const engineError = Math.abs(w.diff);
+    const fantasyProsError = Math.abs(w.fantasyProsDiff);
+    if (engineError < fantasyProsError) engine++;
+    else if (fantasyProsError < engineError) fantasyPros++;
+    else tie++;
+  }
+  return { engine, fantasyPros, tie, graded: engine + fantasyPros + tie };
+}
+
 function DetailCard({ detail }: { detail: PlayerProjectionDetail }) {
   const { summary } = detail;
   const totals = {
@@ -21,6 +52,7 @@ function DetailCard({ detail }: { detail: PlayerProjectionDetail }) {
     diff: sumColumn(detail.weeks, (w) => w.diff),
     fantasyProsDiff: sumColumn(detail.weeks, (w) => w.fantasyProsDiff),
   };
+  const closer = countCloserWeeks(detail.weeks);
 
   return (
     <div className="space-y-2">
@@ -38,6 +70,15 @@ function DetailCard({ detail }: { detail: PlayerProjectionDetail }) {
             : "No graded weeks in this range"}
         </span>
       </div>
+      {closer.graded > 0 && (
+        <div className="text-xs text-zinc-500">
+          Closer to actual: <span className="font-semibold text-zinc-900 dark:text-zinc-100">Engine {closer.engine}</span>
+          {" · "}
+          <span className="font-semibold text-zinc-900 dark:text-zinc-100">FantasyPros {closer.fantasyPros}</span>
+          {closer.tie > 0 ? ` · Tied ${closer.tie}` : ""}
+          {` (of ${closer.graded} weeks with both projections)`}
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -103,6 +144,11 @@ interface ProjectionPlayerDetailProps {
  * treated as zero — so the net over/under-projection across the whole
  * range is visible at a glance without re-deriving it from the header's
  * bias figure (which is engine-only and MAE-based, not a raw sum).
+ * `countCloserWeeks` adds a "who got it right more" counter — for a
+ * single player there's no pairwise pick to grade the way every other
+ * accuracy number in this app works, so "right" means "closer to the
+ * real score that week" (smaller absolute error), counted only over
+ * weeks where both projections and a real actual exist.
  */
 export function ProjectionPlayerDetailView({ players }: ProjectionPlayerDetailProps) {
   if (players.length === 0) return null;

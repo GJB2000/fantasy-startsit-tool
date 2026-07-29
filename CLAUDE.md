@@ -4890,6 +4890,20 @@ single-season numbers for those specific constants.
       72/74 already quantified per-week (FantasyPros under-projects
       Stafford by about half as much as the blended engine does, summed
       across the whole season). Zero console errors.
+    - **Second follow-up, same item: added a "who got it right more"
+      counter** (`countCloserWeeks`, `ProjectionPlayerDetail.tsx`). For a
+      single searched player there's no pairwise pick to grade the way
+      every other backtest accuracy number in this app works (see
+      `gradeOutcome`/`compareBreakdowns`) — "right" here means "closer to
+      the real score that week," a smaller absolute error between
+      `diff`/`fantasyProsDiff`, counted only over weeks where both
+      projections and a real actual exist (a bye week or a coverage gap
+      can't be judged either way). Renders as a line under the header:
+      "Closer to actual: Engine N · FantasyPros N (· Tied N) (of N weeks
+      with both projections)." Re-verified live against Stafford: Engine
+      6 · FantasyPros 11 (of 17) — consistent with the MAE/bias/total-diff
+      numbers already established, just expressed as a per-week win
+      count instead of an aggregate error magnitude. Zero console errors.
 
 ### Open items (as of item 65 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
