@@ -8,6 +8,7 @@ interface LeagueOption {
   leagueId: string;
   name: string;
   season: string;
+  rosterPositions: string[];
 }
 
 interface SleeperImportProps {
@@ -90,6 +91,7 @@ export function SleeperImport({ connection, onConnectionChange, onImportPlayers 
       leagueId: league.leagueId,
       leagueName: `${league.name} (${league.season})`,
       leagueRosteredPlayerIds: [],
+      rosterPositions: league.rosterPositions,
     };
     onConnectionChange(next);
     setLeagues([]);

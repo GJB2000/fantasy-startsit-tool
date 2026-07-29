@@ -116,8 +116,16 @@ Tuning History" item 65 and Open Items): the engine systematically
 *under-projects* at least one real player (Matthew Stafford, wrong in
 the same direction all 16 graded weeks) and can produce *negative*
 point projections in-season, neither of which has been investigated
-yet. Scoped to 2025/PPR/skill-positions-only for this first pass. Out
-of scope so far:
+yet — since fixed for the Stafford case specifically, see "Backtesting &
+Tuning History" item 66. Scoped to 2025/PPR/skill-positions-only for
+this first pass. A fifth live tool, the Lineup Optimizer (`/lineup`),
+shipped after that — import a roster from Sleeper or add players by
+hand, say how many starters go at each spot, and it fills out the best
+lineup, reusing the already-validated `scoreExtendedPlayer`/`finalScore`
+exactly as every other live tool (see "Backtesting & Tuning History"
+item 76) — the first genuine whole-roster assignment problem this app
+has tackled, as opposed to every other tool's pairwise-or-list framing.
+Out of scope so far:
 database/persistence, auth. Upcoming-schedule/next-opponent
 lookup — previously fully out of scope — is now partially built (see
 below): the live start/sit tool's own matchup modifier still looks up
@@ -4905,6 +4913,149 @@ single-season numbers for those specific constants.
       numbers already established, just expressed as a per-week win
       count instead of an aggregate error magnitude. Zero console errors.
 
+76. **Built a Lineup Optimizer — a fifth live tool (`/lineup`), the first
+    genuine whole-roster assignment problem this app has tackled**, as
+    opposed to every existing tool's pairwise-or-list framing (Start/Sit
+    compares 2-3 named players; Trade Analyzer compares two sides; Waivers
+    ranks a candidate pool). Import a roster from Sleeper or add players
+    by hand, tell it how many starters go at each spot, and it fills out
+    the best lineup — reusing the already-validated `scoreExtendedPlayer`/
+    `finalScore` exactly as every other live tool does. No new scoring
+    signal and no new backtest were needed: this is a new assignment/UI
+    layer on top of already-proven scoring, not a new prediction claim.
+    - **Scoped as its own tool, not folded into Start/Sit**, after
+      discussing the tradeoff with the user directly: a lineup optimizer
+      is architecturally a whole-roster assignment problem (much closer
+      to Waivers' "import a real Sleeper roster, score everyone on it"
+      shape) rather than Start/Sit's 2-3-named-player pairwise comparison.
+    - **Fixed a real, already-documented gap as part of this work** (was
+      Open Item 10): Sleeper roster import previously skipped D/ST and K
+      entirely. `resolveSleeperRoster` (`lib/sleeper/resolveRoster.ts`)
+      now reads from `getActiveExtendedPlayers()` (skill + K + synthetic
+      D/ST rows) instead of the skill-only `getAllPlayers()` — K joins by
+      name exactly like a skill player (a locally-built skill+K name
+      index replaces the shared `buildSdioPlayerIdByNormalizedName`
+      helper here, since that helper is deliberately skill-only for its
+      other callers). D/ST needs a genuinely different path: Sleeper
+      represents a team defense as `position: "DEF"`, `full_name: null`,
+      with the team's own abbreviation as its `player_id` (confirmed
+      live) — resolved against a team-code → synthetic-PlayerID map built
+      from the same already-fetched extended pool. **A real, useful
+      surprise found while building this**: assumed Sleeper's team codes
+      would need the same `LA`→`LAR` translation nflverse's data needs
+      (the one known SportsDataIO mismatch documented elsewhere in this
+      file) — checked live instead of assuming, and found Sleeper's own
+      player dump uses `LAR` directly, already matching SportsDataIO. The
+      `toSdioTeam()` call is kept anyway as a defensive no-op (same
+      "falls back to its input unchanged" precedent the function already
+      has), and the code comment states the verified fact, not the
+      original wrong assumption. **Verified live against a real public
+      Sleeper league**: Cleveland's `"CLE"` roster entry now resolves to
+      the correct synthetic D/ST PlayerID (900008) with zero unmatched
+      entries for that slot (previously silently skipped); K's join was
+      independently confirmed viable by cross-checking a real active
+      kicker's Sleeper name against this app's own extended player search
+      (no live roster with a rostered kicker was available to test the
+      full round-trip, but the two halves — Sleeper having real,
+      name-joinable K entries, and this app's search resolving that exact
+      name — were each verified directly). `leagueRosteredPlayerIds`
+      (Waivers' own exclusion list) improves for free from the same fix,
+      not new scope — confirmed Waivers' own behavior is unchanged/only
+      improved, not regressed, by re-running it after this change.
+    - **Roster slots auto-detect from the real connected Sleeper league,
+      always editable** — the user's explicit choice over always-manual
+      configuration, matching this app's standing "real data over
+      guesses" pattern. `SleeperLeague.roster_positions` (a field Sleeper
+      already returns, just not previously typed/threaded through) is now
+      surfaced end-to-end: `sleeper/types.ts` → `/api/sleeper/leagues`
+      route → `SleeperImport.tsx`'s `LeagueOption` →
+      `useSleeperConnection.ts`'s `SleeperConnection` (with a
+      backward-compatible empty-array default for a connection saved
+      before this field existed, same precedent as
+      `leagueRosteredPlayerIds`'s own earlier addition). New
+      `lib/lineup/rosterSlots.ts`: `SlotType` (QB/RB/WR/TE/K/DST plus the
+      real flex variants Sleeper leagues use — FLEX, SUPER_FLEX,
+      WRRB_FLEX, REC_FLEX; IDP-style flex slots are silently ignored,
+      since this app has no defensive-player pool at all),
+      `parseSleeperRosterPositions()` (counts real starting slots from
+      Sleeper's raw array, ignoring BN/TAXI/IR), `DEFAULT_SLOTS` (a
+      standard 9-starter shape used when no Sleeper league is connected).
+      Verified the parser directly against the real `roster_positions`
+      array pulled from a real public league
+      (`["QB","RB","RB","WR","WR","TE","FLEX","FLEX","DEF","BN"×6]`) —
+      correctly produced `{QB:1,RB:2,WR:2,TE:1,DST:1,FLEX:2}`, matching
+      that league's real settings exactly (a 12-team league with 2 flex
+      spots and no kicker).
+    - **Assignment algorithm** (`lib/lineup/optimizeLineup.ts`): fills
+      fixed single-position slots first (each with that position's own
+      top-scored players, since only that position can fill them anyway),
+      then fills flex-type slots from whatever's left over, narrowest-
+      eligibility-first (WRRB_FLEX/REC_FLEX, then FLEX, then SUPER_FLEX)
+      — the standard, provably-optimal greedy order for this "fixed slots
+      then shared flex" structure for the common case of 0-2 total flex
+      slots (documented in code as a heuristic, not a full weighted-
+      assignment solver, for the rare case of several overlapping flex
+      types at once). Availability-first sort within each position
+      (healthy/active players always rank above a bye-week or Out/
+      Doubtful player, regardless of raw score) mirrors `compareBreakdowns`'
+      own "prefer healthy, but still fill the slot if that's all there
+      is" philosophy (`engine.ts`), just applied to N-way assignment
+      instead of a single pairwise comparison. An unfillable slot (not
+      enough eligible players on the roster) renders as an honest empty
+      slot ("No eligible player on your roster for this slot — add one
+      to fill it"), not a crash or a silently dropped row.
+    - **New `/api/lineup` route** mirrors `/api/compare`/`/api/trade`'s
+      existing fetch block exactly (context, positionDefenseTable,
+      nflversePlayerWeekTable, remainingOpponentsByTeam + season-
+      rollforward, teamWeatherByTeamWeek, impliedTotalsByTeamWeek,
+      `getCurrentExpertConsensusByNormalizedName`) — full live-data parity
+      with every other live route, no new fetch logic invented. Scores
+      every rostered player via `scoreExtendedPlayer` (already handles
+      skill/K/D/ST uniformly) then calls `optimizeLineup`. Slot counts
+      travel over the wire as a compact `<SlotType><count>` string (e.g.
+      `QB1,RB2,WR2,TE1,FLEX1,K1,DST1`), parsed/serialized by
+      `parseSlotsParam`/`serializeSlots` in the same `rosterSlots.ts`.
+    - **UI**: `LineupTool.tsx` mirrors `WaiverTool.tsx`'s shape exactly —
+      `useRosteredPlayers()`/`useSleeperConnection()` are the SAME global
+      hooks Waivers already uses (verified live: connecting Sleeper or
+      adding a player on either page shows up on both — one roster
+      concept across the app, not a per-tool one), plus `SleeperImport`
+      and `PlayerSearchInput` reused verbatim. New `RosterSlotsEditor.tsx`
+      (a compact grid of per-slot-type steppers, re-populated from
+      `parseSleeperRosterPositions(connection.rosterPositions)` whenever
+      the connected league actually changes — tracked via a ref so
+      further manual edits aren't clobbered on every render — never
+      locked to the detected value). New `LineupResult.tsx` (starters
+      grouped by slot, reusing `breakdown.notes` verbatim for reasoning —
+      same "one source of truth for reasoning text" precedent as
+      `WaiverResult`/`TradeResult` — plus a Bench section for everyone
+      else). `AppShell.tsx` gained a "Lineup" nav link between Waivers
+      and Backtest.
+    - **Verified live end-to-end, not just via the API**: built a real
+      8-player roster (Burrow/Bijan/McCaffrey/Jefferson/Lamb/Kelce/
+      Butker/Cleveland D/ST) through the actual UI — correct assignment
+      to every fixed slot, an intentionally-thin roster correctly left
+      RB2/WR2/FLEX as honest empty slots with zero players benched. A
+      second, larger roster (10 players, two QBs and three WRs) via
+      direct API confirmed the harder cases: the backup QB (Mahomes,
+      lower score) correctly benched behind the starter, and the third
+      WR (Jefferson, the lowest-scored of three) correctly rolled into
+      the FLEX slot rather than the bench — confirming the "fixed slots
+      first, then flex from leftovers" ordering works as designed, not
+      just in the simple case. Checked light and dark mode, zero console
+      errors throughout, and confirmed Waivers itself is unchanged (same
+      shared roster, same Sleeper connection, `Find waiver targets` still
+      returns real results) after all of the above. `next build`,
+      `npx tsc --noEmit -p .`, and `npm run lint` all clean.
+    - **Deliberately out of scope for this pass**: no backtest validation
+      for the ASSIGNMENT logic itself (not a new prediction claim — see
+      above), no support for saving/naming multiple lineup configurations
+      (the roster and slot config are both single, global, localStorage-
+      only state, same "no persistence" scope as every other live tool),
+      and no attempt to solve the rare multi-overlapping-flex-type case
+      with a true weighted-assignment algorithm (documented as a known,
+      accepted heuristic limitation instead).
+
 ### Open items (as of item 65 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
@@ -5070,19 +5221,13 @@ project's standing rule. Nothing below is started or fixed yet:
    cross-position logic (mirrors the same scoping decision the Trade
    Analyzer itself never needed to make, since it's user-driven there).
    Both are candidates for a dedicated pass if this tool gets real usage.
-10. **Sleeper roster import still skips D/ST and K** (item 62) —
-    `sleeper/resolveRoster.ts` explicitly filters out `position ===
-    "DEF"`/`"K"` Sleeper players, written back when this app genuinely
-    had no D/ST/K support (item 59); that's no longer true as of item
-    62, but the import path wasn't updated as part of that work. Fixing
-    it needs its own real join, not just deleting the filter: Sleeper
-    identifies team defenses by team abbreviation rather than a player
-    ID the way it does for every other position, so
-    `resolveRoster.ts`'s existing name-based join wouldn't directly
-    apply to the D/ST case the way it does for K. Until fixed, a
-    Sleeper-connected user's own D/ST/K never appears in their synced
-    roster (manual marking via `PlayerSearchInput` still works for
-    both).
+10. **Sleeper roster import skipping D/ST and K — resolved, see item
+    76.** `resolveSleeperRoster` now reads from `getActiveExtendedPlayers()`
+    and resolves D/ST via a team-code → synthetic-PlayerID map (K joins
+    by name like any skill player), fixed alongside the Lineup Optimizer
+    since that tool needed a Sleeper-imported roster to be able to fill
+    DEF/K slots automatically. Verified live against a real public
+    league. No longer open.
 11. **D/ST and K's Backtest-page support (item 63) is scoped to the
     primary 2025 SportsDataIO pipeline and to Broad/Single Pair mode
     only** — two real gaps, not oversights:
@@ -5460,6 +5605,33 @@ project's standing rule. Nothing below is started or fixed yet:
   item 27 already fixed once for the nflverse backtest pipeline
   (confirmed live: this scan pattern reproduced a real
   `SportsDataError: fetch failed` before the fix).
+- `src/lib/lineup/` — the Lineup Optimizer's slot model and assignment
+  algorithm (item 76), the first whole-roster assignment feature in this
+  app (as opposed to Waivers' ranking or Start/Sit's pairwise comparison).
+  `rosterSlots.ts` defines `SlotType` (QB/RB/WR/TE/K/DST plus the real
+  flex variants Sleeper leagues use — FLEX/SUPER_FLEX/WRRB_FLEX/REC_FLEX)
+  and each one's eligible `ExtendedPosition`s, `parseSleeperRosterPositions`
+  (turns a real Sleeper league's raw `roster_positions` array into slot
+  counts, ignoring bench/taxi/IR entries), `DEFAULT_SLOTS` (a standard
+  9-starter shape for when no Sleeper league is connected), and
+  `parseSlotsParam`/`serializeSlots` (a compact `<SlotType><count>`
+  wire format shared between the client and `/api/lineup`).
+  `optimizeLineup.ts` fills fixed single-position slots first with each
+  position's own top-scored, already-computed `PlayerScoreBreakdown`s
+  (via `scoreExtendedPlayer` — no new scoring, just a new consumer of it),
+  then fills flex-type slots from whatever's left over, narrowest-
+  eligibility-first — the standard, provably-optimal greedy order for
+  this "fixed slots then shared flex" structure at the 0-2-total-flex-
+  slot scale nearly every real league uses (documented as a heuristic,
+  not a full weighted-assignment solver, for the rare case of several
+  overlapping flex types at once). Availability-first sort within each
+  position (a healthy/active player always outranks one on a bye or
+  Out/Doubtful, regardless of raw score) mirrors `compareBreakdowns`'
+  own "prefer healthy, but still fill the slot if that's all there is"
+  philosophy (`engine.ts`), just applied to N-way assignment instead of
+  a single pairwise comparison. An unfillable slot renders `breakdown:
+  null` rather than disappearing, so the UI can show an honest empty-slot
+  message instead of silently dropping a row.
 - `src/lib/sleeper/` — server-only client for Sleeper's free, no-auth
   public API (item 59), the real-roster-import path that replaced
   manual one-by-one roster marking as the primary way to populate the
@@ -5469,18 +5641,25 @@ project's standing rule. Nothing below is started or fixed yet:
   JSON `null` body, not a 404, confirmed live — rather than throwing).
   `resolveRoster.ts` resolves EVERY roster in the league in one pass
   (`getSleeperRosters` already returns all of them, not just the
-  requesting user's), skipping team-defense/kicker slots — a decision
-  made when this app genuinely had no D/ST or K support (item 59); item
-  62 added real D/ST/K support to all three live tools, but this filter
-  was NOT revisited as part of that work (out of scope for that task —
-  see Open Items), so a Sleeper-synced roster still never includes a
-  user's own D/ST/K even though the rest of the app can now score them
-  — and joining each remaining Sleeper player to a
-  SportsDataIO PlayerID by name — reusing nflverse/playerMatch.ts's
-  `normalizePlayerName`/`buildSdioPlayerIdByNormalizedName` rather than
-  a third hand-rolled scheme, since it's the same kind of join (Sleeper
-  has no ID shared with SportsDataIO either) already solved once for
-  nflverse. Returns two genuinely different things from that one pass:
+  requesting user's), joining each Sleeper player to a SportsDataIO
+  PlayerID. D/ST and K are both resolved as of item 76 (previously both
+  were skipped entirely — a decision made when this app genuinely had no
+  D/ST or K support, item 59, never revisited when item 62 added real
+  support for both; see CLAUDE.md's Lineup Optimizer item for why it was
+  finally fixed). K joins by name like any skill player, via a locally-
+  built skill+K name index (reusing `nflverse/playerMatch.ts`'s
+  `normalizePlayerName`, but NOT the shared `buildSdioPlayerIdByNormalizedName`
+  helper, which is deliberately skill-only for its other callers). D/ST
+  has no name to join on at all (Sleeper represents a team defense as
+  `position: "DEF"`, `full_name: null`, with the team's own abbreviation
+  as its `player_id`, confirmed live) — resolved instead against a
+  team-code → synthetic-PlayerID map built from the same already-fetched
+  extended pool, passed through `recommendation/restOfSeason.ts`'s
+  `toSdioTeam` defensively (confirmed live this is a no-op today —
+  Sleeper's own codes already match SportsDataIO's, even for the one
+  known `LAR`/`LA` mismatch documented elsewhere in this file — kept for
+  the same "falls back to its input unchanged" reason `toSdioTeam` itself
+  has). Returns two genuinely different things from that one pass:
   the requesting user's own roster (`players`/`unmatched`, matching
   `owner_id` OR `co_owners`) and `leagueRosteredPlayerIds` — every
   player owned by ANY team in the league, IDs only. Item 59 originally
@@ -5788,6 +5967,13 @@ project's standing rule. Nothing below is started or fixed yet:
   players (ready to feed straight into the same roster state the manual
   `PlayerSearchInput` flow already populates) plus, as of item 60,
   `leagueRosteredPlayerIds` for every team in that league.
+  `src/app/api/lineup` (item 76) mirrors `/api/compare`/`/api/trade`'s
+  fetch block exactly (full live-data parity — same context/schedule/
+  weather/implied-totals/expert-consensus fetches every other live route
+  already does), scores every rostered `ids` player via
+  `scoreExtendedPlayer`, then calls `lib/lineup/optimizeLineup.ts`. Slot
+  counts travel as a compact `<SlotType><count>` string parsed/serialized
+  by `lib/lineup/rosterSlots.ts`'s `parseSlotsParam`/`serializeSlots`.
   `src/app/api/backtest/pair`,
   `src/app/api/backtest/broad` (also `scoringFormat`-aware, item 50),
   `src/app/api/backtest/broad-nflverse`,
@@ -5850,7 +6036,21 @@ project's standing rule. Nothing below is started or fixed yet:
   `connection`/`onConnectionChange` as props rather than calling
   `useSleeperConnection()` itself, which would create a second
   independent copy of the same localStorage-synced state that wouldn't
-  see this component's own updates), and
+  see this component's own updates), `LineupTool.tsx`/`LineupResult.tsx`/
+  `RosterSlotsEditor.tsx` (live Lineup Optimizer mode, at `/lineup`, item
+  76 — `LineupTool.tsx` mirrors `WaiverTool.tsx`'s exact shape, owning
+  its own `useRosteredPlayers()`/`useSleeperConnection()` instances;
+  since both hooks are backed by the SAME localStorage keys as Waivers',
+  connecting Sleeper or adding a player on either page is really one
+  shared roster/connection, not a per-tool one — verified live.
+  `RosterSlotsEditor.tsx` is a compact grid of per-`SlotType` steppers,
+  re-populated from `lib/lineup/rosterSlots.ts`'s
+  `parseSleeperRosterPositions(connection.rosterPositions)` whenever the
+  connected league actually changes, tracked via a ref so it doesn't
+  clobber further manual edits on every render; `LineupResult.tsx`
+  groups starters by slot, reusing `PlayerScoreBreakdown.notes` verbatim
+  for reasoning — same "one source of truth" precedent as
+  `WaiverResult.tsx`/`TradeResult.tsx` — plus a Bench section), and
   `BacktestTool.tsx`/`BacktestWeekTable.tsx`/`BacktestSummary.tsx`/
   `BacktestCaveatNote.tsx`/`TradeBacktestTable.tsx`/`ProjectionSummary.tsx`/
   `ProjectionPlayerTable.tsx`/`ProjectionPlayerDetail.tsx`

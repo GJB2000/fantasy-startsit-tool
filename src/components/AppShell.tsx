@@ -59,6 +59,17 @@ const LINKS: { href: string; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    href: "/lineup",
+    label: "Lineup",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none">
+        <rect x="3" y="4" width="18" height="4" rx="1.3" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="3" y="10" width="18" height="4" rx="1.3" stroke="currentColor" strokeWidth="1.6" />
+        <rect x="3" y="16" width="10" height="4" rx="1.3" stroke="currentColor" strokeWidth="1.6" />
+      </svg>
+    ),
+  },
+  {
     href: "/backtest",
     label: "Backtest",
     icon: (

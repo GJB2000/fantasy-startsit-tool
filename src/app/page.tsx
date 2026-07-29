@@ -42,6 +42,20 @@ const TOOLS = [
     ),
   },
   {
+    href: "/lineup",
+    label: "Lineup",
+    title: "Who should start this week?",
+    description:
+      "Import your roster from Sleeper or add players by hand, tell us your league's slots, and we'll fill out your best lineup.",
+    icon: (
+      <>
+        <rect x="3" y="4" width="18" height="4" rx="1.3" stroke="currentColor" strokeWidth="1.7" />
+        <rect x="3" y="10" width="18" height="4" rx="1.3" stroke="currentColor" strokeWidth="1.7" />
+        <rect x="3" y="16" width="10" height="4" rx="1.3" stroke="currentColor" strokeWidth="1.7" />
+      </>
+    ),
+  },
+  {
     href: "/backtest",
     label: "Backtest",
     title: "Does the engine actually work?",
@@ -56,7 +70,7 @@ export default function HomePage() {
       <PageHeader
         eyebrow="Legitfootball"
         title="Your fantasy toolkit"
-        description="Four tools, one engine — start/sit calls, trade grades, waiver targets, and the backtested accuracy behind all of it."
+        description="Five tools, one engine — start/sit calls, trade grades, waiver targets, full-lineup optimization, and the backtested accuracy behind all of it."
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

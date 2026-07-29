@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
     const leagues = leaguesBySeason
       .flat()
-      .map((l) => ({ leagueId: l.league_id, name: l.name, season: l.season }));
+      .map((l) => ({ leagueId: l.league_id, name: l.name, season: l.season, rosterPositions: l.roster_positions }));
 
     return Response.json({
       userId: user.user_id,

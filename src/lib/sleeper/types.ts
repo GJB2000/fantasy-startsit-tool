@@ -8,6 +8,8 @@ export interface SleeperLeague {
   league_id: string;
   name: string;
   season: string;
+  /** The league's real starting-lineup slots, e.g. ["QB","RB","RB","WR","WR","TE","FLEX","FLEX","DEF","BN",...] — includes non-starting entries (BN/TAXI/IR) too, which callers must filter out. See lib/lineup/rosterSlots.ts for the parser. */
+  roster_positions: string[];
 }
 
 export interface SleeperRoster {

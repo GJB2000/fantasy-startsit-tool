@@ -7,6 +7,8 @@ export interface SleeperConnection {
   leagueName: string;
   /** Every player rostered by ANY team in this league (including the user's own) — refreshed on each sync, used to exclude already-owned players from waiver candidates league-wide, not just the user's own roster. */
   leagueRosteredPlayerIds: number[];
+  /** The league's real starting-lineup slots (raw Sleeper roster_positions, including non-starting BN/TAXI/IR entries) — used by the Lineup Optimizer (lib/lineup/rosterSlots.ts) to auto-fill a real slot configuration instead of guessing. */
+  rosterPositions: string[];
 }
 
 const STORAGE_KEY = "sleeperConnection";
@@ -30,8 +32,9 @@ export function useSleeperConnection(): [SleeperConnection | null, (next: Sleepe
         // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from localStorage (an external system) after mount, same documented exception as useScoringFormat.ts.
         setConnectionState({
           ...parsed,
-          // Backward-compatible default for a connection saved before this field existed.
+          // Backward-compatible defaults for connections saved before these fields existed.
           leagueRosteredPlayerIds: Array.isArray(parsed.leagueRosteredPlayerIds) ? parsed.leagueRosteredPlayerIds : [],
+          rosterPositions: Array.isArray(parsed.rosterPositions) ? parsed.rosterPositions : [],
         });
       }
     } catch {
