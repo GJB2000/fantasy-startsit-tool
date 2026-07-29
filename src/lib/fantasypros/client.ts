@@ -10,6 +10,10 @@ const REPO = "dynastyprocess/data";
 const WEEKLY_FILE_PATH = "files/fp_latest_weekly.csv";
 const COMMITS_API = `https://api.github.com/repos/${REPO}/commits`;
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}`;
+// Confirmed live (not assumed "main") — this repo's default branch is
+// "master". Used only by the live current-snapshot path below; the
+// historical path always pins to a specific commit sha instead.
+const DEFAULT_BRANCH = "master";
 
 // GitHub requires a User-Agent on API requests, or it 403s.
 const HEADERS = { "User-Agent": "fantasy-startsit-tool" };
@@ -157,6 +161,39 @@ export async function fetchCommitHistory(): Promise<CommitInfo[]> {
 
   setCached(cacheKey, all, 24 * 60 * 60);
   return all;
+}
+
+/**
+ * The file's CURRENT content (branch HEAD, not a pinned historical
+ * commit) — the live tool only ever needs THIS week's rankings, already
+ * sitting at whatever the daily scrape most recently committed, so
+ * there's no need for fetchCommitHistory()'s git-history-mining dance at
+ * all here. Cached a few hours (not 30 days like a pinned commit, since
+ * this one's content changes as new commits land) but not on every
+ * request either, to stay polite to raw.githubusercontent.com across a
+ * comparison's several concurrent player lookups.
+ */
+export async function fetchCurrentSnapshot(): Promise<Record<string, string>[]> {
+  const cacheKey = "current-snapshot";
+  const cached = getCached<Record<string, string>[]>(cacheKey);
+  if (cached) return cached;
+
+  const url = `${RAW_BASE}/${DEFAULT_BRANCH}/${WEEKLY_FILE_PATH}`;
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: HEADERS, cache: "no-store" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new FantasyProsError(`Network error calling ${url}: ${message}`, undefined, url);
+  }
+  if (!res.ok) {
+    throw new FantasyProsError(`raw.githubusercontent.com returned ${res.status} for ${url}`, res.status, url);
+  }
+  const text = await res.text();
+  const rows = parseCsv(text);
+
+  setCached(cacheKey, rows, 6 * 60 * 60);
+  return rows;
 }
 
 /**

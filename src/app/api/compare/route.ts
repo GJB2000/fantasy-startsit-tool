@@ -1,6 +1,7 @@
 import { getPositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat } from "@/lib/sportsdata/types";
+import { getCurrentExpertConsensusByNormalizedName } from "@/lib/fantasypros/weeklyConsensus";
 import { compareBreakdowns } from "@/lib/recommendation/engine";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
@@ -34,13 +35,15 @@ export async function GET(request: Request) {
 
   try {
     const context = await getSeasonContext();
-    const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt] = await Promise.all([
-      getPositionDefenseTable(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
-      getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
-      getRemainingOpponentsByTeam(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
-        () => new Map<string, RemainingGame[]>()
-      ),
-    ]);
+    const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt, expertConsensusByNormalizedName] =
+      await Promise.all([
+        getPositionDefenseTable(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
+        getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
+        getRemainingOpponentsByTeam(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
+          () => new Map<string, RemainingGame[]>()
+        ),
+        getCurrentExpertConsensusByNormalizedName().catch(() => new Map()),
+      ]);
 
     // Same season-rollforward pattern as /api/trade — try continuing the
     // season lastCompletedWeek belongs to first; if it has no games left,
@@ -69,7 +72,8 @@ export async function GET(request: Request) {
           nflversePlayerWeekTable,
           remainingOpponentsByTeam,
           teamWeatherByTeamWeek,
-          impliedTotalsByTeamWeek
+          impliedTotalsByTeamWeek,
+          expertConsensusByNormalizedName
         )
       )
     );

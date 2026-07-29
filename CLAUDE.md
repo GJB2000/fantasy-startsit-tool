@@ -4655,6 +4655,196 @@ single-season numbers for those specific constants.
       the gating sweep deleted after recording these numbers, same
       precedent as every other one-off analysis in this document.
 
+73. **Wired `EXPERT_CONSENSUS_BLEND_WEIGHT` into the live tool — the
+    real, previously-missing piece flagged since item 70 (Open Items
+    16/17): the weight had zero effect on the deployed Start/Sit, Trade
+    Analyzer, and Waivers tools, only backtest-mode validation, because
+    no "current snapshot" fetch path existed for FantasyPros' rankings.**
+    - **Simpler than the historical path by design**: the backtest path
+      (`getExpertConsensusByNormalizedNameWeek`) has to mine git commit
+      history to reconstruct a PAST week's snapshot, since
+      `dynastyprocess/data`'s `fp_latest_weekly.csv` only ever holds the
+      single most recent daily overwrite. Live mode only ever needs "what
+      does the consensus say right now" — no commit-history lookup at
+      all, just a direct fetch of the file's current branch HEAD. New
+      `fetchCurrentSnapshot()` (`fantasypros/client.ts`) does exactly
+      that, confirmed live against the repo's real default branch
+      (`master`, not `main` — checked via the GitHub API rather than
+      assumed) and cached 6 hours (shorter than the historical path's
+      30-day pinned-commit cache, since this content changes as new
+      commits land, but long enough to stay polite to
+      raw.githubusercontent.com across a single comparison's several
+      concurrent player lookups). New
+      `getCurrentExpertConsensusByNormalizedName()`
+      (`fantasypros/weeklyConsensus.ts`) parses it the same way the
+      per-week historical reader does, minus the week dimension —
+      `normalizedName -> {rank, r2pPts}`.
+    - **Threaded through the same "fetch once per request, share across
+      every player" pattern every other live-mode signal in this app
+      already uses** (`remainingOpponentsByTeam`/`teamWeatherByTeamWeek`/
+      `impliedTotalsByTeamWeek`): `buildInput.ts` gained an
+      `expertConsensusByNormalizedName` parameter (default empty map,
+      same defaulting style as `priorSeasonPprAvgByNormalizedName`),
+      `scoreExtendedPlayer` (`scoreExtended.ts`) threads it through to the
+      skill-position path only (D/ST's and K's own scorers never read
+      this signal, since `EXPERT_CONSENSUS_BLEND_WEIGHT` only applies
+      inside `scorePlayer`), and all three live routes
+      (`/api/compare`, `/api/trade`, `/api/waivers`) fetch it once
+      alongside their existing schedule/weather fetches and pass it down.
+      `buildWaiverReport.ts`'s `buildWaiverCandidateDetails` (which calls
+      `buildComparisonInput` directly, bypassing `scoreExtendedPlayer`,
+      since waiver ranking is skill-position-only) and
+      `suggestDrop.ts`'s `suggestDrops` (which scores a user's own
+      rostered players via `scoreExtendedPlayer`) both needed the same
+      threading to cover every skill-position scoring path in the
+      Waivers tool, not just the candidate-ranking one.
+    - **Verified live end-to-end against the real running app, not just
+      `tsc`/lint** (via direct requests to the dev server already
+      running on this machine, since this is server-side data with no
+      visual surface to check in a browser): a real `/api/compare`
+      request (Joe Burrow vs. Patrick Mahomes) showed Burrow with a real,
+      non-null `expertConsensusR2pPts` (22.1) and a real nonzero
+      `expertConsensusModifier` (+3.8) computed correctly, while Mahomes
+      — genuinely absent from the current snapshot, confirmed by
+      grepping the raw fetched CSV directly rather than assuming a bug —
+      correctly degraded to `null`/`0`, the same honest-gap handling
+      every other optional external signal in this app already has.
+      `/api/trade` and `/api/waivers` both verified working end-to-end
+      too, including the real "FantasyPros' weekly consensus projects
+      roughly X points..." reasoning note rendering correctly in a real
+      Waivers candidate's notes. Zero errors in the dev server log across
+      all three.
+    - This closes Open Items 16 and 17 as originally written (both are
+      superseded by this item, not left standing alongside it).
+
+74. **Investigated Open Item 18 — whether `volumeModifier`'s
+    population-average conversion factor could be fixed for durable
+    per-player outliers (the root cause item 72 identified for
+    Stafford's residual calibration bias) by blending each player's own
+    trailing conversion rate in alongside the population one, exactly
+    the mechanism item 72 itself proposed as the real fix. Tested
+    properly, found a clean, monotonic, negative result. Not shipped.**
+    - **Design**: an empirical-Bayes shrinkage estimator, not a flat
+      per-player substitution — `shrunkRate = (seasonAttempts * ownRate +
+      K * populationRate) / (seasonAttempts + K)`, where `ownRate` is a
+      QB's own season-to-date PPR points ÷ season-to-date pass attempts
+      **strictly before the target week** (no leakage — same discipline
+      as every other backtest-mode signal in this app) and `K` is a
+      tunable "prior strength" in attempts — a small `K` trusts a
+      player's own rate heavily even off a modest sample, a large `K`
+      stays close to the population rate regardless of sample size. This
+      specifically avoids the naive version of this idea (using a
+      player's own RECENT-window rate) which item 72's investigation
+      never wrote out explicitly but which was worth ruling out on
+      inspection first: since `recentPprAvg`/`blendedScore` already
+      IS the recent-window points average, computing a "conversion rate"
+      from that same window and multiplying back through
+      `recentVolumeAvg` just reconstructs `blendedScore` itself at high
+      weight — collapsing the validated volume signal back into the
+      pre-volume, points-only engine (item 2's 50.3% baseline) rather
+      than fixing anything. Using a longer, more stable SEASON-TO-DATE
+      window for `ownRate`, shrunk by sample size, avoids that collapse.
+    - **Built as a temporary diagnostic** (`/api/debug-qb-volume-
+      shrinkage`, deleted after recording these numbers, same precedent
+      as every other one-off analysis in this document), reusing real
+      production functions rather than re-deriving the scoring formula
+      from scratch where possible: `buildBacktestComparisonInput`/
+      `scorePlayer` for the real baseline breakdown, `compareBreakdowns`/
+      `gradeWeek` for pick-accuracy grading (only `finalScore` swapped on
+      a cloned breakdown), `buildRankedPoolForWeek`/`buildPairsForWeek`
+      for the identical realistic-pool/adjacent-rank methodology every
+      other backtest number in this app uses. The one piece that
+      genuinely had to be hand-reconstructed was the QB modifier chain
+      itself (to substitute an alternative volume-conversion factor
+      without touching any other modifier), which reads every other raw
+      signal straight off the real breakdown (`matchupModifier`,
+      `recentQbRushAttemptsAvg`, `goalLineTouchesAvg`, `successRateAvg`,
+      `qbRushEpaAvg`, `expertConsensusR2pPts`) rather than recomputing
+      them independently.
+    - **Caught the exact bug class item 43 already warned about, on the
+      first run — a real, load-bearing lesson in why this project cross-
+      checks every sweep harness against the real engine before trusting
+      it.** The first version of the reconstruction blended
+      `matchupModifier` into `volumeModifier`'s own basis (i.e. blended
+      `blendedScore + matchupModifier` toward the volume-implied
+      estimate), but the real `engine.ts` blends `volumeModifier` against
+      `blendedScore` ALONE — `matchupModifier` only enters the running
+      score that every SUBSEQUENT modifier uses as its base. This
+      produced a real, nonzero (0.79-point) mismatch against the actual
+      shipped engine at the "population-rate-only" control point, caught
+      by the same discipline items 43/44 established (verify the harness
+      reproduces the real engine exactly before trusting any new number)
+      rather than assumed correct. Fixed; the corrected harness matches
+      the real engine's `finalScore` EXACTLY (0.0 max difference) across
+      all 204 graded QB pool-weeks before any of the numbers below were
+      trusted.
+    - **Result: a clean, monotonic, negative result — not an ambiguous
+      tradeoff requiring a user decision, unlike QB rushing/RB EPA/the
+      ensemble ratio elsewhere in this document.** Swept `K` from 25
+      (aggressive shrinkage) to 1600 (very mild) against `K=∞`
+      (population-rate-only, i.e. today's shipped behavior), full 2025
+      season, primary SportsDataIO pipeline, QB pool
+      (`buildRankedPoolForWeek`, n=204 pool-weeks / n=102 pairs):
+
+      | K | pool MAE | pool bias | pool pick accuracy |
+      |---|---|---|---|
+      | 25 (aggressive) | 6.89 | +2.06 | 56.9% |
+      | 100 | 6.78 | +1.74 | 57.8% |
+      | 400 | 6.67 | +1.37 | 59.8% |
+      | 1600 (mild) | 6.61 | +1.12 | 60.8% |
+      | population-only (shipped) | **6.58** | **+0.98** | **61.8%** |
+
+      Every metric — calibration (MAE, and bias moving further positive,
+      i.e. more over-projection on average) AND pick accuracy — gets
+      monotonically WORSE as `K` decreases (more weight on each player's
+      own rate), with NO interior optimum anywhere in the tested range.
+      Unlike every genuine tradeoff this document has shipped (items
+      30/33/41/44/70), there is no point in this family that's "some
+      good, some bad" — population-rate-only (today's behavior) is
+      simply better on every axis tested, at every `K`.
+    - **But the ORIGINAL motivating case — Stafford's own calibration —
+      does move in the predicted direction, just not enough to be worth
+      the pool-wide cost.** Stafford's own bias (same pool-restricted
+      12-week sample `runProjectionBacktest`'s `byPlayer` uses) improves
+      from -4.00 (population-only) to -3.31 at `K=25` — real, but a
+      partial fix at best (still a meaningfully large under-projection,
+      not resolved), bought at the cost of every OTHER QB in the pool
+      getting worse-calibrated on average. Confirms item 72's root-cause
+      diagnosis was directionally correct (Stafford's durable
+      above-population efficiency really is part of his bias), but this
+      specific fix generalizes badly across the pool.
+    - **Best-guess explanation for the pool-wide regression, worth
+      recording for anyone who revisits this**: even a season-to-date
+      `ownRate` is still derived from PPR POINTS, which carry real
+      touchdown-rate variance — using it to build a "conversion rate"
+      partially re-introduces exactly the noise the volume signal was
+      built to filter out in the first place (items 6-13). It also
+      likely double-counts rushing value for dual-threat QBs
+      specifically: a QB's own points-per-pass-attempt rate includes
+      whatever rushing production they have, which is ALREADY captured
+      by the separate `qbRushModifier`/`QB_RUSH_BLEND_WEIGHT` additive
+      term (item 30) — inflating the volume-conversion estimate on top
+      of that for a QB like Lamar Jackson or Josh Allen, while a genuine
+      pocket passer like Stafford (minimal rushing) gets a cleaner
+      signal from the same mechanism. The pool mixes both kinds of QB,
+      and the aggregate effect of the confound outweighs the aggregate
+      benefit of the fix.
+    - **Not shipped — no `config.ts`/`engine.ts` change.** This is a
+      genuine rejection, not a "kept but disabled" precedent like most
+      zeroed-out signals in this file, since no new named constant was
+      ever added to production code. A future attempt at this same idea
+      should probably start from a units-cleaner efficiency proxy than
+      total PPR points per attempt (e.g. passing yards or EPA per
+      dropback, isolated from rushing production) rather than this
+      item's direct approach — flagged as an open avenue below, not
+      pursued further here per the standard "don't chase an ambiguous
+      idea past its first clean rejection" discipline this document has
+      followed throughout (see items 25/26/34's partial rejections,
+      38/42/54/55's full ones).
+    - This closes Open Item 18 as originally written, with a real,
+      quantified answer (not a "still not started" placeholder) — see
+      the Open Items entry below for what's left if this gets revisited.
+
 ### Open items (as of item 65 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
@@ -4723,11 +4913,18 @@ and item 72's Stafford investigation (the real `playerProjectionLookup.ts`
 bug fix — a third missed `expertConsensusByPlayerIdWeek` call site —
 plus the new, currently-inert `QB_RUSH_MIN_ATTEMPTS_THRESHOLD` gate in
 `config.ts`/`engine.ts`, kept at `0`/no-op since the gating sweep found
-no clean win) — is committed as `bae0ce1`. **This CLAUDE.md write-up
-itself (items 70-72's text plus Open Items 17-18) is the one thing still
-uncommitted as of this writing** — commit only once the user explicitly
-asks, per this project's standing rule. Nothing below is started or
-fixed yet:
+no clean win) — is committed as `bae0ce1`. Item 73's real code — the
+live FantasyPros current-snapshot wiring (`fantasypros/client.ts`'s
+`fetchCurrentSnapshot`, `weeklyConsensus.ts`'s
+`getCurrentExpertConsensusByNormalizedName`, and the threading through
+`buildInput.ts`/`scoreExtended.ts`/`buildWaiverReport.ts`/
+`suggestDrop.ts` and all three live routes) — plus item 74's
+investigation (which shipped no code at all, a documented negative
+finding only) are **both still uncommitted as of this writing, along
+with this CLAUDE.md write-up itself (items 73-74's text plus the
+resolution of Open Items 17-18 and the new Open Item 18-follow-up
+below)** — commit only once the user explicitly asks, per this
+project's standing rule. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -4942,64 +5139,55 @@ fixed yet:
       the one position where FantasyPros' raw estimate calibrates
       *better* than the blended engine, a hint (not proof) that TE might
       want a different weight than QB/RB/WR here too.
-    - **Live-tool integration is a bigger lift than any other external
-      source in this app has needed, and is now the one piece standing
-      between this being "validated and integrated in backtest" and
-      "actually affects real recommendations."** Every other live
-      signal (nflverse, Sleeper, weather/schedules) is a direct
-      current-state fetch. This one would need `fantasypros/client.ts`'s
-      SEPARATE "current HEAD snapshot" path (not git-history mining —
-      the live tool only ever needs THIS week's rankings, already
-      sitting at the file's current content) plus threading
-      `expertConsensusR2pPts` through `buildInput.ts`/`scoreExtended.ts`
-      into all three live routes — not built yet, since items 69-71 only
-      needed the historical/backtest path. Until this exists,
-      `EXPERT_CONSENSUS_BLEND_WEIGHT` being nonzero has ZERO effect on
-      what the live tool actually recommends, regardless of its value.
+    - **Live-tool integration: done — see item 73.** The current-HEAD
+      snapshot fetch path now exists (`fetchCurrentSnapshot`/
+      `getCurrentExpertConsensusByNormalizedName`) and is threaded
+      through `buildInput.ts`/`scoreExtended.ts` into all three live
+      routes, verified live end-to-end. `EXPERT_CONSENSUS_BLEND_WEIGHT`
+      now has a real effect on what Start/Sit, Trade Analyzer, and
+      Waivers actually recommend.
     - Also worth a dedicated look if picked up again: whether
       `pickByExpertConsensus` genuinely doesn't need position-scoping
       (unlike every other signal in this document, all four positions
       cleared the bar convincingly here) or whether 2024 QB's exact-50%
       season and TE's wide season-to-season range (52.5-66.3%) are early
       warning signs that would show up with more scrutiny.
-17. **Live-tool wiring for `EXPERT_CONSENSUS_BLEND_WEIGHT` is a real,
-    separately-flagged open item** (duplicated here from item 16's own
-    bullet for visibility, per direct request) — right now this factor
-    has ZERO effect on the actual deployed Start/Sit, Trade Analyzer, or
-    Waivers tools, only on backtest-mode validation. Needs
-    `fantasypros/client.ts`'s current-snapshot fetch path (simpler than
-    the backtest git-history-mining path — live mode only ever needs
-    *this* week's rankings, already sitting at the file's current HEAD)
-    threaded through `buildInput.ts`/`scoreExtended.ts` into all three
-    live routes.
+17. **Live-tool wiring for `EXPERT_CONSENSUS_BLEND_WEIGHT` — resolved,
+    see item 73.** `fantasypros/client.ts`'s current-snapshot fetch path
+    now exists and is threaded through `buildInput.ts`/`scoreExtended.ts`
+    into all three live routes, verified live end-to-end. No longer
+    open.
 18. **`volumeModifier`'s population-average conversion factor
-    (`POINTS_PER_VOLUME_UNIT.QB`) will systematically miscalibrate any
-    QB whose true season-long efficiency durably differs from the
-    population rate — item 72's root-cause finding for the residual
-    ~-3 point bias that persisted in Matthew Stafford's 2025 projections
-    even after fixing the two real bugs found alongside it.** Precisely
-    quantified, not speculative: Stafford's real 2025 conversion rate
-    was 0.587 PPR points/attempt (350.4 points ÷ 597 attempts, from
-    nflverse's own play-by-play) against the engine's population-wide
-    0.511 — a real, ~15% durable gap, not noise. This is the SAME
-    mechanism the whole volume signal was built and validated on (items
-    6-13: volume beats raw points as a *population-level* predictor,
-    since raw points carry touchdown-variance noise) — for an
-    individual player whose efficiency durably sits away from the
-    population average, exactly what a genuine breakout or decline
-    season looks like, the same mechanism necessarily miscalibrates
-    them. Deliberately NOT touched in item 72: `VOLUME_BLEND_WEIGHT=0.9`
-    is one of the most extensively cross-season-validated weights in
-    this entire engine (a genuine four-season plateau, item 43), and
-    this isn't a weight-tuning problem — a real fix needs a
-    structurally different mechanism (e.g. blending each player's own
-    trailing conversion rate alongside the population one, rather than
-    the population rate alone) that doesn't yet exist anywhere in this
-    codebase, and would need its own full backtest validation before
-    shipping — real risk it just re-introduces the touchdown-variance
-    noise the volume signal was originally built to filter out. Whether
-    this is worth pursuing, and at what scope, is an open design
-    question, not yet started.
+    (`POINTS_PER_VOLUME_UNIT.QB`) systematically miscalibrating durable
+    per-player outliers — investigated, see item 74. Not a clean fix.**
+    The proposed mechanism (blending each player's own season-to-date
+    trailing conversion rate into the volume-modifier's conversion
+    factor via empirical-Bayes shrinkage) DOES move the originally-
+    diagnosed case (Stafford) in the right direction — bias improves
+    from -4.00 to -3.31 at the most aggressive shrinkage tested — but
+    makes the WHOLE QB pool's calibration and pick accuracy
+    monotonically WORSE at every shrinkage strength tested (pool MAE
+    6.58→6.89, bias +0.98→+2.06, pick accuracy 61.8%→56.9% from
+    population-only to the most aggressive setting) — a clean rejection,
+    not an ambiguous tradeoff needing a user decision. Not shipped; no
+    `config.ts`/`engine.ts` change. **Left genuinely open for a future
+    attempt, if picked up again**: item 74's own best-guess explanation
+    is that a player's own points-per-attempt rate — even season-to-date
+    — still carries real touchdown-variance noise (the exact thing the
+    volume signal was built to filter out, items 6-13) and likely
+    double-counts rushing value for dual-threat QBs specifically, since
+    it's derived from TOTAL PPR points (passing + rushing) while
+    `qbRushModifier` already separately models rushing volume. A
+    follow-up attempt should probably start from a units-cleaner
+    efficiency proxy isolated from rushing and touchdown variance —
+    passing yards per attempt, or completion-percentage-above-
+    expectation-adjusted yardage — rather than total points per attempt,
+    before concluding the whole idea doesn't work. `cpoe` itself was
+    already tested standalone and rejected as a QB signal (item 16,
+    44.0%, worse than chance) but that tested it as a PICK-accuracy
+    signal directly, not as an input to a shrinkage-based volume-
+    modifier fix — a genuinely different use of the same underlying
+    stat, not yet tried.
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
@@ -5362,11 +5550,24 @@ fixed yet:
   names via the same `nflverse/playerMatch.ts` join every other external
   source here uses. Fetches weeks sequentially (not `Promise.all`) —
   same politeness-toward-a-many-request-source discipline as
-  `loadRunNflverseOnly.ts`'s own sequential staging (item 27). Used only
-  by `backtest/loadRunNflverseOnly.ts`, same scope as the nflverse-only
-  sources above — resolved onto the pipeline's synthetic PlayerIDs at
-  load time, backs the (deliberately unscoped across all four positions)
-  `pickByExpertConsensus` baseline.
+  `loadRunNflverseOnly.ts`'s own sequential staging (item 27). Used by
+  both backtest pipelines as of item 70 (`loadRunNflverseOnly.ts` and,
+  since item 70 needed a primary-pipeline check per item 53's
+  whole-score-signal precedent, `loadRun.ts` too) — resolved onto each
+  pipeline's own PlayerID space at load time, backs the (deliberately
+  unscoped across all four positions) `pickByExpertConsensus` baseline
+  and, in `loadRun.ts`'s case, feeds `finalScore` directly via
+  `EXPERT_CONSENSUS_BLEND_WEIGHT`. `client.ts`'s `fetchCurrentSnapshot()`
+  (item 73) is the live-mode counterpart to the historical
+  commit-mining path above — no commit lookup at all, just the file's
+  current branch HEAD (confirmed live: `master`, not `main`), cached 6h
+  rather than the historical path's 30-day pinned-commit cache, since
+  this content changes as new commits land. `weeklyConsensus.ts`'s
+  `getCurrentExpertConsensusByNormalizedName()` parses it the same way
+  as the per-week reader, minus the week dimension — this is what
+  `buildInput.ts` (live mode) reads, threaded through
+  `scoreExtended.ts` into all three live routes, the piece that was
+  missing from item 70's original ship (see CLAUDE.md item 73).
 - `src/lib/backtest/` — the backtesting feature: `loadRun.ts` (the only
   network I/O — fetches every needed week once per request, both
   player-level and team-level rows, plus the nflverse tables above; as

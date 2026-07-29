@@ -1,3 +1,4 @@
+import { getCurrentExpertConsensusByNormalizedName } from "@/lib/fantasypros/weeklyConsensus";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import {
   getGameWeatherByTeamWeek,
@@ -41,13 +42,15 @@ export async function GET(request: Request) {
   try {
     const context = await getSeasonContext();
 
-    const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt] = await Promise.all([
-      getPositionDefenseTable(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
-      getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
-      getRemainingOpponentsByTeam(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
-        () => new Map<string, RemainingGame[]>()
-      ),
-    ]);
+    const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt, expertConsensusByNormalizedName] =
+      await Promise.all([
+        getPositionDefenseTable(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
+        getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
+        getRemainingOpponentsByTeam(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
+          () => new Map<string, RemainingGame[]>()
+        ),
+        getCurrentExpertConsensusByNormalizedName().catch(() => new Map()),
+      ]);
 
     // Same season-rollforward fallback as /api/trade: try the current
     // season's remaining schedule first, roll forward to next season's
@@ -87,7 +90,8 @@ export async function GET(request: Request) {
           context,
           format,
           positionDefenseTable,
-          nflversePlayerWeekTable
+          nflversePlayerWeekTable,
+          expertConsensusByNormalizedName
         );
         return [position, details] as const;
       })
@@ -110,7 +114,8 @@ export async function GET(request: Request) {
       nflversePlayerWeekTable,
       remainingOpponentsByTeam,
       teamWeatherByTeamWeek,
-      impliedTotalsByTeamWeek
+      impliedTotalsByTeamWeek,
+      expertConsensusByNormalizedName
     );
 
     const candidatesByPosition = Object.fromEntries(

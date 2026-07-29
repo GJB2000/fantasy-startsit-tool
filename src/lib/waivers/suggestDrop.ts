@@ -1,3 +1,4 @@
+import type { ExpertConsensusEntry } from "@/lib/fantasypros/weeklyConsensus";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { projectExtendedRestOfSeason, scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
 import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
@@ -33,7 +34,8 @@ export async function suggestDrops(
   nflversePlayerWeekTable: NflversePlayerWeekTable,
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   teamWeatherByTeamWeek: Map<string, GameWeather>,
-  impliedTotalsByTeamWeek: Map<string, number>
+  impliedTotalsByTeamWeek: Map<string, number>,
+  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map()
 ): Promise<Map<number, DropSuggestion>> {
   const suggestions = new Map<number, DropSuggestion>();
   if (rosteredPlayerIds.length === 0 || candidates.length === 0) return suggestions;
@@ -48,7 +50,8 @@ export async function suggestDrops(
         nflversePlayerWeekTable,
         remainingOpponentsByTeam,
         teamWeatherByTeamWeek,
-        impliedTotalsByTeamWeek
+        impliedTotalsByTeamWeek,
+        expertConsensusByNormalizedName
       );
       const projection = projectExtendedRestOfSeason(
         breakdown,

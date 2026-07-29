@@ -9,6 +9,7 @@ import {
   averageSuccessRate,
   averageTargetShare,
 } from "@/lib/nflverse/aggregate";
+import type { ExpertConsensusEntry } from "@/lib/fantasypros/weeklyConsensus";
 import { getByeWeekForTeam } from "@/lib/sportsdata/byes";
 import { getActivePlayerById, getAllPlayers, getAnyPlayerById } from "@/lib/sportsdata/players";
 import { getMatchupContext, type PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
@@ -31,7 +32,8 @@ export async function buildComparisonInput(
   nflversePlayerWeekTable: NflversePlayerWeekTable,
   remainingOpponentsByTeam: Map<string, RemainingGame[]> = new Map(),
   teamWeatherByTeamWeek: Map<string, GameWeather> = new Map(),
-  priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map()
+  priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map(),
+  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map()
 ): Promise<PlayerComparisonInput> {
   const player = await getActivePlayerById(playerId).catch(() => null);
 
@@ -116,10 +118,18 @@ export async function buildComparisonInput(
     qbRushEpaPerPlay: averageQbRushEpa(recentNflverseStats, player.Position),
   };
 
+  const normalizedName = normalizePlayerName(`${player.FirstName} ${player.LastName}`);
+
   const priorSeasonPprAvg =
     recentGames.length === 0 && seasonStat == null
-      ? (priorSeasonPprAvgByNormalizedName.get(normalizePlayerName(`${player.FirstName} ${player.LastName}`)) ?? null)
+      ? (priorSeasonPprAvgByNormalizedName.get(normalizedName) ?? null)
       : null;
+
+  // Live counterpart to buildBacktestComparisonInput's per-week lookup —
+  // there's no week dimension here, just "what does the consensus say
+  // right now" (see fantasypros/weeklyConsensus.ts's
+  // getCurrentExpertConsensusByNormalizedName).
+  const expertConsensusR2pPts = expertConsensusByNormalizedName.get(normalizedName)?.r2pPts ?? null;
 
   return {
     requestedPlayerId: playerId,
@@ -128,11 +138,7 @@ export async function buildComparisonInput(
     seasonStat,
     recentGames,
     priorSeasonPprAvg,
-    // No live "current snapshot" fetch path exists yet (see CLAUDE.md item
-    // 69's Open Items) — always null in live mode, same as
-    // nextOpponent/nextGameWeather being backtest-null in the reverse
-    // direction. buildBacktestComparisonInput is the only populated path.
-    expertConsensusR2pPts: null,
+    expertConsensusR2pPts,
     byeWeek,
     isOnByeThisWeek,
     matchupContext,

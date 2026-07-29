@@ -1,6 +1,6 @@
 import { getWeekStartDates } from "@/lib/nflverse/schedules";
 import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
-import { fetchCommitHistory, fetchSnapshotAtCommit, type CommitInfo } from "./client";
+import { fetchCommitHistory, fetchCurrentSnapshot, fetchSnapshotAtCommit, type CommitInfo } from "./client";
 
 const PAGE_TO_POSITION: Record<string, string> = {
   qb: "QB",
@@ -100,6 +100,50 @@ export async function getExpertConsensusByNormalizedNameWeek(
       }
       byWeek.set(week, { rank, r2pPts: r2pPts != null && Number.isFinite(r2pPts) ? r2pPts : null });
     }
+  }
+
+  return result;
+}
+
+/**
+ * FantasyPros' CURRENT weekly positional consensus rankings — the live-
+ * mode counterpart to getExpertConsensusByNormalizedNameWeek above. Live
+ * mode only ever needs "what does the consensus say right now," so this
+ * skips the whole git-history-mining dance entirely and just reads the
+ * file's current branch HEAD (fetchCurrentSnapshot) — no commit lookup,
+ * no per-week loop, no `season`/`maxWeek` needed. See CLAUDE.md's
+ * live-tool-wiring item for why this was previously missing: every other
+ * piece of this signal (the standalone baseline, the finalScore blend)
+ * shipped backtest-only, since only the historical path existed until
+ * now.
+ *
+ * Returns `normalizedName -> {rank, r2pPts}`, same join key
+ * getExpertConsensusByNormalizedNameWeek uses, just without the week
+ * dimension. Degrades to an empty map on any fetch failure — same
+ * fail-open discipline as every other optional external signal here.
+ */
+export async function getCurrentExpertConsensusByNormalizedName(): Promise<Map<string, ExpertConsensusEntry>> {
+  const result = new Map<string, ExpertConsensusEntry>();
+
+  let rows: Record<string, string>[];
+  try {
+    rows = await fetchCurrentSnapshot();
+  } catch {
+    return result;
+  }
+
+  for (const row of rows) {
+    const position = PAGE_TO_POSITION[row.page];
+    if (!position) continue;
+
+    const rank = Number(row.rank);
+    if (!Number.isFinite(rank)) continue;
+
+    const r2pRaw = row.r2p_pts;
+    const r2pPts = r2pRaw && r2pRaw !== "NA" ? Number(r2pRaw) : null;
+
+    const normalizedName = normalizePlayerName(row.player_name);
+    result.set(normalizedName, { rank, r2pPts: r2pPts != null && Number.isFinite(r2pPts) ? r2pPts : null });
   }
 
   return result;

@@ -67,13 +67,15 @@ export interface PlayerComparisonInput {
   /**
    * FantasyPros' weekly consensus rank-to-points estimate for this
    * player/week, when available — see fantasypros/weeklyConsensus.ts.
-   * Backtest-only for now (nflverse-only pipeline; see
-   * loadRunNflverseOnly.ts) — always null in live mode, since the live
-   * "current snapshot" fetch path hasn't been built yet (see CLAUDE.md
-   * item 69's Open Items). A standalone baseline built on the same
-   * signal (`pickByExpertConsensus`, baselines.ts) validated
-   * exceptionally strong (57-60% pooled pick accuracy across all four
-   * skill positions) before this field was added — see item 69/70.
+   * Populated in backtest mode from a pinned historical git commit (the
+   * nflverse-only pipeline; see loadRunNflverseOnly.ts) and in live mode
+   * from the file's current branch HEAD (buildInput.ts, via
+   * getCurrentExpertConsensusByNormalizedName — no week dimension needed
+   * there, just "what does the consensus say right now"). A standalone
+   * baseline built on the same signal (`pickByExpertConsensus`,
+   * baselines.ts) validated exceptionally strong (57-60% pooled pick
+   * accuracy across all four skill positions) before this field was
+   * added — see item 69/70.
    */
   expertConsensusR2pPts: number | null;
   byeWeek: number | null;

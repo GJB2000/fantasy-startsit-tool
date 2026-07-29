@@ -634,9 +634,9 @@ export const ENSEMBLE_VOLUME_BLEND_RATIO: Record<ScoringFormat, Record<SkillPosi
  * rejected one — see CLAUDE.md item 70's Open Items if this gets
  * revisited with more data.
  *
- * `input.expertConsensusR2pPts` is only ever non-null in backtest mode
- * right now — no live "current snapshot" fetch path exists yet (see
- * Open Items), so this is a structural no-op for the live tool
- * regardless of this value until that's built.
+ * `input.expertConsensusR2pPts` is now populated in live mode too (see
+ * CLAUDE.md's live-tool-wiring item) — this weight has a real effect on
+ * the deployed Start/Sit, Trade Analyzer, and Waivers tools, not just
+ * backtest-mode validation.
  */
 export const EXPERT_CONSENSUS_BLEND_WEIGHT = 0.5;
