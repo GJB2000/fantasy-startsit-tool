@@ -10,9 +10,13 @@ import { sliceWeekData } from "./weekData";
 export interface PlayerWeekProjection {
   week: number;
   predicted: number | null;
+  /** FantasyPros' own weekly consensus point estimate (r2p_pts) for this player/week, shown alongside our own for direct comparison — see fantasypros/weeklyConsensus.ts. Own coverage: not every player has an entry every week. */
+  fantasyProsProjection: number | null;
   actual: number | null;
   /** predicted - actual; null whenever either side is unavailable (no score yet, bye, didn't play). */
   diff: number | null;
+  /** fantasyProsProjection - actual, same shape as diff above but for FantasyPros' own estimate — lets the two be compared directly, week by week. */
+  fantasyProsDiff: number | null;
   played: boolean;
 }
 
@@ -29,7 +33,15 @@ export interface PlayerProjectionDetail {
 /**
  * Week-by-week projected-vs-actual detail for specific, user-searched
  * players — the individual-player counterpart to
- * runProjectionBacktest.ts's pooled position-level aggregate.
+ * runProjectionBacktest.ts's pooled position-level aggregate. Each week
+ * also carries FantasyPros' own consensus estimate (fantasyProsProjection)
+ * alongside our engine's, read straight off the already-loaded
+ * weekSlice.expertConsensusByPlayerIdWeek — no new fetch, just surfacing
+ * data this function already had in scope. fantasyProsDiff mirrors diff's
+ * shape for that same estimate. Both stay out of the `summary` field's
+ * MAE/RMSE/bias math (that's still engine-vs-actual only, unchanged) —
+ * these are side-by-side display columns, not a second graded series
+ * (the UI sums them directly instead for a per-player total).
  * Deliberately NOT restricted to that function's "realistic startable
  * pool" (BROAD_MODE_POOL_SIZE): a user searching for one player wants
  * that exact player's history, whether or not they'd have ranked
@@ -100,6 +112,7 @@ export async function runPlayerProjectionLookup(
       // any MAE/RMSE/bias number — those already require both predicted
       // AND actual to be non-null, and actual was already null here.
       const predicted = weekRow ? breakdown.finalScore : null;
+      const fantasyProsProjection = weekSlice.expertConsensusByPlayerIdWeek.get(playerId)?.get(week)?.r2pPts ?? null;
 
       metaByPlayer.set(playerId, {
         displayName: breakdown.displayName,
@@ -110,8 +123,10 @@ export async function runPlayerProjectionLookup(
       weeksByPlayer.get(playerId)!.push({
         week,
         predicted,
+        fantasyProsProjection,
         actual,
         diff: predicted != null && actual != null ? predicted - actual : null,
+        fantasyProsDiff: fantasyProsProjection != null && actual != null ? fantasyProsProjection - actual : null,
         played: weekRow != null,
       });
     }

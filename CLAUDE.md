@@ -4845,6 +4845,52 @@ single-season numbers for those specific constants.
       quantified answer (not a "still not started" placeholder) — see
       the Open Items entry below for what's left if this gets revisited.
 
+75. **Promoted the FantasyPros-vs-engine per-week comparison (used ad hoc
+    for items 72/74 and again for three user-requested spot-checks —
+    Stafford, George Pickens, Bijan Robinson) into a permanent feature,
+    rather than rebuilding a one-off diagnostic route every time a
+    specific player's numbers were wanted.** The data was already fully
+    in scope — `playerProjectionLookup.ts`'s per-player week-by-week
+    lookup already reads `weekSlice.expertConsensusByPlayerIdWeek` for
+    its own purposes elsewhere in the file — it just wasn't surfaced on
+    the `PlayerWeekProjection` shape itself.
+    - **New `fantasyProsProjection: number | null` field** on
+      `PlayerWeekProjection`, populated the same way the temporary
+      diagnostic scripts did (`weekSlice.expertConsensusByPlayerIdWeek
+      .get(playerId)?.get(week)?.r2pPts`) — no new fetch, same
+      already-loaded data, just returned instead of discarded. Kept
+      deliberately out of the `diff`/summary math (that stays
+      engine-vs-actual only, unchanged) — this is a side-by-side display
+      column, not a second graded series (that's what the separate
+      `expertConsensusOverall`/`expertConsensusByPosition` pooled series
+      from item 71 already does, at the position level).
+    - **`ProjectionPlayerDetail.tsx`'s table gained a "Projected
+      (FantasyPros)" column** next to the existing "Projected (engine)"
+      one (renamed from plain "Projected" for clarity now that there are
+      two). No new fetch, no new route — the existing
+      `/api/backtest/projection?ids=...` response already carried this
+      data through `playerDetail` once the field was added upstream.
+    - **Verified live end-to-end through the real UI**, not just the
+      API response: ran Matthew Stafford through the actual `/backtest`
+      page (Projection accuracy mode, player search, all four position
+      checkboxes unchecked for a player-only lookup) and confirmed the
+      rendered table matches the manually-pulled numbers from the
+      diagnostic-script era exactly (e.g. week 4: engine 14.9,
+      FantasyPros 17.2, actual 27.4). Zero console errors.
+    - **Follow-up, same item**: added a `fantasyProsDiff` column (same
+      `fantasyProsProjection - actual` shape as the existing engine
+      `diff`) and a totals row summing every numeric column
+      (`sumColumn` in `ProjectionPlayerDetail.tsx`, skipping weeks with
+      no value for that column — bye weeks don't get treated as zero).
+      Labeled the two diff columns "Diff (engine)"/"Diff (FantasyPros)"
+      once there were two, rather than a bare "Diff." Re-verified live
+      against Stafford: total row reads engine 278.3 / FantasyPros
+      314.3 / actual 350.4 / engine diff -72.1 / FantasyPros diff -36.1
+      — a concrete, season-long confirmation of the same finding items
+      72/74 already quantified per-week (FantasyPros under-projects
+      Stafford by about half as much as the blended engine does, summed
+      across the whole season). Zero console errors.
+
 ### Open items (as of item 65 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
