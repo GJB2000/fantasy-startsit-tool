@@ -290,8 +290,15 @@ function computeLegitScores(
  * calls before returning anything, and a real user only looks at one
  * position tab at a time anyway. Bounding cost to one position also
  * keeps this in line with every other live route's maxDuration budget.
+ *
+ * Returns the FULL ranked list, unbounded by RANKING_LIMIT — that cap is
+ * a display concern for the single-position tabs (applied by
+ * getLegitRankingsForPosition below), not something the cached
+ * computation itself should bake in, since the "Top 100" view needs the
+ * full pool from every position to pick its own top 100 across all of
+ * them, not just whatever a single position's own display cap left over.
  */
-export async function getLegitRankingsForPosition(
+async function getFullLegitRankingsForPosition(
   position: ExtendedPosition,
   context: SeasonContext,
   format: ScoringFormat,
@@ -300,7 +307,7 @@ export async function getLegitRankingsForPosition(
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   teamWeatherByTeamWeek: Map<string, GameWeather>,
   impliedTotalsByTeamWeek: Map<string, number>,
-  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map()
+  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry>
 ): Promise<LegitRankingEntry[]> {
   const cacheKey = `${position}:${context.lastCompletedSeason}:${context.lastCompletedWeek}:${format}`;
   const cached = cache.get(cacheKey);
@@ -328,28 +335,61 @@ export async function getLegitRankingsForPosition(
   );
 
   const ranked = computeLegitScores(breakdowns, fpByKey, position);
-  const limit = RANKING_LIMIT[position];
-  const shown = limit != null ? ranked.slice(0, limit) : ranked;
-  cache.set(cacheKey, { data: shown, expiresAt: Date.now() + CACHE_TTL_MS });
-  return shown;
+  cache.set(cacheKey, { data: ranked, expiresAt: Date.now() + CACHE_TTL_MS });
+  return ranked;
 }
 
+/** The single-position tab's own view: getFullLegitRankingsForPosition, trimmed to RANKING_LIMIT. */
+export async function getLegitRankingsForPosition(
+  position: ExtendedPosition,
+  context: SeasonContext,
+  format: ScoringFormat,
+  positionDefenseTable: PositionDefenseTable,
+  nflversePlayerWeekTable: NflversePlayerWeekTable,
+  remainingOpponentsByTeam: Map<string, RemainingGame[]>,
+  teamWeatherByTeamWeek: Map<string, GameWeather>,
+  impliedTotalsByTeamWeek: Map<string, number>,
+  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map()
+): Promise<LegitRankingEntry[]> {
+  const ranked = await getFullLegitRankingsForPosition(
+    position,
+    context,
+    format,
+    positionDefenseTable,
+    nflversePlayerWeekTable,
+    remainingOpponentsByTeam,
+    teamWeatherByTeamWeek,
+    impliedTotalsByTeamWeek,
+    expertConsensusByNormalizedName
+  );
+  const limit = RANKING_LIMIT[position];
+  return limit != null ? ranked.slice(0, limit) : ranked;
+}
+
+/** The combined "Top 100" view shows regardless of the four positions' own individual display caps. */
+const TOP_100_LIMIT = 100;
+
 /**
- * The "Overall" view: every position's already-computed (and already
- * per-position-capped) list, merged and re-sorted by legitScore — no new
- * scoring pass, just a re-combination of getLegitRankingsForPosition's
- * own cached output for each of the four rankable positions. Sorting
- * across positions by legitScore (not raw finalScore) is what makes this
- * a fair combination at all: legitScore is already normalized 1-100
- * within each position's own pool, so a QB's 90 and a WR's 90 both mean
- * "about as good as it gets at that position this week" — raw
- * finalScore wouldn't be comparable across positions the same way
- * (QBs/RBs naturally score higher point totals than TEs regardless of
- * relative quality). `positionRank` is reassigned to this combined
- * list's own 1..N order (overwriting each entry's original per-position
- * rank) — the number shown in the UI's leading column, so it should mean
- * "rank in the list you're looking at" for both views, not silently
- * switch meaning between them.
+ * The "Top 100" view: every position's FULL (uncapped) ranked list,
+ * merged and re-sorted by legitScore, then trimmed to the 100 best
+ * players regardless of position — no new scoring pass, just a
+ * re-combination of getFullLegitRankingsForPosition's own cached output
+ * for each of the four rankable positions. Deliberately reads the
+ * uncapped list, not getLegitRankingsForPosition's own tab-display-
+ * capped one (QB10/RB20/WR25/TE10, ~65 total) — those caps exist so a
+ * single position's tab doesn't run all the way to replacement-level
+ * noise, not because there are only 65 players worth ever showing across
+ * all positions combined. Sorting across positions by legitScore (not
+ * raw finalScore) is what makes this a fair combination at all:
+ * legitScore is already normalized 1-100 within each position's own
+ * pool, so a QB's 90 and a WR's 90 both mean "about as good as it gets
+ * at that position this week" — raw finalScore wouldn't be comparable
+ * across positions the same way (QBs/RBs naturally score higher point
+ * totals than TEs regardless of relative quality). `positionRank` is
+ * reassigned to this combined list's own 1..100 order (overwriting each
+ * entry's original per-position rank) — the number shown in the UI's
+ * leading column, so it should mean "rank in the list you're looking
+ * at" for both views, not silently switch meaning between them.
  */
 export async function getLegitRankingsOverall(
   context: SeasonContext,
@@ -363,7 +403,7 @@ export async function getLegitRankingsOverall(
 ): Promise<LegitRankingEntry[]> {
   const perPosition = await Promise.all(
     RANKABLE_POSITIONS.map((position) =>
-      getLegitRankingsForPosition(
+      getFullLegitRankingsForPosition(
         position,
         context,
         format,
@@ -377,6 +417,9 @@ export async function getLegitRankingsOverall(
     )
   );
 
-  const merged = perPosition.flat().sort((a, b) => b.legitScore - a.legitScore);
+  const merged = perPosition
+    .flat()
+    .sort((a, b) => b.legitScore - a.legitScore)
+    .slice(0, TOP_100_LIMIT);
   return merged.map((entry, i) => ({ ...entry, positionRank: i + 1 }));
 }

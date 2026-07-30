@@ -12,16 +12,18 @@ interface RankingsResponse {
 
 // The four rankable positions (D/ST and K were dropped — their "this
 // week vs. season rank" streaming shape never fit this tool's "who's
-// actually good" framing) plus a combined "Overall" view — see
+// actually good" framing) plus a combined "Top 100" view — see
 // buildRankings.ts's getLegitRankingsOverall for how that one's built
-// (a merge of the four position lists by their already-normalized
-// legitScore, not a new scoring pass). "OVERALL" isn't a real
+// (a merge of the four position lists' UNCAPPED rankings by their
+// already-normalized legitScore, not a new scoring pass, then trimmed
+// to the top 100 regardless of position). "OVERALL" isn't a real
 // ExtendedPosition, so this tab list is its own type, not a reuse of
-// the shared position constants.
+// the shared position constants — kept as the internal tab/query-param
+// value even though the user-facing label is "Top 100".
 type RankingsTab = "OVERALL" | "QB" | "RB" | "WR" | "TE";
 
 const TAB_LABEL: Record<RankingsTab, string> = {
-  OVERALL: "Overall",
+  OVERALL: "Top 100",
   QB: "QB",
   RB: "RB",
   WR: "WR",
