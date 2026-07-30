@@ -54,13 +54,43 @@ const MATCHUP_TONE_CLASSES: Record<"good" | "bad" | "neutral", string> = {
   neutral: "bg-foreground/8 text-foreground/55",
 };
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+function clamp01(n: number) {
+  return Math.max(0, Math.min(1, n));
+}
+
+function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-foreground/35" fill="none">
+      <path
+        d="M12 3l7 3v5c0 4.2-2.9 7.5-7 8.5-4.1-1-7-4.3-7-8.5V6l7-3z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-foreground/35" fill="none">
+      <rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CloudIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-foreground/35" fill="none">
+      <path
+        d="M7 18h9a3.5 3.5 0 00.4-6.98A5 5 0 007 9.5 3.75 3.75 0 007 18z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 type Tone = "good" | "caution" | "info";
@@ -227,17 +257,21 @@ function ChevronIcon({ open }: { open: boolean }) {
 }
 
 /**
- * The real range this player has actually produced recently (min/max of
+ * A player's real recent floor-to-ceiling range (min/max of
  * recentPprFloor/Ceiling — real box-score numbers, not a statistical
- * projection interval; see PlayerScoreBreakdown's doc comment). The
- * recent AVERAGE always falls between floor and ceiling by construction
- * (it's the mean of the same values), so the marker never needs
- * clamping. A single-game sample renders floor===ceiling as one point,
- * labeled honestly rather than drawing a fake range.
+ * projection interval; see PlayerScoreBreakdown's doc comment) shown as a
+ * shaded band, with a marker at our actual projection (finalScore) so you
+ * can see exactly where the projection sits relative to what they've
+ * recently produced. The scale spans 0..max but is EXTENDED to include the
+ * projection itself, so if the engine projects a player above their recent
+ * ceiling (real — finalScore layers matchup/volume/consensus modifiers on
+ * top of recent scoring), the marker sits truthfully to the right of the
+ * band rather than being clipped or hidden. A single-game sample
+ * (floor===ceiling) is labeled honestly rather than drawing a fake range.
  */
 function FloorCeilingBar({ player }: { player: PlayerScoreBreakdown }) {
-  const { recentPprFloor: floor, recentPprCeiling: ceiling, recentPprAvg: avg } = player;
-  if (floor == null || ceiling == null || avg == null) return null;
+  const { recentPprFloor: floor, recentPprCeiling: ceiling, finalScore: proj } = player;
+  if (floor == null || ceiling == null) return null;
 
   if (floor === ceiling) {
     return (
@@ -247,29 +281,31 @@ function FloorCeilingBar({ player }: { player: PlayerScoreBreakdown }) {
     );
   }
 
-  // Anchored to 0, not just floor->ceiling, so a real negative game
-  // (possible for D/ST, whose FantasyPoints can go negative) doesn't
-  // produce a negative `left` percentage — that would visually clip to
-  // a full-width bar rather than an honest partial range.
-  const scaleMin = Math.min(floor, 0);
-  const scaleMax = Math.max(ceiling, 1) * 1.05;
+  // Anchored to include 0 and the projection, so a real negative game
+  // (possible for D/ST, whose FantasyPoints can go negative) or a
+  // projection above the recent ceiling both stay on the bar honestly
+  // rather than clipping to a full-width fill.
+  const scaleMin = Math.min(floor, proj ?? floor, 0);
+  const scaleMax = Math.max(ceiling, proj ?? ceiling, 1) * 1.05;
   const scaleRange = scaleMax - scaleMin || 1;
   const toPct = (v: number) => ((v - scaleMin) / scaleRange) * 100;
   const floorPct = toPct(floor);
   const ceilingPct = toPct(ceiling);
-  const avgPct = toPct(avg);
 
   return (
     <div className="mt-2">
       <div className="relative h-1.5 w-full rounded-full bg-foreground/10">
         <div
-          className="absolute h-full rounded-full bg-accent/30"
+          className="absolute h-full rounded-full bg-accent/25"
           style={{ left: `${floorPct}%`, width: `${ceilingPct - floorPct}%` }}
         />
-        <div
-          className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-accent bg-surface"
-          style={{ left: `${avgPct}%` }}
-        />
+        {proj != null && (
+          <div
+            className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-accent bg-surface"
+            style={{ left: `${toPct(proj)}%` }}
+            title={`Projection ${proj.toFixed(1)}`}
+          />
+        )}
       </div>
       <div className="mt-1 flex justify-between text-[10.5px] text-foreground/40">
         <span>Floor {floor.toFixed(1)}</span>
@@ -279,61 +315,203 @@ function FloorCeilingBar({ player }: { player: PlayerScoreBreakdown }) {
   );
 }
 
+// Per-position opportunity/volume stat: RB touches, WR/TE targets, all
+// from recentVolumeAvg (the real volume signal). QB uses rush attempts
+// (recentQbRushAttemptsAvg) — the fantasy-relevant QB opportunity signal,
+// per the layout spec — not pass attempts.
 const VOLUME_UNIT_LABEL: Record<string, string> = {
-  QB: "Pass attempts/gm",
   RB: "Touches/gm",
   WR: "Targets/gm",
   TE: "Targets/gm",
 };
 
-interface StatTile {
+// Reference maxima for the small magnitude bars under each stat — a fixed
+// visual scale (like the confidence bar's 0-100), NOT fabricated player
+// data: the displayed number is always the player's real value; the bar
+// just fills proportionally toward a "strong" level for that stat.
+const RECENT_PPR_BAR_MAX = 25;
+const VOLUME_BAR_MAX: Record<string, number> = { QB: 12, RB: 25, WR: 12, TE: 12 };
+const DROP_RATE_BAR_MAX = 0.15;
+const RZ_TOUCH_BAR_MAX: Record<string, number> = { RB: 6, QB: 3 };
+
+interface StatSlot {
   label: string;
-  value: string;
+  /** Real, formatted value — or null, which renders as "—" (never a fabricated placeholder). */
+  value: string | null;
+  /** 0-1 magnitude bar fill, or null to omit the bar (when there's no real value). */
+  fill: number | null;
 }
 
-/** Position-specific real signals, already computed on the breakdown — no new data, just picking which fields matter per position for a compact grid instead of one long list. */
-function buildStatTiles(player: PlayerScoreBreakdown, formatLabel: string): StatTile[] {
-  const tiles: StatTile[] = [];
+/** Slot 4: the position's real secondary signal — red-zone touches (RB), red-zone rushes (QB), drop rate (WR/TE). Never forces a stat a position doesn't have. */
+function buildRzDropSlot(player: PlayerScoreBreakdown): StatSlot {
+  const pos = player.position;
+  if (pos === "RB" && player.redZoneTouchesAvg != null) {
+    return {
+      label: "Red-zone touches/gm",
+      value: player.redZoneTouchesAvg.toFixed(1),
+      fill: clamp01(player.redZoneTouchesAvg / RZ_TOUCH_BAR_MAX.RB),
+    };
+  }
+  if (pos === "QB" && player.redZoneTouchesAvg != null) {
+    return {
+      label: "Red-zone rushes/gm",
+      value: player.redZoneTouchesAvg.toFixed(1),
+      fill: clamp01(player.redZoneTouchesAvg / RZ_TOUCH_BAR_MAX.QB),
+    };
+  }
+  if ((pos === "WR" || pos === "TE") && player.dropRateAvg != null) {
+    return {
+      label: "Drop rate",
+      value: `${(player.dropRateAvg * 100).toFixed(0)}%`,
+      fill: clamp01(player.dropRateAvg / DROP_RATE_BAR_MAX),
+    };
+  }
+  const label = pos === "WR" || pos === "TE" ? "Drop rate" : "Red-zone touches/gm";
+  return { label, value: null, fill: null };
+}
 
-  if (player.recentPprAvg != null) {
-    tiles.push({ label: `Recent avg (${formatLabel})`, value: player.recentPprAvg.toFixed(1) });
-  }
-  if (player.seasonPprAvg != null) {
-    tiles.push({ label: `Season avg (${formatLabel})`, value: player.seasonPprAvg.toFixed(1) });
-  }
-  if (player.position && player.recentVolumeAvg != null) {
-    tiles.push({
-      label: VOLUME_UNIT_LABEL[player.position] ?? "Volume/gm",
+/**
+ * The fixed 2x2 stat grid, real fields only. Any slot without real data
+ * for the given position renders "—" rather than a fabricated number
+ * (e.g. QB has no drop rate; D/ST and K have no volume/snap/red-zone
+ * signals at all). Numbers are all real breakdown fields already computed
+ * by the engine — this just selects the four per-position slots and adds a
+ * magnitude bar.
+ */
+function buildStatSlots(player: PlayerScoreBreakdown, formatLabel: string): StatSlot[] {
+  const pos = player.position;
+
+  // Slot 1 — recent avg (PPR).
+  const recentAvg: StatSlot =
+    player.recentPprAvg != null
+      ? {
+          label: `Recent avg (${formatLabel})`,
+          value: player.recentPprAvg.toFixed(1),
+          fill: clamp01(player.recentPprAvg / RECENT_PPR_BAR_MAX),
+        }
+      : { label: `Recent avg (${formatLabel})`, value: null, fill: null };
+
+  // Slot 2 — position-specific opportunity/volume.
+  let opportunity: StatSlot;
+  if (pos === "QB") {
+    opportunity =
+      player.recentQbRushAttemptsAvg != null
+        ? {
+            label: "Rush attempts/gm",
+            value: player.recentQbRushAttemptsAvg.toFixed(1),
+            fill: clamp01(player.recentQbRushAttemptsAvg / VOLUME_BAR_MAX.QB),
+          }
+        : { label: "Rush attempts/gm", value: null, fill: null };
+  } else if (pos && VOLUME_UNIT_LABEL[pos] && player.recentVolumeAvg != null) {
+    opportunity = {
+      label: VOLUME_UNIT_LABEL[pos],
       value: player.recentVolumeAvg.toFixed(1),
-    });
-  }
-  if (player.position === "RB" && player.redZoneTouchesAvg != null) {
-    tiles.push({ label: "Red-zone touches/gm", value: player.redZoneTouchesAvg.toFixed(1) });
-  }
-  if (player.position === "TE" && player.snapShareAvg != null) {
-    tiles.push({ label: "Snap share", value: `${(player.snapShareAvg * 100).toFixed(0)}%` });
-  }
-  if (player.position === "WR" && player.dropRateAvg != null) {
-    tiles.push({ label: "Drop rate", value: `${(player.dropRateAvg * 100).toFixed(0)}%` });
-  }
-  if (player.position === "QB" && player.recentQbRushAttemptsAvg != null) {
-    tiles.push({ label: "Rush attempts/gm", value: player.recentQbRushAttemptsAvg.toFixed(1) });
+      fill: clamp01(player.recentVolumeAvg / (VOLUME_BAR_MAX[pos] ?? 20)),
+    };
+  } else {
+    opportunity = { label: (pos && VOLUME_UNIT_LABEL[pos]) || "Opportunity", value: null, fill: null };
   }
 
-  return tiles.slice(0, 4);
+  // Slot 3 — snap share (real wherever nflverse snap data exists).
+  const snapShare: StatSlot =
+    player.snapShareAvg != null
+      ? { label: "Snap share", value: `${(player.snapShareAvg * 100).toFixed(0)}%`, fill: clamp01(player.snapShareAvg) }
+      : { label: "Snap share", value: null, fill: null };
+
+  // Slot 4 — red-zone or drop rate, whichever is the position's real signal.
+  return [recentAvg, opportunity, snapShare, buildRzDropSlot(player)];
+}
+
+function StatTile({ slot }: { slot: StatSlot }) {
+  return (
+    <div className="rounded-2xl bg-foreground/[0.03] px-3 py-2.5">
+      <p className="text-[10.5px] text-foreground/45">{slot.label}</p>
+      <p className="mt-0.5 font-mono text-[15px] font-semibold tabular-nums">{slot.value ?? "—"}</p>
+      {slot.fill != null && (
+        <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-foreground/10">
+          <div className="h-full rounded-full bg-accent/60" style={{ width: `${slot.fill * 100}%` }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StartBenchPill({ isRecommended }: { isRecommended: boolean }) {
+  if (isRecommended) {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-good/12 px-2.5 py-1 text-[11px] font-semibold text-good">
+        <svg viewBox="0 0 24 24" className="h-2.5 w-2.5" fill="none">
+          <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        Start
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full bg-foreground/8 px-2.5 py-1 text-[11px] font-semibold text-foreground/55">
+      Bench lean
+    </span>
+  );
+}
+
+/**
+ * Item 2 — the opponent + defensive-rank line. Colored by MATCHUP
+ * FAVORABILITY (diffFromAverage, via matchupLabel): favorable = green,
+ * tough = red. NOTE the rank number direction is the opposite of what it
+ * might read like: our rank sorts descending by points allowed, so #1 =
+ * the defense that allows the MOST (weakest, most favorable) and #32 =
+ * the stingiest. The "favorable/tough/average" word is kept alongside the
+ * number so the color and the rank stay unambiguous together.
+ */
+function OpponentLine({ player }: { player: PlayerScoreBreakdown }) {
+  const m = player.matchupContext;
+  if (!m) return null;
+  const { tone, text } = matchupLabel(m.diffFromAverage);
+  return (
+    <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-foreground/[0.03] px-3 py-2">
+      <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] text-foreground/60">
+        <ShieldIcon />
+        <span className="truncate">
+          {player.team ?? "—"} vs {m.opponentTeam}
+        </span>
+      </span>
+      <span
+        className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold ${MATCHUP_TONE_CLASSES[tone]}`}
+      >
+        <span className="font-mono">
+          #{m.rank} of {m.teamCount}
+        </span>{" "}
+        · {text}
+      </span>
+    </div>
+  );
+}
+
+function ContextRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="flex shrink-0 items-center gap-1.5 pt-0.5 text-[12px] text-foreground/50">
+        {icon}
+        {label}
+      </span>
+      <span className="pt-0.5 text-right font-mono text-[12px] font-semibold text-foreground/80">{value}</span>
+    </div>
+  );
 }
 
 function PlayerCard({
   player,
+  rank,
   isRecommended,
   formatLabel,
 }: {
   player: PlayerScoreBreakdown;
+  rank: number;
   isRecommended: boolean;
   formatLabel: string;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const statTiles = buildStatTiles(player, formatLabel);
+  const statSlots = buildStatSlots(player, formatLabel);
 
   return (
     <div
@@ -341,9 +519,10 @@ function PlayerCard({
         isRecommended ? "border-good/40 bg-good/[0.04]" : "border-foreground/10 bg-surface"
       }`}
     >
+      {/* 1 — header: rank circle, name, Start/Bench pill */}
       <div className="flex items-center gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent/12 text-sm font-bold text-accent">
-          {initials(player.displayName)}
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/12 font-mono text-sm font-bold tabular-nums text-accent">
+          {rank}
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="truncate font-semibold tracking-tight">{player.displayName}</h3>
@@ -354,14 +533,7 @@ function PlayerCard({
             </p>
           )}
         </div>
-        {isRecommended && (
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-good/12 px-2.5 py-1 text-[11px] font-semibold text-good">
-            <svg viewBox="0 0 24 24" className="h-2.5 w-2.5" fill="none">
-              <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Start
-          </span>
-        )}
+        <StartBenchPill isRecommended={isRecommended} />
       </div>
 
       {(player.isOnByeThisWeek || player.injuryStatus || player.dataQuality !== "full") && (
@@ -382,58 +554,34 @@ function PlayerCard({
         </div>
       )}
 
+      {/* 2 — opponent + defensive-rank line */}
+      <OpponentLine player={player} />
+
+      {/* 3 — big projection + real floor→ceiling range with projection marker */}
       <div className="mt-4 border-t border-foreground/[0.07] pt-4">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">
-          Our projection
-        </span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">Our projection</span>
         <p className="mt-0.5 font-mono text-[32px] font-bold leading-none tabular-nums">
           {player.finalScore != null ? player.finalScore.toFixed(1) : "—"}
         </p>
         <FloorCeilingBar player={player} />
       </div>
 
-      {statTiles.length > 0 && (
-        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-foreground/[0.07] pt-4">
-          {statTiles.map((tile) => (
-            <div key={tile.label} className="rounded-2xl bg-foreground/[0.03] px-3 py-2">
-              <p className="text-[10.5px] text-foreground/45">{tile.label}</p>
-              <p className="mt-0.5 font-mono text-[15px] font-semibold tabular-nums">{tile.value}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* 4 — 2x2 stat grid, real fields only, "—" where a position lacks one */}
+      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-foreground/[0.07] pt-4">
+        {statSlots.map((slot, i) => (
+          <StatTile key={`${slot.label}-${i}`} slot={slot} />
+        ))}
+      </div>
 
-      {(player.matchupContext || player.nextOpponent) && (
+      {/* 5 — context rows: next opponent + weather, with icons */}
+      {player.nextOpponent && (
         <div className="mt-4 flex flex-col gap-2 border-t border-foreground/[0.07] pt-4">
-          {player.matchupContext && (
-            <div className="flex items-start justify-between gap-3">
-              <span className="shrink-0 pt-0.5 text-[12px] text-foreground/50">
-                Last matchup ({player.matchupContext.opponentTeam})
-              </span>
-              <span
-                className={`shrink-0 font-mono whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold ${MATCHUP_TONE_CLASSES[matchupLabel(player.matchupContext.diffFromAverage).tone]}`}
-              >
-                #{player.matchupContext.rank} of {player.matchupContext.teamCount} ·{" "}
-                {matchupLabel(player.matchupContext.diffFromAverage).text}
-              </span>
-            </div>
-          )}
-          {player.nextOpponent && (
-            <div className="flex items-start justify-between gap-3">
-              <span className="shrink-0 pt-0.5 text-[12px] text-foreground/50">Next opponent</span>
-              <span className="pt-0.5 text-right font-mono text-[12px] font-semibold text-foreground/80">
-                {player.nextOpponent.team} · Wk {player.nextOpponent.week}
-              </span>
-            </div>
-          )}
-          {player.nextOpponent && (
-            <div className="flex items-start justify-between gap-3">
-              <span className="shrink-0 pt-0.5 text-[12px] text-foreground/50">Weather</span>
-              <span className="pt-0.5 text-right font-mono text-[12px] font-semibold text-foreground/80">
-                {formatWeather(player.nextGameWeather)}
-              </span>
-            </div>
-          )}
+          <ContextRow
+            icon={<CalendarIcon />}
+            label="Next opponent"
+            value={`${player.nextOpponent.team} · Wk ${player.nextOpponent.week}`}
+          />
+          <ContextRow icon={<CloudIcon />} label="Weather" value={formatWeather(player.nextGameWeather)} />
         </div>
       )}
 
@@ -521,6 +669,7 @@ export function ComparisonResult({ result, contextNote, scoringFormat }: Compari
           <PlayerCard
             key={player.playerId ?? `unresolved-${i}`}
             player={player}
+            rank={i + 1}
             isRecommended={player.playerId === result.recommendedPlayerId}
             formatLabel={formatLabel}
           />
