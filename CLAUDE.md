@@ -138,19 +138,54 @@ inventing new logic (item 77). A sixth live tool, **Legit Rankings**
 K deliberately excluded) ranked and scored 1-100, blending this app's
 own engine snapshot with a genuinely new data source, FantasyPros'
 season-long redraft consensus, plus a combined "Overall" cross-position
-view and a gold "elite" tier for 90+ scores (item 78). The Start/Sit
+view (renamed **Top 100** and widened to a real top 100 players
+regardless of position, item 84 — see below) and a gold "elite" tier for
+90+ scores (item 78). The Start/Sit
 result was then restructured (not re-scored) into a punchy verdict
 banner — big name, a confidence bar derived from this app's own
 already-validated historical accuracy-by-bucket numbers, and the full
 signal breakdown moved into a collapsed-by-default "Why this pick"
-section (item 79). Most recently, the whole app's visual identity was
+section (item 79). The whole app's visual identity was then
 replaced: a dark/emerald "data-grade" design system (near-black
 `#0B0E0C`, a merged emerald `--accent`/`--good`, a gold `--premium`
 token, Barlow Condensed headlines, JetBrains Mono on every number) now
 spans every page **including Backtest**, which had been deliberately
 excluded from both prior visual passes — see item 80 for the full
 token/typography system and the real calibration/normalization bugs
-items 78 surfaced along the way.
+items 78 surfaced along the way. The per-tool player-search box used by
+every live tool was then unified into one shared component,
+`PlayerMultiSelect.tsx` (replacing the old `PlayerSearchInput.tsx`,
+deleted) — chips above the input, a selected-count-vs-max counter, a
+disabled input with an explanatory placeholder at max, click-outside
+close, and refocus-reopen, the same interaction everywhere a player is
+picked (item 81). The Waiver Wire and Lineup Optimizer's "Your roster"
+panel gained a collapsible header (a shared `CollapsibleSection.tsx`,
+also reused by the new per-row collapse in the restyled Waiver Wire
+results — see below) and a click-again-to-confirm "Clear" action (a new
+`ConfirmButton.tsx`, deliberately not a native `window.confirm()`
+dialog, which would have broken out of the app's own styling) (item
+82). The Waiver Wire tool's results were then restyled from a two-column
+card grid into a compact, collapsible row-list matching Legit Rankings'
+own visual pattern, and gained a real quality/efficiency floor — a
+candidate's recent yards-per-unit efficiency now has to clear 75% of
+their position's real full-season baseline, closing a genuine false-
+positive where a badly-performing backup QB forced into volume (real
+box-score data, not a bug) still ranked as a top waiver target purely on
+"opportunity outpacing production" (item 83). Most recently, the
+Start/Sit page itself was substantially redesigned to match a
+teammate-shared reference: a sidebar layout, player cards always visible
+(not gated behind a global toggle) and ranked by the engine's own real
+score, a real floor-to-ceiling range per card (actual min/max of recent
+box-score output, not a fabricated projection interval — a new
+`recentPprFloor`/`recentPprCeiling` pair on `PlayerScoreBreakdown`), a
+position-specific stat grid, a per-card "Why this pick," four reference
+labels under the confidence bar, and — after a follow-up question about
+why every position showed the same 52% — a genuinely **position-aware**
+confidence percentage pulled from this app's own real per-position
+backtest history rather than one pooled cross-position number (items
+85-86). Matchup context, injury status, and next-opponent/weather were
+then moved out of the sidebar and into each player card directly, on
+request, closing out the redesign (item 87).
 Out of scope so far:
 database/persistence, auth. Upcoming-schedule/next-opponent
 lookup — previously fully out of scope — is now partially built (see
@@ -5264,7 +5299,302 @@ single-season numbers for those specific constants.
       new UI; zero console errors anywhere; `tsc`/lint clean; a full
       `next build` production build succeeds. Committed as `b60906c`.
 
-### Open items (as of item 80 — pick up here)
+81. **Unified the player-selection UI across every tool that picks
+    players into one shared component** — Start/Sit, Trade Analyzer
+    (×2, give/get), Waivers, Lineup, and Backtest (×2, Single pair and
+    the Projection-accuracy player lookup) each had their own hand-
+    rolled chip-list-plus-search markup, in three visibly different chip
+    styles (one literally duplicated verbatim between Waivers and
+    Lineup). Before building anything, surveyed and reported the full
+    scope back to the user — six call sites, one shared
+    `PlayerSearchInput.tsx` underneath all of them for the actual fetch/
+    dropdown logic, but zero shared chip/counter/max-handling behavior.
+    - **New `PlayerMultiSelect.tsx`** replaces all six sites: chips
+      render above the input (not below), the input clears and stays
+      focused after each pick, a `{selected}/{max}` counter renders next
+      to an optional label when `max` is set (omitted entirely for the
+      two genuinely unlimited tools, Waivers/Lineup's roster — no fake
+      "X/∞" implied limit), the input **disables** with an explanatory
+      placeholder at max rather than disappearing (the previous
+      behavior everywhere), a real `mousedown`-outside listener closes
+      the dropdown (replacing a `blur`+`setTimeout` proxy), and
+      refocusing the input reopens the cached dropdown if room remains.
+      An `extraExcludeIds` prop covers Trade Analyzer's cross-side
+      exclusion (a player already on "You give" can't also appear in
+      "You get" results).
+    - Chip style unified into one design (avatar initials, position
+      badge, name, team, remove ×) used everywhere, replacing the three
+      prior styles (Start/Sit and Trade Analyzer's avatar-card, Waivers/
+      Lineup's team-less pill, Backtest's plain unstyled row).
+    - **Verified live**, not just via `tsc`/lint: exercised every one of
+      the six sites end-to-end in the real browser (search → select →
+      chip appears → counter updates → max disables the input → click-
+      outside closes → refocus reopens with cached results), plus the
+      cross-side exclusion on Trade Analyzer specifically. Zero console
+      errors, light and dark mode both checked.
+    - `PlayerSearchInput.tsx` deleted outright once all six call sites
+      were migrated — confirmed via `tsc`/lint that nothing else
+      referenced it (two doc-comment mentions elsewhere in the codebase,
+      unrelated to this component, were updated to point at the new
+      name instead). Committed as `b04e9e0`.
+82. **Made the Waiver Wire/Lineup Optimizer "Your roster" panel
+    collapsible, with a click-again-to-confirm "Clear" action** — direct
+    follow-up requests after item 81 shipped: a real, Sleeper-synced
+    roster can run 30+ chips deep (confirmed live against the user's own
+    connected dynasty league), dominating the page every time either
+    tool loads.
+    - **New `CollapsibleSection.tsx`** — the same expand/collapse
+      pattern `ComparisonResult.tsx`'s "Why this pick" toggle already
+      used (item 79), factored out for reuse: a header row (arbitrary
+      `label` content plus an optional `action` slot rendered outside
+      the toggle button itself, so a second interactive control can sit
+      in the header without invalid nested-`<button>` HTML) and a
+      chevron that flips on toggle. `WaiverTool.tsx`/`LineupTool.tsx`
+      both wrap their `PlayerMultiSelect` roster block in one, labeled
+      `Your roster ({count})`, expanded by default.
+    - **New `ConfirmButton.tsx`** — a click-again-to-confirm button
+      (first click arms it: label swaps to a danger-styled
+      "Click to confirm" for 3 seconds; a second click within that
+      window fires the real action; clicking elsewhere or waiting it out
+      disarms it) used for the new "Clear" action. Deliberately NOT a
+      native `window.confirm()` dialog — tried that first, and it
+      visually breaks out of this app's entire custom dark/light design
+      system (unstyled OS chrome next to Barlow Condensed/JetBrains
+      Mono everywhere else), plus complicated live-browser verification
+      (native dialogs don't reliably respond to the same automated-click
+      tooling the rest of this app's verification uses). A new
+      `clearRostered()` was added to `useRosteredPlayers.ts` alongside
+      the existing `addRostered`/`removeRostered`.
+    - **Verified live against the user's real, live-connected Sleeper
+      account** — clicking Clear correctly emptied a real 34-player
+      roster down to 0, and re-clicking "Sync roster" restored it to the
+      TRUE current Sleeper roster (29 players) rather than the pre-clear
+      34. The 5-player gap was investigated, not assumed benign: those 5
+      (Joe Burrow, Ja'Marr Chase, Travis Kelce, Harrison Butker,
+      Cleveland Browns D/ST) turned out to be stale manually-added test
+      players left over from earlier development sessions' live
+      verification work, confirmed absent from the real Sleeper roster
+      via a direct API check — Clear + Sync actually cleaned up leftover
+      test data rather than losing anything real.
+    - Committed as `4b6677c`.
+83. **Restyled the Waiver Wire tool's results from a two-column card
+    grid into a compact, collapsible row-list** (direct request: "it
+    should look more similar to our legit rankings tab, with collapsable
+    additional info") — matches `RankingsResult.tsx`'s own pattern
+    exactly: one bordered container per position, thin row dividers,
+    avatar/name/badges on the left with a stat on the right, each row
+    collapsed by default and individually expandable (`ChevronIcon`
+    exported from `CollapsibleSection.tsx` for reuse here rather than a
+    third copy of the same inline SVG). A first pass (`flex flex-col
+    gap-4`, still card-shaped, just single-column) was shipped and
+    explicitly rejected by the user as still not what they wanted before
+    this row-list version replaced it.
+    - **A real false positive surfaced by direct user question**
+      ("chris oladokun and brady cook are both backup qbs, why are they
+      being recommended") — investigated against real box scores (a
+      temporary debug route, deleted after use, same discipline as every
+      other one-off diagnostic in this document) rather than guessed at.
+      Confirmed NOT a bug: both genuinely started/played extended snaps
+      late in the real 2025 season (Oladokun: KC, 16-22 real pass
+      attempts across weeks 16-18; Cook: NYJ, real starter since week
+      14, 22-35 attempts/game) — real, verified data. But both were
+      genuinely BAD (Oladokun ~4.4 real yards/attempt across those
+      games, Cook ~4.7), and the waiver ranking's whole mechanism
+      (opportunity outpacing production — item 58) has no way to
+      distinguish "a good player in a temporary slump, buy low" from "a
+      bad backup who just inherited volume and is performing exactly as
+      badly as expected," since both look identical on a pure
+      volume-vs-points gap.
+    - **Added a real efficiency/quality floor** — yards per unit of
+      volume (pass attempt for QB, touch for RB, target for WR/TE;
+      `getEfficiencyStat` in `rankCandidates.ts`), computed from real
+      `PassingYards`/`RushingYards`/`ReceivingYards` fields newly added
+      to `PlayerGameStat`/`PlayerSeasonStat` (SportsDataIO already
+      returns these; this app just wasn't reading them — same "cast, not
+      whitelist" extension pattern as every prior field addition to this
+      type). A candidate's own recent efficiency has to clear
+      `EFFICIENCY_FLOOR_RATIO` (0.75) of the position's real baseline.
+    - **The baseline went through two real iterations, not one
+      guess-and-ship** — a first version used the mean efficiency of
+      just the thin ~4-week recent candidate pool as the baseline, which
+      looked reasonable but, verified live, failed to actually exclude
+      Brady Cook: late-season weeks with many backups getting real spot
+      duty drag the whole recent pool's average down WITH the bad
+      players, exactly when the filter matters most. Replaced with a
+      **full-season, ratio-of-sums baseline** (`computeSeasonEfficiencyBaseline`,
+      the same "ratio of sums" methodology this app's other empirically-
+      derived conversion factors already use) — hundreds of real
+      attempts/touches/targets per position across a whole season,
+      immune to any single week's composition. Re-verified live after
+      the fix: both Oladokun and Cook correctly excluded from the real
+      `/api/waivers` response (not just an isolated debug check), while
+      every other position's candidate list still filled its normal 6
+      slots with reasonable players — confirms the floor isn't so
+      aggressive it empties the pool.
+    - Committed as `94e9af4`.
+84. **Renamed Legit Rankings' "Overall" tab to "Top 100" and made it
+    show a real top 100 players regardless of position** — the combined
+    view previously merged each position's own DISPLAY-capped list
+    (QB10/RB20/WR25/TE10 — `RANKING_LIMIT`, item 78 — roughly 65 players
+    max), not a genuine top 100 across positions.
+    - Split `getLegitRankingsForPosition` (item 78's original function)
+      into a new internal `getFullLegitRankingsForPosition` (the real,
+      cached, UNCAPPED ranked list per position) plus a thin wrapper that
+      applies `RANKING_LIMIT` only for the individual QB/RB/WR/TE tabs —
+      the per-tab display caps are unchanged, only the combined view's
+      own input changed. `getLegitRankingsOverall` now merges all four
+      positions' full uncapped lists, sorts by `legitScore`, and slices
+      to a new `TOP_100_LIMIT = 100` — the caching behavior itself is
+      unaffected (still one cache entry per position, 30-minute TTL;
+      only what gets sliced out of that cached list differs by caller).
+    - The `"OVERALL"` internal tab/query-param value was kept as-is
+      (only the user-facing label changed to "Top 100") — no API
+      contract change, just `RankingsTool.tsx`'s `TAB_LABEL` map.
+    - **Verified live**: the real `/api/rankings?position=OVERALL`
+      response now returns exactly 100 entries spanning all four
+      positions (confirmed programmatically, not eyeballed), while each
+      individual position tab's own count is unchanged (QB 10/RB 20/
+      WR 25/TE 10) — the two display caps are genuinely independent now.
+      Committed as `eec51a2`.
+85. **Redesigned the Start/Sit results page's layout and structure to
+    match a teammate-shared reference design** — explicitly a
+    presentation/structure change, not a scoring or data change: every
+    real signal, number, and piece of reasoning stays exactly what it
+    was, just laid out differently. Per direct instruction, mapped the
+    request onto this app's existing components BEFORE writing any code
+    (StartSitTool.tsx already had a 2-column sidebar grid and a top-of-
+    page player picker from items 64/81; ComparisonResult.tsx's verdict
+    banner/confidence bar from item 79 needed extending, not rebuilding;
+    each player's own `.notes` — already reused verbatim by Waivers/
+    Trade Analyzer — was the natural source for a per-card "Why this
+    pick," replacing the prior single GLOBAL toggle that gated the
+    entire card grid behind one "Why this pick" click). Two real,
+    upfront judgment calls were put to the user via `AskUserQuestion`
+    before building: (1) should the verdict banner be a fixed-dark card
+    like the sidebar nav, or stay theme-adaptive like every other card —
+    **kept theme-adaptive**; (2) the reference design's four confidence-
+    scale labels (Coin flip/Lean/Confident/Lock) don't match this app's
+    own real, narrow 51-59% accuracy band, so the dot would almost
+    always sit in the first two zones — **kept the generic honest scale**
+    anyway (chosen over curve-fitting the thresholds to this app's own
+    range), consistent with this app's standing "don't force false
+    confidence" philosophy.
+    - **One genuinely new field was needed, not fabricated**: no
+      floor-to-ceiling projection-range data existed anywhere in this
+      engine (`finalScore` is a single point estimate). Rather than
+      invent a statistical interval, added `recentPprFloor`/
+      `recentPprCeiling` to `PlayerScoreBreakdown` — the REAL min/max of
+      a player's own recent-game PPR output, computed from `recentGames`
+      data every scorer (`engine.ts`, `scoreDefense.ts`, `scoreKicker.ts`)
+      already fetches but previously discarded down to just an average.
+      The recent average always falls between floor and ceiling by
+      construction (same underlying values), so the UI marker never
+      needs clamping.
+    - **Player cards are now always visible** (not gated behind the old
+      global toggle) and sorted by real `finalScore` descending —
+      `result.players` itself is selection order, not ranked order, so
+      this is a pure client-side display sort on an already-real field,
+      not a new signal. Each card: a large bold projection number
+      (`finalScore`) with the new floor-ceiling range bar underneath, a
+      compact position-specific stat grid (real fields already on the
+      breakdown — pass attempts for QB, touches + red-zone touches for
+      RB, targets + drop rate for WR, targets + snap share for TE — no
+      new signals, just picking which 3-4 already-computed fields matter
+      per position instead of one long flat list), and its own
+      collapsed-by-default "Why this pick" using that player's real
+      `.notes`.
+    - **Confidence bar gained four static reference-scale markers**
+      (tick marks + labels at 50/60/75/90%) under the existing real
+      percentage — explicitly NOT four new validated accuracy tiers
+      (there were only ever three real backtested numbers), just generic
+      calibration context for the one real number, per the judgment call
+      above.
+    - **A real bug was caught and fixed during live verification, not
+      assumed away**: the floor-ceiling bar's percentage math assumed
+      floor/ceiling were always non-negative — a real D/ST game can score
+      negative FantasyPoints, and a negative floor produced a negative
+      CSS `left%` that visually clipped to a full-width bar (looked
+      "maxed out" rather than showing the real, honest partial range).
+      Fixed by anchoring the bar's scale to `min(floor, 0)` instead of
+      always 0, verified live against a real Arizona Cardinals D/ST card
+      (floor -3.0, ceiling 5.0) showing a correct partial-width bar
+      after the fix.
+    - **Sidebar** gained a new `KeyTakeawaysPanel` (`result.reasoning`,
+      the pairwise comparison-level summary that no longer had a home
+      once the old global toggle was removed) and, briefly, an
+      `InjuryWeatherPanel` — see item 87, which moved that panel's
+      content into the cards themselves shortly after this item shipped.
+    - **Verified live end-to-end**, not just via `tsc`/lint: real 2-and
+      3-player comparisons (including a real D/ST-vs-D/ST comparison
+      specifically to exercise the negative-floor bug above) in both
+      light and dark mode, per-card expand/collapse, zero console errors
+      throughout. Committed as `2ebc2f0`.
+86. **Made the Start/Sit confidence percentage position-aware** — a
+    direct follow-up question after item 85 shipped ("how is it possible
+    every position is 52% correct — aren't our backtest numbers
+    different by position?"). Investigated and confirmed: yes, the
+    52%/59%/51% numbers were pooled across every position and season
+    combined (item 45's original two-proportion z-test), not broken out
+    per position, even though this app's own backtest history has always
+    shown real per-position variation.
+    - **Pulled real per-position numbers from the existing backtest
+      infrastructure** rather than guessing or re-deriving a new
+      pipeline: QB/RB/WR/TE from `/api/backtest/broad-nflverse-multiseason`
+      (the pooled 2022-2025 nflverse-only route, filtered per position —
+      the same pooled cross-season source item 45's original number used,
+      just broken out instead of combined), D/ST and K from
+      `/api/backtest/broad` on the primary 2025 pipeline only, since the
+      nflverse-only pipeline has no D/ST/K support at all (a real,
+      disclosed difference in rigor between the two groups — skill
+      positions rest on 4 pooled seasons, D/ST/K on one).
+    - **Real numbers** (confident/limitedData/closeCall): QB 55/65/45,
+      RB 62/60/52, WR 53/61/49, TE 59/56/56, D/ST 64/66/64, K 39/55/50.
+    - **A second real bug surfaced by actually pulling the numbers,
+      not assumed going in**: the old label text ("limited data — but
+      historically our most reliable calls") baked in the POOLED
+      ordering (closeCall worst, confident middle, limitedData best) as
+      if it were universal. It isn't — RB's confident bucket (62%) beats
+      its own limited-data bucket (60%), and K's confident bucket (39%,
+      n=31) is the WORST of its three, below a coin flip. Shipping the
+      old label text next to the new, correct per-position number would
+      have been actively misleading for those positions. Rewrote the
+      label copy to stop implying any fixed cross-bucket ranking, letting
+      the real number do the honest work instead.
+    - New `CONFIDENCE_BY_POSITION`/`POOLED_CONFIDENCE` (fallback only)
+      tables in `ComparisonResult.tsx`; `getConfidence()` now looks up
+      the recommended player's own position. Verified live: a real QB
+      comparison correctly showed 65% (not the old flat 59%) for a
+      limited-data pick, a real RB comparison showed 62% for a confident
+      pick — two different real numbers where every comparison used to
+      show the same one. Committed as `b792069`.
+87. **Moved matchup context, injury status, and next-opponent/weather
+    out of the sidebar and into each player card directly** — a direct
+    follow-up request after item 85 shipped both there (cards) and in
+    the sidebar (`MatchupContextPanel`/`InjuryWeatherPanel`, added by
+    item 85 itself). Asked one clarifying question first (`AskUserQuestion`):
+    move the data out of the sidebar entirely, or duplicate it in both
+    places — **user chose moving it out**, no duplication.
+    - `MatchupContextPanel`/`InjuryWeatherPanel` deleted from
+      `StartSitRail.tsx` entirely (along with their now-unused
+      `formatWeather`/`matchupLabel`/`injuryBadgeClasses`/`DOME_ROOFS`
+      helpers) — sidebar now holds only `KeyTakeawaysPanel` and
+      `RecentComparisonsPanel`. The same real fields
+      (`matchupContext`/`injuryStatus`/`nextOpponent`/`nextGameWeather`)
+      moved into `ComparisonResult.tsx`'s `PlayerCard` instead, as a new
+      section between the stat grid and the per-card "Why this pick."
+    - **A real alignment bug was caught and fixed on direct follow-up**
+      ("the text where it says forecast not available isn't even with
+      weather and not aligned with the opponent/week row above it"): the
+      row layout used `items-center`, which vertically centers a label
+      against a value that wraps to two lines (e.g. "Forecast not yet
+      available") — inconsistent against single-line rows above it, and
+      the wrapped value itself was left-aligned within its own box
+      rather than flush with the row above. Fixed with `items-start` +
+      `text-right` on the value, verified live against the exact
+      wrapped-text case that prompted the report.
+    - Committed as `cd8525b`.
+
+### Open items (as of item 87 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -5355,10 +5685,25 @@ position caps, the D/ST-and-K removal, and the Overall view) — is
 committed as a single commit, `beefc54`. Item 79's Start/Sit verdict-
 banner restructure is committed as `dcd90b1`. Item 80's full visual
 redesign (tokens, typography, the Backtest migration) is committed as
-`b60906c`. This CLAUDE.md write-up of items 77-80 (this paragraph plus
-those four numbered items above) is itself **not yet committed as of
-this writing** — commit only once the user explicitly asks, per this
-project's standing rule. Nothing below is started or fixed yet:
+`b60906c`. The CLAUDE.md write-up of items 77-80 was committed
+separately, as `ea48508`. Item 81's shared `PlayerMultiSelect.tsx` (and
+the deletion of `PlayerSearchInput.tsx`) is committed as `b04e9e0`. Item
+82's `CollapsibleSection.tsx`/`ConfirmButton.tsx` and the roster-panel
+Clear action are committed as `4b6677c`. Item 83's Waiver Wire row-list
+restyle and the real efficiency floor (`PassingYards`/`RushingYards`/
+`ReceivingYards` additions, `computeSeasonEfficiencyBaseline`) are
+committed as `94e9af4`. Item 84's Legit Rankings "Top 100" rename and
+real top-100 merge are committed as `eec51a2`. Item 85's Start/Sit
+redesign (sidebar layout, ranked always-visible cards, the new
+`recentPprFloor`/`recentPprCeiling` fields, the confidence-scale
+markers, and the negative-floor bar-math fix) is committed as `2ebc2f0`.
+Item 86's position-aware confidence percentages are committed as
+`b792069`. Item 87's matchup/injury/weather-into-cards move (and the
+row-alignment fix) is committed as `cd8525b`. This CLAUDE.md write-up of
+items 81-87 (this paragraph plus those seven numbered items above) is
+itself **not yet committed as of this writing** — commit only once the
+user explicitly asks, per this project's standing rule. Nothing below is
+started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -5797,7 +6142,15 @@ project's standing rule. Nothing below is started or fixed yet:
   ranking each position by the gap between a player's recent-volume rank
   and recent-points rank; a real backtest found trend/delta framing adds
   nothing over this absolute-level gap (see item 58), so this is
-  deliberately NOT a trend signal. `buildWaiverReport.ts` runs the real
+  deliberately NOT a trend signal. As of item 83, a candidate also has to
+  clear a real yards-per-unit efficiency floor (`getEfficiencyStat`,
+  `EFFICIENCY_FLOOR_RATIO=0.75`) against the position's real full-season
+  baseline (`computeSeasonEfficiencyBaseline`, fetched via
+  `getPlayerSeasonStats` — a ratio-of-sums over hundreds of real
+  attempts/touches/targets, not the thin recent-candidate pool a first,
+  rejected version used) — closes a real false positive where a badly-
+  performing backup QB forced into volume still ranked as a top target on
+  the opportunity-vs-production gap alone. `buildWaiverReport.ts` runs the real
   engine for just the surfaced top-N candidates, reusing
   `PlayerScoreBreakdown.notes` verbatim rather than inventing new copy
   (same discipline as `ComparisonResult.tsx`/`TradeResult.tsx`), with one
@@ -6153,7 +6506,9 @@ project's standing rule. Nothing below is started or fixed yet:
   difference, not a bug.
 - `src/app/api/players` (item 62: now calls `searchActiveExtendedPlayers`
   instead of the skill-only `searchActivePlayers`, so D/ST and K appear
-  in the shared `PlayerSearchInput.tsx` search box everywhere it's used),
+  in the shared `PlayerMultiSelect.tsx` search box everywhere it's used —
+  see item 81; `PlayerSearchInput.tsx` was that shared search box before
+  item 81 replaced it, and is now deleted),
   `src/app/api/compare`, `src/app/api/trade`
   (item 47 — both `compare` and `trade` also accept an optional
   `scoringFormat` query param, `ppr`/`half_ppr`/`standard`, via
@@ -6188,7 +6543,7 @@ project's standing rule. Nothing below is started or fixed yet:
   dynasty league might already exist for next season), `roster`
   resolves one league+user into the requesting user's own SportsDataIO
   players (ready to feed straight into the same roster state the manual
-  `PlayerSearchInput` flow already populates) plus, as of item 60,
+  `PlayerMultiSelect.tsx` flow already populates) plus, as of item 60,
   `leagueRosteredPlayerIds` for every team in that league.
   `src/app/api/lineup` (item 76) mirrors `/api/compare`/`/api/trade`'s
   fetch block exactly (full live-data parity — same context/schedule/
@@ -6219,23 +6574,40 @@ project's standing rule. Nothing below is started or fixed yet:
   shell wrapping every page from `layout.tsx`, replacing the old
   `NavBar.tsx`, now deleted) and `PageHeader.tsx` (item 64 — the compact
   title/subtitle every page uses in place of its old full-bleed hero),
-  `StartSitTool.tsx`/`PlayerSearchInput.tsx`/`ComparisonResult.tsx` (live
-  start/sit mode, at `/start-sit` as of item 64 (previously `/`) —
-  `ComparisonResult.tsx`'s player cards also show each
-  player's next opponent/weather, display-only; see Overview and the
-  `buildInput.ts` Conventions entry). As of item 64, `StartSitTool.tsx`
+  `StartSitTool.tsx`/`PlayerMultiSelect.tsx`/`ComparisonResult.tsx` (live
+  start/sit mode, at `/start-sit` as of item 64 (previously `/`) — as of
+  item 81, `PlayerMultiSelect.tsx` is the shared chip-plus-search
+  component every player-picking tool in this app uses, replacing the
+  old `PlayerSearchInput.tsx` (deleted); see Overview and that item for
+  the full six-site migration. As of items 85/87, `ComparisonResult.tsx`
+  no longer gates its player cards behind one global "Why this pick"
+  toggle — cards render always, sorted by real `finalScore`, each with a
+  large projection number, a real floor-to-ceiling range bar
+  (`recentPprFloor`/`recentPprCeiling`, item 85), a position-specific
+  stat-tile grid, matchup context + next opponent + weather (moved here
+  from the sidebar by item 87), and its own per-card "Why this pick"
+  reading that player's real `.notes`. The verdict banner's confidence
+  bar is now position-aware (`CONFIDENCE_BY_POSITION`, item 86) and
+  shows four static reference-scale markers under the real percentage).
+  As of item 64, `StartSitTool.tsx`
   lays out as a 2-column grid with a new `StartSitRail.tsx` alongside
-  `ComparisonResult.tsx` — a matchup-context panel (built from
-  `PlayerScoreBreakdown.matchupContext`, already present in the API
-  response, no new fetch) and a `RecentComparisonsPanel` (exported for
+  `ComparisonResult.tsx` — as of item 87, the sidebar holds only
+  `KeyTakeawaysPanel` (`result.reasoning`, item 85 — the pairwise
+  comparison-level summary that needed a new home once the old global
+  toggle was removed) and `RecentComparisonsPanel` (exported for
   reuse) backed by `src/lib/useRecentComparisons.ts`, a localStorage
   hook mirroring `useRosteredPlayers.ts`'s pattern that records real
-  Start/Sit results the user has actually run this session.
+  Start/Sit results the user has actually run this session — the
+  sidebar's original `MatchupContextPanel`/`InjuryWeatherPanel` (added by
+  item 85) were both deleted by item 87 once their content moved into
+  the player cards themselves, rather than being duplicated in both
+  places (a deliberate choice, not an oversight — see that item).
   `RecentComparisonsHomeCard.tsx` is a thin "use client" wrapper around
   that same panel so the (server-rendered) Home page can show it too
   without itself needing to be a client component. `TradeAnalyzer.tsx`/`TradeResult.tsx` (live Trade
   Analyzer mode, at `/trade`, item 47 — `TradeAnalyzer.tsx` reuses
-  `PlayerSearchInput.tsx` for both sides of a trade), `ScoringFormatToggle.tsx`
+  `PlayerMultiSelect.tsx` for both sides of a trade, via its
+  `extraExcludeIds` prop for the cross-side exclusion), `ScoringFormatToggle.tsx`
   (item 50 — the PPR/Half-PPR/Standard segmented control, shared by
   `StartSitTool.tsx` and `TradeAnalyzer.tsx`; its selected value is
   owned by `src/lib/useScoringFormat.ts`, a small localStorage-backed
@@ -6243,9 +6615,21 @@ project's standing rule. Nothing below is started or fixed yet:
   persistence" scope — so the choice carries across both live tools
   within a session), `WaiverTool.tsx`/`WaiverResult.tsx` (live Waiver
   Wire mode, at `/waivers`, item 58 — `WaiverTool.tsx` also reuses
-  `PlayerSearchInput.tsx` for one-off manual roster additions, backed by
+  `PlayerMultiSelect.tsx` (item 81) for one-off manual roster additions,
+  backed by
   `src/lib/useRosteredPlayers.ts`, a localStorage hook mirroring
-  `useScoringFormat.ts`'s pattern; `WaiverResult.tsx`'s "Already
+  `useScoringFormat.ts`'s pattern (item 82 added `clearRostered()`
+  alongside the original `addRostered`/`removeRostered`); the roster
+  block is wrapped in a `CollapsibleSection.tsx` (item 82, label
+  `Your roster ({count})`, expanded by default) with a `ConfirmButton.tsx`
+  "Clear" action in its header — a click-again-to-confirm control,
+  deliberately not a native `window.confirm()` dialog, which would break
+  out of this app's own styling. As of item 83, `WaiverResult.tsx`
+  renders each position as a `RankingsResult.tsx`-style bordered
+  row-list (one container per position, thin dividers, each row
+  collapsed by default and individually expandable — `ChevronIcon`
+  imported from `CollapsibleSection.tsx` for reuse) rather than the
+  original two-column card grid; `WaiverResult.tsx`'s "Already
   rostered" button both dismisses a candidate from the current view
   instantly via local state and adds it to the roster list for future
   runs), `SleeperImport.tsx` (item 59 — the primary way to populate that
@@ -6262,7 +6646,10 @@ project's standing rule. Nothing below is started or fixed yet:
   see this component's own updates), `LineupTool.tsx`/`LineupResult.tsx`/
   `RosterSlotsEditor.tsx` (live Lineup Optimizer mode, at `/lineup`, item
   76 — `LineupTool.tsx` mirrors `WaiverTool.tsx`'s exact shape, owning
-  its own `useRosteredPlayers()`/`useSleeperConnection()` instances;
+  its own `useRosteredPlayers()`/`useSleeperConnection()` instances, and
+  as of items 81/82 also mirrors its `PlayerMultiSelect.tsx`/
+  `CollapsibleSection.tsx`/`ConfirmButton.tsx` roster-panel structure
+  exactly;
   since both hooks are backed by the SAME localStorage keys as Waivers',
   connecting Sleeper or adding a player on either page is really one
   shared roster/connection, not a per-tool one — verified live.
@@ -6288,13 +6675,20 @@ project's standing rule. Nothing below is started or fixed yet:
   `moveHeadline`, reused rather than re-derived. `RankingsTool.tsx`/
   `RankingsResult.tsx` (item 78 — the Legit Rankings tool, at
   `/rankings`) render `RankingsTab = "OVERALL" | "QB" | "RB" | "WR" |
-  "TE"` (default `"OVERALL"`), fetching `/api/rankings` per tab;
+  "TE"` (default `"OVERALL"`, internal value unchanged since item 78 —
+  only its user-facing `TAB_LABEL` changed, to "Top 100", by item 84),
+  fetching `/api/rankings` per tab;
   `RankingsResult.tsx` takes a plain `positionLabel: string` prop
-  (not `ExtendedPosition`) since the Overall tab's rows span multiple
+  (not `ExtendedPosition`) since the Top 100 tab's rows span multiple
   real positions at once, each with its own within-position rank
   reassigned by `getLegitRankingsOverall` (`lib/rankings/
-  buildRankings.ts`) rather than reusing whichever position's rank the
-  row happened to carry from its own position-specific computation, and
+  buildRankings.ts` — as of item 84, this reads each position's real
+  UNCAPPED ranked list via a new internal `getFullLegitRankingsForPosition`
+  rather than the per-tab display-capped one, so the combined view can
+  pick a genuine top 100 across positions rather than whatever was left
+  over from each tab's own cap) rather than reusing whichever position's
+  rank the row happened to carry from its own position-specific
+  computation, and
   `BacktestTool.tsx`/`BacktestWeekTable.tsx`/`BacktestSummary.tsx`/
   `BacktestCaveatNote.tsx`/`TradeBacktestTable.tsx`/`ProjectionSummary.tsx`/
   `ProjectionPlayerTable.tsx`/`ProjectionPlayerDetail.tsx`
