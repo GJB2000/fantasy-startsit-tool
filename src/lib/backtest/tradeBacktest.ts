@@ -43,7 +43,7 @@ export interface TradeBacktestResult {
  * SportsDataIO specifically), so unlike the live version, no LAR/LA-style
  * translation is needed.
  */
-function buildOpponentsByTeamWeek(
+export function buildOpponentsByTeamWeek(
   allWeeklyRows: PlayerGameStat[][],
   fromWeek: number
 ): Map<string, string[]> {
@@ -68,7 +68,7 @@ function buildOpponentsByTeamWeek(
   return byTeam;
 }
 
-function projectFromHistory(
+export function projectFromHistory(
   breakdown: PlayerScoreBreakdown,
   opponentsByTeamWeek: Map<string, string[]>,
   positionDefenseTable: PositionDefenseTable
@@ -83,7 +83,7 @@ function projectFromHistory(
   return sumProjectedPoints(baseRate, opponents, position, positionDefenseTable);
 }
 
-function actualRestOfSeasonTotal(
+export function actualRestOfSeasonTotal(
   playerId: number,
   allWeeklyRows: PlayerGameStat[][],
   fromWeek: number

@@ -5724,8 +5724,81 @@ single-season numbers for those specific constants.
       were reverted and the curl-driven sweep left no repo artifact (this
       write-up is the only lasting record, same discipline as items
       43/52's own sweep cleanups).
+90. **Built the multi-player trade backtest (Open Item #5) — 2-for-2
+    validates cleanly; 2-for-1 surfaced a real confound in the tool's
+    raw-sum trade valuation.** The live Trade Analyzer (item 47) has always
+    accepted any number of players per side (values summed), but only
+    1-for-1 synthetic trades were ever backtested (items 48-49). This
+    extends it to the two canonical multi-player shapes, CROSS-POSITION
+    (the user's explicit call over same-position, via AskUserQuestion —
+    matches how the live tool is actually used), pooled 2022-2025
+    nflverse-only, cutoffs 1-12 (same range as the 1-for-1 trade backtest).
+    - **Construction (the actual design pass #5 called for)**: sides are
+      value-balanced by SEASON-TO-DATE average — the neutral basis
+      adjacent-rank pairing already uses, deliberately NOT the projection
+      being graded (which would leak / circularly bias toward ties). All
+      startable skill players pool into one cross-position value ranking
+      (points are comparable across positions). 2-for-2 = non-overlapping
+      groups of 4 split {rank1,rank4} vs {rank2,rank3} (the exact
+      generalization of adjacent-rank pairing — a 1-for-1 is {rank1} vs
+      {rank2} — naturally near-balanced). 2-for-1 = each anchor matched to
+      the two lower-ranked players whose combined value is closest, within
+      `BALANCE_TOLERANCE=0.2`, consumed so trades don't overlap. Grading is
+      the direct generalization: predicted-winner side = higher SUMMED
+      projection, graded against the side that actually scored more SUMMED
+      rest-of-season points. New `backtest/multiPlayerTradeBacktest.ts` +
+      route `/api/backtest/trade-multi-nflverse-multiseason`
+      (validation-only, no UI, same precedent as the 1-for-1 multiseason
+      route); reuses `tradeBacktest.ts`'s now-exported
+      `buildOpponentsByTeamWeek`/`projectFromHistory`/
+      `actualRestOfSeasonTotal`.
+    - **A real methodological confound, caught by spot-checking generated
+      trades** (the item-48 discipline — item 48 caught an 8000-point
+      projection bug the same way): for UNEVEN-count trades (2-for-1),
+      summed-total grading is confounded by count. Two players accumulate
+      more total than one over the same remaining games unless each sits
+      well below the single's rate — so the larger side tends to win the
+      total regardless of quality, AND the engine's summed projection tends
+      to favor it. Baked a permanent naive baseline into the result — "pick
+      the side with more players" (a no_pick tie on even-count trades) —
+      per this project's #1 discipline (never report accuracy without a
+      naive baseline, items 2/3).
+    - **Results, pooled 2022-2025 (n=1361 trades):**
 
-### Open items (as of item 89 — pick up here)
+      | shape | engine | naive "more players" | n |
+      |---|---|---|---|
+      | 2-for-2 (even) | **55.5%** | n/a (tie) | 863 |
+      | 2-for-1 (uneven) | 62.2% | 61.2% | 497 |
+
+      **2-for-2 is the clean, meaningful validation**: 55.5% pooled,
+      essentially matching the 1-for-1 trade backtest re-run on the current
+      engine (55.0%), every season above chance (50.9/55.8/57.9/57.4). The
+      trade analyzer's rest-of-season projection generalizes to balanced
+      multi-player swaps about as well as it does to 1-for-1.
+    - **2-for-1's 62.2% is NOT a clean skill measure** — it barely beats
+      the naive "more players" baseline (61.2%, +1.0pp pooled), and by
+      season the engine is genuinely mixed against it: beats it in 2022
+      (54.2 vs 47.9) and 2024 (67.6 vs 62.2), LOSES in 2023 (68.0 vs 76.0),
+      ties in 2025 (60.5 vs 60.5). A temporary tally (deleted after
+      recording, same discipline as every other one-off in this document)
+      confirmed the mechanism: the engine picks the larger side ~74% of the
+      time while that side wins only ~61% — a systematic bias toward
+      over-valuing the side with more players.
+    - **This is itself a finding about the shipped tool, not just the
+      backtest**: `evaluateTrade.ts` sums per-side value with no accounting
+      for the roster spot a consolidation trade frees, so it structurally
+      over-values quantity in uneven trades — the backtest faithfully
+      validated the tool as built and surfaced that bias. Flagged as a new
+      open item (a replacement-level normalization — credit the short side
+      with a waiver-level filler for the freed lineup spot — would make
+      both the 2-for-1 backtest meaningful AND the live tool's uneven-trade
+      verdicts fairer).
+    - **Resolves Open Item #5** for the even-count case (validated) and
+      documents the uneven-count confound rather than papering over it.
+      `npx tsc --noEmit` and `npm run lint` clean; temporary diagnostic
+      route/code deleted, the permanent naive baseline kept.
+
+### Open items (as of item 90 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -5841,10 +5914,14 @@ hooks, and the `AppShell`/`WaiverTool`/`LineupTool` rewiring) as
 `8874ef5`; item 88's remaining touch (dropping the roster-slots shape
 summary on mobile) plus its CLAUDE.md write-up followed as `66a92aa`.
 Item 89 (the `QB_RUSH_BLEND_WEIGHT` re-sweep) shipped NO code — a
-confirmed no-change result — so its only artifact is this CLAUDE.md
-write-up, **not yet committed as of this writing** — commit only once the
-user explicitly asks, per this project's standing rule. Nothing below is
-started or fixed yet:
+confirmed no-change result — so its only artifact is its CLAUDE.md
+write-up, committed as `7b2b1f6`. Item 90's code (the multi-player trade
+backtest: `backtest/multiPlayerTradeBacktest.ts`, the
+`/api/backtest/trade-multi-nflverse-multiseason` route, and the three
+now-exported helpers in `tradeBacktest.ts`) plus this write-up are **not
+yet committed as of this writing** — commit only once the user explicitly
+asks, per this project's standing rule. Nothing below is started or fixed
+yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -5873,15 +5950,17 @@ started or fixed yet:
    team-level game-script baseline in item 12), so they'd need their own
    dedicated pass to figure out how to attribute them fairly, not a
    quick extension of item 32's join.
-5. **Trade Analyzer: multi-player trades (2-for-1, 2-for-2, etc.)** —
-   deferred in item 49. The live `/trade` page and `evaluateTrade.ts`
-   already support any number of players per side (values are just
-   summed), but the *backtest* only validates 1-for-1 synthetic trades —
-   adjacent-rank pairing doesn't obviously generalize to grouping 3+
-   players into a realistic synthetic trade candidate, so this needs its
-   own design pass (how to pick realistic multi-player groupings, not
-   just an extension of the existing pairing loop) before the backtest
-   can cover it.
+5. **Trade Analyzer: multi-player trades — RESOLVED for even-count
+   trades, see item 90; uneven-count confound documented + spun into new
+   item #19 below.** Built the cross-position 2-for-1/2-for-2 backtest
+   (`multiPlayerTradeBacktest.ts`). 2-for-2 (equal counts) validates
+   cleanly at 55.5% pooled (≈ the 1-for-1 backtest's 55.0%), every season
+   above chance — the projection generalizes to balanced multi-player
+   swaps. 2-for-1 (uneven counts) is confounded by count under summed-total
+   grading: the engine (62.2%) barely beats a naive "pick the side with
+   more players" (61.2%), so that number isn't a clean skill measure. Only
+   3+-for-N shapes (beyond 2-for-2/2-for-1) remain unbuilt, and the
+   uneven-trade fix is item #19.
 6. **Scoring-format toggle still isn't fully universal — narrowed
    further by item 52, one gap left.** Item 51 made the nflverse-only
    backtest and every naive baseline picker format-aware; item 52
@@ -6102,6 +6181,24 @@ started or fixed yet:
     signal directly, not as an input to a shrinkage-based volume-
     modifier fix — a genuinely different use of the same underlying
     stat, not yet tried.
+19. **Uneven trades (2-for-1, N-for-M with unequal counts) are
+    over-valued toward the larger side — a real bias in the live
+    `evaluateTrade.ts`, surfaced by item 90.** Both the live Trade Analyzer
+    and the trade backtest sum per-side rest-of-season points with NO
+    accounting for the roster/lineup spot a consolidation trade frees, so
+    the side with more players is structurally favored (more bodies
+    accumulate more total points). Item 90 confirmed it: on 2-for-1s the
+    engine's summed projection picks the larger side ~74% of the time and
+    barely beats a naive "more players" baseline. The fix (which would make
+    BOTH the live verdict fairer and the 2-for-1 backtest a meaningful skill
+    measure): credit the short side with a replacement/waiver-level filler
+    for each freed starting spot, so both sides field the same number of
+    startable players before summing. Needs a defensible "replacement
+    level" definition (e.g. the pooled ranking's startable-tier cutoff
+    value, position-aware) and touches `evaluateTrade.ts` (live) +
+    `multiPlayerTradeBacktest.ts` (backtest) together. Also still unbuilt:
+    3+-player-per-side shapes beyond 2-for-2/2-for-1 (item 90 covered the
+    two canonical ones).
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
@@ -6623,6 +6720,17 @@ started or fixed yet:
   cutoff walk (mirroring `collectBroadResultsForSeason`'s role in
   `runBacktestNflverseOnly.ts`), shared by the single-cutoff
   `runTradeBacktest` and the pooled `runTradeBacktestMultiSeason`.
+  `multiPlayerTradeBacktest.ts` (item 90) extends this to cross-position
+  2-for-1/2-for-2 synthetic trades (route
+  `/api/backtest/trade-multi-nflverse-multiseason`) — sides value-balanced
+  by season-to-date average, graded by summed rest-of-season projection vs
+  actual, reusing `tradeBacktest.ts`'s now-exported
+  `buildOpponentsByTeamWeek`/`projectFromHistory`/`actualRestOfSeasonTotal`.
+  It reports a permanent naive "pick the side with more players" baseline
+  alongside the engine, because uneven-count (2-for-1) trades are
+  structurally confounded by count under summed-total grading (see
+  "Backtesting & Tuning History" item 90 and Open Item #19); 2-for-2
+  (even counts) is the clean measure.
   `projectionGrading.ts`/`runProjectionBacktest.ts` (item 65) are a
   third parallel feature alongside `tradeBacktest.ts` — grading
   `finalScore` itself as a continuous point projection (MAE/RMSE/bias)
