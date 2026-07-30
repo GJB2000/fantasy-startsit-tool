@@ -80,7 +80,12 @@ internal validation tool, not a page newsletter readers use directly.
 Time" palette, and — as of item 64 — the top nav itself was replaced
 by a persistent sidebar shell with a real Home landing page; both of
 those are separate, later changes from the pass described in this
-paragraph, kept here as the original historical record.)
+paragraph, kept here as the original historical record. As of item 80,
+the entire visual system described in this paragraph — including the
+teal/navy accent, the `-apple-system`/`ui-rounded` typography, and the
+Backtest-page exclusion — has been replaced outright by a dark/emerald
+"data-grade" system spanning every page with no exclusions; this
+paragraph is kept as historical record, not current styling.)
 Both live tools also gained real PPR/Half-PPR/Standard scoring-format
 toggles — not just a relabeled display, the five active conversion
 factors were empirically re-tuned per format and the choice is threaded
@@ -125,6 +130,27 @@ lineup, reusing the already-validated `scoreExtendedPlayer`/`finalScore`
 exactly as every other live tool (see "Backtesting & Tuning History"
 item 76) — the first genuine whole-roster assignment problem this app
 has tackled, as opposed to every other tool's pairwise-or-list framing.
+The Home page next gained three real "this week" widgets — a lineup
+snapshot, a top waiver target, and a genuine cross-team trade suggestion
+for connected Sleeper users — reusing each tool's own engine rather than
+inventing new logic (item 77). A sixth live tool, **Legit Rankings**
+(`/rankings`), shipped after that — every rankable QB/RB/WR/TE (D/ST and
+K deliberately excluded) ranked and scored 1-100, blending this app's
+own engine snapshot with a genuinely new data source, FantasyPros'
+season-long redraft consensus, plus a combined "Overall" cross-position
+view and a gold "elite" tier for 90+ scores (item 78). The Start/Sit
+result was then restructured (not re-scored) into a punchy verdict
+banner — big name, a confidence bar derived from this app's own
+already-validated historical accuracy-by-bucket numbers, and the full
+signal breakdown moved into a collapsed-by-default "Why this pick"
+section (item 79). Most recently, the whole app's visual identity was
+replaced: a dark/emerald "data-grade" design system (near-black
+`#0B0E0C`, a merged emerald `--accent`/`--good`, a gold `--premium`
+token, Barlow Condensed headlines, JetBrains Mono on every number) now
+spans every page **including Backtest**, which had been deliberately
+excluded from both prior visual passes — see item 80 for the full
+token/typography system and the real calibration/normalization bugs
+items 78 surfaced along the way.
 Out of scope so far:
 database/persistence, auth. Upcoming-schedule/next-opponent
 lookup — previously fully out of scope — is now partially built (see
@@ -5056,7 +5082,189 @@ single-season numbers for those specific constants.
       with a true weighted-assignment algorithm (documented as a known,
       accepted heuristic limitation instead).
 
-### Open items (as of item 65 — pick up here)
+77. **Added three real "this week" widgets to the Home page** — a
+    lineup snapshot, a top waiver target, and a genuine cross-team trade
+    suggestion — plus moved the whole "This week" section above the
+    tool-launch cards on request. None invented new scoring logic; each
+    widget calls the exact same route/engine its full tool page does.
+    - **`HomeLineupWidget.tsx`/`HomeWaiverWidget.tsx`** call `/api/lineup`
+      and `/api/waivers` directly, auto-fetching on mount against
+      whatever roster/Sleeper connection is already saved (no button
+      click needed, unlike the full tool pages) — an honest empty-state
+      CTA when no roster exists yet, never fabricated data.
+    - **`HomeTradeWidget.tsx` is the genuinely new piece**: a real,
+      two-sided cross-team trade FINDER, not just a display of the
+      existing Trade Analyzer (which only grades a trade the user
+      already proposes). New `lib/trade/suggestLeagueTrade.ts` finds
+      your best bench surplus (by rest-of-season value) and your
+      weakest starter/empty slot, scans every other real roster in a
+      connected Sleeper league for a positional match, and proposes a
+      trade — but ONLY after two gates: the other team has a genuine,
+      comparatively weak spot at your surplus's position, and the trade
+      grades as **"fair"** (roughly matched rest-of-season value), never
+      "good for you." That second gate isn't arbitrary — an early
+      version allowed "good," and live testing immediately produced an
+      unrealistic offer (a backup QB for a top-12 WR) — mathematically,
+      under one shared valuation, "good for you" is *always* "bad" for
+      the other side by the identical margin, so "fair" is the only
+      value band that can ever be mutually sensible. Deliberately
+      Sleeper-only (no manual-roster fallback), since it needs real
+      per-team roster data no manually-built roster has.
+    - **New Sleeper plumbing**: `resolveSleeperRoster` now also returns
+      `otherTeams` (every OTHER team's real, resolved roster — previously
+      discarded down to just a league-wide union), backed by a new
+      `getSleeperLeagueUsers` (`sleeper/api.ts`) for real team names. New
+      `/api/trade-suggestion` route; the position tabs component pattern
+      and `POSITION_ORDER`/`isStreamingPosition`/`moveHeadline` were
+      exported from `WaiverResult.tsx` for the waiver widget to reuse
+      verbatim rather than re-deriving copy.
+    - **Verified live end-to-end** against a real, live Sleeper account
+      (username provided by the user, since no test credentials existed
+      in memory or code from prior sessions): the trade widget found a
+      real, sensible trade ("Sam Darnold ↔ Wan'Dale Robinson," graded
+      fair) against a real opposing team once the "fair-only" fix
+      shipped. Committed as `a3a38fa`.
+
+78. **Shipped Legit Rankings (`/rankings`), the sixth live tool** — every
+    rankable QB/RB/WR/TE (D/ST and K excluded — see below) ranked and
+    given a **Legit Score, 1-100**, plus a combined **Overall** view
+    spanning all four positions. Built, then iteratively fixed against
+    real, user-flagged bad rankings — a genuine "ship, get real feedback,
+    fix the real cause" cycle, not a one-shot build.
+    - **Core mechanism** (`lib/rankings/buildRankings.ts`): scores every
+      "played recently" player at a position via the same
+      `scoreExtendedPlayer` every other live tool uses (no new
+      prediction model), min-max normalizes `finalScore` within that
+      position's pool to `[1,100]`, and caches the computed RESULT
+      itself (not just source data — a new pattern for this app) for 30
+      minutes per `(position, season, week, format)`. Negative-projection
+      players (a known, still-open engine calibration gap — see items
+      65/66) are excluded from the pool entirely rather than shown a
+      nonsensical "-36 projected points."
+    - **FantasyPros season-long blend, a genuinely new data source**:
+      `lib/fantasypros/seasonProjections.ts` reads dynastyprocess/data's
+      `db_fpecr_latest.csv` (FantasyPros' current REDRAFT — season-long,
+      not weekly — consensus rank per position), confirmed live to cover
+      all six positions, PPR only. Blended in specifically to fix a real
+      case: Mahomes scored a legitScore of only 58 because only 1 of his
+      4 recent-window games had usable data, producing a noisy, thin
+      snapshot the engine had no way to distinguish from a real decline
+      — confirmed directly against SportsDataIO's own weekly
+      stats before concluding this wasn't a bug. `ENGINE_WEIGHT` (per
+      `dataQuality`) controls how much the engine's own snapshot counts
+      vs. FantasyPros' consensus; twice retuned lower for thin-sample
+      cases (`full`=0.65 unchanged, `limited`/`insufficient` eventually
+      0.15/0.05) after a second real case (Lamar Jackson, a genuinely
+      elite FantasyPros QB2, still under-ranked at the first, milder
+      retune) showed the first fix wasn't strong enough.
+    - **A second, independent root cause found via live testing** (not
+      just weight tuning): Justin Jefferson (real FantasyPros WR6) was
+      initially outranked by Quentin Johnston (real FantasyPros WR46) —
+      caused by normalizing FantasyPros' rank against its OWN full
+      redraft pool (239 WRs, mostly deep scrubs), which inflated a
+      mediocre rank like 46 to ~80/100. Fixed with `FP_NORMALIZATION_CAP`
+      — caps the normalization depth to roughly 3x this file's own
+      per-position display limit, not FantasyPros' full published pool.
+    - **A real, second team-code mismatch found and fixed**: FantasyPros'
+      source uses "JAC" for Jacksonville where SportsDataIO uses "JAX" —
+      distinct from (and in addition to) the already-known nflverse
+      LAR/LA mismatch — confirmed by diffing the full 32-team list, not
+      assumed.
+    - **Follow-up scope changes, all on direct request**: capped the
+      visible list per position (`RANKING_LIMIT`: top 10 QB/20 RB/25
+      WR/10 TE — computed BEFORE truncation so a 10th-ranked QB's score
+      still reflects standing against the full pool, not just the
+      visible ten); D/ST and K removed entirely (`RANKABLE_POSITIONS`,
+      route now rejects them); and the combined **Overall** view
+      (`getLegitRankingsOverall`) added — merges the four position lists
+      by their already-normalized `legitScore` (not raw `finalScore`,
+      which isn't comparable across positions), no new scoring pass.
+    - **Verified live at every step** against real players (Mahomes,
+      Lamar Jackson, Jefferson/Johnston, and a full sweep of QB/RB/WR/TE/
+      DST/K before D/ST/K were removed) — `tsc`/lint clean throughout.
+      Committed as `beefc54`.
+
+79. **Restructured the Start/Sit result's presentation — explicitly NOT a
+    scoring/logic change** (per the user's own framing of the request):
+    leads with a bold verdict banner (big player name, a confidence bar),
+    then a one-sentence summary (`result.headline`, reused verbatim),
+    with the full signal breakdown, matchup notes, and both player cards
+    moved into a collapsed-by-default "Why this pick" toggle — content
+    preserved exactly, just reachable one click away instead of always
+    expanded.
+    - **The confidence percentage isn't fabricated**: it maps the
+      already-existing `isCloseCall`/`hasLimitedData` flags (computed
+      exactly as before, in `comparePlayers`, untouched) to this app's
+      own already-validated historical accuracy rates per bucket — close
+      call ~51% (item 22), confident ~52%, limited data ~59% (item 45's
+      real two-proportion z-test, pooled 2022-2025) — the same
+      counterintuitive "limited data is more reliable than confident"
+      finding this app's headline copy already reflected, now given a
+      real number and a visual bar instead of just words.
+    - `ComparisonResult.tsx` gained a `useState` toggle (now a real
+      client component, `"use client"` added) but zero new fetches, zero
+      changes to `comparePlayers`/`scorePlayer`/`engine.ts`. Verified
+      live with two real comparisons, light and dark mode, both toggle
+      states. Committed as `dcd90b1`.
+
+80. **Replaced the entire visual identity — a full re-skin, zero scoring/
+    logic changes** — a teammate shared a reference design from a
+    similar tool; proposed the token/typography mapping and three
+    genuinely open decisions (dark-only vs. keep both themes; whether
+    Backtest joins this time; where the new gold "premium" color
+    actually gets used) via `AskUserQuestion` before touching any code,
+    per explicit instruction to propose first.
+    - **User's calls**: keep both light AND dark as first-class themes
+      (not dark-only, despite the reference being dark-first — a new
+      light theme was designed from scratch, not just inherited from the
+      old one); bring Backtest fully into the redesign this time,
+      breaking the precedent both prior visual passes (the original
+      "cohesive pass" and the Apple-inspired one) set of deliberately
+      excluding it as "the internal tool"; gold reserved for Legit
+      Rankings' new 90+ elite tier specifically.
+    - **Tokens** (`globals.css`): dark background `#0B0E0C`, light
+      `#F5F7F5` (a genuinely new design, not a negative of the dark
+      theme); `--accent` and `--good` deliberately MERGED into one
+      emerald (`#00E07F` dark / `#00B868` light) — a real philosophy
+      reversal from the Apple-inspired system's explicit "keep brand and
+      meaning separate" choice, since this reference's whole language is
+      "green is the brand is money is good," same as Underdog/PrizePicks-
+      style products; `--bad`/`--caution`/`--info` kept distinct; new
+      `--accent-secondary` (gradients/hover) and `--premium`/
+      `--premium-ink` (gold, `#E8C468` dark / `#B8863A` light).
+    - **Typography**: Barlow Condensed (new `--font-display` token) on
+      `PageHeader` titles, the verdict banner's big name, and the
+      `AppShell` wordmark; Inter replaces the `-apple-system` stack for
+      `--font-sans`; JetBrains Mono replaces `ui-rounded` for what's now
+      `--font-mono` (renamed from `--font-rounded` — a single token
+      redefinition cascaded through all 10 files already using the
+      `font-rounded` utility class via one mechanical rename, no
+      per-component font logic needed). All three loaded via
+      `next/font/google` in `layout.tsx` (self-hosted at build time, same
+      privacy posture as the system-font stack it replaces).
+    - **Gold elite tier**: `RankingsResult.tsx`'s `legitScoreClasses`
+      gained a 90+ tier using `--premium`, and the old 60/85 accent/good
+      split was collapsed to one 70+ tier — a real, necessary fix, not
+      just an addition: with `--accent`/`--good` now the same color, the
+      OLD two-tier split would have rendered two adjacent bands
+      identically.
+    - **Backtest migration** (the biggest mechanical piece): all 8
+      components (`BacktestTool`, `BacktestSummary`, `BacktestWeekTable`,
+      `BacktestCaveatNote`, `TradeBacktestTable`, `ProjectionSummary`,
+      `ProjectionPlayerTable`, `ProjectionPlayerDetail`) moved off
+      hardcoded `zinc`/`amber`/`sky`/`emerald`/`red` Tailwind-default
+      classes onto this app's own semantic tokens, with mode/season
+      toggle buttons and the primary CTA upgraded from plain
+      `rounded-md` boxes to the same pill/segmented-control and
+      shadowed-CTA conventions every other page already uses.
+    - **Verified live across all six tools plus Backtest, light AND dark,
+      with real data** — ran actual comparisons, trades, waiver searches,
+      a lineup build, rankings, and a real backtest (58.7% overall
+      accuracy, matching this app's own documented history) through the
+      new UI; zero console errors anywhere; `tsc`/lint clean; a full
+      `next build` production build succeeds. Committed as `b60906c`.
+
+### Open items (as of item 80 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -5131,10 +5339,25 @@ live FantasyPros current-snapshot wiring (`fantasypros/client.ts`'s
 `buildInput.ts`/`scoreExtended.ts`/`buildWaiverReport.ts`/
 `suggestDrop.ts` and all three live routes) — plus item 74's
 investigation (which shipped no code at all, a documented negative
-finding only) are **both still uncommitted as of this writing, along
-with this CLAUDE.md write-up itself (items 73-74's text plus the
-resolution of Open Items 17-18 and the new Open Item 18-follow-up
-below)** — commit only once the user explicitly asks, per this
+finding only) — plus this document's own write-up of both — are
+committed together as `1c5c1c0`. Item 75's permanent FantasyPros-vs-
+engine per-player projection comparison (`playerProjectionLookup.ts`'s
+`fantasyProsProjection`/`fantasyProsDiff` columns and
+`ProjectionPlayerDetail.tsx`'s totals row) is committed as `b4ecb3d`;
+its same-item "closer to actual" week counter follow-up as `c55b367`.
+Item 76's Lineup Optimizer is committed as `45de3f0`. Item 77's Home
+page widgets (including the trade-suggestion engine and its live-tested
+"fair-only" fix) are committed as `a3a38fa`. Item 78's Legit Rankings
+tool — including every fix found via live testing along the way
+(Mahomes/Lamar Jackson's `ENGINE_WEIGHT` retune, the Jefferson/Johnston
+`FP_NORMALIZATION_CAP` fix, the Jacksonville JAC/JAX team-code fix, the
+position caps, the D/ST-and-K removal, and the Overall view) — is
+committed as a single commit, `beefc54`. Item 79's Start/Sit verdict-
+banner restructure is committed as `dcd90b1`. Item 80's full visual
+redesign (tokens, typography, the Backtest migration) is committed as
+`b60906c`. This CLAUDE.md write-up of items 77-80 (this paragraph plus
+those four numbered items above) is itself **not yet committed as of
+this writing** — commit only once the user explicitly asks, per this
 project's standing rule. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
@@ -6050,7 +6273,28 @@ project's standing rule. Nothing below is started or fixed yet:
   clobber further manual edits on every render; `LineupResult.tsx`
   groups starters by slot, reusing `PlayerScoreBreakdown.notes` verbatim
   for reasoning — same "one source of truth" precedent as
-  `WaiverResult.tsx`/`TradeResult.tsx` — plus a Bench section), and
+  `WaiverResult.tsx`/`TradeResult.tsx` — plus a Bench section),
+  `HomeLineupWidget.tsx`/`HomeWaiverWidget.tsx`/`HomeTradeWidget.tsx`
+  (item 77 — three self-fetching client widgets in a new "This week"
+  section at the top of the Home page, each independently calling
+  `/api/lineup`/`/api/waivers`/`/api/trade-suggestion` on mount rather
+  than the server-rendered page fetching for them, so a slow/failed
+  widget never blocks the rest of Home from rendering; each degrades to
+  its own honest empty/error state — e.g. `HomeTradeWidget.tsx` shows
+  nothing actionable when no Sleeper league is connected, rather than a
+  fake placeholder, per this app's standing "no dummy data" rule).
+  `HomeWaiverWidget.tsx` picks its single top candidate using
+  `WaiverResult.tsx`'s exported `POSITION_ORDER`/`isStreamingPosition`/
+  `moveHeadline`, reused rather than re-derived. `RankingsTool.tsx`/
+  `RankingsResult.tsx` (item 78 — the Legit Rankings tool, at
+  `/rankings`) render `RankingsTab = "OVERALL" | "QB" | "RB" | "WR" |
+  "TE"` (default `"OVERALL"`), fetching `/api/rankings` per tab;
+  `RankingsResult.tsx` takes a plain `positionLabel: string` prop
+  (not `ExtendedPosition`) since the Overall tab's rows span multiple
+  real positions at once, each with its own within-position rank
+  reassigned by `getLegitRankingsOverall` (`lib/rankings/
+  buildRankings.ts`) rather than reusing whichever position's rank the
+  row happened to carry from its own position-specific computation, and
   `BacktestTool.tsx`/`BacktestWeekTable.tsx`/`BacktestSummary.tsx`/
   `BacktestCaveatNote.tsx`/`TradeBacktestTable.tsx`/`ProjectionSummary.tsx`/
   `ProjectionPlayerTable.tsx`/`ProjectionPlayerDetail.tsx`
@@ -6077,33 +6321,62 @@ project's standing rule. Nothing below is started or fixed yet:
   the "Look up specific players" chip-list + search UI and renders
   `playerProjectionLookup.ts`'s week-by-week Projected/Actual/Diff table
   per searched player, same table styling again).
-  Restyled in an Apple-inspired pass,
-  superseding the original indigo-accent design: `globals.css` defines
-  a real token system via Tailwind v4's `@theme inline` — `--accent`
-  (teal, brand/UI-chrome only: nav, buttons, focus rings) plus
-  `--good`/`--bad`/`--caution`/`--info` (verdict semantics — recommended
-  pick, close call/bad trade, limited data — kept deliberately separate
-  from `--accent` so brand and meaning never collide), each tuned
-  separately for light/dark. `--font-sans` is the `-apple-system` stack
-  (genuinely SF Pro on Apple devices, no webfont/CSP risk) and a new
-  `--font-rounded` (`ui-rounded` → SF Pro Rounded on Apple platforms)
-  is applied via a `font-rounded` utility class to every stat numeral in
-  `ComparisonResult.tsx`/`TradeResult.tsx`, echoing how Apple Health/
-  Fitness renders its own numeric displays — replacing the prior
-  `font-mono`/Geist Mono usage there. (This paragraph predates item 64's
-  sidebar rework — `NavBar.tsx`'s frosted `backdrop-blur` glass bar has
-  since been replaced by `AppShell.tsx`'s sidebar; see that item for the
-  current nav treatment.) One real bug caught before shipping: a template-
-  literal Tailwind class (`` `bg-${token}/12` ``) doesn't work — Tailwind's
-  static scanner only resolves complete literal class strings, so
-  verdict-to-badge-color mapping must go through a lookup object
-  (`VERDICT_BADGE` in `TradeResult.tsx`), not string interpolation.
-  Deliberately does NOT touch `BacktestTool.tsx`'s own chrome (mode
-  buttons, season toggle, table stay on the prior zinc/rounded-md
-  styling) — it inherits the new nav/background/fonts automatically
-  since components like `PlayerSearchInput.tsx` are shared, but the
-  backtest page is the secondary/internal validation tool, restyled
-  in neither visual pass.
+  **Restyled twice, historically.** A first Apple-inspired pass (teal
+  `--accent`, `-apple-system` type, `font-rounded`/`ui-rounded` on stat
+  numerals) superseded the original indigo-accent design and
+  deliberately excluded `BacktestTool.tsx`'s own chrome (kept on prior
+  zinc/rounded-md styling as the secondary/internal validation tool).
+  **Both of those are now themselves superseded by item 80's full
+  dark/emerald redesign**, adopted from a teammate-shared design
+  reference and applied everywhere, Backtest included this time — see
+  item 80 for the full page-by-page rollout and the clarifying
+  questions asked before building it. `globals.css` now defines: `--accent`
+  (emerald `#00E07F`/`#00B868` — brand, verdict-positive, AND recommended-
+  pick semantics all share this one token, a deliberate merge from the
+  prior system's teal-accent/emerald-verdict split, made because the
+  reference design uses one green throughout) plus `--bad`/`--caution`/
+  `--info` (unchanged in meaning, retuned in hex) and two new tokens:
+  `--premium` (gold `#E8C468`, reserved for a rare top tier — currently
+  only the Legit Rankings 90+ score band) and `--accent-secondary`
+  (`#00B868`, the reference's secondary green, used sparingly for
+  depth/hover rather than as a second semantic meaning). Both light and
+  dark are first-class, tuned independently — dark uses the near-black
+  navy `#0B0E0C` background from the reference directly; light is this
+  app's own equivalent construction, not copied from any reference,
+  since the design brief only specified a dark treatment. `--font-sans`
+  moved from `-apple-system` to Inter (self-hosted via
+  `next/font/google`, `layout.tsx`); a new `--font-display` (Barlow
+  Condensed, bold/condensed) is used for headlines/verdict names/nav
+  wordmark via a `font-display` utility class; `--font-mono` (renamed
+  from the prior system's `--font-rounded`, and now genuinely JetBrains
+  Mono via `next/font/google` rather than a system UI-rounded fallback)
+  is applied to every stat numeral across the app — the same call sites
+  `font-rounded` used before, plus several more picked up while
+  migrating each page off the old zinc/amber/sky/emerald palette
+  (`BacktestCaveatNote.tsx`, `BacktestSummary.tsx`, `BacktestTool.tsx`,
+  `BacktestWeekTable.tsx`, `TradeBacktestTable.tsx`,
+  `ProjectionSummary.tsx`, `ProjectionPlayerTable.tsx`,
+  `ProjectionPlayerDetail.tsx`). The same template-literal-Tailwind-class
+  bug class the first pass already caught once (`` `bg-${token}/12` ``
+  not resolving through Tailwind's static scanner, requiring a lookup
+  object like `VERDICT_BADGE` instead of string interpolation) was
+  re-confirmed still true and re-avoided throughout this pass — no new
+  instances introduced. One collision fixed while merging `--accent`
+  and the old `--good` into one emerald: `RankingsResult.tsx`'s
+  `legitScoreClasses` tiering previously used `--accent` and `--good` as
+  two visually distinct bands (60+ / 85+) — under the merged token
+  those would have rendered identically, so it was collapsed to a
+  single 70+ emerald tier plus a new 90+ `--premium` gold tier (chosen,
+  via `AskUserQuestion`, over a Backtest-accuracy-number or a
+  general "any 90+ score" application — Rankings' elite tier was judged
+  the clearest, least noisy fit for a reserved-for-rare highlight
+  color). The design's dark verdict-banner treatment
+  (dark card background, green accent, confidence bar) already existed
+  structurally in `ComparisonResult.tsx` from item 79's restructure —
+  item 80 restyled its colors/type (`font-display text-[34px]` on the
+  winner name) rather than rebuilding its layout, since the two changes
+  were complementary, not competing (item 79: information hierarchy;
+  item 80: visual identity).
 - Season/week resolution for the live tool is always computed live via
   `getSeasonContext()` (never hardcoded) — it correctly falls back to
   the last completed season during the NFL offseason. Backtest mode
