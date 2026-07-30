@@ -7,6 +7,8 @@ import { DEFAULT_SLOTS, parseSleeperRosterPositions, serializeSlots, type SlotTy
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { useSleeperConnection } from "@/lib/useSleeperConnection";
+import { CollapsibleSection } from "./CollapsibleSection";
+import { ConfirmButton } from "./ConfirmButton";
 import { LineupResult, type LineupSlotResponse } from "./LineupResult";
 import { PlayerMultiSelect } from "./PlayerMultiSelect";
 import { RosterSlotsEditor } from "./RosterSlotsEditor";
@@ -20,7 +22,7 @@ interface LineupResponse {
 }
 
 export function LineupTool() {
-  const { rostered, addRostered, removeRostered } = useRosteredPlayers();
+  const { rostered, addRostered, removeRostered, clearRostered } = useRosteredPlayers();
   const [sleeperConnection, setSleeperConnection] = useSleeperConnection();
   const [scoringFormat, setScoringFormat] = useScoringFormat();
   const [slotCounts, setSlotCounts] = useState<Record<SlotType, number>>(DEFAULT_SLOTS);
@@ -96,15 +98,27 @@ export function LineupTool() {
           onImportPlayers={handleImportPlayers}
         />
 
-        <div className="mt-4 border-t border-foreground/[0.07] pt-4">
+        <CollapsibleSection
+          label={`Your roster (${rostered.length})`}
+          className="mt-4 border-t border-foreground/[0.07] pt-4"
+          action={
+            rostered.length > 0 && (
+              <ConfirmButton
+                onConfirm={clearRostered}
+                label="Clear"
+                confirmLabel="Click to confirm"
+                className="shrink-0 rounded-full px-2.5 py-1 text-[11px]"
+              />
+            )
+          }
+        >
           <PlayerMultiSelect
-            label="Your roster"
             selected={rostered}
             onAdd={addRostered}
             onRemove={removeRostered}
             placeholder={() => "Add another player manually…"}
           />
-        </div>
+        </CollapsibleSection>
       </div>
 
       <div className="mt-5 rounded-3xl border border-foreground/10 bg-surface p-5 shadow-sm">

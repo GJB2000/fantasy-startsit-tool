@@ -5,6 +5,8 @@ import type { ExtendedPosition, PlayerSummary } from "@/lib/sportsdata/types";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { useSleeperConnection } from "@/lib/useSleeperConnection";
+import { CollapsibleSection } from "./CollapsibleSection";
+import { ConfirmButton } from "./ConfirmButton";
 import { PlayerMultiSelect } from "./PlayerMultiSelect";
 import { ScoringFormatToggle } from "./ScoringFormatToggle";
 import { SleeperImport } from "./SleeperImport";
@@ -16,7 +18,7 @@ interface WaiverResponse {
 }
 
 export function WaiverTool() {
-  const { rostered, addRostered, removeRostered } = useRosteredPlayers();
+  const { rostered, addRostered, removeRostered, clearRostered } = useRosteredPlayers();
   const [sleeperConnection, setSleeperConnection] = useSleeperConnection();
   const [scoringFormat, setScoringFormat] = useScoringFormat();
   const [response, setResponse] = useState<WaiverResponse | null>(null);
@@ -57,6 +59,7 @@ export function WaiverTool() {
     for (const player of players) addRostered(player);
   }
 
+
   const filteredCandidatesByPosition = response
     ? (Object.fromEntries(
         Object.entries(response.candidatesByPosition).map(([position, candidates]) => [
@@ -86,15 +89,27 @@ export function WaiverTool() {
           onImportPlayers={handleImportPlayers}
         />
 
-        <div className="mt-4 border-t border-foreground/[0.07] pt-4">
+        <CollapsibleSection
+          label={`Your roster (${rostered.length})`}
+          className="mt-4 border-t border-foreground/[0.07] pt-4"
+          action={
+            rostered.length > 0 && (
+              <ConfirmButton
+                onConfirm={clearRostered}
+                label="Clear"
+                confirmLabel="Click to confirm"
+                className="shrink-0 rounded-full px-2.5 py-1 text-[11px]"
+              />
+            )
+          }
+        >
           <PlayerMultiSelect
-            label="Your roster"
             selected={rostered}
             onAdd={addRostered}
             onRemove={removeRostered}
             placeholder={() => "Add another player manually…"}
           />
-        </div>
+        </CollapsibleSection>
       </div>
 
       <button

@@ -15,6 +15,7 @@ export function useRosteredPlayers(): {
   rostered: PlayerSummary[];
   addRostered: (player: PlayerSummary) => void;
   removeRostered: (playerId: number) => void;
+  clearRostered: () => void;
 } {
   const [rostered, setRostered] = useState<PlayerSummary[]>([]);
 
@@ -49,5 +50,10 @@ export function useRosteredPlayers(): {
     });
   }
 
-  return { rostered, addRostered, removeRostered };
+  function clearRostered() {
+    setRostered([]);
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
+  return { rostered, addRostered, removeRostered, clearRostered };
 }
