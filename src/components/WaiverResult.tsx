@@ -1,5 +1,9 @@
+"use client";
+
+import { useState } from "react";
 import type { TradeEvaluation, TradeVerdict } from "@/lib/trade/evaluateTrade";
 import type { ExtendedPosition, ScoringFormat } from "@/lib/sportsdata/types";
+import { ChevronIcon } from "./CollapsibleSection";
 
 export interface WaiverCandidateResponse {
   playerId: number;
@@ -109,7 +113,7 @@ function DropSuggestion({ evaluation, formatLabel }: { evaluation: TradeEvaluati
   );
 }
 
-function WaiverCandidateCard({
+function WaiverCandidateRow({
   candidate,
   formatLabel,
   showRosteredButton,
@@ -120,65 +124,75 @@ function WaiverCandidateCard({
   showRosteredButton: boolean;
   onMarkRostered: WaiverResultProps["onMarkRostered"];
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <div className="rounded-3xl border border-foreground/10 bg-surface p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-      <div className="flex items-center gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent/12 text-sm font-bold text-accent">
+    <div className="border-t border-foreground/[0.07] first:border-none">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-foreground/[0.02]"
+        aria-expanded={expanded}
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent/12 text-[13px] font-bold text-accent">
           {initials(candidate.displayName)}
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="truncate font-semibold tracking-tight">{candidate.displayName}</h3>
-          <p className="text-xs text-foreground/45">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h3 className="truncate text-[14px] font-semibold tracking-tight">{candidate.displayName}</h3>
+            {candidate.injuryStatus && (
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${injuryBadgeClasses(candidate.injuryStatus)}`}>
+                {candidate.injuryStatus}
+              </span>
+            )}
+          </div>
+          <p className="truncate text-[12px] text-foreground/45">
             {candidate.position}
             {candidate.team ? ` · ${candidate.team}` : ""}
           </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="rounded-full bg-good/12 px-2 py-0.5 text-[10px] font-semibold text-good">
+              {candidate.positionLabel} {isStreamingPosition(candidate.position) ? "this week" : "by volume"}
+            </span>
+            <span className="rounded-full bg-foreground/8 px-2 py-0.5 text-[10px] font-medium text-foreground/55">
+              {candidate.productionLabel} {isStreamingPosition(candidate.position) ? "this season" : "by points"}
+            </span>
+          </div>
         </div>
-      </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className="font-mono text-[15px] font-semibold tabular-nums">{candidate.recentPprAvg.toFixed(1)}</span>
+          <span className="text-[10px] text-foreground/40">last {candidate.gamesUsedForRecent}g</span>
+        </div>
+        <ChevronIcon open={expanded} />
+      </button>
 
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <span className="rounded-full bg-good/12 px-2.5 py-1 text-[11px] font-semibold text-good">
-          {candidate.positionLabel} {isStreamingPosition(candidate.position) ? "this week" : "by volume"}
-        </span>
-        <span className="rounded-full bg-foreground/8 px-2.5 py-1 text-[11px] font-medium text-foreground/55">
-          {candidate.productionLabel} {isStreamingPosition(candidate.position) ? "this season" : "by points"}
-        </span>
-        {candidate.injuryStatus && (
-          <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${injuryBadgeClasses(candidate.injuryStatus)}`}>
-            {candidate.injuryStatus}
-          </span>
-        )}
-      </div>
+      {expanded && (
+        <div className="px-4 pb-4">
+          {showRosteredButton && (
+            <button
+              type="button"
+              onClick={() => onMarkRostered(candidate.playerId, candidate.displayName, candidate.position, candidate.team)}
+              className="mb-3 shrink-0 whitespace-nowrap rounded-full border border-foreground/10 px-2.5 py-1 text-[11px] font-medium text-foreground/50 transition-colors hover:border-foreground/20 hover:text-foreground"
+            >
+              Already rostered
+            </button>
+          )}
 
-      {showRosteredButton && (
-        <button
-          type="button"
-          onClick={() => onMarkRostered(candidate.playerId, candidate.displayName, candidate.position, candidate.team)}
-          className="mt-1.5 shrink-0 whitespace-nowrap rounded-full border border-foreground/10 px-2.5 py-1 text-[11px] font-medium text-foreground/50 transition-colors hover:border-foreground/20 hover:text-foreground"
-        >
-          Already rostered
-        </button>
+          <div className="border-t border-foreground/[0.07] pt-3.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">Why</span>
+            <ul className="mt-3 flex flex-col gap-2.5">
+              {candidate.reasoning.map((line, i) => (
+                <li key={i} className="relative pl-4 text-sm leading-relaxed text-foreground/70">
+                  <span className="absolute left-0 top-[0.55em] h-1.5 w-1.5 rounded-full bg-accent" />
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {candidate.dropSuggestion && <DropSuggestion evaluation={candidate.dropSuggestion} formatLabel={formatLabel} />}
+        </div>
       )}
-
-      <dl className="mt-4 flex flex-col gap-2.5">
-        <div className="flex justify-between border-t border-foreground/[0.07] pt-2.5 first:border-none first:pt-0">
-          <dt className="text-[13px] text-foreground/50">Last {candidate.gamesUsedForRecent} games ({formatLabel} avg)</dt>
-          <dd className="font-mono text-[15px] font-semibold tabular-nums">{candidate.recentPprAvg.toFixed(1)}</dd>
-        </div>
-      </dl>
-
-      <div className="mt-4 border-t border-foreground/[0.07] pt-4">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">Why</span>
-        <ul className="mt-3 flex flex-col gap-2.5">
-          {candidate.reasoning.map((line, i) => (
-            <li key={i} className="relative pl-4 text-sm leading-relaxed text-foreground/70">
-              <span className="absolute left-0 top-[0.55em] h-1.5 w-1.5 rounded-full bg-accent" />
-              {line}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {candidate.dropSuggestion && <DropSuggestion evaluation={candidate.dropSuggestion} formatLabel={formatLabel} />}
     </div>
   );
 }
@@ -209,9 +223,9 @@ export function WaiverResult({
         return (
           <div key={position}>
             <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-foreground/40">{position}</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="overflow-hidden rounded-3xl border border-foreground/10 bg-surface shadow-sm">
               {candidates.map((candidate) => (
-                <WaiverCandidateCard
+                <WaiverCandidateRow
                   key={candidate.playerId}
                   candidate={candidate}
                   formatLabel={formatLabel}

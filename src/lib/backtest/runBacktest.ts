@@ -53,6 +53,9 @@ function toDstActualRows(defenseRows: TeamDefenseGameStat[], dstPlayerIdByTeam: 
       RushingAttempts: 0,
       PassingAttempts: 0,
       Receptions: 0,
+      PassingYards: 0,
+      RushingYards: 0,
+      ReceivingYards: 0,
     });
   }
   return rows;

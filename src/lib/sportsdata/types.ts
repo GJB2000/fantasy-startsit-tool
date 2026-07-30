@@ -69,6 +69,12 @@ export interface PlayerSeasonStat {
   FantasyPoints: number;
   FantasyPointsPPR: number;
   Receptions: number;
+  PassingAttempts: number;
+  PassingYards: number;
+  RushingAttempts: number;
+  RushingYards: number;
+  ReceivingTargets: number;
+  ReceivingYards: number;
 }
 
 export interface PlayerGameStat {
@@ -87,6 +93,9 @@ export interface PlayerGameStat {
   RushingAttempts: number;
   PassingAttempts: number;
   Receptions: number;
+  PassingYards: number;
+  RushingYards: number;
+  ReceivingYards: number;
 }
 
 /**

@@ -10,6 +10,12 @@ interface RunningTotal {
   team: string;
   position: string;
   season: number;
+  passingAttempts: number;
+  passingYards: number;
+  rushingAttempts: number;
+  rushingYards: number;
+  receivingTargets: number;
+  receivingYards: number;
 }
 
 /**
@@ -45,6 +51,12 @@ export function buildSeasonToDatePlayerStatsFromRows(
         existing.team = row.Team;
         existing.position = row.Position;
         existing.season = row.Season;
+        existing.passingAttempts += row.PassingAttempts;
+        existing.passingYards += row.PassingYards;
+        existing.rushingAttempts += row.RushingAttempts;
+        existing.rushingYards += row.RushingYards;
+        existing.receivingTargets += row.ReceivingTargets;
+        existing.receivingYards += row.ReceivingYards;
       } else {
         totals.set(row.PlayerID, {
           points: row.FantasyPoints,
@@ -55,6 +67,12 @@ export function buildSeasonToDatePlayerStatsFromRows(
           team: row.Team,
           position: row.Position,
           season: row.Season,
+          passingAttempts: row.PassingAttempts,
+          passingYards: row.PassingYards,
+          rushingAttempts: row.RushingAttempts,
+          rushingYards: row.RushingYards,
+          receivingTargets: row.ReceivingTargets,
+          receivingYards: row.ReceivingYards,
         });
       }
     }
@@ -72,6 +90,12 @@ export function buildSeasonToDatePlayerStatsFromRows(
       FantasyPoints: total.points,
       FantasyPointsPPR: total.pointsPPR,
       Receptions: total.receptions,
+      PassingAttempts: total.passingAttempts,
+      PassingYards: total.passingYards,
+      RushingAttempts: total.rushingAttempts,
+      RushingYards: total.rushingYards,
+      ReceivingTargets: total.receivingTargets,
+      ReceivingYards: total.receivingYards,
     });
   }
   return result;
