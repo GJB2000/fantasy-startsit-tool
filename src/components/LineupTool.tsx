@@ -107,7 +107,7 @@ export function LineupTool() {
               <span className="font-semibold uppercase tracking-wide text-foreground/60">
                 Roster slots · {totalStarters(slotCounts)} starters
               </span>
-              <span className="ml-1.5 text-foreground/40">{summarizeSlots(slotCounts)}</span>
+              <span className="ml-1.5 hidden text-foreground/40 sm:inline">{summarizeSlots(slotCounts)}</span>
             </span>
           }
         >

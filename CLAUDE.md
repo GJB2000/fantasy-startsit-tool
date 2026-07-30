@@ -5593,8 +5593,80 @@ single-season numbers for those specific constants.
       `text-right` on the value, verified live against the exact
       wrapped-text case that prompted the report.
     - Committed as `cd8525b`.
+88. **Unified the roster-import feature into one app-wide sidebar modal,
+    fixed a real cross-instance state-sync bug it surfaced along the way,
+    and collapsed the Lineup page's roster-slots panel behind a live
+    summary** — all from direct user feedback that the Sleeper import
+    block was repetitive (rendered full-size on BOTH the Waivers and
+    Lineup pages) and took up too much space, plus a specific report that
+    the sidebar's scoring indicator "seems broken and doesn't change."
+    - **Grounded the advice in the real wiring before proposing
+      anything**: the import UI (`SleeperImport.tsx`) rendered in exactly
+      two places (`WaiverTool.tsx`/`LineupTool.tsx`); the Trade Analyzer
+      never used it (the user's "trade analyzer" was `HomeTradeWidget`, a
+      read-only consumer); and the connection/roster were ALREADY global
+      state (localStorage hooks), just with a bulky control duplicated per
+      tool. So the fix was a re-home, not a rebuild.
+    - **Root cause of the scoring-indicator bug — the load-bearing find,
+      not the cosmetic one.** `useScoringFormat`/`useSleeperConnection`/
+      `useRosteredPlayers` each held their own `useState`, so two hook
+      instances (the sidebar vs. a tool page) never synced — a same-tab
+      localStorage write doesn't notify other instances (the `storage`
+      event only fires in OTHER tabs). The sidebar's scoring chip read its
+      own copy and never re-rendered when a tool page's toggle changed the
+      format. This is the same class of drift item 60 worked around by
+      lifting connection state into `WaiverTool.tsx` — but that only
+      covers one page's own children, not a sibling like the shell.
+    - **Fixed all three hooks at the root** with one shared module-level
+      store (new `src/lib/createPersistentStore.ts`, built on
+      `useSyncExternalStore`): every consumer subscribes to ONE value, so
+      a write anywhere re-renders every reader in the tab, and a `storage`
+      listener keeps separate tabs in sync too. Hook APIs are
+      byte-identical (tuple/object shapes unchanged), so no consumer
+      needed refactoring — the Home widgets, `PlayerMultiSelect`, both
+      tools, and the shell all kept working unmodified. Hydration stays
+      safe by deferring the localStorage read to an effect
+      (`usePersistentStore`), the same server-default-then-sync discipline
+      the per-hook versions used.
+    - **The import itself moved into one app-wide modal**: new
+      `RosterManager.tsx` (Sleeper connect/sync/change + manual add via
+      `PlayerMultiSelect` + Clear via `ConfirmButton`), rendered once by
+      `AppShell.tsx` and opened from anywhere via a new in-memory
+      `useRosterModal` store (a non-persisted `createPersistentStore` with
+      `storageKey: null` — a modal shouldn't reopen on reload). Themed as
+      a normal content surface (not the fixed-dark sidebar), so
+      `SleeperImport`'s existing token styling renders right in both
+      themes; scrim-click and Escape close it.
+    - **Three entry points, no duplicated panel**: a compact "My roster"
+      status block in the desktop sidebar footer (player count + connected
+      league name, next to the now-working Scoring chip); a mobile-only
+      top-bar button (`sticky right-0` so it stays reachable while the nav
+      scrolls, with a left-fade mask — the sidebar footer is desktop-only,
+      so this is how mobile reaches the manager); and a shared
+      `RosterSummaryButton.tsx` on the Waivers and Lineup pages ("Your
+      roster · N players · Manage") replacing each page's old full-size
+      inline `SleeperImport` + roster `CollapsibleSection` block.
+    - **Collapsed the Lineup roster-slots panel** the same "reduce space"
+      way, but as a page-level `CollapsibleSection` (collapsed by
+      default), NOT the shell modal — slot config is Lineup-specific,
+      unlike the cross-tool roster. Its header shows a live summary
+      (`summarizeSlots`/`totalStarters` in `lib/lineup/rosterSlots.ts`):
+      "Roster slots · 9 starters · 1 QB · 2 RB · ..." — verifiable at a
+      glance (and reflecting a connected league's real slots without
+      expanding), expanding to the full stepper grid only to edit. The
+      full shape is dropped on mobile (`hidden sm:inline`), keeping just
+      "N starters" on narrow screens; `RosterSlotsEditor` lost its
+      now-redundant internal heading.
+    - **Verification was tsc + lint only, stated honestly**: another
+      chat's `next dev` held Next 16's per-project dev lock (same working
+      directory), so a second dev server refused to start and this
+      session's Browser tools couldn't reach the other one — and killing
+      that server or risking its shared `.next` with a production build
+      wasn't worth it. `npx tsc --noEmit` and `npm run lint` clean
+      throughout; the user's own running server (on this folder) HMR'd the
+      changes for their own visual check.
 
-### Open items (as of item 87 — pick up here)
+### Open items (as of item 88 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -5699,11 +5771,19 @@ redesign (sidebar layout, ranked always-visible cards, the new
 markers, and the negative-floor bar-math fix) is committed as `2ebc2f0`.
 Item 86's position-aware confidence percentages are committed as
 `b792069`. Item 87's matchup/injury/weather-into-cards move (and the
-row-alignment fix) is committed as `cd8525b`. This CLAUDE.md write-up of
-items 81-87 (this paragraph plus those seven numbered items above) is
-itself **not yet committed as of this writing** — commit only once the
-user explicitly asks, per this project's standing rule. Nothing below is
-started or fixed yet:
+row-alignment fix) is committed as `cd8525b`; the CLAUDE.md write-up of
+items 81-87 followed as `c3352b6`. Item 88's code landed in two commits,
+both pushed to `main`: the sidebar roster modal + the cross-instance
+scoring-sync fix (`createPersistentStore.ts`, `RosterManager.tsx`,
+`RosterSummaryButton.tsx`, `useRosterModal.ts`, the three rewritten
+hooks, and the `AppShell`/`WaiverTool`/`LineupTool` rewiring) as
+`990a73d`, and the Lineup roster-slots collapse
+(`summarizeSlots`/`totalStarters`, the `CollapsibleSection` wrap) as
+`8874ef5`. Item 88's remaining touch (dropping the roster-slots shape
+summary on mobile, `hidden sm:inline`) and this CLAUDE.md write-up of
+item 88 are **not yet committed as of this writing** — commit only once
+the user explicitly asks, per this project's standing rule. Nothing
+below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
