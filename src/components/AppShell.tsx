@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
+import { useRosterModal } from "@/lib/useRosterModal";
 import { useScoringFormat } from "@/lib/useScoringFormat";
+import { useSleeperConnection } from "@/lib/useSleeperConnection";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
+import { RosterManager } from "./RosterManager";
 
 const FORMAT_LABEL: Record<ScoringFormat, string> = {
   ppr: "PPR",
@@ -108,6 +112,9 @@ const LINKS: { href: string; label: string; icon: React.ReactNode }[] = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [scoringFormat] = useScoringFormat();
+  const [rosterOpen, setRosterOpen] = useRosterModal();
+  const [connection] = useSleeperConnection();
+  const { rostered } = useRosteredPlayers();
 
   return (
     <div className="flex min-h-full w-full flex-col md:flex-row">
@@ -153,7 +160,45 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
+        {/* Mobile-only roster entry point — the desktop footer block below is
+            md:-only, so this pins a compact roster button to the right of the
+            horizontal bar (sticky right-0 keeps it reachable while the nav
+            scrolls). The left fade masks nav links scrolling underneath it. */}
+        <div
+          className="sticky right-0 flex shrink-0 items-center py-0.5 pl-4 md:hidden"
+          style={{ background: "linear-gradient(90deg, transparent, #0b0e0c 45%)" }}
+        >
+          <button
+            type="button"
+            onClick={() => setRosterOpen(true)}
+            aria-label="Manage your roster"
+            className="flex items-center gap-1.5 rounded-[9px] bg-white/[0.06] px-2.5 py-1.5 text-[12px] font-medium text-[#cfe3d8] transition-colors hover:bg-white/[0.1]"
+          >
+            <svg viewBox="0 0 24 24" className="h-[15px] w-[15px]" fill="none">
+              <circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M5 20a7 7 0 0114 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            {connection && (
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#00e07f" }} />
+            )}
+            <span className="font-mono text-[11px] font-bold text-white">{rostered.length}</span>
+          </button>
+        </div>
+
         <div className="hidden md:mt-auto md:flex md:flex-col md:gap-2 md:border-t md:border-white/[0.07] md:pt-4">
+          <button
+            type="button"
+            onClick={() => setRosterOpen(true)}
+            className="flex flex-col gap-0.5 rounded-[9px] bg-white/[0.04] px-2.5 py-2 text-left transition-colors hover:bg-white/[0.08]"
+          >
+            <span className="flex items-center justify-between text-xs">
+              <span className="text-[#7c8983]">My roster</span>
+              <span className="font-mono text-[11px] font-bold text-white">{rostered.length}</span>
+            </span>
+            <span className="truncate text-[11px] text-[#5f6b64]">
+              {connection ? connection.leagueName : "Connect Sleeper →"}
+            </span>
+          </button>
           <div className="flex items-center justify-between rounded-[9px] bg-white/[0.04] px-2.5 py-2 text-xs">
             <span className="text-[#7c8983]">Scoring</span>
             <span
@@ -167,6 +212,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="min-w-0 flex-1">{children}</div>
+
+      <RosterManager open={rosterOpen} onClose={() => setRosterOpen(false)} />
     </div>
   );
 }

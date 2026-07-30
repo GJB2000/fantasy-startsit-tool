@@ -2,18 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
-import type { PlayerSummary } from "@/lib/sportsdata/types";
 import { DEFAULT_SLOTS, parseSleeperRosterPositions, serializeSlots, type SlotType } from "@/lib/lineup/rosterSlots";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
+import { useRosterModal } from "@/lib/useRosterModal";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { useSleeperConnection } from "@/lib/useSleeperConnection";
-import { CollapsibleSection } from "./CollapsibleSection";
-import { ConfirmButton } from "./ConfirmButton";
 import { LineupResult, type LineupSlotResponse } from "./LineupResult";
-import { PlayerMultiSelect } from "./PlayerMultiSelect";
 import { RosterSlotsEditor } from "./RosterSlotsEditor";
+import { RosterSummaryButton } from "./RosterSummaryButton";
 import { ScoringFormatToggle } from "./ScoringFormatToggle";
-import { SleeperImport } from "./SleeperImport";
 
 interface LineupResponse {
   slots: LineupSlotResponse[];
@@ -22,8 +19,9 @@ interface LineupResponse {
 }
 
 export function LineupTool() {
-  const { rostered, addRostered, removeRostered, clearRostered } = useRosteredPlayers();
-  const [sleeperConnection, setSleeperConnection] = useSleeperConnection();
+  const { rostered } = useRosteredPlayers();
+  const [sleeperConnection] = useSleeperConnection();
+  const [, setRosterOpen] = useRosterModal();
   const [scoringFormat, setScoringFormat] = useScoringFormat();
   const [slotCounts, setSlotCounts] = useState<Record<SlotType, number>>(DEFAULT_SLOTS);
   const [response, setResponse] = useState<LineupResponse | null>(null);
@@ -74,10 +72,6 @@ export function LineupTool() {
     }
   }
 
-  function handleImportPlayers(players: PlayerSummary[]) {
-    for (const player of players) addRostered(player);
-  }
-
   return (
     <div className="mx-auto mt-10 w-full max-w-3xl">
       <div className="mb-6 flex items-center justify-center gap-3">
@@ -91,35 +85,11 @@ export function LineupTool() {
         />
       </div>
 
-      <div className="rounded-3xl border border-foreground/10 bg-surface p-5 shadow-sm">
-        <SleeperImport
-          connection={sleeperConnection}
-          onConnectionChange={setSleeperConnection}
-          onImportPlayers={handleImportPlayers}
-        />
-
-        <CollapsibleSection
-          label={`Your roster (${rostered.length})`}
-          className="mt-4 border-t border-foreground/[0.07] pt-4"
-          action={
-            rostered.length > 0 && (
-              <ConfirmButton
-                onConfirm={clearRostered}
-                label="Clear"
-                confirmLabel="Click to confirm"
-                className="shrink-0 rounded-full px-2.5 py-1 text-[11px]"
-              />
-            )
-          }
-        >
-          <PlayerMultiSelect
-            selected={rostered}
-            onAdd={addRostered}
-            onRemove={removeRostered}
-            placeholder={() => "Add another player manually…"}
-          />
-        </CollapsibleSection>
-      </div>
+      <RosterSummaryButton
+        count={rostered.length}
+        connection={sleeperConnection}
+        onManage={() => setRosterOpen(true)}
+      />
 
       <div className="mt-5 rounded-3xl border border-foreground/10 bg-surface p-5 shadow-sm">
         <RosterSlotsEditor slots={slotCounts} onChange={setSlotCounts} />
