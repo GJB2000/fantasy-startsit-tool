@@ -100,7 +100,7 @@ export class PlayerNotInNflverseSeasonError extends Error {
 /**
  * nflverse-only equivalent of runBacktest.ts's runPairBacktest. The
  * single-pair UI only ever searches SportsDataIO's player list (see
- * PlayerSearchInput.tsx), so the two requested IDs are SportsDataIO
+ * PlayerMultiSelect.tsx), so the two requested IDs are SportsDataIO
  * PlayerIDs — resolved here to nflverse's synthetic 2024 IDs by name
  * (playerMatch.ts's reverse join) before running, so the same search box
  * works for both pipelines without a parallel 2024-specific search UI.

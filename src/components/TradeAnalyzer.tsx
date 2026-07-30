@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { TradeEvaluation } from "@/lib/trade/evaluateTrade";
 import type { PlayerSummary } from "@/lib/sportsdata/types";
 import { useScoringFormat } from "@/lib/useScoringFormat";
-import { PlayerSearchInput } from "./PlayerSearchInput";
+import { PlayerMultiSelect } from "./PlayerMultiSelect";
 import { ScoringFormatToggle } from "./ScoringFormatToggle";
 import { TradeResult } from "./TradeResult";
 
@@ -13,70 +13,6 @@ const MAX_PER_SIDE = 4;
 interface TradeResponse {
   evaluation: TradeEvaluation;
   context: { contextNote: string };
-}
-
-function PlayerChip({ player, onRemove }: { player: PlayerSummary; onRemove: () => void }) {
-  return (
-    <div className="flex items-center justify-between rounded-2xl border border-foreground/10 bg-surface px-4 py-3 shadow-sm transition-shadow hover:shadow-md">
-      <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-accent/12 text-xs font-bold text-accent">
-          {player.name
-            .split(" ")
-            .map((part) => part[0])
-            .slice(0, 2)
-            .join("")
-            .toUpperCase()}
-        </span>
-        <span className="text-sm">
-          <span className="font-semibold">{player.name}</span>{" "}
-          <span className="text-foreground/50">
-            {player.position}
-            {player.team ? ` · ${player.team}` : ""}
-          </span>
-        </span>
-      </div>
-      <button
-        type="button"
-        onClick={onRemove}
-        className="rounded-full p-1.5 text-foreground/35 transition-colors hover:bg-bad/10 hover:text-bad"
-        aria-label={`Remove ${player.name}`}
-      >
-        ✕
-      </button>
-    </div>
-  );
-}
-
-function TradeSide({
-  label,
-  players,
-  otherSideIds,
-  onAdd,
-  onRemove,
-}: {
-  label: string;
-  players: PlayerSummary[];
-  otherSideIds: number[];
-  onAdd: (player: PlayerSummary) => void;
-  onRemove: (playerId: number) => void;
-}) {
-  return (
-    <div>
-      <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-foreground/40">{label}</h2>
-      <div className="space-y-2.5">
-        {players.map((player) => (
-          <PlayerChip key={player.playerId} player={player} onRemove={() => onRemove(player.playerId)} />
-        ))}
-        {players.length < MAX_PER_SIDE && (
-          <PlayerSearchInput
-            onSelect={onAdd}
-            excludeIds={[...players.map((p) => p.playerId), ...otherSideIds]}
-            placeholder={players.length === 0 ? "Search a player…" : "Search another player…"}
-          />
-        )}
-      </div>
-    </div>
-  );
 }
 
 export function TradeAnalyzer() {
@@ -136,17 +72,19 @@ export function TradeAnalyzer() {
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2">
-        <TradeSide
+        <PlayerMultiSelect
           label="You give"
-          players={givePlayers}
-          otherSideIds={getPlayers.map((p) => p.playerId)}
+          selected={givePlayers}
+          max={MAX_PER_SIDE}
+          extraExcludeIds={getPlayers.map((p) => p.playerId)}
           onAdd={addTo(setGivePlayers)}
           onRemove={removeFrom(setGivePlayers)}
         />
-        <TradeSide
+        <PlayerMultiSelect
           label="You get"
-          players={getPlayers}
-          otherSideIds={givePlayers.map((p) => p.playerId)}
+          selected={getPlayers}
+          max={MAX_PER_SIDE}
+          extraExcludeIds={givePlayers.map((p) => p.playerId)}
           onAdd={addTo(setGetPlayers)}
           onRemove={removeFrom(setGetPlayers)}
         />

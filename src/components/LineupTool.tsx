@@ -8,7 +8,7 @@ import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { useSleeperConnection } from "@/lib/useSleeperConnection";
 import { LineupResult, type LineupSlotResponse } from "./LineupResult";
-import { PlayerSearchInput } from "./PlayerSearchInput";
+import { PlayerMultiSelect } from "./PlayerMultiSelect";
 import { RosterSlotsEditor } from "./RosterSlotsEditor";
 import { ScoringFormatToggle } from "./ScoringFormatToggle";
 import { SleeperImport } from "./SleeperImport";
@@ -17,23 +17,6 @@ interface LineupResponse {
   slots: LineupSlotResponse[];
   bench: PlayerScoreBreakdown[];
   context: { contextNote: string };
-}
-
-function RosterChip({ player, onRemove }: { player: PlayerSummary; onRemove: () => void }) {
-  return (
-    <div className="flex items-center gap-2 rounded-full border border-foreground/10 bg-surface py-1.5 pl-3 pr-1.5 text-xs shadow-sm">
-      <span className="font-medium">{player.name}</span>
-      <span className="text-foreground/45">{player.position}</span>
-      <button
-        type="button"
-        onClick={onRemove}
-        className="rounded-full p-1 text-foreground/35 transition-colors hover:bg-bad/10 hover:text-bad"
-        aria-label={`Remove ${player.name} from roster`}
-      >
-        ✕
-      </button>
-    </div>
-  );
 }
 
 export function LineupTool() {
@@ -113,18 +96,13 @@ export function LineupTool() {
           onImportPlayers={handleImportPlayers}
         />
 
-        {rostered.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2 border-t border-foreground/[0.07] pt-4">
-            {rostered.map((player) => (
-              <RosterChip key={player.playerId} player={player} onRemove={() => removeRostered(player.playerId)} />
-            ))}
-          </div>
-        )}
-        <div className="mt-3">
-          <PlayerSearchInput
-            onSelect={addRostered}
-            excludeIds={rostered.map((p) => p.playerId)}
-            placeholder="Add another player manually…"
+        <div className="mt-4 border-t border-foreground/[0.07] pt-4">
+          <PlayerMultiSelect
+            label="Your roster"
+            selected={rostered}
+            onAdd={addRostered}
+            onRemove={removeRostered}
+            placeholder={() => "Add another player manually…"}
           />
         </div>
       </div>

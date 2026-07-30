@@ -6,7 +6,7 @@ import type { PlayerSummary } from "@/lib/sportsdata/types";
 import { useRecentComparisons } from "@/lib/useRecentComparisons";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { ComparisonResult } from "./ComparisonResult";
-import { PlayerSearchInput } from "./PlayerSearchInput";
+import { PlayerMultiSelect } from "./PlayerMultiSelect";
 import { ScoringFormatToggle } from "./ScoringFormatToggle";
 import { StartSitRail } from "./StartSitRail";
 
@@ -81,52 +81,13 @@ export function StartSitTool() {
             />
           </div>
 
-          <div className="space-y-2.5">
-            {selectedPlayers.map((player) => (
-              <div
-                key={player.playerId}
-                className="flex items-center justify-between rounded-2xl border border-foreground/10 bg-surface-sunken px-4 py-3 transition-shadow hover:shadow-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent/12 text-sm font-bold text-accent">
-                    {player.name
-                      .split(" ")
-                      .map((part) => part[0])
-                      .slice(0, 2)
-                      .join("")
-                      .toUpperCase()}
-                  </span>
-                  <span className="text-sm">
-                    <span className="font-semibold">{player.name}</span>{" "}
-                    <span className="text-foreground/50">
-                      {player.position}
-                      {player.team ? ` · ${player.team}` : ""}
-                    </span>
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removePlayer(player.playerId)}
-                  className="rounded-full p-1.5 text-foreground/35 transition-colors hover:bg-bad/10 hover:text-bad"
-                  aria-label={`Remove ${player.name}`}
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-
-            {selectedPlayers.length < MAX_PLAYERS && (
-              <PlayerSearchInput
-                onSelect={addPlayer}
-                excludeIds={selectedPlayers.map((p) => p.playerId)}
-                placeholder={
-                  selectedPlayers.length === 0
-                    ? "Search your first player…"
-                    : "Search another player…"
-                }
-              />
-            )}
-          </div>
+          <PlayerMultiSelect
+            selected={selectedPlayers}
+            onAdd={addPlayer}
+            onRemove={removePlayer}
+            max={MAX_PLAYERS}
+            placeholder={(count) => (count === 0 ? "Search your first player…" : "Search another player…")}
+          />
 
           <button
             type="button"

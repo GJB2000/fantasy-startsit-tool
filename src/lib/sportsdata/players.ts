@@ -46,7 +46,7 @@ export async function getAnyPlayerById(id: number): Promise<Player | null> {
  * getActivePlayers() staying skill-only, since neither concept (volume
  * rank, a same-position teammate injury bump) has a defined meaning for
  * a kicker or a team defense. Only the player-search surface (used
- * directly by PlayerSearchInput.tsx, so everywhere a user picks a
+ * directly by PlayerMultiSelect.tsx, so everywhere a user picks a
  * player) needs the wider pool. K is already in `/Players`, just
  * excluded by isSkillPosition — D/ST has no `/Players` rows at all (see
  * defenseTeams.ts), so its synthetic entries are unioned in here.

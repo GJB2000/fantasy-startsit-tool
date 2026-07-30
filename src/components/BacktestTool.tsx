@@ -15,7 +15,7 @@ import type { TradeGradeResult } from "@/lib/backtest/tradeBacktest";
 import { BacktestCaveatNote } from "./BacktestCaveatNote";
 import { BacktestSummaryView } from "./BacktestSummary";
 import { BacktestWeekTable } from "./BacktestWeekTable";
-import { PlayerSearchInput } from "./PlayerSearchInput";
+import { PlayerMultiSelect } from "./PlayerMultiSelect";
 import { ProjectionPlayerDetailView } from "./ProjectionPlayerDetail";
 import { ProjectionPlayerTable } from "./ProjectionPlayerTable";
 import { ProjectionSummaryView } from "./ProjectionSummary";
@@ -265,40 +265,13 @@ export function BacktestTool() {
             2025 season only, PPR only, for now — how close the engine&apos;s own score comes to real points
             scored, not just whether it picked the right player.
           </p>
-          <div className="space-y-2">
-            <span className="text-sm text-foreground/45">Look up specific players (optional)</span>
-            <div className="space-y-2">
-              {lookupPlayers.map((player) => (
-                <div
-                  key={player.playerId}
-                  className="flex items-center justify-between rounded-2xl border border-foreground/15 bg-surface px-3.5 py-2.5 shadow-sm"
-                >
-                  <span className="text-sm">
-                    {player.name}{" "}
-                    <span className="text-foreground/45">
-                      {player.position}
-                      {player.team ? ` · ${player.team}` : ""}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeLookupPlayer(player.playerId)}
-                    className="text-sm text-foreground/45 hover:text-foreground"
-                    aria-label={`Remove ${player.name}`}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-              {lookupPlayers.length < MAX_LOOKUP_PLAYERS && (
-                <PlayerSearchInput
-                  onSelect={addLookupPlayer}
-                  excludeIds={lookupPlayers.map((p) => p.playerId)}
-                  placeholder="Search a player…"
-                />
-              )}
-            </div>
-          </div>
+          <PlayerMultiSelect
+            label="Look up specific players (optional)"
+            selected={lookupPlayers}
+            onAdd={addLookupPlayer}
+            onRemove={removeLookupPlayer}
+            max={MAX_LOOKUP_PLAYERS}
+          />
         </>
       ) : (
         <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -327,37 +300,13 @@ export function BacktestTool() {
       )}
 
       {mode === "pair" && (
-        <div className="space-y-3">
-          {players.map((player) => (
-            <div
-              key={player.playerId}
-              className="flex items-center justify-between rounded-2xl border border-foreground/15 bg-surface px-3.5 py-2.5 shadow-sm"
-            >
-              <span className="text-sm">
-                {player.name}{" "}
-                <span className="text-foreground/45">
-                  {player.position}
-                  {player.team ? ` · ${player.team}` : ""}
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={() => removePlayer(player.playerId)}
-                className="text-sm text-foreground/45 hover:text-foreground"
-                aria-label={`Remove ${player.name}`}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-          {players.length < 2 && (
-            <PlayerSearchInput
-              onSelect={addPlayer}
-              excludeIds={players.map((p) => p.playerId)}
-              placeholder={players.length === 0 ? "Search your first player…" : "Search your second player…"}
-            />
-          )}
-        </div>
+        <PlayerMultiSelect
+          selected={players}
+          onAdd={addPlayer}
+          onRemove={removePlayer}
+          max={2}
+          placeholder={(count) => (count === 0 ? "Search your first player…" : "Search your second player…")}
+        />
       )}
 
       {mode === "trade" && (
