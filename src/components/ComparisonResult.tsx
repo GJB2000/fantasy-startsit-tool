@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { GameWeather } from "@/lib/nflverse/schedules";
 import type { ComparisonResult as ComparisonResultData, PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
 
@@ -22,6 +23,36 @@ function injuryBadgeClasses(status: string) {
   }
   return "bg-caution/15 text-caution";
 }
+
+const DOME_ROOFS = new Set(["dome", "closed"]);
+
+/**
+ * nflverse's schedule only carries actual recorded conditions, not a
+ * pregame forecast — wind/temp are frequently blank for games that
+ * haven't happened yet. Roof type is a fixed stadium property, so it's
+ * always knowable in advance regardless of how far out the game is.
+ */
+function formatWeather(weather: GameWeather | null): string {
+  if (!weather) return "Not yet available";
+  if (DOME_ROOFS.has(weather.roof)) return "Dome";
+  if (weather.temp == null && weather.wind == null) return "Forecast not yet available";
+  const parts: string[] = [];
+  if (weather.temp != null) parts.push(`${weather.temp}°F`);
+  if (weather.wind != null) parts.push(`${weather.wind} mph wind`);
+  return parts.join(" · ");
+}
+
+function matchupLabel(diffFromAverage: number): { text: string; tone: "good" | "bad" | "neutral" } {
+  if (diffFromAverage > 1.5) return { text: "favorable", tone: "good" };
+  if (diffFromAverage < -1.5) return { text: "tough", tone: "bad" };
+  return { text: "average", tone: "neutral" };
+}
+
+const MATCHUP_TONE_CLASSES: Record<"good" | "bad" | "neutral", string> = {
+  good: "bg-good/12 text-good",
+  bad: "bg-bad/12 text-bad",
+  neutral: "bg-foreground/8 text-foreground/55",
+};
 
 function initials(name: string) {
   return name
@@ -369,6 +400,40 @@ function PlayerCard({
               <p className="mt-0.5 font-mono text-[15px] font-semibold tabular-nums">{tile.value}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {(player.matchupContext || player.nextOpponent) && (
+        <div className="mt-4 flex flex-col gap-2 border-t border-foreground/[0.07] pt-4">
+          {player.matchupContext && (
+            <div className="flex items-start justify-between gap-3">
+              <span className="shrink-0 pt-0.5 text-[12px] text-foreground/50">
+                Last matchup ({player.matchupContext.opponentTeam})
+              </span>
+              <span
+                className={`shrink-0 font-mono whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold ${MATCHUP_TONE_CLASSES[matchupLabel(player.matchupContext.diffFromAverage).tone]}`}
+              >
+                #{player.matchupContext.rank} of {player.matchupContext.teamCount} ·{" "}
+                {matchupLabel(player.matchupContext.diffFromAverage).text}
+              </span>
+            </div>
+          )}
+          {player.nextOpponent && (
+            <div className="flex items-start justify-between gap-3">
+              <span className="shrink-0 pt-0.5 text-[12px] text-foreground/50">Next opponent</span>
+              <span className="pt-0.5 text-right font-mono text-[12px] font-semibold text-foreground/80">
+                {player.nextOpponent.team} · Wk {player.nextOpponent.week}
+              </span>
+            </div>
+          )}
+          {player.nextOpponent && (
+            <div className="flex items-start justify-between gap-3">
+              <span className="shrink-0 pt-0.5 text-[12px] text-foreground/50">Weather</span>
+              <span className="pt-0.5 text-right font-mono text-[12px] font-semibold text-foreground/80">
+                {formatWeather(player.nextGameWeather)}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
