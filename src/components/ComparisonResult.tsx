@@ -58,25 +58,71 @@ function HeadlineIcon({ tone }: { tone: Tone }) {
   );
 }
 
+interface ConfidenceRates {
+  confident: number;
+  limitedData: number;
+  closeCall: number;
+}
+
 /**
- * A real, historically-validated accuracy rate per bucket — not a
- * fabricated per-pick confidence score. See CLAUDE.md's backtesting
- * history, item 45 (a real two-proportion z-test against the pooled
- * 2022-2025 backtest): "limited data" picks are genuinely MORE reliable
- * than "confident" ones (58.8% vs. 52.4%), and a real "close call" really
- * is close to a coin flip (~51%, item 22). isCloseCall/hasLimitedData
- * themselves are computed exactly as before in comparePlayers() — this
- * only maps those two already-existing flags to already-known numbers
- * for display, the same three-way split the headline text already uses.
+ * Real per-position pick accuracy for each of the three confidence
+ * buckets — QB/RB/WR/TE pulled from the pooled 2022-2025 nflverse-only
+ * multiseason backtest (/api/backtest/broad-nflverse-multiseason,
+ * filtered per position), the same pooled cross-season source item 45's
+ * original z-test used for the old pooled 51/52/59 numbers, just broken
+ * out by position instead of combined. D/ST and K come from the primary
+ * 2025 SportsDataIO pipeline only (/api/backtest/broad?positions=DST|K)
+ * — the nflverse-only pipeline has no D/ST/K support at all (see
+ * CLAUDE.md Open Items), so these two rest on one season, not a
+ * four-season pool — a real difference in rigor from the skill
+ * positions, not hidden here.
+ *
+ * A genuinely useful finding from pulling these real numbers, not
+ * assumed going in: the pooled ordering (closeCall worst, confident
+ * middle, limitedData best) does NOT hold per position. RB's confident
+ * bucket (61.6%) actually beats its own limited-data bucket (59.6%);
+ * K's confident bucket (38.7%, n=31) is the WORST of its three, below a
+ * coin flip; D/ST's close-call bucket (64.3%) is nowhere near a coin
+ * flip. The label text below is written generically for exactly this
+ * reason — it no longer claims a specific cross-bucket ranking, since
+ * that ranking isn't universal. Sample sizes vary a lot by bucket
+ * (close-call buckets in particular are often n<60) — read the number as
+ * real signal, not decimal-point precision.
  */
+const CONFIDENCE_BY_POSITION: Record<string, ConfidenceRates> = {
+  QB: { confident: 55, limitedData: 65, closeCall: 45 },
+  RB: { confident: 62, limitedData: 60, closeCall: 52 },
+  WR: { confident: 53, limitedData: 61, closeCall: 49 },
+  TE: { confident: 59, limitedData: 56, closeCall: 56 },
+  DST: { confident: 64, limitedData: 66, closeCall: 64 },
+  K: { confident: 39, limitedData: 55, closeCall: 50 },
+};
+
+/** Only used if a recommended player's position somehow isn't in the table above — the old pooled-across-everything numbers, not a real position's rate. */
+const POOLED_CONFIDENCE: ConfidenceRates = { confident: 52, limitedData: 59, closeCall: 51 };
+
+const POSITION_DISPLAY_LABEL: Record<string, string> = {
+  QB: "QB",
+  RB: "RB",
+  WR: "WR",
+  TE: "TE",
+  DST: "D/ST",
+  K: "K",
+};
+
 function getConfidence(result: ComparisonResultData): { pct: number; tone: Tone; label: string } {
+  const winner = result.players.find((p) => p.playerId === result.recommendedPlayerId);
+  const position = winner?.position ?? null;
+  const rates = (position && CONFIDENCE_BY_POSITION[position]) || POOLED_CONFIDENCE;
+  const positionLabel = (position && POSITION_DISPLAY_LABEL[position]) || "this position";
+
   if (result.isCloseCall) {
-    return { pct: 51, tone: "caution", label: "Close call — historically about a coin flip" };
+    return { pct: rates.closeCall, tone: "caution", label: `Close call — a genuinely tight score gap for ${positionLabel}` };
   }
   if (result.hasLimitedData) {
-    return { pct: 59, tone: "info", label: "Limited data — but historically our most reliable calls" };
+    return { pct: rates.limitedData, tone: "info", label: `Limited recent data for at least one ${positionLabel}` };
   }
-  return { pct: 52, tone: "good", label: "Confident pick" };
+  return { pct: rates.confident, tone: "good", label: `Confident pick for ${positionLabel}` };
 }
 
 // Generic, honest reference points on a 0-100 win-rate scale — NOT four
