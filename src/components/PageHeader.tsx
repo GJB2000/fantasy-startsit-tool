@@ -17,7 +17,7 @@ export function PageHeader({ eyebrow, title, description, action }: PageHeaderPr
     <div className="mb-7 flex flex-wrap items-end justify-between gap-5">
       <div>
         <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">{eyebrow}</span>
-        <h1 className="mt-1 text-balance text-[26px] font-bold tracking-tight text-foreground">{title}</h1>
+        <h1 className="mt-1 text-balance font-display text-[30px] font-bold tracking-tight text-foreground">{title}</h1>
         <p className="mt-1 max-w-md text-sm leading-relaxed text-foreground/55">{description}</p>
       </div>
       {action}

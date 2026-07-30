@@ -59,22 +59,22 @@ function DetailCard({ detail }: { detail: PlayerProjectionDetail }) {
       <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
         <span className="font-medium">
           {detail.displayName}{" "}
-          <span className="text-zinc-500">
+          <span className="text-foreground/45">
             {detail.position ?? "—"}
             {detail.team ? ` · ${detail.team}` : ""}
           </span>
         </span>
-        <span className="text-xs text-zinc-500">
+        <span className="font-mono text-xs text-foreground/45">
           {summary.mae != null
             ? `MAE ${summary.mae.toFixed(1)} (RMSE ${summary.rmse!.toFixed(1)}, bias ${signedLabel(summary.bias)}, n=${summary.n})`
             : "No graded weeks in this range"}
         </span>
       </div>
       {closer.graded > 0 && (
-        <div className="text-xs text-zinc-500">
-          Closer to actual: <span className="font-semibold text-zinc-900 dark:text-zinc-100">Engine {closer.engine}</span>
+        <div className="font-mono text-xs text-foreground/45">
+          Closer to actual: <span className="font-semibold text-foreground">Engine {closer.engine}</span>
           {" · "}
-          <span className="font-semibold text-zinc-900 dark:text-zinc-100">FantasyPros {closer.fantasyPros}</span>
+          <span className="font-semibold text-foreground">FantasyPros {closer.fantasyPros}</span>
           {closer.tie > 0 ? ` · Tied ${closer.tie}` : ""}
           {` (of ${closer.graded} weeks with both projections)`}
         </div>
@@ -82,7 +82,7 @@ function DetailCard({ detail }: { detail: PlayerProjectionDetail }) {
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-zinc-300 text-left text-zinc-500 dark:border-zinc-700">
+            <tr className="border-b border-foreground/10 text-left text-foreground/45">
               <th className="py-2 pr-3">Week</th>
               <th className="py-2 pr-3">Projected (engine)</th>
               <th className="py-2 pr-3">Projected (FantasyPros)</th>
@@ -93,28 +93,28 @@ function DetailCard({ detail }: { detail: PlayerProjectionDetail }) {
           </thead>
           <tbody>
             {detail.weeks.map((w) => (
-              <tr key={w.week} className="border-b border-zinc-200 dark:border-zinc-800">
-                <td className="py-2 pr-3">{w.week}</td>
-                <td className="py-2 pr-3">{w.predicted != null ? w.predicted.toFixed(1) : "—"}</td>
-                <td className="py-2 pr-3">
+              <tr key={w.week} className="border-b border-foreground/[0.07]">
+                <td className="py-2 pr-3 font-mono">{w.week}</td>
+                <td className="py-2 pr-3 font-mono">{w.predicted != null ? w.predicted.toFixed(1) : "—"}</td>
+                <td className="py-2 pr-3 font-mono">
                   {w.fantasyProsProjection != null ? w.fantasyProsProjection.toFixed(1) : "—"}
                 </td>
-                <td className="py-2 pr-3">{w.played ? (w.actual != null ? w.actual.toFixed(1) : "—") : "Bye/DNP"}</td>
-                <td className="py-2 pr-3 font-medium">{signedLabel(w.diff)}</td>
-                <td className="py-2 pr-3 font-medium">{signedLabel(w.fantasyProsDiff)}</td>
+                <td className="py-2 pr-3 font-mono">{w.played ? (w.actual != null ? w.actual.toFixed(1) : "—") : "Bye/DNP"}</td>
+                <td className="py-2 pr-3 font-mono font-medium">{signedLabel(w.diff)}</td>
+                <td className="py-2 pr-3 font-mono font-medium">{signedLabel(w.fantasyProsDiff)}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-zinc-300 text-left font-semibold dark:border-zinc-700">
+            <tr className="border-t border-foreground/10 text-left font-semibold">
               <td className="py-2 pr-3">Total</td>
-              <td className="py-2 pr-3">{totals.predicted != null ? totals.predicted.toFixed(1) : "—"}</td>
-              <td className="py-2 pr-3">
+              <td className="py-2 pr-3 font-mono">{totals.predicted != null ? totals.predicted.toFixed(1) : "—"}</td>
+              <td className="py-2 pr-3 font-mono">
                 {totals.fantasyProsProjection != null ? totals.fantasyProsProjection.toFixed(1) : "—"}
               </td>
-              <td className="py-2 pr-3">{totals.actual != null ? totals.actual.toFixed(1) : "—"}</td>
-              <td className="py-2 pr-3">{signedLabel(totals.diff)}</td>
-              <td className="py-2 pr-3">{signedLabel(totals.fantasyProsDiff)}</td>
+              <td className="py-2 pr-3 font-mono">{totals.actual != null ? totals.actual.toFixed(1) : "—"}</td>
+              <td className="py-2 pr-3 font-mono">{signedLabel(totals.diff)}</td>
+              <td className="py-2 pr-3 font-mono">{signedLabel(totals.fantasyProsDiff)}</td>
             </tr>
           </tfoot>
         </table>

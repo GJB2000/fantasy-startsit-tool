@@ -45,18 +45,30 @@ function injuryBadgeClasses(status: string) {
   return "bg-caution/15 text-caution";
 }
 
-/** Full literal class strings, not interpolated — Tailwind's static scanner can't resolve a template like `bg-${token}`, same constraint documented elsewhere in this app (TradeResult.tsx/WaiverResult.tsx). */
+/**
+ * Full literal class strings, not interpolated — Tailwind's static
+ * scanner can't resolve a template like `bg-${token}`, same constraint
+ * documented elsewhere in this app (TradeResult.tsx/WaiverResult.tsx).
+ *
+ * 90+ gets the gold "premium" treatment — a real blue-chip tier on top
+ * of an already-real 1-100 number, not a new grading concept. `--accent`
+ * and `--good` are the same emerald in this design system (deliberately
+ * — brand and "good" reinforce each other here), so the old accent/good
+ * split at 60/85 would now render as two identical-looking greens;
+ * collapsed into one 70+ tier instead so every band still reads as
+ * visually distinct.
+ */
 function legitScoreClasses(score: number): string {
-  if (score >= 85) return "bg-good/15 text-good";
-  if (score >= 60) return "bg-accent/15 text-accent";
-  if (score >= 35) return "bg-caution/15 text-caution";
+  if (score >= 90) return "bg-premium/15 text-premium";
+  if (score >= 70) return "bg-good/15 text-good";
+  if (score >= 45) return "bg-caution/15 text-caution";
   return "bg-bad/12 text-bad";
 }
 
 function RankingRow({ entry, formatLabel }: { entry: RankingEntryResponse; formatLabel: string }) {
   return (
     <div className="flex items-center gap-3 border-t border-foreground/[0.07] px-4 py-3.5 first:border-none">
-      <span className="w-6 shrink-0 text-right font-rounded text-[13px] font-bold text-foreground/35">
+      <span className="w-6 shrink-0 text-right font-mono text-[13px] font-bold text-foreground/35">
         {entry.positionRank}
       </span>
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent/12 text-[13px] font-bold text-accent">
@@ -82,7 +94,7 @@ function RankingRow({ entry, formatLabel }: { entry: RankingEntryResponse; forma
         </p>
         {entry.notes[0] && <p className="mt-1 truncate text-[12px] leading-snug text-foreground/55">{entry.notes[0]}</p>}
       </div>
-      <span className={`font-rounded shrink-0 rounded-2xl px-3 py-2 text-center text-[18px] font-bold tabular-nums ${legitScoreClasses(entry.legitScore)}`}>
+      <span className={`font-mono shrink-0 rounded-2xl px-3 py-2 text-center text-[18px] font-bold tabular-nums ${legitScoreClasses(entry.legitScore)}`}>
         {entry.legitScore}
       </span>
     </div>

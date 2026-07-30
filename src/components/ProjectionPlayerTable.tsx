@@ -18,7 +18,7 @@ export function ProjectionPlayerTable({ players }: ProjectionPlayerTableProps) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-zinc-300 text-left text-zinc-500 dark:border-zinc-700">
+          <tr className="border-b border-foreground/10 text-left text-foreground/45">
             <th className="py-2 pr-3">Player</th>
             <th className="py-2 pr-3">Pos</th>
             <th className="py-2 pr-3">Team</th>
@@ -33,14 +33,14 @@ export function ProjectionPlayerTable({ players }: ProjectionPlayerTableProps) {
             const bias = p.summary.bias;
             const biasLabel = bias == null ? "—" : bias >= 0 ? `+${bias.toFixed(1)}` : bias.toFixed(1);
             return (
-              <tr key={p.playerId} className="border-b border-zinc-200 dark:border-zinc-800">
+              <tr key={p.playerId} className="border-b border-foreground/[0.07]">
                 <td className="py-2 pr-3">{p.displayName}</td>
                 <td className="py-2 pr-3">{p.position}</td>
                 <td className="py-2 pr-3">{p.team ?? "—"}</td>
-                <td className="py-2 pr-3 font-medium">{p.summary.mae?.toFixed(1) ?? "—"}</td>
-                <td className="py-2 pr-3">{p.summary.rmse?.toFixed(1) ?? "—"}</td>
-                <td className="py-2 pr-3">{biasLabel}</td>
-                <td className="py-2 pr-3">{p.summary.n}</td>
+                <td className="py-2 pr-3 font-mono font-medium">{p.summary.mae?.toFixed(1) ?? "—"}</td>
+                <td className="py-2 pr-3 font-mono">{p.summary.rmse?.toFixed(1) ?? "—"}</td>
+                <td className="py-2 pr-3 font-mono">{biasLabel}</td>
+                <td className="py-2 pr-3 font-mono">{p.summary.n}</td>
               </tr>
             );
           })}

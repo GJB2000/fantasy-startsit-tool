@@ -1,10 +1,10 @@
 import type { BacktestOutcome, WeekGradeResult } from "@/lib/backtest/grading";
 
 const outcomeStyles: Record<BacktestOutcome, string> = {
-  correct: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400",
-  incorrect: "bg-red-500/20 text-red-600 dark:text-red-400",
-  push: "bg-zinc-400/20 text-zinc-500",
-  no_pick: "bg-zinc-400/20 text-zinc-500",
+  correct: "bg-good/20 text-good",
+  incorrect: "bg-bad/20 text-bad",
+  push: "bg-foreground/10 text-foreground/50",
+  no_pick: "bg-foreground/10 text-foreground/50",
 };
 
 const outcomeLabels: Record<BacktestOutcome, string> = {
@@ -23,7 +23,7 @@ export function BacktestWeekTable({ weekResults }: BacktestWeekTableProps) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-zinc-300 text-left text-zinc-500 dark:border-zinc-700">
+          <tr className="border-b border-foreground/10 text-left text-foreground/45">
             <th className="py-2 pr-3">Week</th>
             <th className="py-2 pr-3">Recommended</th>
             <th className="py-2 pr-3">Actual scores</th>
@@ -34,8 +34,8 @@ export function BacktestWeekTable({ weekResults }: BacktestWeekTableProps) {
           {weekResults.map((wr) => {
             const recommended = wr.result.players.find((p) => p.playerId === wr.result.recommendedPlayerId);
             return (
-              <tr key={wr.week} className="border-b border-zinc-200 dark:border-zinc-800">
-                <td className="py-2 pr-3">{wr.week}</td>
+              <tr key={wr.week} className="border-b border-foreground/[0.07]">
+                <td className="py-2 pr-3 font-mono">{wr.week}</td>
                 <td className="py-2 pr-3">{recommended?.displayName ?? "—"}</td>
                 <td className="py-2 pr-3">
                   {wr.result.players
@@ -46,7 +46,7 @@ export function BacktestWeekTable({ weekResults }: BacktestWeekTableProps) {
                     .join(" vs ")}
                 </td>
                 <td className="py-2 pr-3">
-                  <span className={`rounded px-1.5 py-0.5 text-xs ${outcomeStyles[wr.outcome]}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${outcomeStyles[wr.outcome]}`}>
                     {outcomeLabels[wr.outcome]}
                   </span>
                 </td>

@@ -68,14 +68,14 @@ function PlayerValueCard({ player, formatLabel }: { player: TradePlayerResult; f
       </div>
       <div className="mt-2 flex items-baseline justify-between border-t border-foreground/[0.07] pt-2">
         <span className="text-xs text-foreground/50">Rest of season ({formatLabel})</span>
-        <span className="font-rounded text-[15px] font-semibold tabular-nums">
+        <span className="font-mono text-[15px] font-semibold tabular-nums">
           {player.restOfSeasonTotal != null ? `${player.restOfSeasonTotal.toFixed(1)} pts` : "—"}
         </span>
       </div>
       {player.restOfSeasonTotal != null && (
         <div className="mt-1 flex items-baseline justify-between text-xs text-foreground/45">
           <span>{player.gamesRemaining} games left</span>
-          <span className="font-rounded tabular-nums">{(player.restOfSeasonPerGame ?? 0).toFixed(1)}/gm</span>
+          <span className="font-mono tabular-nums">{(player.restOfSeasonPerGame ?? 0).toFixed(1)}/gm</span>
         </div>
       )}
     </div>
@@ -97,7 +97,7 @@ function SideColumn({
     <div>
       <div className="mb-2 flex items-baseline justify-between">
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">{label}</h3>
-        <span className="font-rounded text-sm font-semibold tabular-nums">
+        <span className="font-mono text-sm font-semibold tabular-nums">
           {total != null ? `${total.toFixed(1)} pts` : "—"}
         </span>
       </div>

@@ -162,7 +162,7 @@ function WaiverCandidateCard({
       <dl className="mt-4 flex flex-col gap-2.5">
         <div className="flex justify-between border-t border-foreground/[0.07] pt-2.5 first:border-none first:pt-0">
           <dt className="text-[13px] text-foreground/50">Last {candidate.gamesUsedForRecent} games ({formatLabel} avg)</dt>
-          <dd className="font-rounded text-[15px] font-semibold tabular-nums">{candidate.recentPprAvg.toFixed(1)}</dd>
+          <dd className="font-mono text-[15px] font-semibold tabular-nums">{candidate.recentPprAvg.toFixed(1)}</dd>
         </div>
       </dl>
 

@@ -213,10 +213,10 @@ export function BacktestTool() {
         <button
           type="button"
           onClick={() => setMode("pair")}
-          className={`rounded-md px-3 py-1.5 ${
+          className={`rounded-full px-3.5 py-1.5 font-medium transition-colors ${
             mode === "pair"
-              ? "bg-foreground text-background"
-              : "border border-zinc-300 dark:border-zinc-700"
+              ? "bg-accent text-accent-ink"
+              : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
           }`}
         >
           Single pair
@@ -224,10 +224,10 @@ export function BacktestTool() {
         <button
           type="button"
           onClick={() => setMode("broad")}
-          className={`rounded-md px-3 py-1.5 ${
+          className={`rounded-full px-3.5 py-1.5 font-medium transition-colors ${
             mode === "broad"
-              ? "bg-foreground text-background"
-              : "border border-zinc-300 dark:border-zinc-700"
+              ? "bg-accent text-accent-ink"
+              : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
           }`}
         >
           Broad (many pairs)
@@ -235,10 +235,10 @@ export function BacktestTool() {
         <button
           type="button"
           onClick={() => setMode("trade")}
-          className={`rounded-md px-3 py-1.5 ${
+          className={`rounded-full px-3.5 py-1.5 font-medium transition-colors ${
             mode === "trade"
-              ? "bg-foreground text-background"
-              : "border border-zinc-300 dark:border-zinc-700"
+              ? "bg-accent text-accent-ink"
+              : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
           }`}
         >
           Trade analyzer
@@ -249,10 +249,10 @@ export function BacktestTool() {
             setMode("projection");
             setSeason("2025");
           }}
-          className={`rounded-md px-3 py-1.5 ${
+          className={`rounded-full px-3.5 py-1.5 font-medium transition-colors ${
             mode === "projection"
-              ? "bg-foreground text-background"
-              : "border border-zinc-300 dark:border-zinc-700"
+              ? "bg-accent text-accent-ink"
+              : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
           }`}
         >
           Projection accuracy
@@ -261,21 +261,21 @@ export function BacktestTool() {
 
       {mode === "projection" ? (
         <>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-foreground/45">
             2025 season only, PPR only, for now — how close the engine&apos;s own score comes to real points
             scored, not just whether it picked the right player.
           </p>
           <div className="space-y-2">
-            <span className="text-sm text-zinc-500">Look up specific players (optional)</span>
+            <span className="text-sm text-foreground/45">Look up specific players (optional)</span>
             <div className="space-y-2">
               {lookupPlayers.map((player) => (
                 <div
                   key={player.playerId}
-                  className="flex items-center justify-between rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2"
+                  className="flex items-center justify-between rounded-2xl border border-foreground/15 bg-surface px-3.5 py-2.5 shadow-sm"
                 >
                   <span className="text-sm">
                     {player.name}{" "}
-                    <span className="text-zinc-500">
+                    <span className="text-foreground/45">
                       {player.position}
                       {player.team ? ` · ${player.team}` : ""}
                     </span>
@@ -283,7 +283,7 @@ export function BacktestTool() {
                   <button
                     type="button"
                     onClick={() => removeLookupPlayer(player.playerId)}
-                    className="text-sm text-zinc-500 hover:text-foreground"
+                    className="text-sm text-foreground/45 hover:text-foreground"
                     aria-label={`Remove ${player.name}`}
                   >
                     ✕
@@ -302,7 +302,7 @@ export function BacktestTool() {
         </>
       ) : (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-zinc-500">Season</span>
+          <span className="text-foreground/45">Season</span>
           {SEASON_OPTIONS.map((s) => (
             <button
               key={s}
@@ -313,14 +313,14 @@ export function BacktestTool() {
                 setBroadResult(null);
                 setTradeResult(null);
               }}
-              className={`rounded-md px-3 py-1.5 ${
-                season === s ? "bg-foreground text-background" : "border border-zinc-300 dark:border-zinc-700"
+              className={`rounded-full px-3.5 py-1.5 font-medium transition-colors ${
+                season === s ? "bg-accent text-accent-ink" : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
               }`}
             >
               {s}
             </button>
           ))}
-          <span className="text-xs text-zinc-500">
+          <span className="text-xs text-foreground/45">
             {season === "2025" ? "primary, tuned" : "out-of-sample validation (nflverse-only)"}
           </span>
         </div>
@@ -331,11 +331,11 @@ export function BacktestTool() {
           {players.map((player) => (
             <div
               key={player.playerId}
-              className="flex items-center justify-between rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2"
+              className="flex items-center justify-between rounded-2xl border border-foreground/15 bg-surface px-3.5 py-2.5 shadow-sm"
             >
               <span className="text-sm">
                 {player.name}{" "}
-                <span className="text-zinc-500">
+                <span className="text-foreground/45">
                   {player.position}
                   {player.team ? ` · ${player.team}` : ""}
                 </span>
@@ -343,7 +343,7 @@ export function BacktestTool() {
               <button
                 type="button"
                 onClick={() => removePlayer(player.playerId)}
-                className="text-sm text-zinc-500 hover:text-foreground"
+                className="text-sm text-foreground/45 hover:text-foreground"
                 aria-label={`Remove ${player.name}`}
               >
                 ✕
@@ -361,7 +361,7 @@ export function BacktestTool() {
       )}
 
       {mode === "trade" && (
-        <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-3 text-xs text-sky-700 dark:text-sky-400">
+        <div className="rounded-2xl border border-info/40 bg-info/10 p-3 text-xs text-info">
           <strong>Scope:</strong> synthetic 1-for-1 trades only, generated the same way broad-mode
           start/sit pairs are (adjacent-rank pairs at each position, ranked as of the week below).
           Grades the trade analyzer&apos;s rest-of-season projection against what each player
@@ -375,7 +375,7 @@ export function BacktestTool() {
             {ALL_POSITIONS.map((position) => (
               <label
                 key={position}
-                className="flex items-center gap-1.5 rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                className="flex items-center gap-1.5 rounded-full border border-foreground/15 px-2.5 py-1"
               >
                 <input
                   type="checkbox"
@@ -390,7 +390,7 @@ export function BacktestTool() {
               EXTENDED_ONLY_POSITIONS.map((position) => (
                 <label
                   key={position}
-                  className="flex items-center gap-1.5 rounded-md border border-zinc-300 px-2 py-1 dark:border-zinc-700"
+                  className="flex items-center gap-1.5 rounded-full border border-foreground/15 px-2.5 py-1"
                 >
                   <input
                     type="checkbox"
@@ -402,7 +402,7 @@ export function BacktestTool() {
               ))}
           </div>
           {mode === "broad" && season === "2025" && (
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-foreground/45">
               D/ST and K run on a much simpler model than the skill positions — recent scoring plus one
               matchup signal, not a blend of a dozen. D/ST&apos;s own signal backtested strong; K&apos;s was
               weaker than just ranking kickers by season average. Only available on the 2025 season for now.
@@ -418,7 +418,7 @@ export function BacktestTool() {
             <select
               value={asOfWeek}
               onChange={(e) => setAsOfWeek(Number(e.target.value))}
-              className="rounded-md border border-zinc-300 bg-background px-1.5 py-1 dark:border-zinc-700"
+              className="rounded-xl border border-foreground/15 bg-surface px-1.5 py-1"
             >
               {AS_OF_WEEK_OPTIONS.map((w) => (
                 <option key={w} value={w}>
@@ -427,7 +427,7 @@ export function BacktestTool() {
               ))}
             </select>
           </label>
-          <span className="text-xs text-zinc-500">
+          <span className="text-xs text-foreground/45">
             trades are built from data through this week, then graded against weeks {asOfWeek + 1}-18
           </span>
         </div>
@@ -438,7 +438,7 @@ export function BacktestTool() {
             <select
               value={weekFrom}
               onChange={(e) => setWeekFrom(Number(e.target.value))}
-              className="rounded-md border border-zinc-300 bg-background px-1.5 py-1 dark:border-zinc-700"
+              className="rounded-xl border border-foreground/15 bg-surface px-1.5 py-1"
             >
               {WEEK_OPTIONS.map((w) => (
                 <option key={w} value={w}>
@@ -447,11 +447,11 @@ export function BacktestTool() {
               ))}
             </select>
           </label>
-          <span className="text-zinc-500">to</span>
+          <span className="text-foreground/45">to</span>
           <select
             value={weekTo}
             onChange={(e) => setWeekTo(Number(e.target.value))}
-            className="rounded-md border border-zinc-300 bg-background px-1.5 py-1 dark:border-zinc-700"
+            className="rounded-xl border border-foreground/15 bg-surface px-1.5 py-1"
           >
             {WEEK_OPTIONS.map((w) => (
               <option key={w} value={w}>
@@ -465,7 +465,7 @@ export function BacktestTool() {
               setWeekFrom(1);
               setWeekTo(18);
             }}
-            className="text-xs text-zinc-500 underline"
+            className="text-xs text-foreground/45 underline"
           >
             All weeks
           </button>
@@ -476,16 +476,16 @@ export function BacktestTool() {
         type="button"
         onClick={runBacktest}
         disabled={loading || (mode === "pair" && players.length !== 2)}
-        className="w-full rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-40"
+        className="w-full rounded-full bg-accent px-4 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
       >
         {loading ? "Running…" : "Run backtest"}
       </button>
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-bad">{error}</p>}
 
       {pairResult && (
         <div className="space-y-4">
-          <p className="text-xs font-medium text-zinc-500">
+          <p className="text-xs font-medium text-foreground/45">
             Showing {pairResultSeason} results ({pairResultSeason === "2025" ? "SportsDataIO" : "nflverse-only"})
           </p>
           <BacktestSummaryView
@@ -500,7 +500,7 @@ export function BacktestTool() {
 
       {broadResult && (
         <div className="space-y-4">
-          <p className="text-xs font-medium text-zinc-500">
+          <p className="text-xs font-medium text-foreground/45">
             Showing {broadResultSeason} results ({broadResultSeason === "2025" ? "SportsDataIO" : "nflverse-only"})
           </p>
           <BacktestSummaryView
@@ -515,7 +515,7 @@ export function BacktestTool() {
 
       {tradeResult && (
         <div className="space-y-4">
-          <p className="text-xs font-medium text-zinc-500">
+          <p className="text-xs font-medium text-foreground/45">
             Showing {tradeResultSeason} results ({tradeResultSeason === "2025" ? "SportsDataIO" : "nflverse-only"}) —{" "}
             {tradeResult.results.length} synthetic trade{tradeResult.results.length === 1 ? "" : "s"}
           </p>
@@ -526,11 +526,11 @@ export function BacktestTool() {
 
       {projectionResult && (
         <div className="space-y-4">
-          <p className="text-xs font-medium text-zinc-500">Showing 2025 results (SportsDataIO, PPR)</p>
+          <p className="text-xs font-medium text-foreground/45">Showing 2025 results (SportsDataIO, PPR)</p>
 
           {projectionResult.playerDetail && projectionResult.playerDetail.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground/45">
                 Player lookup — projected vs. actual by week
               </h3>
               <ProjectionPlayerDetailView players={projectionResult.playerDetail} />
@@ -548,7 +548,7 @@ export function BacktestTool() {
                 expertConsensusByPosition={projectionResult.expertConsensusByPosition ?? undefined}
               />
               <div className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground/45">
                   By player (worst MAE first)
                 </h3>
                 <ProjectionPlayerTable players={projectionResult.byPlayer ?? []} />

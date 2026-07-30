@@ -28,7 +28,7 @@ function StepperRow({
         >
           −
         </button>
-        <span className="w-4 text-center font-rounded text-sm font-semibold tabular-nums">{count}</span>
+        <span className="w-4 text-center font-mono text-sm font-semibold tabular-nums">{count}</span>
         <button
           type="button"
           onClick={() => onChange(count + 1)}

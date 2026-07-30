@@ -1,17 +1,29 @@
 @import "tailwindcss";
 
+/*
+ * Dark/emerald "data-grade" design system — replaces the earlier
+ * Apple-inspired system (system-font typography, ui-rounded numerals,
+ * navy/blue accent). Light and dark are both first-class themes here,
+ * not just a system-preference afterthought: the reference this was
+ * built from is dark-first, so light mode was designed as its own
+ * inversion (darker emerald for contrast on white, darker semantic
+ * colors) rather than a literal negative of the dark palette.
+ */
 :root {
-  --background: #eef1f6;
-  --foreground: #0b1220;
+  --background: #f5f7f5;
+  --foreground: #0b0e0c;
   --surface: #ffffff;
   --surface-glass: rgba(255, 255, 255, 0.78);
-  --surface-sunken: #f4f6fa;
-  --accent: #1552c9;
+  --surface-sunken: #edf1ee;
+  --accent: #00b868;
+  --accent-secondary: #00a85d;
   --accent-ink: #ffffff;
-  --good: #268a4a;
-  --bad: #c0342f;
-  --caution: #a8700f;
-  --info: #1f6fb0;
+  --good: #00b868;
+  --bad: #d93636;
+  --caution: #c97a0a;
+  --info: #1e7fbf;
+  --premium: #b8863a;
+  --premium-ink: #ffffff;
 }
 
 @theme inline {
@@ -21,33 +33,35 @@
   --color-surface-glass: var(--surface-glass);
   --color-surface-sunken: var(--surface-sunken);
   --color-accent: var(--accent);
+  --color-accent-secondary: var(--accent-secondary);
   --color-accent-ink: var(--accent-ink);
   --color-good: var(--good);
   --color-bad: var(--bad);
   --color-caution: var(--caution);
   --color-info: var(--info);
-  --font-sans:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
-  --font-rounded:
-    ui-rounded, -apple-system, BlinkMacSystemFont, "SF Pro Rounded",
-    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --color-premium: var(--premium);
+  --color-premium-ink: var(--premium-ink);
+  --font-sans: var(--font-sans-loaded), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: var(--font-display), "Barlow Condensed", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-mono-loaded), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #070b14;
-    --foreground: #eef1f8;
-    --surface: #10161f;
-    --surface-glass: rgba(16, 22, 31, 0.68);
-    --surface-sunken: #0c111a;
-    --accent: #2f7dff;
-    --accent-ink: #061024;
-    --good: #3ee06a;
-    --bad: #ff4f5e;
-    --caution: #ffc247;
-    --info: #6fd1ff;
+    --background: #0b0e0c;
+    --foreground: #f2f5f3;
+    --surface: #12151a;
+    --surface-glass: rgba(18, 21, 26, 0.7);
+    --surface-sunken: #08090a;
+    --accent: #00e07f;
+    --accent-secondary: #00b868;
+    --accent-ink: #06120c;
+    --good: #00e07f;
+    --bad: #ff4d4d;
+    --caution: #ffb020;
+    --info: #4fc3f7;
+    --premium: #e8c468;
+    --premium-ink: #221802;
   }
 }
 

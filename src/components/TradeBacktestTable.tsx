@@ -2,10 +2,10 @@ import type { BacktestOutcome } from "@/lib/backtest/grading";
 import type { TradeGradeResult } from "@/lib/backtest/tradeBacktest";
 
 const outcomeStyles: Record<BacktestOutcome, string> = {
-  correct: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400",
-  incorrect: "bg-red-500/20 text-red-600 dark:text-red-400",
-  push: "bg-zinc-400/20 text-zinc-500",
-  no_pick: "bg-zinc-400/20 text-zinc-500",
+  correct: "bg-good/20 text-good",
+  incorrect: "bg-bad/20 text-bad",
+  push: "bg-foreground/10 text-foreground/50",
+  no_pick: "bg-foreground/10 text-foreground/50",
 };
 
 const outcomeLabels: Record<BacktestOutcome, string> = {
@@ -28,7 +28,7 @@ export function TradeBacktestTable({ results }: TradeBacktestTableProps) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-zinc-300 text-left text-zinc-500 dark:border-zinc-700">
+          <tr className="border-b border-foreground/10 text-left text-foreground/45">
             <th className="py-2 pr-3">Pos</th>
             <th className="py-2 pr-3">Give</th>
             <th className="py-2 pr-3">Get</th>
@@ -46,20 +46,20 @@ export function TradeBacktestTable({ results }: TradeBacktestTableProps) {
                   ? r.get.displayName
                   : "—";
             return (
-              <tr key={i} className="border-b border-zinc-200 dark:border-zinc-800">
+              <tr key={i} className="border-b border-foreground/[0.07]">
                 <td className="py-2 pr-3">{r.position}</td>
                 <td className="py-2 pr-3">
-                  {r.give.displayName} ({fmt(r.give.projectedTotal)} proj.)
+                  {r.give.displayName} (<span className="font-mono">{fmt(r.give.projectedTotal)}</span> proj.)
                 </td>
                 <td className="py-2 pr-3">
-                  {r.get.displayName} ({fmt(r.get.projectedTotal)} proj.)
+                  {r.get.displayName} (<span className="font-mono">{fmt(r.get.projectedTotal)}</span> proj.)
                 </td>
                 <td className="py-2 pr-3">{predictedName}</td>
-                <td className="py-2 pr-3">
+                <td className="py-2 pr-3 font-mono">
                   {fmt(r.give.actualTotal)} vs {fmt(r.get.actualTotal)}
                 </td>
                 <td className="py-2 pr-3">
-                  <span className={`rounded px-1.5 py-0.5 text-xs ${outcomeStyles[r.outcome]}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${outcomeStyles[r.outcome]}`}>
                     {outcomeLabels[r.outcome]}
                   </span>
                 </td>

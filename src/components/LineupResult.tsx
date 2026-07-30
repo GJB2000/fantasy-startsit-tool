@@ -88,7 +88,7 @@ function StarterCard({ heading, breakdown, formatLabel }: { heading: string; bre
       <dl className="mt-4 flex flex-col gap-2.5">
         <div className="flex justify-between border-t border-foreground/[0.07] pt-2.5 first:border-none first:pt-0">
           <dt className="text-[13px] text-foreground/50">Projected score ({formatLabel})</dt>
-          <dd className="font-rounded text-[15px] font-semibold tabular-nums">
+          <dd className="font-mono text-[15px] font-semibold tabular-nums">
             {breakdown.finalScore != null ? breakdown.finalScore.toFixed(1) : "—"}
           </dd>
         </div>
@@ -121,7 +121,7 @@ function BenchRow({ breakdown, formatLabel }: { breakdown: PlayerScoreBreakdown;
           {breakdown.team ? ` · ${breakdown.team}` : ""}
         </p>
       </div>
-      <span className="font-rounded shrink-0 text-sm font-semibold tabular-nums text-foreground/70">
+      <span className="font-mono shrink-0 text-sm font-semibold tabular-nums text-foreground/70">
         {breakdown.finalScore != null ? `${breakdown.finalScore.toFixed(1)} ${formatLabel}` : "—"}
       </span>
     </div>

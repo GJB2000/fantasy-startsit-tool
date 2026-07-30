@@ -103,7 +103,7 @@ function ConfidenceBar({ pct, tone, label }: { pct: number; tone: Tone; label: s
     <div className="mt-4">
       <div className="flex items-baseline justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">Confidence</span>
-        <span className="font-rounded text-sm font-bold tabular-nums" style={{ color: `var(--${tone})` }}>
+        <span className="font-mono text-sm font-bold tabular-nums" style={{ color: `var(--${tone})` }}>
           {pct}%
         </span>
       </div>
@@ -150,7 +150,7 @@ export function ComparisonResult({ result, contextNote, scoringFormat }: Compari
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">Start</p>
-                <h2 className="mt-0.5 truncate text-[28px] font-bold leading-tight tracking-tight">
+                <h2 className="mt-0.5 truncate font-display text-[34px] font-bold leading-tight tracking-tight">
                   {winner.displayName}
                 </h2>
               </div>
@@ -260,20 +260,20 @@ export function ComparisonResult({ result, contextNote, scoringFormat }: Compari
                     <dt className="text-[13px] text-foreground/50">
                       Last {player.gamesUsedForRecent || 0} games ({formatLabel} avg)
                     </dt>
-                    <dd className="font-rounded text-[15px] font-semibold tabular-nums">
+                    <dd className="font-mono text-[15px] font-semibold tabular-nums">
                       {player.recentPprAvg != null ? player.recentPprAvg.toFixed(1) : "—"}
                     </dd>
                   </div>
                   <div className="flex justify-between border-t border-foreground/[0.07] pt-2.5">
                     <dt className="text-[13px] text-foreground/50">Season avg ({formatLabel})</dt>
-                    <dd className="font-rounded text-[15px] font-semibold tabular-nums">
+                    <dd className="font-mono text-[15px] font-semibold tabular-nums">
                       {player.seasonPprAvg != null ? player.seasonPprAvg.toFixed(1) : "—"}
                     </dd>
                   </div>
                   {player.recentVolumeAvg != null && (
                     <div className="flex justify-between border-t border-foreground/[0.07] pt-2.5">
                       <dt className="text-[13px] text-foreground/50">Recent volume/game</dt>
-                      <dd className="font-rounded text-[15px] font-semibold tabular-nums">{player.recentVolumeAvg.toFixed(1)}</dd>
+                      <dd className="font-mono text-[15px] font-semibold tabular-nums">{player.recentVolumeAvg.toFixed(1)}</dd>
                     </div>
                   )}
                   {player.matchupContext && (
@@ -281,7 +281,7 @@ export function ComparisonResult({ result, contextNote, scoringFormat }: Compari
                       <dt className="text-[13px] text-foreground/50">
                         Last matchup ({player.matchupContext.opponentTeam})
                       </dt>
-                      <dd className="font-rounded text-[15px] font-semibold tabular-nums">
+                      <dd className="font-mono text-[15px] font-semibold tabular-nums">
                         #{player.matchupContext.rank} of {player.matchupContext.teamCount}
                       </dd>
                     </div>
@@ -289,7 +289,7 @@ export function ComparisonResult({ result, contextNote, scoringFormat }: Compari
                   {player.nextOpponent && (
                     <div className="flex justify-between border-t border-foreground/[0.07] pt-2.5">
                       <dt className="text-[13px] text-foreground/50">Next opponent</dt>
-                      <dd className="font-rounded text-[15px] font-semibold tabular-nums">
+                      <dd className="font-mono text-[15px] font-semibold tabular-nums">
                         {player.nextOpponent.team} · Wk {player.nextOpponent.week}
                       </dd>
                     </div>
@@ -297,7 +297,7 @@ export function ComparisonResult({ result, contextNote, scoringFormat }: Compari
                   {player.nextOpponent && (
                     <div className="flex justify-between border-t border-foreground/[0.07] pt-2.5">
                       <dt className="text-[13px] text-foreground/50">Weather</dt>
-                      <dd className="font-rounded text-[15px] font-semibold tabular-nums">
+                      <dd className="font-mono text-[15px] font-semibold tabular-nums">
                         {formatWeather(player.nextGameWeather)}
                       </dd>
                     </div>

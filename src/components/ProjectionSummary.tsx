@@ -8,9 +8,9 @@ interface ProjectionBanner {
 function ProjectionRow({ label, summary }: ProjectionBanner) {
   if (summary.n === 0 || summary.mae == null) {
     return (
-      <div className="flex items-center justify-between rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">
+      <div className="flex items-center justify-between rounded-2xl border border-foreground/10 bg-surface px-3.5 py-2.5 text-sm shadow-sm">
         <span className="font-medium">{label}</span>
-        <span className="text-zinc-500">— (n=0)</span>
+        <span className="text-foreground/45">— (n=0)</span>
       </div>
     );
   }
@@ -18,11 +18,11 @@ function ProjectionRow({ label, summary }: ProjectionBanner) {
   const biasLabel = summary.bias! >= 0 ? `+${summary.bias!.toFixed(1)}` : summary.bias!.toFixed(1);
 
   return (
-    <div className="flex items-center justify-between rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">
+    <div className="flex items-center justify-between rounded-2xl border border-foreground/10 bg-surface px-3.5 py-2.5 text-sm shadow-sm">
       <span className="font-medium">{label}</span>
       <span>
-        <span className="font-semibold">{summary.mae.toFixed(1)} MAE</span>{" "}
-        <span className="text-zinc-500">
+        <span className="font-mono font-semibold">{summary.mae.toFixed(1)} MAE</span>{" "}
+        <span className="font-mono text-foreground/45">
           (RMSE {summary.rmse!.toFixed(1)}, bias {biasLabel}, n={summary.n})
         </span>
       </span>
@@ -57,7 +57,7 @@ export function ProjectionSummaryView({
   return (
     <div className="space-y-5">
       <div className="space-y-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Engine projection error</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground/45">Engine projection error</h3>
         <ProjectionRow label="Overall" summary={overall} />
         {byPosition &&
           Object.entries(byPosition).map(([position, summary]) => (
@@ -67,7 +67,7 @@ export function ProjectionSummaryView({
 
       {baselineOverall && (
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground/45">
             vs. naive baseline (season-to-date average, same player-weeks)
           </h3>
           <ProjectionRow label="Overall" summary={baselineOverall} />
@@ -80,7 +80,7 @@ export function ProjectionSummaryView({
 
       {expertConsensusOverall && (
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground/45">
             vs. FantasyPros&apos; weekly consensus estimate (same player-weeks, own coverage)
           </h3>
           <ProjectionRow label="Overall" summary={expertConsensusOverall} />

@@ -39,7 +39,7 @@ function MatchupContextPanel({ result }: { result: ComparisonResultData }) {
               <span className="text-[12.5px] font-medium">
                 {ctx.opponentTeam} <span className="text-foreground/45">vs. {ctx.position}</span>
               </span>
-              <span className={`font-rounded whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold ${TONE_CLASSES[tone]}`}>
+              <span className={`font-mono whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold ${TONE_CLASSES[tone]}`}>
                 #{ctx.rank} of {ctx.teamCount} · {text}
               </span>
             </div>

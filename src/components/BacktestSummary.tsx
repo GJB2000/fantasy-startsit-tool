@@ -8,11 +8,11 @@ interface AccuracyBannerProps {
 
 function AccuracyBanner({ label, summary }: AccuracyBannerProps) {
   return (
-    <div className="flex items-center justify-between rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm">
+    <div className="flex items-center justify-between rounded-2xl border border-foreground/10 bg-surface px-3.5 py-2.5 text-sm shadow-sm">
       <span className="font-medium">{label}</span>
-      <span>
+      <span className="font-mono tabular-nums">
         {summary.accuracyPct != null ? `${summary.accuracyPct.toFixed(1)}%` : "—"}{" "}
-        <span className="text-zinc-500">
+        <span className="text-foreground/45">
           ({summary.correct}-{summary.incorrect}
           {summary.push > 0 ? `, ${summary.push} push` : ""}
           {summary.noPick > 0 ? `, ${summary.noPick} no-pick` : ""})
@@ -25,7 +25,7 @@ function AccuracyBanner({ label, summary }: AccuracyBannerProps) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{title}</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground/45">{title}</h3>
       {children}
     </div>
   );

@@ -8,7 +8,7 @@ interface BacktestCaveatNoteProps {
 export function BacktestCaveatNote({ season, showNflverseCaveat = false }: BacktestCaveatNoteProps) {
   return (
     <div className="space-y-2">
-      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+      <div className="rounded-2xl border border-caution/40 bg-caution/10 p-3 text-xs text-caution">
         <strong>Heads up:</strong>{" "}
         historical injury status can&apos;t be reconstructed from this data source
         (archived records only ever show None/Out/Probable, never Questionable/Doubtful
@@ -17,7 +17,7 @@ export function BacktestCaveatNote({ season, showNflverseCaveat = false }: Backt
         injury-flagging behavior.
       </div>
       {showNflverseCaveat && (
-        <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-3 text-xs text-sky-700 dark:text-sky-400">
+        <div className="rounded-2xl border border-info/40 bg-info/10 p-3 text-xs text-info">
           <strong>{season ?? "This season"} is an out-of-sample check:</strong>{" "}
           SportsDataIO doesn&apos;t serve {season ?? "this"}{" "}
           data on this plan, so this runs

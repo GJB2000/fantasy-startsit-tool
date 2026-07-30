@@ -50,7 +50,7 @@ function SlotRow({ slot }: { slot: LineupSlotResponse }) {
         )}
       </div>
       {b?.finalScore != null && (
-        <span className="font-rounded shrink-0 text-[12.5px] font-semibold tabular-nums text-foreground/70">
+        <span className="font-mono shrink-0 text-[12.5px] font-semibold tabular-nums text-foreground/70">
           {b.finalScore.toFixed(1)}
         </span>
       )}
