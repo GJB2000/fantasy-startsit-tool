@@ -5665,8 +5665,67 @@ single-season numbers for those specific constants.
       wasn't worth it. `npx tsc --noEmit` and `npm run lint` clean
       throughout; the user's own running server (on this folder) HMR'd the
       changes for their own visual check.
+89. **Re-swept `QB_RUSH_BLEND_WEIGHT` against both pipelines and confirmed
+    0.3 is optimal — Open Item #7's premise no longer holds on the current
+    engine.** Item 52 flagged (as a side-finding) that pooled 2022-2025
+    accuracy seemed to "climb well past 0.3," raising the question of
+    whether 0.3 left accuracy on the table or that was an artifact of
+    grading 2025 through the nflverse-only pipeline. Swept
+    w ∈ {0.0, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9} against the REAL shipped engine
+    (config edit + curl of the real `/api/backtest/broad` and
+    `/api/backtest/broad-nflverse-multiseason` routes — no reimplemented
+    scoring, so no cross-check harness was needed; validated the harness
+    reproduces the documented shipped numbers exactly first, primary 2025
+    PPR overall 58.69% / QB 61.76%, matching item 70). PPR only: the weight
+    is a single format-shared scalar whose curve shape item 52 already
+    found identical across formats, and since the decision was "no change,"
+    no format needed re-validation regardless.
+    - **The premise did NOT reproduce.** On the current engine, POOLED
+      accuracy PEAKS at 0.3 and declines above it, rather than climbing:
 
-### Open items (as of item 88 — pick up here)
+      | w | pooled overall | pooled QB | primary 2025 overall | primary 2025 QB |
+      |---|---|---|---|---|
+      | 0.0 | 57.69 | 60.05 | 58.69 | 61.76 |
+      | 0.2 | 57.73 | 60.29 | 59.02 | 63.73 |
+      | **0.3** | **57.78** | **60.54** | 58.69 | 61.76 |
+      | 0.4 | 57.45 | 58.58 | 59.02 | 63.73 |
+      | 0.5 | 57.53 | 59.07 | 57.21 | 52.94 |
+      | 0.7 | 57.45 | 58.58 | 56.89 | 50.98 |
+      | 0.9 | 57.32 | 57.84 | 56.39 | 48.04 |
+
+    - **Why the premise is stale, not wrong-at-the-time**: item 52 measured
+      this before item 66 disabled `QB_RUSH_EPA_BLEND_WEIGHT` and before
+      item 70 blended FantasyPros expert consensus into `finalScore` at
+      0.5. Expert consensus now carries most of the QB score (item 70
+      lifted primary QB from 52.9% to 61.8%), which flattened and then
+      inverted the QB-rush weight's old upward slope — the landscape the
+      item-52 side-finding described no longer exists.
+    - **0.3 is the clean pooled peak for both overall and QB**, and
+      dominates 0.0 specifically via 2024 (pooled 2024 QB 55.9% at 0.3 vs.
+      50.98% at 0.0 — the out-of-sample season the QB-rush term was added
+      for in item 30 — with everything else ~equal). The original item-30
+      cross-season tradeoff still holds exactly: pooled 2024 QB wants HIGH
+      weight (50.98→59.80 across 0.0→0.9) while 2022/2023/2025 QB want LOW
+      and crater at 0.5+ — so 0.3 remains the right balanced compromise for
+      the same reason it was chosen originally.
+    - **Primary 2025 is a noisy plateau across 0.0-0.4** (overall
+      58.69-59.02, QB 61.76-63.73 — 1-2 QB pairs of jitter on n=102) then
+      collapses at 0.5+ (QB → 48% at 0.9). 0.2/0.4 edge 0.3 on primary by
+      1-2 pairs, but pooled and 2024 both prefer 0.3, and chasing a
+      1-2-pair small-sample primary peak over the robust pooled signal is
+      exactly the "don't trust an isolated peak" discipline this document
+      applies elsewhere (items 9/20/38). Not moved.
+    - **Decision: no change — `QB_RUSH_BLEND_WEIGHT` stays 0.3**, now
+      re-confirmed as the pooled optimum on the current engine rather than
+      a legacy item-30 compromise. Answers Open Item #7's question: it's
+      neither a real generalization gain to capture nor merely a
+      2025-nflverse artifact — the effect it described was overtaken by
+      later engine changes. No code changed; the temporary config edits
+      were reverted and the curl-driven sweep left no repo artifact (this
+      write-up is the only lasting record, same discipline as items
+      43/52's own sweep cleanups).
+
+### Open items (as of item 89 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -5779,11 +5838,13 @@ scoring-sync fix (`createPersistentStore.ts`, `RosterManager.tsx`,
 hooks, and the `AppShell`/`WaiverTool`/`LineupTool` rewiring) as
 `990a73d`, and the Lineup roster-slots collapse
 (`summarizeSlots`/`totalStarters`, the `CollapsibleSection` wrap) as
-`8874ef5`. Item 88's remaining touch (dropping the roster-slots shape
-summary on mobile, `hidden sm:inline`) and this CLAUDE.md write-up of
-item 88 are **not yet committed as of this writing** — commit only once
-the user explicitly asks, per this project's standing rule. Nothing
-below is started or fixed yet:
+`8874ef5`; item 88's remaining touch (dropping the roster-slots shape
+summary on mobile) plus its CLAUDE.md write-up followed as `66a92aa`.
+Item 89 (the `QB_RUSH_BLEND_WEIGHT` re-sweep) shipped NO code — a
+confirmed no-change result — so its only artifact is this CLAUDE.md
+write-up, **not yet committed as of this writing** — commit only once the
+user explicitly asks, per this project's standing rule. Nothing below is
+started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -5837,17 +5898,17 @@ below is started or fixed yet:
    so the remaining gap is more likely structural (e.g. `blendedScore`
    itself, or `POINTS_PER_*` conversion factors interacting with
    position pools differently per format) than a tuning oversight.
-7. **`QB_RUSH_BLEND_WEIGHT` (0.3) may be leaving accuracy on the table,
-   independent of format** — flagged in item 52 as a side-finding, not
-   acted on there since it isn't format-specific. Re-sweeping it against
-   the pooled 2022-2025 nflverse-only sample (all four seasons through
-   the *same* pipeline) shows accuracy climbing well past 0.3 for PPR,
-   Half-PPR, and Standard alike, with only 2023 declining as weight
-   increases (2022/2024/2025 all improve) — a materially different
-   picture than the two-pipeline (SportsDataIO 2025 + nflverse 2024)
-   tension that originally justified 0.3 in item 30. Worth a dedicated
-   pass: is this a real generalization gain, or an artifact of grading
-   2025 through the nflverse-only pipeline instead of the primary one?
+7. **`QB_RUSH_BLEND_WEIGHT` (0.3) re-sweep — RESOLVED, see item 89: no
+   change, 0.3 re-confirmed optimal.** Item 52's side-finding (pooled
+   accuracy "climbing well past 0.3") did NOT reproduce on the current
+   engine — it predated item 66 (disabling `QB_RUSH_EPA_BLEND_WEIGHT`) and
+   item 70 (FantasyPros expert consensus now carrying the QB score). Swept
+   both pipelines fresh: pooled 2022-2025 accuracy now PEAKS at 0.3 (both
+   overall and QB) and declines above it, primary 2025 wants ≤0.4 and
+   collapses at 0.5+, and the original item-30 cross-season tradeoff
+   (pooled 2024 QB wants high weight, 2022/2023/2025 QB want low) still
+   holds — so 0.3 stays as the balanced compromise, now confirmed as the
+   pooled optimum rather than a legacy compromise. No longer open.
 8. **Exponentially-weighted recent performance, tested and dropped
    standalone in item 54** — the real, more relevant test was never run.
    Item 54 only judged the raw recent-average signal in total isolation
