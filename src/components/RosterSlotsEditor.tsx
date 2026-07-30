@@ -58,8 +58,7 @@ export function RosterSlotsEditor({ slots, onChange }: RosterSlotsEditorProps) {
 
   return (
     <div>
-      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">Roster slots</h2>
-      <p className="mt-1.5 text-xs leading-relaxed text-foreground/50">
+      <p className="text-xs leading-relaxed text-foreground/50">
         How many starters at each spot — auto-filled from your Sleeper league when connected, always editable.
       </p>
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">

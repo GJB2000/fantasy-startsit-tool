@@ -2,11 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
-import { DEFAULT_SLOTS, parseSleeperRosterPositions, serializeSlots, type SlotType } from "@/lib/lineup/rosterSlots";
+import {
+  DEFAULT_SLOTS,
+  parseSleeperRosterPositions,
+  serializeSlots,
+  summarizeSlots,
+  totalStarters,
+  type SlotType,
+} from "@/lib/lineup/rosterSlots";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useRosterModal } from "@/lib/useRosterModal";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { useSleeperConnection } from "@/lib/useSleeperConnection";
+import { CollapsibleSection } from "./CollapsibleSection";
 import { LineupResult, type LineupSlotResponse } from "./LineupResult";
 import { RosterSlotsEditor } from "./RosterSlotsEditor";
 import { RosterSummaryButton } from "./RosterSummaryButton";
@@ -92,7 +100,19 @@ export function LineupTool() {
       />
 
       <div className="mt-5 rounded-3xl border border-foreground/10 bg-surface p-5 shadow-sm">
-        <RosterSlotsEditor slots={slotCounts} onChange={setSlotCounts} />
+        <CollapsibleSection
+          defaultOpen={false}
+          label={
+            <span className="normal-case">
+              <span className="font-semibold uppercase tracking-wide text-foreground/60">
+                Roster slots · {totalStarters(slotCounts)} starters
+              </span>
+              <span className="ml-1.5 text-foreground/40">{summarizeSlots(slotCounts)}</span>
+            </span>
+          }
+        >
+          <RosterSlotsEditor slots={slotCounts} onChange={setSlotCounts} />
+        </CollapsibleSection>
       </div>
 
       <button

@@ -103,6 +103,17 @@ export function parseSleeperRosterPositions(rosterPositions: string[]): Record<S
   return counts;
 }
 
+/** Human-readable one-line summary of a slot config (e.g. "1 QB · 2 RB · 2 WR · 1 TE · 1 FLEX · 1 K · 1 D/ST"), for the collapsed lineup-slots header. Zero-count slot types are omitted. */
+export function summarizeSlots(counts: Record<SlotType, number>): string {
+  const parts = SLOT_TYPES.filter((t) => counts[t] > 0).map((t) => `${counts[t]} ${SLOT_LABEL[t]}`);
+  return parts.length > 0 ? parts.join(" · ") : "No slots set";
+}
+
+/** Total number of starting slots across every position — for a compact "N starters" summary. */
+export function totalStarters(counts: Record<SlotType, number>): number {
+  return SLOT_TYPES.reduce((sum, t) => sum + counts[t], 0);
+}
+
 /** Compact `<SlotType><count>` pairs (e.g. "QB1,RB2,WR2,TE1,FLEX1,K1,DST1") — a GET-friendly encoding for the roster-slot config, symmetric with parseSlotsParam below. Zero-count slot types are omitted. */
 export function serializeSlots(counts: Record<SlotType, number>): string {
   return SLOT_TYPES.filter((t) => counts[t] > 0)
