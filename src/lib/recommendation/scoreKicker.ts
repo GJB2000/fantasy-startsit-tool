@@ -148,8 +148,10 @@ export function scoreKicker(input: KickerComparisonInput, format: ScoringFormat)
     "Kickers are inherently harder to predict than skill positions — treat this as a rougher estimate, leaning mostly on recent scoring rather than a strong matchup signal.",
   ];
   const gamesUsedForRecent = input.recentGames.length;
-  const recentPprAvg =
-    gamesUsedForRecent > 0 ? average(input.recentGames.map((g) => getFantasyPoints(g, format))) : null;
+  const recentPprValues = input.recentGames.map((g) => getFantasyPoints(g, format));
+  const recentPprAvg = gamesUsedForRecent > 0 ? average(recentPprValues) : null;
+  const recentPprFloor = gamesUsedForRecent > 0 ? Math.min(...recentPprValues) : null;
+  const recentPprCeiling = gamesUsedForRecent > 0 ? Math.max(...recentPprValues) : null;
   const seasonPprAvg =
     input.seasonGames.length > 0 ? average(input.seasonGames.map((g) => getFantasyPoints(g, format))) : null;
   const blendedScore = blendRecentAndSeason(recentPprAvg, seasonPprAvg, gamesUsedForRecent);
@@ -201,6 +203,8 @@ export function scoreKicker(input: KickerComparisonInput, format: ScoringFormat)
     position: "K",
     team: input.team,
     recentPprAvg,
+    recentPprFloor,
+    recentPprCeiling,
     seasonPprAvg,
     gamesUsedForRecent,
     blendedScore,

@@ -139,7 +139,10 @@ export function scoreDst(input: DstComparisonInput): PlayerScoreBreakdown {
     "D/ST uses a simpler model than skill positions: recent scoring plus how good the upcoming opponent's offense is implied to be, not a blend of a dozen signals.",
   ];
   const gamesUsedForRecent = input.recentGames.length;
-  const recentPprAvg = gamesUsedForRecent > 0 ? average(input.recentGames.map((g) => g.FantasyPoints)) : null;
+  const recentPprValues = input.recentGames.map((g) => g.FantasyPoints);
+  const recentPprAvg = gamesUsedForRecent > 0 ? average(recentPprValues) : null;
+  const recentPprFloor = gamesUsedForRecent > 0 ? Math.min(...recentPprValues) : null;
+  const recentPprCeiling = gamesUsedForRecent > 0 ? Math.max(...recentPprValues) : null;
   const seasonPprAvg = input.seasonGames.length > 0 ? average(input.seasonGames.map((g) => g.FantasyPoints)) : null;
   const blendedScore = blendRecentAndSeason(recentPprAvg, seasonPprAvg, gamesUsedForRecent);
 
@@ -185,6 +188,8 @@ export function scoreDst(input: DstComparisonInput): PlayerScoreBreakdown {
     position: "DST",
     team: input.team,
     recentPprAvg,
+    recentPprFloor,
+    recentPprCeiling,
     seasonPprAvg,
     gamesUsedForRecent,
     blendedScore,

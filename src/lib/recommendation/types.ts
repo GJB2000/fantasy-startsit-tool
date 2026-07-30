@@ -104,6 +104,9 @@ export interface PlayerScoreBreakdown {
   position: string | null;
   team: string | null;
   recentPprAvg: number | null;
+  /** Real min/max PPR points actually scored across recentGames — not a statistical projection interval, just the honest range of what this player has actually produced lately. Null whenever recentPprAvg is (no recent games). */
+  recentPprFloor: number | null;
+  recentPprCeiling: number | null;
   seasonPprAvg: number | null;
   gamesUsedForRecent: number;
   blendedScore: number | null;

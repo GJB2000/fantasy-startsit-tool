@@ -9,6 +9,8 @@ export function notFoundBreakdown(label: string): PlayerScoreBreakdown {
     position: null,
     team: null,
     recentPprAvg: null,
+    recentPprFloor: null,
+    recentPprCeiling: null,
     seasonPprAvg: null,
     gamesUsedForRecent: 0,
     blendedScore: null,
@@ -77,6 +79,8 @@ export function skillFieldDefaults(): Omit<
   | "position"
   | "team"
   | "recentPprAvg"
+  | "recentPprFloor"
+  | "recentPprCeiling"
   | "seasonPprAvg"
   | "gamesUsedForRecent"
   | "blendedScore"

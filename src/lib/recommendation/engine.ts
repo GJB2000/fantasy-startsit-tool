@@ -73,8 +73,10 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
   const team = input.player?.Team ?? null;
 
   const gamesUsedForRecent = input.recentGames.length;
-  const recentPprAvg =
-    gamesUsedForRecent > 0 ? average(input.recentGames.map((g) => getFantasyPoints(g, format))) : null;
+  const recentPprValues = input.recentGames.map((g) => getFantasyPoints(g, format));
+  const recentPprAvg = gamesUsedForRecent > 0 ? average(recentPprValues) : null;
+  const recentPprFloor = gamesUsedForRecent > 0 ? Math.min(...recentPprValues) : null;
+  const recentPprCeiling = gamesUsedForRecent > 0 ? Math.max(...recentPprValues) : null;
   const seasonPprAvg = input.seasonStat
     ? getFantasyPoints(input.seasonStat, format) / Math.max(input.seasonStat.Played, 1)
     : null;
@@ -362,6 +364,8 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
     position,
     team,
     recentPprAvg,
+    recentPprFloor,
+    recentPprCeiling,
     seasonPprAvg,
     gamesUsedForRecent,
     blendedScore,
