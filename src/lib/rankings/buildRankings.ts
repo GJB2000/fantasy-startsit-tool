@@ -1,0 +1,382 @@
+import type { ExpertConsensusEntry } from "@/lib/fantasypros/weeklyConsensus";
+import { getSeasonRedraftRankByKey, type SeasonRedraftEntry } from "@/lib/fantasypros/seasonProjections";
+import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
+import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
+import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
+import { toSdioTeam } from "@/lib/recommendation/restOfSeason";
+import { scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
+import type { DataQuality, PlayerScoreBreakdown } from "@/lib/recommendation/types";
+import { getFantasyDefenseByWeek } from "@/lib/sportsdata/defense";
+import { getAllDstPlayers } from "@/lib/sportsdata/defenseTeams";
+import { getActiveExtendedPlayers, getActivePlayers } from "@/lib/sportsdata/players";
+import type { PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
+import { getPlayerSeasonStats } from "@/lib/sportsdata/seasonStats";
+import type { SeasonContext } from "@/lib/sportsdata/timeframes";
+import type { ExtendedPosition, Player, ScoringFormat } from "@/lib/sportsdata/types";
+import { getPlayerGameStatsByWeek } from "@/lib/sportsdata/weeklyStats";
+
+export interface LegitRankingEntry extends PlayerScoreBreakdown {
+  /** 1 = best-projected player at this position, after blending in FantasyPros' season-long consensus (see computeLegitScores). */
+  positionRank: number;
+  /** 1-100 — a blend of this week's engine snapshot and FantasyPros' season-long redraft consensus, normalized within this position's own pool. See computeLegitScores for the method and why. */
+  legitScore: number;
+  /** FantasyPros' current season-long consensus rank at this position, or null if this player wasn't found in their redraft rankings (e.g. a very deep bench player FantasyPros doesn't publish a rank for). Purely informational — already folded into legitScore above. */
+  fantasyProsPositionRank: number | null;
+}
+
+// A player needs at least this many played games in the recent-form
+// window to be worth ranking at all — the same kind of "real, relevant
+// role" gate rankCandidates.ts's waiver scan uses (MIN_RECENT_GAMES),
+// just more permissive (1 vs. 2) since rankings are meant to cover more
+// depth than a waiver-gap scan, not just startable-tier players. This
+// keeps the pool to players who've actually taken the field recently —
+// rosters otherwise carry a lot of camp-body/IR dead weight that would
+// both slow the scan down and clutter the list with meaningless entries.
+const MIN_RECENT_GAMES = 1;
+
+// Computed rankings are expensive (a full engine pass over every
+// rankable player at a position), so the RESULT itself is cached, not
+// just the underlying source data every other route already caches —
+// a new pattern for this app, but the same in-process TTL-Map shape as
+// every other cache here (sportsdata/client.ts, nflverse/client.ts,
+// sleeper/client.ts). 30 minutes: long enough that switching between
+// position tabs or reloading the page doesn't recompute from scratch,
+// short enough to pick up a mid-week injury/status change reasonably
+// promptly.
+const CACHE_TTL_MS = 30 * 60 * 1000;
+const cache = new Map<string, { data: LegitRankingEntry[]; expiresAt: number }>();
+
+// How many players to actually show per position — a real rankings page
+// shouldn't run all the way down to replacement-level noise. Only the
+// four skill positions are capped (by request); D/ST (32 teams) and K
+// (~30 active) are already small, naturally-bounded pools with no
+// equivalent "how deep is worth showing" question. Applied AFTER
+// computeLegitScores, not before: the Legit Score itself still reflects
+// each player's standing against the FULL rankable pool (so, e.g., the
+// 10th-ranked QB's score isn't artificially compressed toward 1 just
+// because he's last in a truncated top-10 list) — this only trims which
+// rows get returned, not what "100" or "1" means.
+const RANKING_LIMIT: Partial<Record<ExtendedPosition, number>> = {
+  QB: 10,
+  RB: 20,
+  WR: 25,
+  TE: 10,
+};
+
+/**
+ * The only positions Legit Rankings actually covers — D/ST and K were
+ * dropped by request (their "this week vs. season rank" streaming shape
+ * never fit this tool's "who's actually good" framing as naturally as
+ * the four skill positions do). Exported so both the API route and the
+ * UI's position tabs read from one source of truth rather than each
+ * hand-maintaining their own list.
+ */
+export const RANKABLE_POSITIONS: readonly ExtendedPosition[] = ["QB", "RB", "WR", "TE"];
+
+function countPlayedGames(rows: { PlayerID: number; Played: number }[][]): Map<number, number> {
+  const counts = new Map<number, number>();
+  for (const weekRows of rows) {
+    for (const row of weekRows) {
+      if (row.Played !== 1) continue;
+      counts.set(row.PlayerID, (counts.get(row.PlayerID) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
+/**
+ * Pool selection + pre-warming, one position at a time (see
+ * getLegitRankingsForPosition below for why this isn't done for every
+ * position in one request). Mirrors rankExtendedWaiverCandidates.ts's
+ * own pre-warm discipline exactly: fetch every week's data ONCE,
+ * sequenced ahead of the per-player fan-out, rather than letting
+ * dozens-to-hundreds of concurrent scoreExtendedPlayer calls race each
+ * other on the same cold cache (the exact stampede bug item 27/62
+ * already found and fixed for the backtest pipeline and the waiver
+ * D/ST-and-K scan).
+ */
+async function getEligiblePlayerIds(position: ExtendedPosition, context: SeasonContext): Promise<number[]> {
+  if (position === "DST") {
+    const allWeeks = Array.from({ length: context.lastCompletedWeek }, (_, i) => i + 1);
+    await Promise.all(allWeeks.map((w) => getFantasyDefenseByWeek(context.lastCompletedApiSeason, w)));
+    await Promise.all(allWeeks.map((w) => getPlayerGameStatsByWeek(context.lastCompletedApiSeason, w)));
+    const dstPlayers = await getAllDstPlayers();
+    return dstPlayers.map((p) => p.PlayerID);
+  }
+
+  if (position === "K") {
+    // K's own comparison input needs every week for its season average
+    // (see scoreKicker.ts), but "worth ranking" is still judged on the
+    // recent-form window alone — fetching allWeeks first pre-warms the
+    // cache either way, so the recentWeeks fetch just below is a free
+    // cache hit, not a second network round-trip.
+    const allWeeks = Array.from({ length: context.lastCompletedWeek }, (_, i) => i + 1);
+    await Promise.all(allWeeks.map((w) => getPlayerGameStatsByWeek(context.lastCompletedApiSeason, w)));
+    const allExtended = await getActiveExtendedPlayers();
+    const kickers = allExtended.filter((p) => p.Position === "K");
+    return filterByRecentGames(kickers, context);
+  }
+
+  // Skill positions: pre-warm the season-aggregate endpoint once (every
+  // buildComparisonInput call reads it via getPlayerSeasonStat) before
+  // the per-player fan-out, same reasoning as above.
+  await getPlayerSeasonStats(context.lastCompletedSeason);
+  const active = await getActivePlayers();
+  const atPosition = active.filter((p) => p.Position === position);
+  return filterByRecentGames(atPosition, context);
+}
+
+async function filterByRecentGames(players: Player[], context: SeasonContext): Promise<number[]> {
+  const weeklyRows = await Promise.all(
+    context.recentWeeks.map((w) => getPlayerGameStatsByWeek(context.lastCompletedApiSeason, w))
+  );
+  const counts = countPlayedGames(weeklyRows);
+  return players.filter((p) => (counts.get(p.PlayerID) ?? 0) >= MIN_RECENT_GAMES).map((p) => p.PlayerID);
+}
+
+// How much the engine's OWN this-week snapshot counts toward the blend,
+// vs. FantasyPros' season-long redraft consensus — split by dataQuality
+// rather than one flat weight, since the real problem this blend exists
+// to fix is specifically small-sample noise: a player with only 1-2
+// games in the engine's recent-form window (dataQuality "limited"/
+// "insufficient") can swing wildly on a single tough matchup or cold
+// game, while FantasyPros' preseason consensus reflects a full season's
+// worth of scouting/opinion and doesn't have that problem. When the
+// engine DOES have a full recent sample, it's trusted more heavily —
+// it's this app's own validated, backtested signal — but even then
+// FantasyPros still gets real weight, since a season-long expectation is
+// inherently more stable than any single-week snapshot regardless of
+// sample size. Not independently backtested (there's no "was this
+// blend right" ground truth the way pick accuracy has one) — a
+// reasoned, transparent default, not a tuned weight.
+//
+// limited/insufficient were originally both 0.4 — re-tuned lower after a
+// real case (Lamar Jackson, "limited") showed 0.4 still wasn't enough:
+// his only 3 usable recent games included one where Baltimore clearly
+// rested/limited him in a lost season (12 and 10 pass attempts across
+// two of them, vs. his normal 20-35), tanking the engine's own snapshot
+// even though FantasyPros still had him at a real, well-earned QB2 —
+// confirmed directly against SportsDataIO's real weekly stats before
+// concluding this wasn't a data or engine bug. A thin sample is
+// EXACTLY the scenario where a single meaningless/limited-role game can
+// dominate the engine's recent-form window, so "insufficient" (even
+// less data than "limited") now trusts FantasyPros' stable consensus
+// more than "limited" does, rather than treating them the same.
+const ENGINE_WEIGHT: Record<DataQuality, number> = {
+  full: 0.65,
+  limited: 0.15,
+  insufficient: 0.05,
+};
+
+// FantasyPros' redraft files rank WAY more players than are ever
+// "relevant" — e.g. redraft-wr has 239 rows, most of them deep-bench
+// names nobody would start. Normalizing a rank against that FULL pool
+// (as an earlier version of this function did) badly inflates mediocre
+// ranks: WR46 normalized against a 239-deep scale lands near 80/100,
+// reading as "elite" when it's really just "startable WR3/flex" — which
+// let a "limited"-data bench player with a so-so FP rank (but a hot
+// recent game or two) outscore a "full"-data star having a merely-good
+// stretch, a real case caught live (Justin Jefferson, real FP WR6,
+// initially ranked BELOW Quentin Johnston, real FP WR46, once Johnston's
+// mediocre rank got inflated by this same distortion). Capping the
+// normalization denominator to roughly "how deep does a real rankings
+// conversation go" fixes this at the source, rather than further
+// tweaking ENGINE_WEIGHT to compensate for a scale that was wrong to
+// begin with. Chosen as roughly 3x this file's own RANKING_LIMIT per
+// position — generous enough to still differentiate real WR2/3/4-tier
+// talent, not so deep that a mediocre rank reads as good.
+const FP_NORMALIZATION_CAP: Partial<Record<ExtendedPosition, number>> = {
+  QB: 30,
+  RB: 60,
+  WR: 75,
+  TE: 30,
+};
+
+function normalize(value: number, min: number, max: number): number {
+  if (max === min) return 100;
+  return Math.min(100, Math.max(1, 1 + 99 * ((value - min) / (max - min))));
+}
+
+function fantasyProsKeyFor(b: PlayerScoreBreakdown, position: ExtendedPosition): string | null {
+  if (position === "DST") return b.team ? toSdioTeam(b.team) : null;
+  return normalizePlayerName(b.displayName);
+}
+
+/**
+ * Blends the engine's this-week snapshot with FantasyPros' season-long
+ * redraft consensus, each independently normalized to [1, 100] within
+ * its own pool, then combined per-player at a dataQuality-dependent
+ * weight (see ENGINE_WEIGHT above) — this is what actually fixes cases
+ * like a normally-elite QB who happened to play just one noisy recent
+ * game: the engine's own snapshot alone would rank him far too low, but
+ * FantasyPros' stable season-long view pulls him back to a realistic
+ * spot. A player with no FantasyPros match at all (a very deep bench
+ * name FantasyPros doesn't publish) falls back to the engine-only score,
+ * same honest degrade as every other optional signal in this app.
+ *
+ * Both pools are min-maxed independently, NOT percentile/rank-based —
+ * same reasoning as the original single-signal version of this function:
+ * two players with nearly identical values land close together, rather
+ * than being spread apart just because they're 3 ranks apart.
+ */
+function computeLegitScores(
+  breakdowns: PlayerScoreBreakdown[],
+  fpByKey: Map<string, SeasonRedraftEntry>,
+  position: ExtendedPosition
+): LegitRankingEntry[] {
+  const ranked = breakdowns
+    // `finalScore` has no floor for very low-data players (a known,
+    // still-open engine gap — see CLAUDE.md's Projection-accuracy/
+    // calibration items) and can come back meaningfully negative for a
+    // deep-bench player with a near-empty stat line. That's tolerable
+    // for every OTHER consumer of this engine, since they only ever use
+    // it in a relative pairwise comparison — but a public "rankings"
+    // list displays the raw number to everyone, so a real player is
+    // never shown a nonsensical "-36 projected points." A negative
+    // projection also isn't a meaningful player to rank publicly at
+    // all, so this excludes them from the pool entirely rather than
+    // clamping the displayed number, which would misrepresent the
+    // engine's own (real, if miscalibrated) output.
+    .filter((b): b is PlayerScoreBreakdown & { finalScore: number } => b.finalScore != null && b.finalScore >= 0);
+
+  if (ranked.length === 0) return [];
+
+  const engineValues = ranked.map((b) => b.finalScore);
+  const engineMin = Math.min(...engineValues);
+  const engineMax = Math.max(...engineValues);
+
+  const fpPositionRanks = [...fpByKey.values()].map((v) => v.positionRank);
+  const fpBestRank = fpPositionRanks.length > 0 ? Math.min(...fpPositionRanks) : 1;
+  const rawFpWorstRank = fpPositionRanks.length > 0 ? Math.max(...fpPositionRanks) : 1;
+  const fpWorstRank = Math.min(rawFpWorstRank, FP_NORMALIZATION_CAP[position] ?? rawFpWorstRank);
+
+  const withBlend = ranked.map((b) => {
+    const engineNorm = normalize(b.finalScore, engineMin, engineMax);
+    const fpKey = fantasyProsKeyFor(b, position);
+    const fpEntry = fpKey ? fpByKey.get(fpKey) : undefined;
+
+    if (!fpEntry) {
+      return { breakdown: b, blended: engineNorm, fantasyProsPositionRank: null as number | null };
+    }
+
+    // Inverted: rank 1 (best) -> 100, the (capped) worst rank -> 1. A
+    // real rank deeper than the cap (e.g. WR120) just clamps to 1 via
+    // normalize()'s own clamping, rather than going negative.
+    const fpNorm = 101 - normalize(fpEntry.positionRank, fpBestRank, fpWorstRank);
+    const engineWeight = ENGINE_WEIGHT[b.dataQuality];
+    const blended = engineWeight * engineNorm + (1 - engineWeight) * fpNorm;
+    return { breakdown: b, blended, fantasyProsPositionRank: fpEntry.positionRank };
+  });
+
+  withBlend.sort((a, b) => b.blended - a.blended);
+
+  return withBlend.map((w, i) => ({
+    ...w.breakdown,
+    positionRank: i + 1,
+    legitScore: Math.round(Math.min(100, Math.max(1, w.blended))),
+    fantasyProsPositionRank: w.fantasyProsPositionRank,
+  }));
+}
+
+/**
+ * The Legit Rankings tool's core: every rankable player at ONE position,
+ * scored through the exact same engine (scoreExtendedPlayer) every other
+ * live tool uses — no new prediction model, just a new presentation of
+ * already-validated output — ranked and converted to a 0-100 Legit Score.
+ *
+ * Deliberately one position per call/cache-entry, not a single
+ * all-positions request: ranking every relevant player across all six
+ * positions in one request would mean several hundred full-engine scoring
+ * calls before returning anything, and a real user only looks at one
+ * position tab at a time anyway. Bounding cost to one position also
+ * keeps this in line with every other live route's maxDuration budget.
+ */
+export async function getLegitRankingsForPosition(
+  position: ExtendedPosition,
+  context: SeasonContext,
+  format: ScoringFormat,
+  positionDefenseTable: PositionDefenseTable,
+  nflversePlayerWeekTable: NflversePlayerWeekTable,
+  remainingOpponentsByTeam: Map<string, RemainingGame[]>,
+  teamWeatherByTeamWeek: Map<string, GameWeather>,
+  impliedTotalsByTeamWeek: Map<string, number>,
+  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map()
+): Promise<LegitRankingEntry[]> {
+  const cacheKey = `${position}:${context.lastCompletedSeason}:${context.lastCompletedWeek}:${format}`;
+  const cached = cache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+  const [playerIds, fpByKey] = await Promise.all([
+    getEligiblePlayerIds(position, context),
+    getSeasonRedraftRankByKey(position),
+  ]);
+
+  const breakdowns = await Promise.all(
+    playerIds.map((id) =>
+      scoreExtendedPlayer(
+        id,
+        context,
+        format,
+        positionDefenseTable,
+        nflversePlayerWeekTable,
+        remainingOpponentsByTeam,
+        teamWeatherByTeamWeek,
+        impliedTotalsByTeamWeek,
+        expertConsensusByNormalizedName
+      )
+    )
+  );
+
+  const ranked = computeLegitScores(breakdowns, fpByKey, position);
+  const limit = RANKING_LIMIT[position];
+  const shown = limit != null ? ranked.slice(0, limit) : ranked;
+  cache.set(cacheKey, { data: shown, expiresAt: Date.now() + CACHE_TTL_MS });
+  return shown;
+}
+
+/**
+ * The "Overall" view: every position's already-computed (and already
+ * per-position-capped) list, merged and re-sorted by legitScore — no new
+ * scoring pass, just a re-combination of getLegitRankingsForPosition's
+ * own cached output for each of the four rankable positions. Sorting
+ * across positions by legitScore (not raw finalScore) is what makes this
+ * a fair combination at all: legitScore is already normalized 1-100
+ * within each position's own pool, so a QB's 90 and a WR's 90 both mean
+ * "about as good as it gets at that position this week" — raw
+ * finalScore wouldn't be comparable across positions the same way
+ * (QBs/RBs naturally score higher point totals than TEs regardless of
+ * relative quality). `positionRank` is reassigned to this combined
+ * list's own 1..N order (overwriting each entry's original per-position
+ * rank) — the number shown in the UI's leading column, so it should mean
+ * "rank in the list you're looking at" for both views, not silently
+ * switch meaning between them.
+ */
+export async function getLegitRankingsOverall(
+  context: SeasonContext,
+  format: ScoringFormat,
+  positionDefenseTable: PositionDefenseTable,
+  nflversePlayerWeekTable: NflversePlayerWeekTable,
+  remainingOpponentsByTeam: Map<string, RemainingGame[]>,
+  teamWeatherByTeamWeek: Map<string, GameWeather>,
+  impliedTotalsByTeamWeek: Map<string, number>,
+  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map()
+): Promise<LegitRankingEntry[]> {
+  const perPosition = await Promise.all(
+    RANKABLE_POSITIONS.map((position) =>
+      getLegitRankingsForPosition(
+        position,
+        context,
+        format,
+        positionDefenseTable,
+        nflversePlayerWeekTable,
+        remainingOpponentsByTeam,
+        teamWeatherByTeamWeek,
+        impliedTotalsByTeamWeek,
+        expertConsensusByNormalizedName
+      )
+    )
+  );
+
+  const merged = perPosition.flat().sort((a, b) => b.legitScore - a.legitScore);
+  return merged.map((entry, i) => ({ ...entry, positionRank: i + 1 }));
+}

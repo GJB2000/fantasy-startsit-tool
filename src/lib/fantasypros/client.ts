@@ -8,6 +8,16 @@ import "server-only";
 // this one is actively maintained and covers 2022-2025+, confirmed live).
 const REPO = "dynastyprocess/data";
 const WEEKLY_FILE_PATH = "files/fp_latest_weekly.csv";
+// A separate file in the same repo — FantasyPros' consensus REDRAFT
+// (season-long, not weekly) rankings, one row per player per ranking
+// page (`page_type`, e.g. "redraft-qb"/"redraft-dst") — see
+// seasonProjections.ts for how this is filtered/joined. Confirmed live
+// (not assumed): covers all six of this app's positions
+// (redraft-qb/rb/wr/te/dst/k), PPR only (`ecr_type` "rp" — no
+// half-PPR/standard variant exists for position-level pages in this
+// file), and is kept current (`scrape_date` matched the day this was
+// checked).
+const SEASON_REDRAFT_FILE_PATH = "files/db_fpecr_latest.csv";
 const COMMITS_API = `https://api.github.com/repos/${REPO}/commits`;
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}`;
 // Confirmed live (not assumed "main") — this repo's default branch is
@@ -179,6 +189,36 @@ export async function fetchCurrentSnapshot(): Promise<Record<string, string>[]> 
   if (cached) return cached;
 
   const url = `${RAW_BASE}/${DEFAULT_BRANCH}/${WEEKLY_FILE_PATH}`;
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: HEADERS, cache: "no-store" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new FantasyProsError(`Network error calling ${url}: ${message}`, undefined, url);
+  }
+  if (!res.ok) {
+    throw new FantasyProsError(`raw.githubusercontent.com returned ${res.status} for ${url}`, res.status, url);
+  }
+  const text = await res.text();
+  const rows = parseCsv(text);
+
+  setCached(cacheKey, rows, 6 * 60 * 60);
+  return rows;
+}
+
+/**
+ * FantasyPros' current consensus REDRAFT (season-long) rankings — branch
+ * HEAD, same "just the latest snapshot, no history-mining needed" shape
+ * as fetchCurrentSnapshot() above, just a different file/cache key.
+ * Cached 6h for the same reason: stays reasonably fresh without hammering
+ * raw.githubusercontent.com on every request.
+ */
+export async function fetchSeasonRedraftRankings(): Promise<Record<string, string>[]> {
+  const cacheKey = "season-redraft-snapshot";
+  const cached = getCached<Record<string, string>[]>(cacheKey);
+  if (cached) return cached;
+
+  const url = `${RAW_BASE}/${DEFAULT_BRANCH}/${SEASON_REDRAFT_FILE_PATH}`;
   let res: Response;
   try {
     res = await fetch(url, { headers: HEADERS, cache: "no-store" });

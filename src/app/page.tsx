@@ -59,6 +59,19 @@ const TOOLS = [
     ),
   },
   {
+    href: "/rankings",
+    label: "Legit Rankings",
+    title: "Who's actually good right now?",
+    description: "Every rankable player at a position, ranked and scored 1-100 by the same engine behind every other tool here.",
+    icon: (
+      <>
+        <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        <path d="M7 4h10v5a5 5 0 01-10 0V4z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+        <path d="M7 6H4v1a4 4 0 004 3.87M17 6h3v1a4 4 0 01-4 3.87" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </>
+    ),
+  },
+  {
     href: "/backtest",
     label: "Backtest",
     title: "Does the engine actually work?",
@@ -73,7 +86,7 @@ export default function HomePage() {
       <PageHeader
         eyebrow="Legitfootball"
         title="Your fantasy toolkit"
-        description="Five tools, one engine — start/sit calls, trade grades, waiver targets, full-lineup optimization, and the backtested accuracy behind all of it."
+        description="Six tools, one engine — start/sit calls, trade grades, waiver targets, full-lineup optimization, position rankings, and the backtested accuracy behind all of it."
       />
 
       <div className="mb-8">

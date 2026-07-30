@@ -70,6 +70,22 @@ const LINKS: { href: string; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    href: "/rankings",
+    label: "Legit Rankings",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none">
+        <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path
+          d="M7 4h10v5a5 5 0 01-10 0V4z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+        <path d="M7 6H4v1a4 4 0 004 3.87M17 6h3v1a4 4 0 01-4 3.87" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/backtest",
     label: "Backtest",
     icon: (
