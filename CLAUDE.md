@@ -5797,8 +5797,59 @@ single-season numbers for those specific constants.
       documents the uneven-count confound rather than papering over it.
       `npx tsc --noEmit` and `npm run lint` clean; temporary diagnostic
       route/code deleted, the permanent naive baseline kept.
+91. **Restructured the Start/Sit player cards to a teammate-provided
+    reference layout — presentation only, real fields only, zero new
+    signals or fabricated numbers.** A follow-on to items 85-87's Start/Sit
+    redesign, `ComparisonResult.tsx`'s `PlayerCard` rebuilt to a fixed
+    structure: (1) header = numbered rank circle (mono) + name + pos/team +
+    a "Start"/"Bench lean" pill (the existing `recommendedPlayerId` logic,
+    not new logic); (2) a color-coded opponent + defensive-rank line; (3)
+    the big projection with the floor→ceiling bar's marker moved to our
+    projection (`finalScore`); (4) a fixed 2x2 stat grid with magnitude
+    bars; (5) context rows (next opponent, weather) with icons, injury/bye/
+    data-quality kept as status badges; (6) mono on every number, regular
+    font on labels.
+    - **Every value is a real, already-computed breakdown field** — no new
+      data. Verified live against a real `/api/compare` (WR/RB/QB/TE) that
+      each slot populates as the per-position mapping assumes:
+      `recentPprAvg`, opportunity (`recentVolumeAvg` — touches for RB,
+      targets for WR/TE; `recentQbRushAttemptsAvg` for QB, per the spec's
+      "rush attempts for QB", not pass attempts), `snapShareAvg` (real for
+      all skill positions, not just TE), and a red-zone-or-drop slot
+      (`redZoneTouchesAvg` for RB/QB, `dropRateAvg` for WR/TE). Any slot a
+      position genuinely lacks renders "—" (never a fabricated placeholder)
+      — `dropRateAvg` is null for QB/RB, and D/ST/K have null volume/snap/
+      red-zone signals, so their slots 2-4 dash out honestly.
+    - **The projection marker now sits at `finalScore`, not
+      `recentPprAvg`** (items 85's marker was the recent average). The
+      floor→ceiling band stays the real recent min/max, but the bar's scale
+      is EXTENDED to include the projection, so a projection above the
+      recent ceiling (real — `finalScore` layers matchup/volume/consensus
+      modifiers on top of recent scoring) shows truthfully to the right of
+      the band rather than clipping. The small stat bars use fixed
+      reference maxima (a visual scale like the confidence bar's 0-100), not
+      fabricated data — the displayed number is always the real value.
+    - **Caught and corrected an inverted instruction rather than following
+      it literally** (the instruction-source-boundary discipline): the ask
+      said "color green if the rank number is high (weak defense)," but our
+      `positionDefenseTable` rank sorts DESCENDING by points allowed
+      (`positionDefense.ts`), so rank #1 = allows the MOST = weakest =
+      MOST favorable, and #32 = stingiest. Following the literal instruction
+      would have colored tough matchups green. Colored by actual
+      favorability instead (`diffFromAverage` via the existing
+      `matchupLabel` — favorable=green, tough=red, the ask's true intent),
+      and kept the "favorable/tough" word beside the rank so the number's
+      direction stays unambiguous. Confirmed live: QB vs NYJ #2 = favorable/
+      green (NYJ allows the 2nd-most to QBs), TE vs LV #29 = tough/red.
+    - **No engine/scoring change** — `comparePlayers`/`scorePlayer`/
+      `finalScore` untouched; this is `ComparisonResult.tsx` only. `npx tsc
+      --noEmit` and `npm run lint` clean. Not browser-screenshot-verified
+      this session (the other chat's dev server held Next's dev lock), but
+      every real-data assumption was verified via the live `/api/compare`
+      response and the user eyeballed it on their own HMR'd server before
+      committing. Committed as `9cb3a2e`.
 
-### Open items (as of item 90 — pick up here)
+### Open items (as of item 91 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -5918,10 +5969,12 @@ confirmed no-change result — so its only artifact is its CLAUDE.md
 write-up, committed as `7b2b1f6`. Item 90's code (the multi-player trade
 backtest: `backtest/multiPlayerTradeBacktest.ts`, the
 `/api/backtest/trade-multi-nflverse-multiseason` route, and the three
-now-exported helpers in `tradeBacktest.ts`) plus this write-up are **not
-yet committed as of this writing** — commit only once the user explicitly
-asks, per this project's standing rule. Nothing below is started or fixed
-yet:
+now-exported helpers in `tradeBacktest.ts`) plus its write-up are
+committed as `0d0ca38`. Item 91's Start/Sit card restructure
+(`ComparisonResult.tsx` only) is committed as `9cb3a2e`; this CLAUDE.md
+write-up of item 91 is **not yet committed as of this writing** — commit
+only once the user explicitly asks, per this project's standing rule.
+Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
