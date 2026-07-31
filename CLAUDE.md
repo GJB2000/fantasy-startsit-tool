@@ -6091,7 +6091,56 @@ single-season numbers for those specific constants.
       `99577ab`. The mockup's subtle load-in animation was deliberately
       left out to keep the component simple/robust — see Open Item #20.
 
-### Open items (as of item 95 — pick up here)
+96. **Redesigned the Home page: a newsletter signup band and a live
+    "Top of the board" rankings preview — presentation/growth features,
+    real data only, no engine change.** Iterated on a full-page mockup
+    (Artifact) through several rounds first, then built the approved
+    direction into `src/app/page.tsx`.
+    - **Live rankings list** (`HomeRankingsBoard.tsx`): the top 5 Legit
+      Scores across all positions, self-fetched client-side from the exact
+      same `/api/rankings?position=OVERALL` route the Legit Rankings tool
+      uses — mounts and fetches on its own, exactly like the existing Home
+      widgets, so a cold-cache rankings computation (which can run several
+      seconds) never blocks the rest of the page from rendering. Rendered
+      as a single bordered list matching `RankingsResult.tsx`'s row
+      pattern (the user picked the list over a card grid): rank → position
+      chip → name (+ gold "Elite" tag at 90+) → team · next opponent ·
+      favorable/tough label → score bar → Legit Score. The
+      favorable/tough labels reuse `ComparisonResult.tsx`'s exact
+      `diffFromAverage` thresholds (>1.5 favorable, <-1.5 tough) so the
+      word means the same thing everywhere. `matchupContext` rides along
+      in the route's JSON — the route returns the full
+      `LegitRankingEntry`/`PlayerScoreBreakdown` objects, so the field is
+      present even though `RankingEntryResponse`'s own typed slice doesn't
+      declare it; the component extends the type locally to read it.
+      Verified live end-to-end against the real running app: real data
+      (Puka Nacua/Trey McBride 100, Bijan/CMC 99, Burrow 96), correct
+      matchup colors, gold elite tier, both light and dark themes.
+    - **Newsletter signup band** (`NewsletterSignup.tsx` + a new
+      `/api/subscribe` route): occupies the slot an earlier mockup used
+      for a backtest-accuracy stat band. The user opted NOT to surface the
+      accuracy number publicly (to a layperson ~57% reads as barely better
+      than a coin flip even though it's genuinely strong for this problem;
+      also a number they'd have to keep current), so the credibility band
+      was replaced with the newsletter CTA — the whole app exists to serve
+      Legitfootball's newsletter, so a signup hook up top is a natural fit.
+      The route is deliberately provider-agnostic: it forwards the email
+      to a `NEWSLETTER_FORM_ENDPOINT` env var (a plain POST URL — the shape
+      Beehiiv/ConvertKit/Buttondown/Mailchimp hosted-form actions and
+      simple APIs accept) and returns an honest "signup isn't connected
+      yet" (503) when that env var is unset, rather than faking a
+      subscription and silently dropping the email — this app's standing
+      "no fake data / show a clear message" rule, applied to a write path.
+      The client component only shows its "You're in" success state after
+      the route confirms. Verified live: valid email with no provider →
+      the honest not-connected message, invalid email → validation error.
+    - **Deliberately left unchanged**: the "This week" widget row and the
+      six-tool grid. The mockup's Start/Sit-as-hero tool-grid restructure
+      was NOT built — it dropped Backtest from the grid and is a bigger
+      opinion call — see Open Item #22. The newsletter's actual provider
+      wiring is Open Item #21. `npx tsc --noEmit` and `npm run lint` clean.
+
+### Open items (as of item 96 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6227,11 +6276,16 @@ is committed as `4415171`, its CLAUDE.md write-up (plus the corrected
 Overview passages) as `0138a1f`. Item 94's stale-snapshot guard
 (`fantasypros/weeklyConsensus.ts`'s `MAX_SNAPSHOT_AGE_DAYS`) is committed
 as `c46acca`, its CLAUDE.md write-up as `dcad3a9`. Item 95's Trade
-Analyzer redesign (`TradeResult.tsx` only) is committed as `99577ab`;
-this CLAUDE.md write-up of item 95 (and the new Open Item #20 for its
-deferred load-in animation) is **not yet committed as of this writing** —
-commit only once the user explicitly asks, per this project's standing
-rule. Nothing below is started or fixed yet:
+Analyzer redesign (`TradeResult.tsx` only) is committed as `99577ab`,
+its CLAUDE.md write-up (and the new Open Item #20 for its deferred
+load-in animation) as `cee54e6`. Item 96's Home-page redesign — the
+newsletter signup band (`NewsletterSignup.tsx`, the new `/api/subscribe`
+route) and the live "Top of the board" rankings list
+(`HomeRankingsBoard.tsx`), wired into `page.tsx` — is committed as
+`68faef0`; this CLAUDE.md write-up of item 96 (and the new Open Items
+#21/#22) is **not yet committed as of this writing** — commit only once
+the user explicitly asks, per this project's standing rule. Nothing below
+is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -6519,6 +6573,27 @@ rule. Nothing below is started or fixed yet:
     `TradeResult` a client component with a small `useState`/`useEffect`)
     or a pure-CSS keyframe reveal keyed off a mount class. Low-priority
     polish, not a correctness issue.
+21. **Newsletter signup provider isn't wired yet (item 96).** The Home
+    page's signup band POSTs to `/api/subscribe`, which forwards the email
+    to a `NEWSLETTER_FORM_ENDPOINT` env var — currently unset, so the live
+    Subscribe button returns an honest "signup isn't connected yet"
+    message and no email is captured. To finish: set
+    `NEWSLETTER_FORM_ENDPOINT` (`.env.local` locally, Vercel project env
+    vars in production — same "never commit a secret" discipline as
+    `SPORTSDATA_API_KEY`) to Legitfootball's newsletter provider's
+    form-POST URL. Most providers (Beehiiv/ConvertKit/Substack/Mailchimp/
+    Buttondown) accept a plain `{ email }` POST; if the chosen provider
+    needs a richer call (an auth header, a different body shape, a list
+    ID), extend `/api/subscribe/route.ts` accordingly. Blocked only on
+    which platform Legitfootball actually runs on — asked, not yet
+    answered.
+22. **Home tool grid wasn't restructured (item 96).** The approved mockup
+    promoted Start/Sit to a wide "hero" card with the other tools smaller,
+    but the build left the existing six-equal-card 2-col grid as-is, since
+    the mockup's version dropped Backtest from the grid and the hero
+    restructure is a bigger opinion call. If picked up: promote Start/Sit
+    (or another flagship) to a hero card while keeping all six tools
+    represented. Presentation-only, `src/app/page.tsx`.
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
