@@ -420,6 +420,25 @@ knowable that far ahead from this data source.
   four seasons). Used only for backtest-side kicker analysis on the
   nflverse pipeline (item 97); the shipped K scorer runs on SportsDataIO's
   own kicker FantasyPoints and is unaffected.
+- **The Odds API (`the-odds-api.com`) — free tier; key in `ODDS_API_KEY`
+  (`.env.local` locally / Vercel env in production, never committed, same
+  discipline as `SPORTSDATA_API_KEY`).** Confirmed live (item 98): the
+  NFL **events/schedule** endpoint is free (0 credits) and carries the
+  full upcoming season as soon as the NFL publishes it; **current game
+  odds/player props** work but cost credits (~6 per event's prop-market
+  request) against a **500-requests/month** quota; **historical odds are
+  paid-only** (the free key returns a 401
+  `HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN`), so nothing backtestable
+  is reachable on free. **Player props are per-game and only posted a few
+  days before kickoff** — empty in the offseason (confirmed: 0 of the
+  first 12 lined 2026 games had props ~6 weeks out). Used only for the
+  display-only "Betting lines" on the Start/Sit cards
+  (`src/lib/oddsapi/`), never scoring. Spread/total are NOT taken from
+  here — nflverse's schedules release already provides those free (see
+  above); The Odds API's only genuinely additive data is player props and
+  line movement, which nflverse lacks (and both need the paid tier to be
+  backtestable — see "Backtesting & Tuning History" item 97 and Open Item
+  #24).
 
 ## Recommendation Logic Philosophy
 This is the most important section — the "brain" of the tool.
@@ -6247,7 +6266,69 @@ single-season numbers for those specific constants.
       standalone result; the lasting artifacts are this write-up and the
       two Data Source Notes (nflverse betting lines / kicker scoring).
 
-### Open items (as of item 97 — pick up here)
+98. **Added display-only player props to the Start/Sit cards (The Odds
+    API free tier) — a live market-context feature, not a model signal.**
+    Follows item 97's finding that a *backtested* odds signal needs paid
+    historical data; this is the free-tier-viable alternative the user
+    chose: show current sportsbook props on each card, visual only ("even
+    if it's just visual and not built into the model yet").
+    - **Probed the free tier first** (temporary route, deleted) rather
+      than assume what it exposes: the full upcoming schedule (events
+      endpoint, free/0 credits, carries all 272 of the 2026 season's
+      games), current game props (endpoint works but **empty in the
+      offseason** — 0 of the first 12 lined 2026 games had props ~6 weeks
+      out; books post props days before kickoff), historical odds
+      **paid-gated** (explicit 401 `HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_
+      PLAN` — so no backtested signal, ever, on free), and a
+      500-requests/month quota (events free; each event's props ≈ ~6
+      credits). See the new Data Source Note.
+    - **New `src/lib/oddsapi/`** (server-only, fail-open, aggressively
+      cached to protect the quota): `client.ts` (reads `ODDS_API_KEY`
+      from env — never committed, same discipline as `SPORTSDATA_API_KEY`
+      — in-process TTL cache), `props.ts` (fetches upcoming events +
+      per-event props, joins to our players by `normalizePlayerName`,
+      position-scoped markets — QB pass yds/pass TDs/rush yds, RB rush
+      yds/receptions/anytime TD, WR·TE rec yds/receptions/anytime TD; a
+      SportsDataIO-code→Odds-API-full-name map finds each player's game),
+      `types.ts` (plain display types with NO `server-only` import, so
+      the client card can `import type` them without pulling server code
+      into the bundle — confirmed by a clean production build).
+    - **Display-only wiring, kept off the scoring path entirely**:
+      `/api/compare` fetches props once per comparison and returns a
+      separate `propsByPlayerId` map (never on `PlayerScoreBreakdown`);
+      `ComparisonResult.tsx` renders a "Betting lines" section on skill
+      cards, last (below Case For/Against), labeled "Market lines — shown
+      for context, not part of our projection." Always rendered for
+      QB/RB/WR/TE with an honest empty state ("Sportsbook lines post
+      closer to kickoff…") so the placement is visible even in the
+      offseason — the same "section exists, data pending" treatment the
+      card already gives weather (added after the user noted the page
+      "looks the same as before," since a hidden-when-empty section is
+      invisible for the ~6 weeks until props post). D/ST and K are
+      excluded (no meaningful props, and this is skill-position
+      start/sit).
+    - **Verified what the offseason allows, honestly**: the pure parser
+      (`extractPlayerLines`, factored out of the fetch for testability)
+      against a realistic Odds-API-shaped fixture — all three position
+      groups, both anytime-TD outcome shapes (Yes/No-with-description and
+      name-only), and an unmatched player (returns empty) — all correct;
+      the live `/api/compare` returns `propsByPlayerId: {}` gracefully
+      (offseason) with the comparison unaffected; a throwaway preview
+      page (deleted) rendering the real card with sample data confirmed
+      both the populated and empty states render correctly; `tsc`, lint,
+      and a full production build all clean. **The one thing not
+      verifiable now**: the populated card with REAL data, since no props
+      exist yet — it gets its first real-data test when Week-1 lines post
+      (~September 2026); fail-open means a parse/join bug there shows
+      nothing (graceful), not a break. (The in-app browser's known
+      click-desync blocked driving a live comparison in the tool; a real
+      browser drives it fine.)
+    - **Not in the model** — display only, per the user's explicit scope.
+      A props-derived *signal* (a passing-yards or rush-attempt prop is a
+      more direct usage signal than target share) would need paid
+      historical data to backtest — see Open Item #24.
+
+### Open items (as of item 98 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6393,10 +6474,15 @@ route) and the live "Top of the board" rankings list
 Item 97's betting-odds signal investigation shipped no code — a
 documented negative finding (nothing cleared the integration/cross-
 pipeline bar), the K weight held at its shipped value; its CLAUDE.md
-write-up (the two Data Source Notes on nflverse betting lines / kicker
-scoring, and the new Open Item #23) is **not yet committed as of this
-writing** — commit only once the user explicitly asks, per this project's
-standing rule. Nothing below is started or fixed yet:
+write-up (two Data Source Notes on nflverse betting lines / kicker
+scoring, and Open Item #23) is committed as `e534955`. Item 98's
+display-only player props on the Start/Sit cards (`src/lib/oddsapi/`,
+the `/api/compare` `propsByPlayerId` field, and `ComparisonResult.tsx`'s
+"Betting lines" section) is committed as `275bc52`; its CLAUDE.md
+write-up (the Data Source Note on The Odds API, the `src/lib/oddsapi/`
+Conventions entry, and the new Open Item #24) is **not yet committed as
+of this writing** — commit only once the user explicitly asks, per this
+project's standing rule. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -6720,6 +6806,23 @@ standing rule. Nothing below is started or fixed yet:
     worthless for kickers and implied total should dominate. Revisit once
     that data exists. (`POINTS_PER_IMPLIED_TOTAL_POINT`/`K_MATCHUP_CAP` in
     `scoreKicker.ts`.)
+24. **Player props are display-only; more needs paid Odds API data (item
+    98).** The Odds API's current player props now show on the Start/Sit
+    cards (visual only, `src/lib/oddsapi/`). Three follow-ups:
+    (a) **verify the populated card with real data once Week-1 lines post
+    (~September 2026)** — the offseason has no props, so the real name-join
+    + market-mapping path has only been validated against a fixture, not
+    live data (fail-open means a bug shows nothing, not a break, but it's
+    worth a quick live confirmation then). (b) A props-derived **usage
+    signal** (a passing-yards or rush-attempt prop line is a more direct,
+    market-informed usage measure than target share) can't be backtested
+    without **paid historical odds** — revisit only if a paid Odds API
+    tier is ever acquired (which also unlocks historical game lines for
+    the item-97 spread/total family). (c) **Quota**: the free tier's 500
+    req/month is tight for real traffic (~a few dozen distinct games'
+    props per month even with caching); at scale it'd need a paid tier or
+    a tighter fetch (fewer markets, or only the recommended player).
+
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
@@ -7148,6 +7251,21 @@ standing rule. Nothing below is started or fixed yet:
   `buildInput.ts` (live mode) reads, threaded through
   `scoreExtended.ts` into all three live routes, the piece that was
   missing from item 70's original ship (see CLAUDE.md item 73).
+- `src/lib/oddsapi/` — server-only client for The Odds API (item 98),
+  the app's betting-lines source for the Start/Sit cards' display-only
+  "Betting lines" section. `client.ts` (in-process TTL cache doubling as
+  quota protection — the free tier is only 500 req/month; reads
+  `ODDS_API_KEY`, throws so every caller fails open to no-props),
+  `props.ts` (`getPropsForPlayers` plus the pure, unit-testable
+  `extractPlayerLines`; fetches upcoming events + per-event props, joins
+  to players by `normalizePlayerName`, position-scoped markets),
+  `types.ts` (plain display types with NO `server-only` import, so the
+  client `ComparisonResult.tsx` can `import type` them without pulling
+  server code into the client bundle). Strictly display-only — never
+  touches `PlayerScoreBreakdown` or any scoring path; `/api/compare`
+  returns it as a separate `propsByPlayerId`, empty in the offseason
+  before books post props. See Data Source Notes for the free-tier
+  limits.
 - `src/lib/backtest/` — the backtesting feature: `loadRun.ts` (the only
   network I/O — fetches every needed week once per request, both
   player-level and team-level rows, plus the nflverse tables above; as
