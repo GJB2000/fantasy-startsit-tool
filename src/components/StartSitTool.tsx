@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { PlayerProps } from "@/lib/oddsapi/types";
 import type { ComparisonResult as ComparisonResultData } from "@/lib/recommendation/types";
 import type { PlayerSummary, ScoringFormat } from "@/lib/sportsdata/types";
 import { usePendingRestoreComparison } from "@/lib/usePendingRestoreComparison";
@@ -15,6 +16,7 @@ const MAX_PLAYERS = 4;
 
 interface CompareResponse {
   result: ComparisonResultData;
+  propsByPlayerId?: Record<number, PlayerProps>;
   context: { contextNote: string };
 }
 
@@ -137,6 +139,7 @@ export function StartSitTool() {
             result={response.result}
             contextNote={response.context.contextNote}
             scoringFormat={scoringFormat}
+            propsByPlayerId={response.propsByPlayerId}
           />
         )}
       </div>

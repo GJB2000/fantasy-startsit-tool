@@ -1,6 +1,7 @@
 "use client";
 
 import type { GameWeather } from "@/lib/nflverse/schedules";
+import type { PlayerProps } from "@/lib/oddsapi/types";
 import type { ComparisonResult as ComparisonResultData, PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
 
@@ -8,6 +9,8 @@ interface ComparisonResultProps {
   result: ComparisonResultData;
   contextNote: string;
   scoringFormat: ScoringFormat;
+  /** Display-only betting lines per playerId (The Odds API) — empty in the offseason before books post props. */
+  propsByPlayerId?: Record<number, PlayerProps>;
 }
 
 const FORMAT_LABEL: Record<ScoringFormat, string> = {
@@ -15,6 +18,13 @@ const FORMAT_LABEL: Record<ScoringFormat, string> = {
   half_ppr: "Half PPR",
   standard: "Standard",
 };
+
+// Betting-line props only apply to the skill positions we fetch markets
+// for (see oddsapi/props.ts) — not K or D/ST, so the section is gated to
+// these, whether or not there's data yet.
+function isSkillCardPosition(position: string | null): boolean {
+  return position === "QB" || position === "RB" || position === "WR" || position === "TE";
+}
 
 const DOME_ROOFS = new Set(["dome", "closed"]);
 
@@ -70,6 +80,20 @@ function CloudIcon() {
         d="M7 18h9a3.5 3.5 0 00.4-6.98A5 5 0 007 9.5 3.75 3.75 0 007 18z"
         stroke="currentColor"
         strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function BettingIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-foreground/35" fill="none">
+      <path
+        d="M4 8.5l7-3.2a2 2 0 011.7 0l7 3.2M4 8.5v7l7 3.2a2 2 0 001.7 0l7-3.2v-7M4 8.5l8 3.7 8-3.7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
         strokeLinejoin="round"
       />
     </svg>
@@ -611,11 +635,13 @@ function PlayerCard({
   rank,
   isRecommended,
   formatLabel,
+  props,
 }: {
   player: PlayerScoreBreakdown;
   rank: number;
   isRecommended: boolean;
   formatLabel: string;
+  props?: PlayerProps;
 }) {
   const statSlots = buildStatSlots(player, formatLabel);
   const next = player.nextOpponent;
@@ -688,11 +714,44 @@ function PlayerCard({
           <p className="mt-1.5 text-[12.5px] leading-relaxed text-foreground/70">{buildCaseAgainst(player)}</p>
         </div>
       </div>
+
+      {/* 6 — betting lines (display-only market context, not our projection).
+          Always shown for skill positions so the placement is visible even
+          before books post props — same "the section exists, data pending"
+          treatment the card gives weather in the offseason. */}
+      {isSkillCardPosition(player.position) && (
+        <div className="mt-4 border-t border-foreground/[0.07] pt-4">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground/40">
+            <BettingIcon />
+            Betting lines
+            {props && props.lines.length > 0 && (
+              <span className="ml-auto font-normal normal-case tracking-normal text-foreground/35">{props.bookmaker}</span>
+            )}
+          </div>
+          {props && props.lines.length > 0 ? (
+            <>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {props.lines.map((line, i) => (
+                  <div key={`${line.label}-${i}`} className="rounded-lg bg-surface-sunken px-2.5 py-1.5">
+                    <div className="text-[10px] text-foreground/45">{line.label}</div>
+                    <div className="font-mono text-[13px] font-semibold tabular-nums">{line.value}</div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[10px] text-foreground/35">Market lines — shown for context, not part of our projection.</p>
+            </>
+          ) : (
+            <p className="mt-2 text-[12px] leading-relaxed text-foreground/45">
+              Sportsbook lines post closer to kickoff — they&rsquo;ll show here (pass/rush/receiving yards, receptions, anytime TD) once this week&rsquo;s game is on the board.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-export function ComparisonResult({ result, contextNote, scoringFormat }: ComparisonResultProps) {
+export function ComparisonResult({ result, contextNote, scoringFormat, propsByPlayerId }: ComparisonResultProps) {
   const formatLabel = FORMAT_LABEL[scoringFormat];
   const winner = result.players.find((p) => p.playerId === result.recommendedPlayerId) ?? null;
   const confidence = getConfidence(result);
@@ -752,6 +811,7 @@ export function ComparisonResult({ result, contextNote, scoringFormat }: Compari
             rank={i + 1}
             isRecommended={player.playerId === result.recommendedPlayerId}
             formatLabel={formatLabel}
+            props={player.playerId != null ? propsByPlayerId?.[player.playerId] : undefined}
           />
         ))}
       </div>
