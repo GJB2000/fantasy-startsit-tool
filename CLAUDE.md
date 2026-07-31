@@ -188,14 +188,18 @@ then moved out of the sidebar and into each player card directly, on
 request, closing out the redesign (item 87).
 Out of scope so far:
 database/persistence, auth. Upcoming-schedule/next-opponent
-lookup — previously fully out of scope — is now partially built (see
-below): the live start/sit tool's own matchup modifier still looks up
-each player's most recent *completed* opponent, not a future one, but
-the schedule-lookup infrastructure this would need now exists and is
-proven, built for the Trade Analyzer's rest-of-season projection.
+lookup — previously fully out of scope — is now built AND wired into
+live scoring: as of item 93, the live start/sit tool's matchup modifier
+looks up each player's *next scheduled* opponent (reusing the same
+schedule-lookup infrastructure the Trade Analyzer proved out), which
+matches how backtest has always scored matchup (the target week's
+opponent). The two paragraphs immediately below are kept as the
+historical record of when this was still a candidate improvement; item
+93 supersedes them.
 
 **Candidate future improvement: next-opponent lookup for live matchup
-context.** The live tool's matchup modifier currently looks up each
+context — RESOLVED in item 93; kept below as the historical record.**
+The live tool's matchup modifier previously looked up each
 player's *last completed* opponent (see above) — for a "who should I
 start this week" tool, it arguably should look up their *next
 scheduled* opponent instead. This is a smaller, more contained fix than
@@ -235,16 +239,19 @@ mapping pieces are already built and proven, just not yet pointed at
 `buildInput.ts`'s matchup-context construction.
 
 **Update: next opponent + weather now shown on the start/sit player
-cards — display only, still NOT wired into scoring.** Deliberately a
+cards — was display-only, but as of item 93 the matchup IS now scored
+off the next opponent (this paragraph's "still NOT wired into scoring"
+framing is historical — see item 93).** Deliberately a
 narrower slice of the candidate improvement above: `ComparisonResult.tsx`
 now shows each player's next scheduled opponent and that game's weather
 (or "Dome" for a fixed-roof stadium), reusing the exact schedule
 infrastructure the Trade Analyzer already proved out
 (`getRemainingOpponentsByTeam`/`getGameWeatherByTeamWeek`, plus
 `restOfSeason.ts`'s `toNflverseTeam`/`toSdioTeam` team-code mapping, now
-exported for reuse) — but `finalScore`/`matchupModifier` are completely
-untouched; the recommendation engine still scores off the *last
-completed* opponent exactly as before. `PlayerComparisonInput`/
+exported for reuse) — at the time, `finalScore`/`matchupModifier` were
+completely untouched and the engine still scored off the *last
+completed* opponent (item 93 later pointed the matchup at the next
+opponent instead). `PlayerComparisonInput`/
 `PlayerScoreBreakdown` gained inert `nextOpponent`/`nextGameWeather`
 fields (see Conventions) that flow through `buildInput.ts` →
 `scorePlayer` → the API response → the component, never touching
@@ -5896,8 +5903,62 @@ single-season numbers for those specific constants.
       `StartSitRail.tsx` + `StartSitTool.tsx` only. `npx tsc --noEmit` and
       `npm run lint` clean; verified live (both cards, no console errors).
       Committed as `b234534`.
+93. **Pointed the live matchup modifier at the NEXT scheduled opponent
+    instead of the last completed one — resolving the long-standing
+    "next-opponent lookup for live matchup context" candidate improvement
+    (see Overview), and bringing the live tool into conformance with the
+    already-validated backtest methodology.** Prompted by a user question:
+    Bijan's card read "ATL vs NO" while the Falcons actually play PIT in
+    Week 1 — because the live matchup rated his *last completed* 2025
+    opponent (New Orleans), not his upcoming one.
+    - **The key insight that made this safe, not risky**: backtest
+      (`buildBacktestInput.ts`) has ALWAYS scored matchup off the target
+      week's opponent (the game being predicted) — confirmed by reading
+      the code before touching anything. LIVE (`buildInput.ts`) was the
+      outlier, scoring off the last *completed* opponent. So every
+      accuracy number in this document was validated with the
+      next/target-week opponent; this change makes live match that, rather
+      than introducing untested behavior. It touches only the live input
+      builder — no backtest input changes, so no accuracy numbers move.
+    - **The change** (`buildInput.ts`): compute the next scheduled
+      opponent first (from the existing `remainingOpponentsByTeam`
+      lookup — the same infra the Trade Analyzer and the display-only
+      next-opponent card line already used), then build `matchupContext`
+      from THAT opponent's `positionDefenseTable` rank, falling back to
+      the most recent completed opponent only when the schedule has no
+      upcoming game (offseason edge, or genuinely no games left). Skill
+      positions only — `positionDefenseTable` is skill-only; D/ST and K
+      score matchup off Vegas-implied totals, untouched.
+    - **Scope of effect, traced deliberately**: Start/Sit, Waivers, and
+      Lineup all score via `scoreExtendedPlayer` → `buildComparisonInput`,
+      so all three now rate the *upcoming* matchup (correct). The **Trade
+      Analyzer is unaffected** — `restOfSeason.ts` strips `matchupModifier`
+      out (`baseRate = finalScore - matchupModifier`) and re-applies a
+      fresh one per remaining opponent, so its base value never depended
+      on which single opponent `matchupContext` held.
+    - **Display follow-through** (`ComparisonResult.tsx`): the opponent
+      line now shows the week (`BAL vs IND · Wk 1`) and its def-rank/color
+      reflect that upcoming game; the redundant "Opponent" context item
+      (which showed the same next opponent) was removed — the context
+      column is now just Weather + Health status — and the now-unused
+      `CalendarIcon` dropped. Case For/Against automatically reference the
+      upcoming opponent now (e.g. "Tough matchup — PIT has been one of the
+      stingier defenses against RBs").
+    - **Verified live end-to-end** (this session's own dev server): a real
+      `/api/compare` confirmed every skill player's `matchupContext.opponentTeam`
+      now equals `nextOpponent.team` (Bijan NO→**PIT** #27 tough, Josh
+      Allen HOU #30, etc.), and the rendered cards show the upcoming
+      opponent + week with correct favorable/tough coloring. `npx tsc
+      --noEmit` and `npm run lint` clean.
+    - **One honest offseason caveat**: the def-rank behind the upcoming
+      opponent is still computed from the last completed season's data
+      (2025) during the offseason, since the new season hasn't happened —
+      a reasonable proxy that becomes live current-season data once the
+      2026 season starts. Also updated the now-stale Overview paragraphs
+      that described the matchup as using the last-completed opponent
+      (kept as historical record, marked superseded by this item).
 
-### Open items (as of item 92 — pick up here)
+### Open items (as of item 93 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6023,10 +6084,14 @@ committed as `0d0ca38`. Item 91's Start/Sit card restructure
 write-up as `25e2a87`. Item 92's follow-on card refinements (the
 Case For/Against split, the context-beside-metrics + Health status move,
 the stacked cards, and the Key Takeaways rail removal — `ComparisonResult.tsx`/
-`StartSitRail.tsx`/`StartSitTool.tsx`) are committed as `b234534`; this
-CLAUDE.md write-up of item 92 is **not yet committed as of this writing**
-— commit only once the user explicitly asks, per this project's standing
-rule. Nothing below is started or fixed yet:
+`StartSitRail.tsx`/`StartSitTool.tsx`) are committed as `b234534`, its
+CLAUDE.md write-up as `bf0b36d`. Item 93's live-matchup-uses-next-opponent
+change (`buildInput.ts` + the `ComparisonResult.tsx` display follow-through)
+is committed as `4415171`; this CLAUDE.md write-up of item 93 (this
+paragraph, the numbered item above, and the corrected Overview passages)
+is **not yet committed as of this writing** — commit only once the user
+explicitly asks, per this project's standing rule. Nothing below is
+started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -6413,8 +6478,10 @@ rule. Nothing below is started or fixed yet:
   fourth, standalone piece alongside the three bridging files above —
   not part of `scorePlayer`/`comparePlayers` at all, but built on top of
   them for the Trade Analyzer: `computeMatchupModifier` is exported from
-  `engine.ts` as a pure function so both `scorePlayer`'s "last completed
-  opponent" case and `restOfSeason.ts`'s "every future opponent" case
+  `engine.ts` as a pure function so both `scorePlayer`'s single-opponent
+  case (the *next scheduled* opponent in live mode as of item 93, the
+  target-week opponent in backtest) and `restOfSeason.ts`'s "every future
+  opponent" case
   share one formula; `sumProjectedPoints`/`projectRestOfSeason` take a
   player's score with that one matchup term stripped out and re-sum it
   against every remaining opponent on their real schedule.
@@ -6430,9 +6497,13 @@ rule. Nothing below is started or fixed yet:
   `getGameWeatherByTeamWeek` the Trade Analyzer already uses, fetched
   once per `/api/compare` request with the same season-rollforward
   fallback `/api/trade` uses) and always `null` in backtest mode
-  (`buildBacktestInput.ts`). Purely inert display data for
-  `ComparisonResult.tsx` — never read by `scorePlayer`/`comparePlayers`,
-  so it has zero effect on `finalScore` or any backtest number.
+  (`buildBacktestInput.ts`). The `nextOpponent`/`nextGameWeather` fields
+  themselves are still inert display data for `ComparisonResult.tsx` —
+  never read by `scorePlayer`/`comparePlayers`. But as of item 93 the live
+  matchup rating (`matchupContext`, a separate field) is built from the
+  SAME next-opponent lookup and DOES feed `finalScore`: so the next
+  opponent now drives live scoring via `matchupContext`, even though these
+  two display-only fields still don't.
   `comparePlayers` is now a thin wrapper: it maps skill inputs through
   `scorePlayer` and hands the resulting breakdowns to a newly-exported
   `compareBreakdowns(breakdowns)`, which does the actual ranking/
