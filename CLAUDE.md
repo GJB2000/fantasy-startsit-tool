@@ -5903,6 +5903,23 @@ single-season numbers for those specific constants.
       `StartSitRail.tsx` + `StartSitTool.tsx` only. `npx tsc --noEmit` and
       `npm run lint` clean; verified live (both cards, no console errors).
       Committed as `b234534`.
+    - **Follow-on note (committed separately as `188c9e4`): QB stat grid
+      is now a passing profile.** On user request, the QB card's slots 2-4
+      (rush attempts/gm, snap share, red-zone rushes/gm — all weak QB
+      signals: snap share is ~always near 100% for a starter, rushing is a
+      small slice for most passers) were replaced with pass attempts/gm
+      (`recentVolumeAvg`), success rate (`successRateAvg`), and EPA/dropback
+      (`epaPerPlayAvg`) — the standard QB volume + efficiency + advanced-
+      efficiency trio, all already-computed real breakdown fields (verified
+      populated for QB in a live `/api/compare` before wiring). EPA is
+      signed, so it's shown with an explicit +/- and its bar uses a shifted
+      scale (league-average ≈ 0 → ~40% fill, poor ≈ empty, elite ≈ full) —
+      the displayed number is always the real value. QB now branches to a
+      new `buildQbStatSlots`; the recent-avg slot (slot 1, unchanged) was
+      factored into a shared `recentAvgSlot` helper used by both paths.
+      RB/WR/TE/D-ST/K grids are untouched; a QB missing any of the three
+      still dashes out honestly. Verified live (Josh Allen -0.11 EPA vs.
+      Joe Burrow +0.14, correct signs/bars), `tsc`/lint clean.
 93. **Pointed the live matchup modifier at the NEXT scheduled opponent
     instead of the last completed one — resolving the long-standing
     "next-opponent lookup for live matchup context" candidate improvement
