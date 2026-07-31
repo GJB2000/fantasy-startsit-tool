@@ -5848,8 +5848,56 @@ single-season numbers for those specific constants.
       every real-data assumption was verified via the live `/api/compare`
       response and the user eyeballed it on their own HMR'd server before
       committing. Committed as `9cb3a2e`.
+92. **Follow-on Start/Sit card refinements — layout + a real "Case For /
+    Case Against" split, presentation only, real fields only.** Three
+    user-requested tweaks after item 91, all in `ComparisonResult.tsx`
+    (plus a two-line rail change), verified live this session on the
+    session's OWN dev server (the other chat's had stopped, freeing Next's
+    dev lock — so unlike item 91 this was browser-screenshot-verified end
+    to end with a real Bijan-vs-Jonathan-Taylor comparison).
+    - **Stacked the two player cards** vertically instead of side-by-side
+      (`grid gap-4 sm:grid-cols-2` → `flex flex-col gap-4`), and **removed
+      the "Key takeaways" rail panel** (`StartSitRail.tsx`'s
+      `KeyTakeawaysPanel` deleted along with its now-unused `result` prop
+      and the `ComparisonResultData` import; `StartSitTool.tsx` updated to
+      pass only `recent`). The rail is now just Recent comparisons.
+      `result.reasoning` is no longer surfaced on the page — an accepted
+      consequence, the verdict banner + per-card Case For/Against carry the
+      reasoning now.
+    - **Replaced the collapsible "Why this pick"** (which rendered
+      `player.notes`) with a NON-collapsible, two-column **Case For**
+      (green header) / **Case Against** (red header), one sentence each.
+      Both are generated deterministically from already-computed breakdown
+      fields — NOT `player.notes` (which are all positive/context, with no
+      "against" side) and not fabricated: `buildCaseFor` picks the single
+      strongest real positive in priority order (favorable matchup →
+      recent form + ceiling → projection), `buildCaseAgainst` the single
+      most relevant real risk (injury → bye → tough matchup → thin data →
+      boom/bust floor, with an honest "few red flags" fallback). Rank
+      NUMBERS are deliberately omitted from these sentences (the words
+      "softer"/"stingier" carry the meaning; the colored opponent line
+      already shows the number) — avoids the same rank-direction confusion
+      item 91 flagged.
+    - **Moved Opponent + Weather up beside the 2x2 metrics grid** (a
+      context column under the projection, `sm:grid-cols-[1fr_170px]`,
+      stacking on mobile) and **added a new color-coded "Health status"
+      line** there: reads the real `injuryStatus` (Out/Doubtful → red,
+      Questionable → amber), `isOnByeThisWeek` → "On bye", else "Active"
+      (green) — worded "Active" (not "Healthy") to not overclaim, since a
+      null injury field means "not injury-listed," not "confirmed 100%".
+      The old label-left/value-right `ContextRow` became a stacked
+      `ContextItem` to fit the narrow column.
+    - **Removed the now-redundant header injury/bye/data-quality badge
+      block** (Health status covers injury/bye; limited-data still shows
+      in the verdict banner and via Case Against), plus the now-unused
+      `injuryBadgeClasses`, `ChevronIcon`, and the `useState` import (the
+      card no longer has any collapsible state).
+    - **No engine/scoring change** — `ComparisonResult.tsx` +
+      `StartSitRail.tsx` + `StartSitTool.tsx` only. `npx tsc --noEmit` and
+      `npm run lint` clean; verified live (both cards, no console errors).
+      Committed as `b234534`.
 
-### Open items (as of item 91 — pick up here)
+### Open items (as of item 92 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -5971,10 +6019,14 @@ backtest: `backtest/multiPlayerTradeBacktest.ts`, the
 `/api/backtest/trade-multi-nflverse-multiseason` route, and the three
 now-exported helpers in `tradeBacktest.ts`) plus its write-up are
 committed as `0d0ca38`. Item 91's Start/Sit card restructure
-(`ComparisonResult.tsx` only) is committed as `9cb3a2e`; this CLAUDE.md
-write-up of item 91 is **not yet committed as of this writing** — commit
-only once the user explicitly asks, per this project's standing rule.
-Nothing below is started or fixed yet:
+(`ComparisonResult.tsx` only) is committed as `9cb3a2e`, its CLAUDE.md
+write-up as `25e2a87`. Item 92's follow-on card refinements (the
+Case For/Against split, the context-beside-metrics + Health status move,
+the stacked cards, and the Key Takeaways rail removal — `ComparisonResult.tsx`/
+`StartSitRail.tsx`/`StartSitTool.tsx`) are committed as `b234534`; this
+CLAUDE.md write-up of item 92 is **not yet committed as of this writing**
+— commit only once the user explicitly asks, per this project's standing
+rule. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
