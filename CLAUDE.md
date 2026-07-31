@@ -6052,7 +6052,46 @@ single-season numbers for those specific constants.
       current-HEAD snapshot via `getCurrentExpertConsensusByNormalizedName`,
       not this historical commit-mining path). `tsc`/lint clean.
 
-### Open items (as of item 94 — pick up here)
+95. **Redesigned the Trade Analyzer result into a "trade desk" — a
+    mockup-driven visual overhaul, real fields only, no engine change.**
+    User asked for a more impressive, less-simple Trade Analyzer. Built a
+    full-page Artifact mockup first (the app's dark/emerald design system,
+    condensed `font-display` headline, mono numbers) grounded in the real
+    `TradeEvaluation` data, then ported it into `TradeResult.tsx`:
+    - **Verdict hero** — a `font-display` headline (verdict-specific
+      phrase) + a big mono net-value number, all COLOR-ADAPTIVE by verdict
+      (good=emerald, fair=amber/caution, bad=red, unknown=info) via inline
+      `var(--TONE)` styles rather than Tailwind classes, so the dynamic
+      color needs no per-verdict literal-class map. Plus a value-balance
+      meter (proportional give-vs-get bars).
+    - **Give ↔ get board** — elevated player cards (avatar initials,
+      position badge, big mono rest-of-season total, per-game micro-bar,
+      games left), a centered exchange node, a gold `--premium` "Higher
+      value" tag on the higher-total side (skipped for fair/unknown), and
+      an accent ring on the single most valuable player. Neutral styling
+      for the give side, emerald for the get side.
+    - **Reasons to accept / Reasons to reject** — on direct follow-up,
+      replaced the (verbose, ~28-line) collapsible "Why this verdict" list
+      with a two-column, non-collapsible pro/con: green "Reasons to accept"
+      + red "Reasons to reject", 1-2 sentences each, generated
+      deterministically from the evaluation (net value, side totals, the
+      marquee player per side, player counts) — NOT the raw per-player
+      reasoning strings. Genuinely two-sided (even a "fair" trade produces
+      a real reason for each). Adapts to good/fair/bad/unknown, any
+      player-count per side, and null projections. Same Case-For/Case-
+      Against precedent as the Start/Sit card (items 85/92).
+    - A **summary stat strip** (give / get / net / weeks-left) closes it.
+    - **No engine/data change** — `TradeResult.tsx` only; every number is a
+      real breakdown/evaluation field. `evaluation.reasoning` (the detailed
+      per-player notes) is no longer surfaced in the trade view, an accepted
+      consequence of the pro/con replacement. Verified live end-to-end (a
+      real Amon-Ra St. Brown + Tony Pollard for Ja'Marr Chase + Jaylen
+      Warren trade → "fair"/+7.8, correct amber theming, both pro/con
+      columns rendering the right sentences), `tsc`/lint clean. Committed as
+      `99577ab`. The mockup's subtle load-in animation was deliberately
+      left out to keep the component simple/robust — see Open Item #20.
+
+### Open items (as of item 95 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6187,9 +6226,12 @@ change (`buildInput.ts` + the `ComparisonResult.tsx` display follow-through)
 is committed as `4415171`, its CLAUDE.md write-up (plus the corrected
 Overview passages) as `0138a1f`. Item 94's stale-snapshot guard
 (`fantasypros/weeklyConsensus.ts`'s `MAX_SNAPSHOT_AGE_DAYS`) is committed
-as `c46acca`; this CLAUDE.md write-up of item 94 is **not yet committed
-as of this writing** — commit only once the user explicitly asks, per
-this project's standing rule. Nothing below is started or fixed yet:
+as `c46acca`, its CLAUDE.md write-up as `dcad3a9`. Item 95's Trade
+Analyzer redesign (`TradeResult.tsx` only) is committed as `99577ab`;
+this CLAUDE.md write-up of item 95 (and the new Open Item #20 for its
+deferred load-in animation) is **not yet committed as of this writing** —
+commit only once the user explicitly asks, per this project's standing
+rule. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -6467,6 +6509,16 @@ this project's standing rule. Nothing below is started or fixed yet:
     `multiPlayerTradeBacktest.ts` (backtest) together. Also still unbuilt:
     3+-player-per-side shapes beyond 2-for-2/2-for-1 (item 90 covered the
     two canonical ones).
+20. **Trade Analyzer result load-in animation — deferred from item 95.**
+    The mockup had a tasteful entrance (the value-balance and per-game bars
+    grow from zero, cards/sections rise + fade on load), guarded by
+    `prefers-reduced-motion`. It was left out of the shipped
+    `TradeResult.tsx` to keep it a lightweight, state-free component (the
+    bars render at their final width). Adding it means either a mount
+    effect (start bars at `scaleX(0)`, animate to final — making
+    `TradeResult` a client component with a small `useState`/`useEffect`)
+    or a pure-CSS keyframe reveal keyed off a mount class. Low-priority
+    polish, not a correctness issue.
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
