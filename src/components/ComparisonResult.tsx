@@ -370,9 +370,8 @@ function FloorCeilingBar({ player }: { player: PlayerScoreBreakdown }) {
 }
 
 // Per-position opportunity/volume stat: RB touches, WR/TE targets, all
-// from recentVolumeAvg (the real volume signal). QB uses rush attempts
-// (recentQbRushAttemptsAvg) — the fantasy-relevant QB opportunity signal,
-// per the layout spec — not pass attempts.
+// from recentVolumeAvg (the real volume signal). QB is handled separately
+// (buildQbStatSlots) with a passing-focused grid.
 const VOLUME_UNIT_LABEL: Record<string, string> = {
   RB: "Touches/gm",
   WR: "Targets/gm",
@@ -387,6 +386,15 @@ const RECENT_PPR_BAR_MAX = 25;
 const VOLUME_BAR_MAX: Record<string, number> = { QB: 12, RB: 25, WR: 12, TE: 12 };
 const DROP_RATE_BAR_MAX = 0.15;
 const RZ_TOUCH_BAR_MAX: Record<string, number> = { RB: 6, QB: 3 };
+// QB passing-grid bar references. Pass attempts ~40 = a high-volume game;
+// success rate ~0.55 = elite. EPA/dropback is signed, so its bar maps a
+// typical range (poor ≈ -0.2 → elite ≈ +0.3) onto 0-1 with 0 (league
+// average) landing at ~40% fill — the displayed number is always the real,
+// signed value.
+const PASS_ATT_BAR_MAX = 40;
+const QB_SUCCESS_RATE_BAR_MAX = 0.55;
+const QB_EPA_BAR_MIN = -0.2;
+const QB_EPA_BAR_RANGE = 0.5;
 
 interface StatSlot {
   label: string;
@@ -424,47 +432,81 @@ function buildRzDropSlot(player: PlayerScoreBreakdown): StatSlot {
   return { label, value: null, fill: null };
 }
 
+/** A recent-avg (PPR) slot — slot 1 for every position. */
+function recentAvgSlot(player: PlayerScoreBreakdown, formatLabel: string): StatSlot {
+  return player.recentPprAvg != null
+    ? {
+        label: `Recent avg (${formatLabel})`,
+        value: player.recentPprAvg.toFixed(1),
+        fill: clamp01(player.recentPprAvg / RECENT_PPR_BAR_MAX),
+      }
+    : { label: `Recent avg (${formatLabel})`, value: null, fill: null };
+}
+
+/**
+ * QB-specific stat grid — a passing profile, all real breakdown fields:
+ * recent scoring, pass volume, and two efficiency signals (success rate,
+ * EPA per dropback). Deliberately replaces the generic rush-attempts /
+ * snap-share / red-zone-rushes slots, which are far less telling for a QB
+ * (snap share is ~always near 100%, rushing is a small slice for most
+ * passers). "—" for any a given QB's data genuinely lacks.
+ */
+function buildQbStatSlots(player: PlayerScoreBreakdown, formatLabel: string): StatSlot[] {
+  const passAtt: StatSlot =
+    player.recentVolumeAvg != null
+      ? {
+          label: "Pass attempts/gm",
+          value: player.recentVolumeAvg.toFixed(1),
+          fill: clamp01(player.recentVolumeAvg / PASS_ATT_BAR_MAX),
+        }
+      : { label: "Pass attempts/gm", value: null, fill: null };
+
+  const successRate: StatSlot =
+    player.successRateAvg != null
+      ? {
+          label: "Success rate",
+          value: `${(player.successRateAvg * 100).toFixed(0)}%`,
+          fill: clamp01(player.successRateAvg / QB_SUCCESS_RATE_BAR_MAX),
+        }
+      : { label: "Success rate", value: null, fill: null };
+
+  const epa: StatSlot =
+    player.epaPerPlayAvg != null
+      ? {
+          label: "EPA/dropback",
+          value: (player.epaPerPlayAvg >= 0 ? "+" : "") + player.epaPerPlayAvg.toFixed(2),
+          fill: clamp01((player.epaPerPlayAvg - QB_EPA_BAR_MIN) / QB_EPA_BAR_RANGE),
+        }
+      : { label: "EPA/dropback", value: null, fill: null };
+
+  return [recentAvgSlot(player, formatLabel), passAtt, successRate, epa];
+}
+
 /**
  * The fixed 2x2 stat grid, real fields only. Any slot without real data
  * for the given position renders "—" rather than a fabricated number
  * (e.g. QB has no drop rate; D/ST and K have no volume/snap/red-zone
  * signals at all). Numbers are all real breakdown fields already computed
  * by the engine — this just selects the four per-position slots and adds a
- * magnitude bar.
+ * magnitude bar. QB gets its own passing-focused grid (buildQbStatSlots).
  */
 function buildStatSlots(player: PlayerScoreBreakdown, formatLabel: string): StatSlot[] {
   const pos = player.position;
 
-  // Slot 1 — recent avg (PPR).
-  const recentAvg: StatSlot =
-    player.recentPprAvg != null
-      ? {
-          label: `Recent avg (${formatLabel})`,
-          value: player.recentPprAvg.toFixed(1),
-          fill: clamp01(player.recentPprAvg / RECENT_PPR_BAR_MAX),
-        }
-      : { label: `Recent avg (${formatLabel})`, value: null, fill: null };
+  if (pos === "QB") return buildQbStatSlots(player, formatLabel);
 
-  // Slot 2 — position-specific opportunity/volume.
-  let opportunity: StatSlot;
-  if (pos === "QB") {
-    opportunity =
-      player.recentQbRushAttemptsAvg != null
-        ? {
-            label: "Rush attempts/gm",
-            value: player.recentQbRushAttemptsAvg.toFixed(1),
-            fill: clamp01(player.recentQbRushAttemptsAvg / VOLUME_BAR_MAX.QB),
-          }
-        : { label: "Rush attempts/gm", value: null, fill: null };
-  } else if (pos && VOLUME_UNIT_LABEL[pos] && player.recentVolumeAvg != null) {
-    opportunity = {
-      label: VOLUME_UNIT_LABEL[pos],
-      value: player.recentVolumeAvg.toFixed(1),
-      fill: clamp01(player.recentVolumeAvg / (VOLUME_BAR_MAX[pos] ?? 20)),
-    };
-  } else {
-    opportunity = { label: (pos && VOLUME_UNIT_LABEL[pos]) || "Opportunity", value: null, fill: null };
-  }
+  // Slot 1 — recent avg (PPR).
+  const recentAvg = recentAvgSlot(player, formatLabel);
+
+  // Slot 2 — position-specific opportunity/volume (RB touches, WR/TE targets).
+  const opportunity: StatSlot =
+    pos && VOLUME_UNIT_LABEL[pos] && player.recentVolumeAvg != null
+      ? {
+          label: VOLUME_UNIT_LABEL[pos],
+          value: player.recentVolumeAvg.toFixed(1),
+          fill: clamp01(player.recentVolumeAvg / (VOLUME_BAR_MAX[pos] ?? 20)),
+        }
+      : { label: (pos && VOLUME_UNIT_LABEL[pos]) || "Opportunity", value: null, fill: null };
 
   // Slot 3 — snap share (real wherever nflverse snap data exists).
   const snapShare: StatSlot =
