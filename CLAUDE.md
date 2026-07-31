@@ -399,6 +399,27 @@ knowable that far ahead from this data source.
   subject to that limit and is immutable once committed, so it's cached
   far longer (30 days) than the commit index itself (24h, since new
   commits keep landing).
+- **nflverse's `schedules` release carries betting lines
+  (`spread_line`/`total_line`, closing) back through 2022, free and
+  no-auth** — already used for the D/ST and K implied-total signals (see
+  `getImpliedTeamTotalsByTeamWeek` in `schedules.ts` and "Backtesting &
+  Tuning History" item 62). Confirmed (item 97) this makes a paid odds
+  API (e.g. The Odds API) unnecessary for any team-level game-line signal
+  (spread, total, implied total) — such an API would only add player
+  props, opening-line movement, and multi-book data, none of which any
+  odds signal tested so far uses. (Signing up for such an API is also not
+  something this assistant can do on the user's behalf — account creation
+  is theirs to do.)
+- **nflverse's `stats_player_week` includes kicker (Position "K") rows
+  with full distance-bucketed FG detail** (`fg_made_0_19` through
+  `fg_made_60_`, `fg_missed_*`, `pat_made`, etc.) for all of 2022-2025 —
+  BUT its own `fantasy_points`/`fantasy_points_ppr` fields are
+  offense-only (0 for every kicker), so kicker fantasy points must be
+  computed from the buckets (standard distance scoring: 3 pts 0-39, 4 pts
+  40-49, 5 pts 50+, 1 per PAT — avg ~8/game, verified sane across all
+  four seasons). Used only for backtest-side kicker analysis on the
+  nflverse pipeline (item 97); the shipped K scorer runs on SportsDataIO's
+  own kicker FantasyPoints and is unaffected.
 
 ## Recommendation Logic Philosophy
 This is the most important section — the "brain" of the tool.
@@ -6140,7 +6161,93 @@ single-season numbers for those specific constants.
       opinion call — see Open Item #22. The newsletter's actual provider
       wiring is Open Item #21. `npx tsc --noEmit` and `npm run lint` clean.
 
-### Open items (as of item 96 — pick up here)
+97. **Tested betting odds as a new signal family (implied team total,
+    spread), following the full process — confirmed the data was already
+    free, ran standalone + integration tests pooled 2022-2025, shipped
+    nothing.** Prompted by a plan to sign up for The Odds API; two things
+    reframed it before any signup: (1) creating that account isn't
+    something this assistant does — flagged for the user to do themselves
+    — and (2) it turned out to be unnecessary. nflverse's `schedules`
+    release already carries `spread_line`/`total_line` (closing lines)
+    back through 2022, and every proposed test operates on team-level game
+    lines (spread + total), which The Odds API would only extend with
+    player props / opening-line movement / multi-book — none of which
+    these tests need. So the whole family was tested on free,
+    already-available data, no signup, no payment (see the Data Source
+    Notes on nflverse betting lines and kicker scoring).
+    - **Kicker scoring confirmed computable from free data first** (the
+      one real unknown): nflverse's `stats_player_week` has K rows with
+      full distance-bucketed FG detail but an offense-only
+      `fantasy_points` (0 for kickers), so kicker points are computed from
+      the buckets — see the Data Source Note.
+    - **Standalone tests (pooled 2022-2025, temporary diagnostic route,
+      deleted after recording):**
+      - **Implied total → K: clears the bar.** 55.1% pooled (n=910),
+        every season 52.6-56.2%, beating a same-harness season-average
+        baseline (49.8% — kicker season-average is ~chance, the well-known
+        low-persistence of kicker scoring) by ~5pp in all four seasons.
+        Differs from item 62's single-season SportsDataIO finding (implied
+        55.4% vs. a 60.1% season-avg baseline) — that season-avg gap is a
+        scoring-source/pool methodology difference between the two
+        pipelines; implied total's own ~55%, stable across four seasons,
+        holds regardless.
+      - **Spread → QB: rejected, as expected.** "Pick the bigger-underdog
+        QB" (garbage-time/volume hypothesis) came in at 47.8% pooled
+        (favorite direction ~52.2%), swinging 42.7-54.0% across seasons
+        and crossing chance both ways — the same cross-season instability
+        every other QB-rushing signal has shown (item 26's
+        qbRushingAttempts flipped 46.8↔63.0). Matched the user's own
+        going-in expectation.
+      - **Implied total × usage interaction (skill), deliberately NOT
+        standalone** (the user's explicit call — a standalone team-level
+        signal already failed once, the pace baseline item 12; don't
+        repeat it). "Usage AND implied total agree" vs. "usage alone":
+        **TE** was cleanest — agreement 58.5% vs. usage-alone 54.1%
+        pooled, beating usage-alone in all four seasons. **WR** was
+        positive pooled (55.7% vs. 50.8%) but 2025 broke it; **RB** was a
+        2024-carried artifact (59.2% vs. 56.8% pooled, but 2022 inverted).
+        Only TE looked worth an integration test.
+    - **Integration tests (the real "consider shipping" step) — both
+      negative:**
+      - **TE interaction, as an additive term on the real engine
+        finalScore** (`finalScore + w*(impliedTotal-22.5)*recentTargetShare`,
+        the item-74 "reuse real scores, add one term" approach; w=0
+        reproduced the real nflverse-only multiseason TE number exactly —
+        56.8% pooled, 58.4/55.9/52.5/60.4 — validating the harness before
+        trusting the sweep). Sweeping w=0-3: best case 57.3% at w=2
+        (+0.5pp, noise), a wash by season (2022/2024 up, 2023/2025 down).
+        The full engine already captures the interaction — most plausibly
+        through the FantasyPros expert-consensus blend (item 70: a TE on a
+        high-total team is already ranked up) plus the matchup modifier.
+        Same failure mode as QB success rate (item 33) and teammate bump
+        (item 35): real standalone, adds nothing once integrated. Not
+        shipped.
+      - **K implied-total weight re-sweep: strong on nflverse, doesn't
+        transfer to production.** The 4-season nflverse sweep is
+        compelling — pure form is *below chance* for kickers (47.2%), and
+        accuracy climbs monotonically as implied gets more weight (current
+        slope 0.175 → 52.0%; slope 1.0/cap 8.0 → 54.9% pooled, every
+        season improving). But K ships on the SportsDataIO pipeline
+        (different kicker scoring), and the primary-pipeline check (2025,
+        the only season SportsDataIO serves) is a noisy wash across
+        weights — 50.7% (slope 0.35) / 52.0% (current) / 52.5% (slope
+        1.0), ±1pp on one season with no direction. Exactly the
+        cross-pipeline non-transfer item 53 documented for the WR
+        ensemble; since production K scoring can't be validated beyond
+        2025 and the current 0.175 was itself derived from real 2025
+        SportsDataIO data (item 62's OLS), retuning to the nflverse result
+        would be tuning to the wrong pipeline. **User chose to hold** at
+        0.175/2.0 rather than ship an unvalidated bump — see Open Item
+        #23. Config reverted; no change.
+    - **Net: nothing shipped** — the process worked as designed
+      (standalone promise → integration/cross-pipeline checks → hold).
+      Both temporary diagnostic routes deleted after recording numbers,
+      same discipline as items 22/29/34/38. Item 62's shipped K
+      implied-total modifier is *validated* (not changed) by the 4-season
+      standalone result; the lasting artifacts are this write-up and the
+      two Data Source Notes (nflverse betting lines / kicker scoring).
+
+### Open items (as of item 97 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6282,10 +6389,14 @@ load-in animation) as `cee54e6`. Item 96's Home-page redesign — the
 newsletter signup band (`NewsletterSignup.tsx`, the new `/api/subscribe`
 route) and the live "Top of the board" rankings list
 (`HomeRankingsBoard.tsx`), wired into `page.tsx` — is committed as
-`68faef0`; this CLAUDE.md write-up of item 96 (and the new Open Items
-#21/#22) is **not yet committed as of this writing** — commit only once
-the user explicitly asks, per this project's standing rule. Nothing below
-is started or fixed yet:
+`68faef0`, its CLAUDE.md write-up (and Open Items #21/#22) as `b535041`.
+Item 97's betting-odds signal investigation shipped no code — a
+documented negative finding (nothing cleared the integration/cross-
+pipeline bar), the K weight held at its shipped value; its CLAUDE.md
+write-up (the two Data Source Notes on nflverse betting lines / kicker
+scoring, and the new Open Item #23) is **not yet committed as of this
+writing** — commit only once the user explicitly asks, per this project's
+standing rule. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -6594,6 +6705,21 @@ is started or fixed yet:
     restructure is a bigger opinion call. If picked up: promote Start/Sit
     (or another flagship) to a hero card while keeping all six tools
     represented. Presentation-only, `src/app/page.tsx`.
+23. **K implied-total weight is validated-higher-on-nflverse but
+    unshipped (item 97).** The 4-season nflverse sweep strongly favors
+    weighting K's implied-total modifier far above the current 0.175
+    (pure form is *below chance* for kickers; slope 1.0/cap 8.0 hit 54.9%
+    pooled, every season improving). NOT shipped because it doesn't
+    transfer to the production SportsDataIO pipeline (a ±1pp wash on 2025,
+    the only season SportsDataIO serves — 50.7/52.0/52.5% across weights,
+    no direction), and the current weight is grounded in real 2025
+    SportsDataIO data (item 62). The only thing missing to resolve this
+    is a second season of SportsDataIO kicker data (2026+), which would
+    allow a genuine multi-season production check of a higher weight; the
+    nflverse-side evidence is already conclusive that form is nearly
+    worthless for kickers and implied total should dominate. Revisit once
+    that data exists. (`POINTS_PER_IMPLIED_TOTAL_POINT`/`K_MATCHUP_CAP` in
+    `scoreKicker.ts`.)
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
