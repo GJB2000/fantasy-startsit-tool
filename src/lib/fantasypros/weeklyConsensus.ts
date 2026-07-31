@@ -9,6 +9,21 @@ const PAGE_TO_POSITION: Record<string, string> = {
   "ppr-te": "TE",
 };
 
+/**
+ * Max age (in days) of a snapshot relative to the week it's meant to
+ * represent. The dynastyprocess "daily scrape" has multi-month gaps in some
+ * offseasons — e.g. NO commits between January and September before the
+ * 2022 and 2024 seasons — so "latest commit strictly before week 1" can
+ * silently resolve to the PRIOR season's playoff-era rankings (wrong data,
+ * zero incoming rookies). Rather than blend stale prior-season rankings
+ * into scoring, any snapshot older than this is treated as no-data for that
+ * week. Fresh snapshots run ~0-21 days old (verified: 2023 week 1 was 21,
+ * 2025 week 1 was 0); the stale prior-season ones are ~240 days, so 60
+ * cleanly separates them without rejecting a legitimately-early preseason
+ * snapshot. See CLAUDE.md's week-1 backtest spike.
+ */
+const MAX_SNAPSHOT_AGE_DAYS = 60;
+
 export interface ExpertConsensusEntry {
   /** Position rank as of that week's snapshot (1 = top-ranked at the position). */
   rank: number;
@@ -74,6 +89,11 @@ export async function getExpertConsensusByNormalizedNameWeek(
     if (!startDate) continue;
     const commit = findCommitBefore(startDate);
     if (!commit) continue;
+
+    // Reject a stale snapshot (see MAX_SNAPSHOT_AGE_DAYS) rather than blend
+    // prior-season rankings in as if they were this week's.
+    const ageDays = (new Date(`${startDate}T00:00:00Z`).getTime() - new Date(commit.date).getTime()) / 86_400_000;
+    if (ageDays > MAX_SNAPSHOT_AGE_DAYS) continue;
 
     let rows: Record<string, string>[];
     try {
