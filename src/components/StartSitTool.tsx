@@ -110,7 +110,7 @@ export function StartSitTool() {
         )}
       </div>
 
-      <StartSitRail result={response?.result ?? null} recent={recent} />
+      <StartSitRail recent={recent} />
     </div>
   );
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { GameWeather } from "@/lib/nflverse/schedules";
 import type { ComparisonResult as ComparisonResultData, PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
@@ -16,13 +15,6 @@ const FORMAT_LABEL: Record<ScoringFormat, string> = {
   half_ppr: "Half PPR",
   standard: "Standard",
 };
-
-function injuryBadgeClasses(status: string) {
-  if (status === "Out" || status === "Doubtful") {
-    return "bg-bad/15 text-bad";
-  }
-  return "bg-caution/15 text-caution";
-}
 
 const DOME_ROOFS = new Set(["dome", "closed"]);
 
@@ -244,16 +236,87 @@ function ConfidenceBar({ pct, tone, label }: { pct: number; tone: Tone; label: s
   );
 }
 
-function ChevronIcon({ open }: { open: boolean }) {
+function HealthIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className={`h-4 w-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
-      fill="none"
-    >
-      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-foreground/35" fill="none">
+      <path
+        d="M3 12h4l2-5 4 10 2-5h6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
+}
+
+/** Health status from real fields — the player's injury designation, bye, or "Active" (no injury listed). Never overclaims: "Active" means not injury-listed, not a guarantee of full health. */
+function healthStatusValue(player: PlayerScoreBreakdown): string {
+  if (player.injuryStatus) return player.injuryStatus;
+  if (player.isOnByeThisWeek) return "On bye";
+  return "Active";
+}
+
+function healthToneClass(player: PlayerScoreBreakdown): string {
+  if (player.injuryStatus === "Out" || player.injuryStatus === "Doubtful") return "text-bad";
+  if (player.injuryStatus) return "text-caution"; // Questionable and the like
+  if (player.isOnByeThisWeek) return "text-foreground/60";
+  return "text-good";
+}
+
+/**
+ * One-sentence "case for starting" — the single most compelling REAL
+ * positive on this player's breakdown, in priority order (favorable
+ * matchup → recent form/ceiling → projection). No fabricated data; every
+ * branch reads an already-computed field.
+ */
+function buildCaseFor(player: PlayerScoreBreakdown): string {
+  const pos = (player.position && POSITION_DISPLAY_LABEL[player.position]) || "this spot";
+  const m = player.matchupContext;
+  const games = player.gamesUsedForRecent;
+  if (m && matchupLabel(m.diffFromAverage).tone === "good") {
+    return `Draws a favorable matchup — ${m.opponentTeam} has been one of the softer defenses against ${pos}s lately.`;
+  }
+  if (player.recentPprAvg != null && player.recentPprCeiling != null) {
+    return `In form lately — averaging ${player.recentPprAvg.toFixed(1)} PPR over the last ${games} game${
+      games === 1 ? "" : "s"
+    }, with a ceiling of ${player.recentPprCeiling.toFixed(1)}.`;
+  }
+  if (player.finalScore != null) {
+    return `Projects for ${player.finalScore.toFixed(1)} PPR points this week.`;
+  }
+  return `Limited recent data, but still worth a look here.`;
+}
+
+/**
+ * One-sentence "case against starting" — the single most relevant REAL
+ * risk, in priority order (injury → bye → tough matchup → thin data →
+ * boom/bust floor). Falls back to an honest "few red flags" when a player
+ * genuinely has none.
+ */
+function buildCaseAgainst(player: PlayerScoreBreakdown): string {
+  const pos = (player.position && POSITION_DISPLAY_LABEL[player.position]) || "this spot";
+  const m = player.matchupContext;
+  if (player.injuryStatus) {
+    return `Injury risk — currently listed ${player.injuryStatus}.`;
+  }
+  if (player.isOnByeThisWeek) {
+    return `On a bye this week — won't score at all.`;
+  }
+  if (m && matchupLabel(m.diffFromAverage).tone === "bad") {
+    return `Tough matchup — ${m.opponentTeam} has been one of the stingier defenses against ${pos}s.`;
+  }
+  if (player.dataQuality !== "full") {
+    return `Thin recent sample — limited data makes this projection less certain.`;
+  }
+  if (
+    player.recentPprFloor != null &&
+    player.recentPprAvg != null &&
+    player.recentPprFloor < player.recentPprAvg * 0.6
+  ) {
+    return `Boom-or-bust — has dipped as low as ${player.recentPprFloor.toFixed(1)} in a recent game.`;
+  }
+  return `Few red flags — the main risk is normal week-to-week variance.`;
 }
 
 /**
@@ -487,14 +550,24 @@ function OpponentLine({ player }: { player: PlayerScoreBreakdown }) {
   );
 }
 
-function ContextRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function ContextItem({
+  icon,
+  label,
+  value,
+  valueClass,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
   return (
-    <div className="flex items-start justify-between gap-3">
-      <span className="flex shrink-0 items-center gap-1.5 pt-0.5 text-[12px] text-foreground/50">
+    <div>
+      <div className="flex items-center gap-1.5 text-[10.5px] text-foreground/45">
         {icon}
         {label}
-      </span>
-      <span className="pt-0.5 text-right font-mono text-[12px] font-semibold text-foreground/80">{value}</span>
+      </div>
+      <div className={`mt-0.5 font-mono text-[12px] font-semibold ${valueClass ?? "text-foreground/80"}`}>{value}</div>
     </div>
   );
 }
@@ -510,8 +583,8 @@ function PlayerCard({
   isRecommended: boolean;
   formatLabel: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const statSlots = buildStatSlots(player, formatLabel);
+  const next = player.nextOpponent;
 
   return (
     <div
@@ -536,24 +609,6 @@ function PlayerCard({
         <StartBenchPill isRecommended={isRecommended} />
       </div>
 
-      {(player.isOnByeThisWeek || player.injuryStatus || player.dataQuality !== "full") && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {player.isOnByeThisWeek && (
-            <span className="rounded-full bg-foreground/8 px-2 py-0.5 text-xs text-foreground/55">Bye week</span>
-          )}
-          {player.injuryStatus && (
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${injuryBadgeClasses(player.injuryStatus)}`}>
-              {player.injuryStatus}
-            </span>
-          )}
-          {player.dataQuality !== "full" && (
-            <span className="rounded-full bg-foreground/8 px-2 py-0.5 text-xs text-foreground/55">
-              {player.dataQuality === "limited" ? "Limited data" : "Insufficient data"}
-            </span>
-          )}
-        </div>
-      )}
-
       {/* 2 — opponent + defensive-rank line */}
       <OpponentLine player={player} />
 
@@ -566,48 +621,44 @@ function PlayerCard({
         <FloorCeilingBar player={player} />
       </div>
 
-      {/* 4 — 2x2 stat grid, real fields only, "—" where a position lacks one */}
-      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-foreground/[0.07] pt-4">
-        {statSlots.map((slot, i) => (
-          <StatTile key={`${slot.label}-${i}`} slot={slot} />
-        ))}
+      {/* 4 — metrics grid + context column (opponent / weather / health) beside it */}
+      <div className="mt-4 grid gap-3 border-t border-foreground/[0.07] pt-4 sm:grid-cols-[1fr_170px]">
+        <div className="grid grid-cols-2 gap-2">
+          {statSlots.map((slot, i) => (
+            <StatTile key={`${slot.label}-${i}`} slot={slot} />
+          ))}
+        </div>
+        <div className="flex flex-col gap-2.5 sm:border-l sm:border-foreground/[0.07] sm:pl-3">
+          <ContextItem
+            icon={<CalendarIcon />}
+            label="Opponent"
+            value={next ? `${next.team} · Wk ${next.week}` : "—"}
+          />
+          <ContextItem
+            icon={<CloudIcon />}
+            label="Weather"
+            value={next ? formatWeather(player.nextGameWeather) : "—"}
+          />
+          <ContextItem
+            icon={<HealthIcon />}
+            label="Health status"
+            value={healthStatusValue(player)}
+            valueClass={healthToneClass(player)}
+          />
+        </div>
       </div>
 
-      {/* 5 — context rows: next opponent + weather, with icons */}
-      {player.nextOpponent && (
-        <div className="mt-4 flex flex-col gap-2 border-t border-foreground/[0.07] pt-4">
-          <ContextRow
-            icon={<CalendarIcon />}
-            label="Next opponent"
-            value={`${player.nextOpponent.team} · Wk ${player.nextOpponent.week}`}
-          />
-          <ContextRow icon={<CloudIcon />} label="Weather" value={formatWeather(player.nextGameWeather)} />
+      {/* 5 — Case For / Case Against (replaces the old "Why this pick" toggle) */}
+      <div className="mt-4 grid grid-cols-2 gap-4 border-t border-foreground/[0.07] pt-4">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-good">Case For</p>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-foreground/70">{buildCaseFor(player)}</p>
         </div>
-      )}
-
-      {player.notes.length > 0 && (
-        <div className="mt-4 border-t border-foreground/[0.07] pt-3">
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="flex w-full items-center justify-between text-left text-[12.5px] font-semibold text-foreground/70"
-            aria-expanded={expanded}
-          >
-            Why this pick
-            <ChevronIcon open={expanded} />
-          </button>
-          {expanded && (
-            <ul className="mt-3 flex flex-col gap-2.5">
-              {player.notes.map((line, i) => (
-                <li key={i} className="relative pl-4 text-sm leading-relaxed text-foreground/70">
-                  <span className="absolute left-0 top-[0.55em] h-1.5 w-1.5 rounded-full bg-accent" />
-                  {line}
-                </li>
-              ))}
-            </ul>
-          )}
+        <div className="border-l border-foreground/[0.07] pl-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-bad">Case Against</p>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-foreground/70">{buildCaseAgainst(player)}</p>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -664,7 +715,7 @@ export function ComparisonResult({ result, contextNote, scoringFormat }: Compari
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="flex flex-col gap-4">
         {rankedPlayers.map((player, i) => (
           <PlayerCard
             key={player.playerId ?? `unresolved-${i}`}
