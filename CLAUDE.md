@@ -5920,6 +5920,26 @@ single-season numbers for those specific constants.
       RB/WR/TE/D-ST/K grids are untouched; a QB missing any of the three
       still dashes out honestly. Verified live (Josh Allen -0.11 EPA vs.
       Joe Burrow +0.14, correct signs/bars), `tsc`/lint clean.
+    - **Follow-on note (committed separately as `928f629`): the "Recent
+      comparisons" widget is now clickable — click an entry to re-open
+      that comparison.** It was previously read-only. Each stored entry
+      now carries its `players` + `scoringFormat` (`useRecentComparisons`),
+      so a click restores the exact selection and re-runs it;
+      `useRecentComparisons` also de-dupes by player set (re-running a
+      matchup moves it to the top rather than stacking a copy). Older
+      entries saved before this change parse to an empty `players` array
+      and are simply non-clickable (backward-compat), not errors.
+      `StartSitTool` factored its fetch into a shared
+      `runComparison(players, format)` used by both the Compare button and
+      a new `handleSelectRecent`. Works on Home too, cross-page:
+      `RecentComparisonsHomeCard` hands the entry off via a new in-memory
+      store (`usePendingRestoreComparison` — survives the client
+      navigation Home → `/start-sit`, deliberately NOT a hard refresh/new
+      tab, so a stale restore never fires on a fresh load) and routes to
+      `/start-sit`, which restores it on mount (a `restoredRef` guards
+      against React strict-mode's double-invoked mount effect). Verified
+      live end-to-end both in-page (rail) and cross-page (Home → Start/Sit
+      restored both chips + result); `tsc`/lint clean.
 93. **Pointed the live matchup modifier at the NEXT scheduled opponent
     instead of the last completed one — resolving the long-standing
     "next-opponent lookup for live matchup context" candidate improvement
