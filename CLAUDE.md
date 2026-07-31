@@ -5995,7 +5995,64 @@ single-season numbers for those specific constants.
       that described the matchup as using the last-completed opponent
       (kept as historical record, marked superseded by this item).
 
-### Open items (as of item 93 — pick up here)
+94. **Spiked a week-1 backtest (using multi-season + expert projections
+    for rookies), found the free FantasyPros data only supports 2 of 4
+    seasons, and shipped a stale-snapshot guard that came out of it —
+    committed as `c46acca`.** The backtest structurally can't score week 1
+    (no in-season prior data: `sliceWeekData`'s `priorRows = slice(0, 0)`
+    → empty pool → no pairs; it grades weeks 2-18). User asked whether,
+    with 4 seasons loaded, week 1 of season N could be built from season
+    N-1 (prior-season averages, item 67) plus FantasyPros' week-1/preseason
+    consensus (items 69/70) — with **rookies specifically leaning on expert
+    projections** (their only pre-week-1 signal). Confirmed the engine
+    would need one small addition for rookies: `expertConsensusModifier` is
+    gated on `blendedScore != null` (`engine.ts:291`), and a rookie has no
+    recent/season/prior-season average, so expert consensus would never
+    apply — it'd need to become the last fallback in the blendedScore
+    chain, one rung below item 67's prior-season fallback.
+    - **Ran two spikes before committing to any build** (temporary
+      diagnostic route, deleted after — same discipline as every one-off
+      in this document):
+      - **Rookie name-matching: clean.** All 28 test rookies (7 per season,
+        2022-2025) name-matched nflverse and had a real per-game average
+        (gradeable) — no crosswalk needed, the name join just works.
+      - **Week-1 consensus snapshots: only 2 of 4 seasons usable.** The
+        dynastyprocess "daily scrape" (item 69's git-history source) has
+        multi-month OFFSEASON GAPS: for 2022 and 2024 there were NO commits
+        between January and week-1 kickoff, so "latest commit strictly
+        before week 1" resolved to the PRIOR season's playoff-era rankings
+        (~240 days stale) — confirmed genuinely absent, not a name miss
+        (the entire incoming rookie class, e.g. Jayden Daniels in 2024, was
+        simply not in the snapshot; only unrelated veterans matched the
+        surnames). 2023 (21-day gap) and 2025 (0-day) had fresh, correct
+        week-1 snapshots with rookies present (Bijan #5, Jeanty #10, etc.).
+        Verified via the GitHub commits API that the scrape resumed right
+        at/after week-1 kickoff both years (2022: Sep 8 21:42, after the
+        Sep 8 kickoff; 2024: Sep 10, after Sep 5), so ONLY week 1 was ever
+        stale — weeks 2-18 always had fresh data.
+    - **Verdict on the week-1 backtest itself: shelved, not built.** The
+      method is sound (rookies-via-expert-projections works, name-matching
+      works), but the free data only supports a 2-season (2023 + 2025)
+      week-1 sample — too thin to be worth the build, and the official
+      FantasyPros API that could fill 2022/2024 is paid (item 69). The
+      rookie engine-fallback change was likewise not made (nothing to
+      validate it against at 2-season scale).
+    - **What DID ship: a stale-snapshot guard** (`MAX_SNAPSHOT_AGE_DAYS =
+      60` in `fantasypros/weeklyConsensus.ts`) — the latent-bug fix the
+      spike surfaced. Any snapshot more than 60 days older than the week it
+      represents is now treated as no-data instead of blended in (fresh
+      snapshots run 0-21 days old, stale ones ~240, so 60 cleanly separates
+      them). Verified it fires exactly right: 2022/2024 week-1 now return 0
+      (was ~393 stale players), while 2023/2025 week-1 and all week-2
+      snapshots are kept. **Zero effect on any existing validated number**
+      — the only stale weeks were the two week-1s, which backtesting
+      already excludes, so the pooled 2022-2025 PPR backtest is
+      byte-identical before/after (overall 57.78%, expert-consensus
+      baseline 59.04% / n=2395). The live tool is untouched (it reads the
+      current-HEAD snapshot via `getCurrentExpertConsensusByNormalizedName`,
+      not this historical commit-mining path). `tsc`/lint clean.
+
+### Open items (as of item 94 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6122,13 +6179,17 @@ write-up as `25e2a87`. Item 92's follow-on card refinements (the
 Case For/Against split, the context-beside-metrics + Health status move,
 the stacked cards, and the Key Takeaways rail removal — `ComparisonResult.tsx`/
 `StartSitRail.tsx`/`StartSitTool.tsx`) are committed as `b234534`, its
-CLAUDE.md write-up as `bf0b36d`. Item 93's live-matchup-uses-next-opponent
+CLAUDE.md write-up as `bf0b36d`. Item 92's two follow-on notes are also
+committed: the QB passing-profile stat grid (`188c9e4`, write-up
+`acbb493`) and the clickable recent-comparisons feature (`928f629`,
+write-up `97d7c06`). Item 93's live-matchup-uses-next-opponent
 change (`buildInput.ts` + the `ComparisonResult.tsx` display follow-through)
-is committed as `4415171`; this CLAUDE.md write-up of item 93 (this
-paragraph, the numbered item above, and the corrected Overview passages)
-is **not yet committed as of this writing** — commit only once the user
-explicitly asks, per this project's standing rule. Nothing below is
-started or fixed yet:
+is committed as `4415171`, its CLAUDE.md write-up (plus the corrected
+Overview passages) as `0138a1f`. Item 94's stale-snapshot guard
+(`fantasypros/weeklyConsensus.ts`'s `MAX_SNAPSHOT_AGE_DAYS`) is committed
+as `c46acca`; this CLAUDE.md write-up of item 94 is **not yet committed
+as of this writing** — commit only once the user explicitly asks, per
+this project's standing rule. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
