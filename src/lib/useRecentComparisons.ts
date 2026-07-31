@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { PlayerSummary, ScoringFormat } from "@/lib/sportsdata/types";
 
 const STORAGE_KEY = "recentComparisons";
 const MAX_ENTRIES = 5;
@@ -11,6 +12,9 @@ export interface RecentComparison {
   isCloseCall: boolean;
   hasLimitedData: boolean;
   timestamp: number;
+  /** The players and format this comparison was run with, so clicking it in the rail can restore the exact selection and re-run it. Older stored entries (saved before this field existed) parse to an empty array and just aren't clickable. */
+  players: PlayerSummary[];
+  scoringFormat: ScoringFormat;
 }
 
 /**
@@ -32,8 +36,14 @@ export function useRecentComparisons(): {
     try {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed)) {
+        // Backward-compatible defaults for entries saved before players/scoringFormat existed.
+        const sanitized: RecentComparison[] = parsed.map((e) => ({
+          ...e,
+          players: Array.isArray(e.players) ? e.players : [],
+          scoringFormat: e.scoringFormat ?? "ppr",
+        }));
         // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from localStorage (an external system) after mount, same documented exception as useScoringFormat.ts.
-        setRecent(parsed);
+        setRecent(sanitized);
       }
     } catch {
       // Corrupt/foreign localStorage value — ignore and start empty rather than throw.
@@ -42,7 +52,14 @@ export function useRecentComparisons(): {
 
   function addComparison(entry: Omit<RecentComparison, "id" | "timestamp">) {
     setRecent((prev) => {
-      const next = [{ ...entry, id: `${Date.now()}`, timestamp: Date.now() }, ...prev].slice(0, MAX_ENTRIES);
+      // De-dupe by the exact set of players, so re-running (or clicking) an
+      // existing comparison moves it to the top instead of stacking a copy.
+      const ids = new Set(entry.players.map((p) => p.playerId));
+      const isSameSet = (e: RecentComparison) =>
+        e.players.length === ids.size && e.players.every((p) => ids.has(p.playerId));
+      const deduped = ids.size > 0 ? prev.filter((e) => !isSameSet(e)) : prev;
+
+      const next = [{ ...entry, id: `${Date.now()}`, timestamp: Date.now() }, ...deduped].slice(0, MAX_ENTRIES);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       return next;
     });

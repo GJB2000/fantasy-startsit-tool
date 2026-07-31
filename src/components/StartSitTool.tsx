@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ComparisonResult as ComparisonResultData } from "@/lib/recommendation/types";
-import type { PlayerSummary } from "@/lib/sportsdata/types";
-import { useRecentComparisons } from "@/lib/useRecentComparisons";
+import type { PlayerSummary, ScoringFormat } from "@/lib/sportsdata/types";
+import { usePendingRestoreComparison } from "@/lib/usePendingRestoreComparison";
+import { useRecentComparisons, type RecentComparison } from "@/lib/useRecentComparisons";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { ComparisonResult } from "./ComparisonResult";
 import { PlayerMultiSelect } from "./PlayerMultiSelect";
@@ -24,6 +25,8 @@ export function StartSitTool() {
   const [error, setError] = useState<string | null>(null);
   const [scoringFormat, setScoringFormat] = useScoringFormat();
   const { recent, addComparison } = useRecentComparisons();
+  const [pendingRestore, setPendingRestore] = usePendingRestoreComparison();
+  const restoredRef = useRef(false);
 
   function addPlayer(player: PlayerSummary) {
     setSelectedPlayers((prev) =>
@@ -37,13 +40,14 @@ export function StartSitTool() {
     setResponse(null);
   }
 
-  async function handleCompare() {
+  async function runComparison(players: PlayerSummary[], format: ScoringFormat) {
+    if (players.length < 2) return;
     setLoading(true);
     setError(null);
     setResponse(null);
     try {
-      const ids = selectedPlayers.map((p) => p.playerId).join(",");
-      const res = await fetch(`/api/compare?ids=${ids}&scoringFormat=${scoringFormat}`);
+      const ids = players.map((p) => p.playerId).join(",");
+      const res = await fetch(`/api/compare?ids=${ids}&scoringFormat=${format}`);
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Something went wrong.");
@@ -58,6 +62,8 @@ export function StartSitTool() {
         otherNames: result.players.filter((p) => p.playerId !== result.recommendedPlayerId).map((p) => p.displayName),
         isCloseCall: result.isCloseCall,
         hasLimitedData: result.hasLimitedData,
+        players,
+        scoringFormat: format,
       });
     } catch {
       setError("Couldn't reach the server. Try again shortly.");
@@ -65,6 +71,31 @@ export function StartSitTool() {
       setLoading(false);
     }
   }
+
+  function handleCompare() {
+    runComparison(selectedPlayers, scoringFormat);
+  }
+
+  // Re-open a past comparison from the rail: restore its exact players +
+  // format and re-run it (fresh data, and reflected in the pickers above).
+  function handleSelectRecent(entry: RecentComparison) {
+    if (entry.players.length < 2) return;
+    setSelectedPlayers(entry.players);
+    setScoringFormat(entry.scoringFormat);
+    runComparison(entry.players, entry.scoringFormat);
+  }
+
+  // Handed off from the Home recent-comparisons widget (usePendingRestoreComparison):
+  // restore that comparison once on mount, then clear the slot. The ref guards
+  // against React strict-mode's double-invoked mount effect re-running it.
+  useEffect(() => {
+    if (restoredRef.current || !pendingRestore) return;
+    restoredRef.current = true;
+    const entry = pendingRestore;
+    setPendingRestore(null);
+    handleSelectRecent(entry);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRestore]);
 
   return (
     <div className="mx-auto grid w-full max-w-5xl grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_300px]">
@@ -110,7 +141,7 @@ export function StartSitTool() {
         )}
       </div>
 
-      <StartSitRail recent={recent} />
+      <StartSitRail recent={recent} onSelectRecent={handleSelectRecent} />
     </div>
   );
 }

@@ -1,6 +1,13 @@
 import type { RecentComparison } from "@/lib/useRecentComparisons";
 
-export function RecentComparisonsPanel({ recent }: { recent: RecentComparison[] }) {
+export function RecentComparisonsPanel({
+  recent,
+  onSelect,
+}: {
+  recent: RecentComparison[];
+  /** When provided, each entry with stored players becomes clickable — re-opening that comparison. */
+  onSelect?: (entry: RecentComparison) => void;
+}) {
   return (
     <div className="rounded-2xl border border-foreground/10 bg-surface p-4 shadow-sm">
       <div className="mb-3 flex items-center gap-2 text-[12.5px] font-semibold">
@@ -15,28 +22,47 @@ export function RecentComparisonsPanel({ recent }: { recent: RecentComparison[] 
           Run a comparison and it&apos;ll show up here — nothing yet this session.
         </p>
       ) : (
-        <div className="flex flex-col gap-2.5">
-          {recent.map((entry) => (
-            <div key={entry.id} className="flex items-start gap-2">
-              <span
-                className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
-                  entry.isCloseCall ? "bg-caution" : entry.hasLimitedData ? "bg-info" : "bg-good"
-                }`}
-              />
-              <p className="text-[12px] leading-snug">
-                {entry.recommendedName ? (
-                  <>
-                    <span className="font-semibold">Start</span> {entry.recommendedName}
-                    {entry.otherNames.length > 0 && (
-                      <span className="text-foreground/45"> over {entry.otherNames.join(", ")}</span>
-                    )}
-                  </>
-                ) : (
-                  <span className="text-foreground/55">{entry.headline}</span>
-                )}
-              </p>
-            </div>
-          ))}
+        <div className="flex flex-col gap-1">
+          {recent.map((entry) => {
+            const content = (
+              <>
+                <span
+                  className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                    entry.isCloseCall ? "bg-caution" : entry.hasLimitedData ? "bg-info" : "bg-good"
+                  }`}
+                />
+                <p className="text-[12px] leading-snug">
+                  {entry.recommendedName ? (
+                    <>
+                      <span className="font-semibold">Start</span> {entry.recommendedName}
+                      {entry.otherNames.length > 0 && (
+                        <span className="text-foreground/45"> over {entry.otherNames.join(", ")}</span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-foreground/55">{entry.headline}</span>
+                  )}
+                </p>
+              </>
+            );
+
+            const canSelect = onSelect && entry.players.length >= 2;
+            return canSelect ? (
+              <button
+                key={entry.id}
+                type="button"
+                onClick={() => onSelect!(entry)}
+                title="Re-open this comparison"
+                className="-mx-1.5 flex items-start gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-foreground/[0.06]"
+              >
+                {content}
+              </button>
+            ) : (
+              <div key={entry.id} className="flex items-start gap-2 px-1.5 py-1">
+                {content}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -49,10 +75,16 @@ export function RecentComparisonsPanel({ recent }: { recent: RecentComparison[] 
  * card instead (ComparisonResult.tsx), so this rail is just genuine
  * session history (useRecentComparisons), not placeholder content.
  */
-export function StartSitRail({ recent }: { recent: RecentComparison[] }) {
+export function StartSitRail({
+  recent,
+  onSelectRecent,
+}: {
+  recent: RecentComparison[];
+  onSelectRecent?: (entry: RecentComparison) => void;
+}) {
   return (
     <div className="flex flex-col gap-4">
-      <RecentComparisonsPanel recent={recent} />
+      <RecentComparisonsPanel recent={recent} onSelect={onSelectRecent} />
     </div>
   );
 }
