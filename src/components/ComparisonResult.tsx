@@ -63,15 +63,6 @@ function ShieldIcon() {
   );
 }
 
-function CalendarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-foreground/35" fill="none">
-      <rect x="4" y="5" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function CloudIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-foreground/35" fill="none">
@@ -536,6 +527,7 @@ function OpponentLine({ player }: { player: PlayerScoreBreakdown }) {
         <ShieldIcon />
         <span className="truncate">
           {player.team ?? "—"} vs {m.opponentTeam}
+          {player.nextOpponent ? ` · Wk ${player.nextOpponent.week}` : ""}
         </span>
       </span>
       <span
@@ -629,11 +621,6 @@ function PlayerCard({
           ))}
         </div>
         <div className="flex flex-col gap-2.5 sm:border-l sm:border-foreground/[0.07] sm:pl-3">
-          <ContextItem
-            icon={<CalendarIcon />}
-            label="Opponent"
-            value={next ? `${next.team} · Wk ${next.week}` : "—"}
-          />
           <ContextItem
             icon={<CloudIcon />}
             label="Weather"

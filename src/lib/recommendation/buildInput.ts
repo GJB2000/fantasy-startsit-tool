@@ -80,25 +80,36 @@ export async function buildComparisonInput(
 
   const isOnByeThisWeek = byeWeek !== null && byeWeek === context.lastCompletedWeek;
 
-  let matchupContext = null;
-  const lastGame = recentGames.at(-1);
-  if (lastGame && isSkillPosition(player.Position)) {
-    matchupContext = getMatchupContext(positionDefenseTable, lastGame.Opponent, player.Position);
-  }
-
-  // Forward-looking counterpart to matchupContext above — display-only (see
-  // NextOpponent/GameWeather in types.ts), not fed into finalScore. nflverse
-  // team codes throughout remainingOpponentsByTeam/teamWeatherByTeamWeek, so
-  // translate both directions around the lookup (toNflverseTeam/toSdioTeam
-  // handle the one known mismatch, LAR/LA — see restOfSeason.ts).
+  // Next scheduled opponent from the real schedule. nflverse team codes
+  // throughout remainingOpponentsByTeam/teamWeatherByTeamWeek, so translate
+  // both directions around the lookup (toNflverseTeam/toSdioTeam handle the
+  // one known mismatch, LAR/LA — see restOfSeason.ts).
   let nextOpponent: NextOpponent | null = null;
   let nextGameWeather: GameWeather | null = null;
+  let nextOpponentSdioTeam: string | null = null;
   if (player.Team) {
     const nflverseTeam = toNflverseTeam(player.Team);
     const nextGame = remainingOpponentsByTeam.get(nflverseTeam)?.[0] ?? null;
     if (nextGame) {
-      nextOpponent = { team: toSdioTeam(nextGame.opponent), week: nextGame.week };
+      nextOpponentSdioTeam = toSdioTeam(nextGame.opponent);
+      nextOpponent = { team: nextOpponentSdioTeam, week: nextGame.week };
       nextGameWeather = teamWeatherByTeamWeek.get(`${nflverseTeam}/${nextGame.week}`) ?? null;
+    }
+  }
+
+  // Matchup rating uses the NEXT scheduled opponent — the game the player is
+  // about to play — which matches backtest, where the matchup is always the
+  // target week's opponent (buildBacktestInput.ts). Live previously used the
+  // last *completed* opponent here, a real mismatch with the validated
+  // methodology. Falls back to the most recent completed opponent only when
+  // the schedule has no upcoming game, so a rating still shows. Skill
+  // positions only (positionDefenseTable is skill-only; D/ST and K score
+  // matchup off Vegas-implied totals instead).
+  let matchupContext = null;
+  if (isSkillPosition(player.Position)) {
+    const matchupOpponent = nextOpponentSdioTeam ?? recentGames.at(-1)?.Opponent ?? null;
+    if (matchupOpponent) {
+      matchupContext = getMatchupContext(positionDefenseTable, matchupOpponent, player.Position);
     }
   }
 
