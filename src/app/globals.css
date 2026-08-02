@@ -24,6 +24,15 @@
   --info: #1e7fbf;
   --premium: #b8863a;
   --premium-ink: #ffffff;
+  /* Position accents — for player-search scanning only. Deliberately
+     outside the semantic set (accent/good/bad/caution) so they never
+     read as "good/bad." */
+  --pos-qb: #7c5cf0;
+  --pos-rb: #0f9b8e;
+  --pos-wr: #2f7fd6;
+  --pos-te: #c94f86;
+  --pos-k: #6b7280;
+  --pos-dst: #b8863a;
 }
 
 @theme inline {
@@ -62,6 +71,12 @@
     --info: #4fc3f7;
     --premium: #e8c468;
     --premium-ink: #221802;
+    --pos-qb: #a78bfa;
+    --pos-rb: #2dd4bf;
+    --pos-wr: #5aa9ff;
+    --pos-te: #f77fb0;
+    --pos-k: #9aa4b2;
+    --pos-dst: #e8c468;
   }
 }
 
