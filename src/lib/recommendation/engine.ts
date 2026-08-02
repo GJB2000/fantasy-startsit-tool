@@ -28,6 +28,8 @@ import {
   RECENT_WEIGHT_MAX,
   RECENT_WEIGHT_PER_GAME,
   REDZONE_BLEND_WEIGHT_RB,
+  SEASON_GAP_GUARDRAIL_ABS,
+  SEASON_GAP_GUARDRAIL_RATIO,
   SNAP_SHARE_BLEND_WEIGHT_TE,
   TEAMMATE_OUT_BUMP_WEIGHT_WR,
   VOLUME_BLEND_WEIGHT,
@@ -577,12 +579,41 @@ export function compareBreakdowns(breakdowns: PlayerScoreBreakdown[]): Compariso
     }
   }
 
+  // Season-gap guardrail (see SEASON_GAP_GUARDRAIL_* in config.ts). A thin
+  // recent sample can let a modifier overturn a large season-long talent
+  // gap and pick a backup over a star; when another candidate dominates
+  // the current pick on season-to-date average AND the comparison involves
+  // limited recent data, fall back to the season-long favorite. Runs after
+  // the WR tiebreaker so it has the final say on `winner`.
+  let seasonGuardrailTriggered = false;
+  if (winner.finalScore != null && winner.seasonPprAvg != null && candidates.some((c) => c.dataQuality !== "full")) {
+    const winnerSeasonAvg = winner.seasonPprAvg;
+    const stronger = ranked.find(
+      (c) =>
+        c.playerId !== winner.playerId &&
+        c.seasonPprAvg != null &&
+        c.seasonPprAvg >= winnerSeasonAvg * SEASON_GAP_GUARDRAIL_RATIO &&
+        c.seasonPprAvg - winnerSeasonAvg >= SEASON_GAP_GUARDRAIL_ABS
+    );
+    if (stronger && stronger.seasonPprAvg != null) {
+      overrideNotes.push(
+        `${stronger.displayName} grades out lower on a small recent sample, but their season-long production (${stronger.seasonPprAvg.toFixed(1)} vs ${winnerSeasonAvg.toFixed(1)} pts/game) is far stronger — with limited recent data here, we lean on the bigger sample.`
+      );
+      winner = stronger;
+      seasonGuardrailTriggered = true;
+      isCloseCall = false;
+      hasLimitedData = false;
+    }
+  }
+
   let headline: string;
   if (wasOverridden) {
     headline =
       ranked.length === 1
         ? `Start ${winner.displayName} — nobody else in this comparison is currently available.`
         : `Start ${winner.displayName}.`;
+  } else if (seasonGuardrailTriggered) {
+    headline = `Start ${winner.displayName} — the far stronger season-long play, despite a thin recent sample this week.`;
   } else if (isCloseCall) {
     headline = `Close call — lean ${winner.displayName}, but it's not a lock.`;
   } else if (hasLimitedData) {

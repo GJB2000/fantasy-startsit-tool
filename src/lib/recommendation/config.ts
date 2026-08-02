@@ -24,6 +24,30 @@ export const CLOSE_CALL_ABS_POINTS = 1.5;
 /** Relative point gap (as a fraction of the higher score) at or below which two players are a "close call". */
 export const CLOSE_CALL_RELATIVE_PCT = 0.08;
 
+/**
+ * Season-gap ranking guardrail (applied in engine.ts's compareBreakdowns).
+ * When the recent-form window is thin, a modifier (volume, expert
+ * consensus, matchup) can overturn a large season-long talent gap and
+ * produce an obviously wrong pick — a backup over a star (the real
+ * Lamar-Jackson-vs-Josh-Johnson case). If another candidate beats the
+ * finalScore leader by BOTH at least RATIO× and ABS points on
+ * season-to-date average, AND the comparison involves limited recent data
+ * (so the recent signals that produced the flip aren't trustworthy), the
+ * guardrail falls back to the season-long favorite. Cause-agnostic and
+ * pairwise — a per-player score can't see the between-player gap. Both
+ * conditions (ratio AND absolute) are required so it only fires on a
+ * genuine star-vs-scrub gap, never on two comparable starters or two
+ * low-scoring backups: this makes it a near-no-op on the adjacent-rank
+ * pairs the backtest measures (their season averages are similar by
+ * construction), so it targets the lopsided cases it exists for without
+ * disturbing the validated close-call population. Not backtest-tunable for
+ * that same reason (it doesn't fire on the test set) — a conservative,
+ * reasoned safety rail, verified to fix the motivating case and to leave
+ * the backtest numbers unchanged. See CLAUDE.md.
+ */
+export const SEASON_GAP_GUARDRAIL_RATIO = 1.6;
+export const SEASON_GAP_GUARDRAIL_ABS = 5;
+
 /** Number of recent weeks of game logs used for the "recent performance" signal. */
 export const RECENT_WEEK_COUNT = 4;
 
