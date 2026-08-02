@@ -6328,7 +6328,44 @@ single-season numbers for those specific constants.
       more direct usage signal than target share) would need paid
       historical data to backtest — see Open Item #24.
 
-### Open items (as of item 98 — pick up here)
+99. **Redesigned the shared player picker (`PlayerMultiSelect.tsx`) —
+    presentation only, every tool upgraded at once.** The search/select
+    panel (used on Start/Sit, Trade, Waivers, Lineup, Backtest — item 81)
+    read as too plain: a bare input plus a text-only dropdown. Mocked up
+    an improved version (Artifact) first, then built the core into the
+    shared component (props interface unchanged, so all six tools got it
+    simultaneously).
+    - **Position-colored initials avatars** — new `--pos-qb/rb/wr/te/k/dst`
+      tokens in `globals.css` (both themes), deliberately OUTSIDE the
+      semantic set (accent/good/bad/caution) so a position color never
+      reads as "good/bad." A violet/teal/blue/rose system for QB/RB/WR/TE,
+      used as a scanning cue on the avatar tile and the position badges.
+    - **Richer dropdown rows** (avatar + name + colored position pill +
+      team + injury pill + a hover "Add" affordance), **a real search
+      field** (search icon, emerald focus ring), **a slot-dot counter**
+      (filled dots + "N of max"), and **selected players as cards** (with
+      the position avatar) instead of the prior tiny chips.
+    - **Headshots tried, then reverted on user feedback.** The
+      `/api/players` response already returns `photoUrl` (real
+      SportsDataIO headshots), and a first pass layered them over the
+      initials tile (onError → fall back to initials). They loaded fine
+      in a real browser, but the low-res S3 images were too muddy to be
+      worth showing — reverted to the position-colored initials tile,
+      keeping everything else. (`photoUrl` is still on the type for a
+      future higher-res source.)
+    - **Deliberately deferred** (need more than styling — see Open Item
+      #25): inline season PPR average in results (the search API returns
+      no stats today) and a "quick-add" empty state (the shared component
+      has no per-tool "recent/popular" feed; Start/Sit's own Recent
+      comparisons would be the natural wire-up, not a fabricated list).
+    - **Verified live both themes** via the real `/start-sit` dropdown
+      with real player data (position colors, badges, search field all
+      correct); the selected-card state renders but wasn't screenshotted
+      (the in-app browser's click-desync blocks driving add-to-select — a
+      real browser does it fine). `tsc`, lint, and a full production build
+      all clean.
+
+### Open items (as of item 99 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6478,11 +6515,14 @@ write-up (two Data Source Notes on nflverse betting lines / kicker
 scoring, and Open Item #23) is committed as `e534955`. Item 98's
 display-only player props on the Start/Sit cards (`src/lib/oddsapi/`,
 the `/api/compare` `propsByPlayerId` field, and `ComparisonResult.tsx`'s
-"Betting lines" section) is committed as `275bc52`; its CLAUDE.md
+"Betting lines" section) is committed as `275bc52`, its CLAUDE.md
 write-up (the Data Source Note on The Odds API, the `src/lib/oddsapi/`
-Conventions entry, and the new Open Item #24) is **not yet committed as
-of this writing** — commit only once the user explicitly asks, per this
-project's standing rule. Nothing below is started or fixed yet:
+Conventions entry, and Open Item #24) as `a0d9eb9`. Item 99's shared
+player-picker redesign (`PlayerMultiSelect.tsx` + the `--pos-*` tokens in
+`globals.css`) is committed as `c5bc1a3`; its CLAUDE.md write-up (and the
+new Open Item #25) is **not yet committed as of this writing** — commit
+only once the user explicitly asks, per this project's standing rule.
+Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -6822,6 +6862,20 @@ project's standing rule. Nothing below is started or fixed yet:
     req/month is tight for real traffic (~a few dozen distinct games'
     props per month even with caching); at scale it'd need a paid tier or
     a tighter fetch (fewer markets, or only the recommended player).
+25. **Player picker follow-ups deferred from the item-99 redesign.** Two
+    mockup elements weren't built because they need more than styling:
+    (a) **inline season PPR average** in each search result —
+    `/api/players` (`searchActiveExtendedPlayers` → `toPlayerSummary`)
+    returns roster info only, no stats; adding it means one cached
+    `getPlayerSeasonStats` lookup joined onto the results (cheap, but a
+    real API change). (b) A **quick-add empty state** (the mockup's
+    "most-compared this week") — `PlayerMultiSelect` is shared across six
+    tools and has no per-tool feed; the honest wire-up is an optional
+    prop the caller passes (Start/Sit → its existing Recent comparisons,
+    item 92), not a fabricated "popular" list. Both presentation-adjacent
+    and low-risk. Also parked here: the `photoUrl` headshots were reverted
+    (item 99) for being too muddy — a higher-res headshot source would
+    make the avatars real photos.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
