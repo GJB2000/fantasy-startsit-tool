@@ -6365,7 +6365,73 @@ single-season numbers for those specific constants.
       real browser does it fine). `tsc`, lint, and a full production build
       all clean.
 
-### Open items (as of item 99 — pick up here)
+100. **Made the Start/Sit pick + confidence player-aware — a ranking
+    guardrail (b) plus gap-calibrated confidence (a).** Prompted by a user
+    asking whether confidence could account for the specific players
+    ("Lamar Jackson should be a lock over someone like Josh Johnson").
+    Checking the live tool exposed two problems: the engine actually
+    *recommended* Josh Johnson (a deep backup — finalScore 12.8 vs Lamar's
+    8.6), and confidence was a flat ~55% bucket that couldn't reflect how
+    lopsided the matchup was. The mis-rank was a three-cause offseason/
+    limited-data pileup: the volume signal (0.9 weight) crushed Lamar's low
+    pass-attempt volume (−7.0), while Johnson's garbage-time attempts
+    (+2.2), a FantasyPros-snapshot presence Lamar lacked (+1.0 expert
+    consensus), and a friendlier matchup inflated him.
+    - **(b) Ranking guardrail — tried the obvious fix, backtested it, and
+      it failed twice.** Down-weighting the volume signal on thin data (the
+      intuitive "lean on season average when the recent window is thin"):
+      swept it and found it REGRESSED the backtest's limited-data bucket
+      (60.4%→58.7% at factor 0.5) — the volume signal is genuinely
+      net-helpful even on thin samples for the CLOSE pairs the backtest
+      measures — AND didn't even fix the case (Johnson still edged Lamar,
+      since the flip is multi-cause, not just volume). Lesson: any
+      thin-data-WIDE suppression aggressive enough to flip a blowout also
+      damages the close calls that rely on those signals. What makes the
+      Lamar case different isn't "thin data" — it's the huge SEASON-LONG
+      gap between the two players, a *pairwise* property a per-player score
+      can't see.
+    - **The guardrail that worked is comparison-level and cause-agnostic**
+      (`compareBreakdowns`): if another candidate beats the finalScore
+      leader by BOTH ≥1.6× and +5 pts on season-to-date average AND the
+      comparison involves limited recent data, fall back to the season-long
+      favorite (with an explanatory note; the raw projections stay honest,
+      only the pick is overridden — same pattern as the existing bye/injury
+      overrides). Both thresholds required so it only fires on a genuine
+      star-vs-scrub gap. **Verified byte-for-byte no-op on the pooled
+      2022-2025 backtest** — adjacent-rank pairs have similar season
+      averages by construction, so the trigger never fires there; it only
+      acts on the lopsided pairs it exists for. Fixes Lamar-vs-Johnson
+      (now recommends Lamar) and doesn't misfire on two comparable starters
+      (Lamar vs Josh Allen, 1.3× season gap → ranks Allen normally).
+      `SEASON_GAP_GUARDRAIL_RATIO`/`_ABS` in config.ts. Not backtest-tunable
+      (it doesn't fire on the test set) — a conservative, reasoned safety
+      rail. Committed `aefad1a`.
+    - **(a) Gap-calibrated confidence.** The old confidence (item 86) maps
+      three coarse flags to per-position accuracy — but those were measured
+      on adjacent-rank (deliberately close) pairs, so there's no "blowout"
+      bucket and a lopsided call can't read as confident. Backtested a
+      gap→accuracy curve instead: all-pairs within each week's startable
+      pool (not just adjacent), pooled 2022-2025, bucketed by the actual
+      |finalScore gap|. Clean and monotonic — 51.9% at gap 0-1, 56.8% at
+      2-3, 65% at 4-6, 70% at 6-9, up to 79% at 13+. So the projection gap
+      is a genuinely well-calibrated confidence signal. `GAP_CONFIDENCE_CURVE`
+      (piecewise-linear) now drives the confidence %, returned as a new
+      `confidence` field on `ComparisonResult` and read by the UI. For a
+      guardrail pick the finalScore gap favors the OTHER player, so
+      confidence there feeds the SEASON-long gap through the same curve
+      (Lamar's 11.6-pt season gap → 76%). Honest ceiling ~79% for two
+      rosterable players, so the reference bar's "Lock" (90%) marker
+      essentially never lights up — our picks genuinely aren't 90%+ even on
+      blowouts. Old 3-bucket logic kept as a fallback. Verified live:
+      Lamar-vs-Johnson 76%, Lamar-vs-Allen (8.3-pt gap) 71%, a toss-up
+      ~52%. Committed `026efa5`.
+    - **Deliberately pooled, not per-position** (unlike item 86's buckets)
+      — the by-position gap curves were similar and monotonic, and the
+      pooled curve is cleaner/better-populated; per-position is a possible
+      refinement (Open Item #26). `tsc`, lint, and a full production build
+      all clean throughout.
+
+### Open items (as of item 100 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6519,10 +6585,15 @@ the `/api/compare` `propsByPlayerId` field, and `ComparisonResult.tsx`'s
 write-up (the Data Source Note on The Odds API, the `src/lib/oddsapi/`
 Conventions entry, and Open Item #24) as `a0d9eb9`. Item 99's shared
 player-picker redesign (`PlayerMultiSelect.tsx` + the `--pos-*` tokens in
-`globals.css`) is committed as `c5bc1a3`; its CLAUDE.md write-up (and the
-new Open Item #25) is **not yet committed as of this writing** — commit
-only once the user explicitly asks, per this project's standing rule.
-Nothing below is started or fixed yet:
+`globals.css`) is committed as `c5bc1a3`, its CLAUDE.md write-up (and
+Open Item #25) as `18f8e44`. Item 100's player-aware Start/Sit pick +
+confidence — the season-gap ranking guardrail (`SEASON_GAP_GUARDRAIL_*`
+in config.ts, `compareBreakdowns`) committed as `aefad1a`, and the
+gap-calibrated confidence (`GAP_CONFIDENCE_CURVE`, the new `confidence`
+field on `ComparisonResult`, the UI wiring) as `026efa5` — has its
+CLAUDE.md write-up (and the new Open Item #26) **not yet committed as of
+this writing** — commit only once the user explicitly asks, per this
+project's standing rule. Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -6876,6 +6947,16 @@ Nothing below is started or fixed yet:
     and low-risk. Also parked here: the `photoUrl` headshots were reverted
     (item 99) for being too muddy — a higher-res headshot source would
     make the avatars real photos.
+26. **Gap-calibrated confidence is pooled across positions (item 100).**
+    `GAP_CONFIDENCE_CURVE` is one pooled 2022-2025 curve; the by-position
+    curves (QB/RB/WR/TE) were similar and monotonic but thinner at the
+    tails. A per-position curve would be marginally more precise
+    (superseding item 86's position-aware buckets in a gap-aware way) if a
+    future need arises. Also: the guardrail-confidence path feeds the
+    season-avg gap through a curve calibrated on finalScore gaps — a
+    reasoned approximation, not separately calibrated (the guardrail
+    doesn't fire on the backtest, so there's no clean sample to calibrate
+    it against).
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
