@@ -48,6 +48,31 @@ export const CLOSE_CALL_RELATIVE_PCT = 0.08;
 export const SEASON_GAP_GUARDRAIL_RATIO = 1.6;
 export const SEASON_GAP_GUARDRAIL_ABS = 5;
 
+/**
+ * Calibrated confidence: real historical pick accuracy as a function of
+ * the |finalScore gap| between the two players, from an all-pairs
+ * backtest over each week's startable pool, pooled 2022-2025 (see
+ * CLAUDE.md). `[gapPoints, accuracyPercent]`, interpolated piecewise-
+ * linearly and clamped at both ends. This supersedes the coarse 3-bucket
+ * confidence (item 86, which was measured only on deliberately-close
+ * adjacent-rank pairs and so had no "blowout" bucket): accuracy climbs
+ * smoothly from a coin flip at gap~0 to ~79% at the largest realistic
+ * startable gaps. ~79% is the honest ceiling for two rosterable players —
+ * a bigger, obviously-lopsided call (a star vs. a scrub) is handled by the
+ * season-gap guardrail, whose confidence feeds the SEASON-long gap through
+ * this same curve.
+ */
+export const GAP_CONFIDENCE_CURVE: readonly (readonly [number, number])[] = [
+  [0.5, 52],
+  [1.5, 53],
+  [2.5, 57],
+  [3.5, 61],
+  [5, 65],
+  [7.5, 70],
+  [11, 76],
+  [15, 79],
+];
+
 /** Number of recent weeks of game logs used for the "recent performance" signal. */
 export const RECENT_WEEK_COUNT = 4;
 

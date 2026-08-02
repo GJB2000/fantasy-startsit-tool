@@ -181,9 +181,23 @@ const POSITION_DISPLAY_LABEL: Record<string, string> = {
 function getConfidence(result: ComparisonResultData): { pct: number; tone: Tone; label: string } {
   const winner = result.players.find((p) => p.playerId === result.recommendedPlayerId);
   const position = winner?.position ?? null;
+
+  // Calibrated confidence (real accuracy % for this projection gap — see
+  // GAP_CONFIDENCE_CURVE) is the number when available: it scales with the
+  // specific players, so a blowout reads far more confident than a
+  // toss-up, unlike the old coarse buckets.
+  if (result.confidence != null) {
+    const pct = result.confidence;
+    const winnerName = winner ? winner.displayName.split(" ").slice(-1)[0] : "this pick";
+    if (pct < 56) return { pct, tone: "caution", label: "Coin flip — essentially a toss-up" };
+    if (pct < 66) return { pct, tone: "info", label: `Lean ${winnerName} — a modest edge` };
+    if (pct < 74) return { pct, tone: "good", label: "Confident pick — a clear edge" };
+    return { pct, tone: "good", label: "Strong pick — about as sure as it gets here" };
+  }
+
+  // Fallback: the older 3-bucket, position-aware confidence (item 86).
   const rates = (position && CONFIDENCE_BY_POSITION[position]) || POOLED_CONFIDENCE;
   const positionLabel = (position && POSITION_DISPLAY_LABEL[position]) || "this position";
-
   if (result.isCloseCall) {
     return { pct: rates.closeCall, tone: "caution", label: `Close call — a genuinely tight score gap for ${positionLabel}` };
   }

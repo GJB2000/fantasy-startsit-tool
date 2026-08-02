@@ -151,6 +151,8 @@ export interface ComparisonResult {
   isCloseCall: boolean;
   /** Limited/insufficient recent data for at least one top candidate — historically *more* reliable than a "confident" pick, not less; kept distinct from isCloseCall for that reason. See CLAUDE.md item 22. */
   hasLimitedData: boolean;
+  /** Calibrated confidence (real historical pick accuracy %) for the gap between the pick and the field — see GAP_CONFIDENCE_CURVE. Null when there's no pick to score (no players found). */
+  confidence: number | null;
   headline: string;
   reasoning: string[];
 }

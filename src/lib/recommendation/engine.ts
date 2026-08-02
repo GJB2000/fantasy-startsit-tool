@@ -4,6 +4,7 @@ import {
   DROP_RATE_BLEND_WEIGHT,
   ENSEMBLE_VOLUME_BLEND_RATIO,
   EXPERT_CONSENSUS_BLEND_WEIGHT,
+  GAP_CONFIDENCE_CURVE,
   MATCHUP_MODIFIER_CAP,
   MATCHUP_MODIFIER_SCALE,
   POINTS_PER_DROP_RATE_UNIT,
@@ -50,6 +51,27 @@ function clamp(value: number, min: number, max: number): number {
 
 function average(values: number[]): number {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
+/**
+ * Maps a points gap between the pick and the field to a calibrated
+ * confidence (real historical pick accuracy %) — piecewise-linear over
+ * GAP_CONFIDENCE_CURVE, clamped at both ends. See the curve's doc comment.
+ */
+function confidenceFromGap(gap: number): number {
+  const curve = GAP_CONFIDENCE_CURVE;
+  const g = Math.abs(gap);
+  if (g <= curve[0][0]) return curve[0][1];
+  const last = curve[curve.length - 1];
+  if (g >= last[0]) return last[1];
+  for (let i = 1; i < curve.length; i++) {
+    if (g <= curve[i][0]) {
+      const [g0, a0] = curve[i - 1];
+      const [g1, a1] = curve[i];
+      return Math.round(a0 + ((a1 - a0) * (g - g0)) / (g1 - g0));
+    }
+  }
+  return last[1];
 }
 
 /**
@@ -465,6 +487,7 @@ export function compareBreakdowns(breakdowns: PlayerScoreBreakdown[]): Compariso
       recommendedPlayerId: null,
       isCloseCall: false,
       hasLimitedData: false,
+      confidence: null,
       headline: "We couldn't find any of the selected players.",
       reasoning: ["Try searching again — none of the selected players matched current data."],
     };
@@ -511,6 +534,7 @@ export function compareBreakdowns(breakdowns: PlayerScoreBreakdown[]): Compariso
       recommendedPlayerId: null,
       isCloseCall: false,
       hasLimitedData: false,
+      confidence: null,
       headline: "Not enough data to make a confident call here.",
       reasoning: [
         ...overrideNotes,
@@ -624,11 +648,25 @@ export function compareBreakdowns(breakdowns: PlayerScoreBreakdown[]): Compariso
 
   const reasoning = buildReasoning(breakdowns, overrideNotes, isCloseCall, wasOverridden);
 
+  // Calibrated confidence from the gap between the pick and the field.
+  // For a guardrail pick the finalScore gap favors the OTHER player, so
+  // we use the season-long gap that actually drove the call; otherwise the
+  // gap between the top-two finalScores. A lone remaining candidate has no
+  // contest, so it lands at the curve's ceiling.
+  let confidenceGap = Infinity;
+  if (seasonGuardrailTriggered && winner.seasonPprAvg != null && ranked[0].seasonPprAvg != null) {
+    confidenceGap = winner.seasonPprAvg - ranked[0].seasonPprAvg;
+  } else if (ranked.length >= 2 && ranked[0].finalScore != null && ranked[1].finalScore != null) {
+    confidenceGap = ranked[0].finalScore - ranked[1].finalScore;
+  }
+  const confidence = confidenceFromGap(confidenceGap);
+
   return {
     players: breakdowns,
     recommendedPlayerId: winner.playerId,
     isCloseCall,
     hasLimitedData,
+    confidence,
     headline,
     reasoning,
   };
