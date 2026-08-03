@@ -6626,10 +6626,11 @@ field on `ComparisonResult`, the UI wiring) as `026efa5`, its CLAUDE.md
 write-up (and Open Item #26) as `2777d22`. Item 100's depth-chart
 confidence-floor follow-on (`getCurrentDepthChartRankByNormalizedName`,
 `DEPTH_STARTER_CONFIDENCE`, the `compareBreakdowns` floor + `/api/compare`
-wiring) is committed as `90151e1`; its CLAUDE.md write-up is **not yet
-committed as of this writing** — commit only once the user explicitly
-asks, per this project's standing rule. Nothing below is started or fixed
-yet:
+wiring) is committed as `90151e1`, its CLAUDE.md write-up as `6f4a662`.
+Everything above (items 96-100, all code and write-ups) is committed and
+pushed to `main` — the working tree is clean. (Per this project's standing
+rule, commit/push only once the user explicitly asks.) Nothing below is
+started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
