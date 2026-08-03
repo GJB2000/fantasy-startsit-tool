@@ -12,7 +12,7 @@ import { WaiverResult, type WaiverCandidateResponse } from "./WaiverResult";
 
 interface WaiverResponse {
   candidatesByPosition: Record<ExtendedPosition, WaiverCandidateResponse[]>;
-  context: { contextNote: string };
+  context: { contextNote?: string };
 }
 
 export function WaiverTool() {
@@ -64,45 +64,45 @@ export function WaiverTool() {
     : null;
 
   return (
-    <div className="mx-auto mt-10 w-full max-w-3xl">
-      <div className="mb-6 flex items-center justify-center gap-3">
-        <span className="text-xs font-medium uppercase tracking-wide text-foreground/40">Scoring</span>
-        <ScoringFormatToggle
-          value={scoringFormat}
-          onChange={(format) => {
-            setScoringFormat(format);
-            setResponse(null);
-          }}
+    <div className="mx-auto mt-10 w-full max-w-5xl">
+      <div className="mx-auto w-full max-w-xl">
+        <div className="mb-6 flex items-center justify-center gap-3">
+          <span className="text-xs font-medium uppercase tracking-wide text-foreground/40">Scoring</span>
+          <ScoringFormatToggle
+            value={scoringFormat}
+            onChange={(format) => {
+              setScoringFormat(format);
+              setResponse(null);
+            }}
+          />
+        </div>
+
+        <RosterSummaryButton
+          count={rostered.length}
+          connection={sleeperConnection}
+          onManage={() => setRosterOpen(true)}
         />
+
+        <button
+          type="button"
+          onClick={handleFind}
+          disabled={loading}
+          className="mt-5 w-full rounded-full bg-accent px-4 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
+        >
+          {loading ? "Scanning the player pool…" : "Find waiver targets"}
+        </button>
+
+        {error && <p className="mt-3 text-sm text-bad">{error}</p>}
       </div>
 
-      <RosterSummaryButton
-        count={rostered.length}
-        connection={sleeperConnection}
-        onManage={() => setRosterOpen(true)}
-      />
-
-      <button
-        type="button"
-        onClick={handleFind}
-        disabled={loading}
-        className="mt-5 w-full rounded-full bg-accent px-4 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
-      >
-        {loading ? "Scanning the player pool…" : "Find waiver targets"}
-      </button>
-
-      {error && <p className="mt-3 text-sm text-bad">{error}</p>}
-
       {response && filteredCandidatesByPosition && (
-        <>
-          <p className="mt-6 text-center text-xs text-foreground/45">{response.context.contextNote}</p>
-          <WaiverResult
-            candidatesByPosition={filteredCandidatesByPosition}
-            scoringFormat={scoringFormat}
-            showRosteredButton={!sleeperConnection}
-            onMarkRostered={handleMarkRostered}
-          />
-        </>
+        <WaiverResult
+          candidatesByPosition={filteredCandidatesByPosition}
+          scoringFormat={scoringFormat}
+          showRosteredButton={!sleeperConnection}
+          onMarkRostered={handleMarkRostered}
+          contextNote={response.context.contextNote}
+        />
       )}
     </div>
   );

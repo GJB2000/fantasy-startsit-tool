@@ -6831,7 +6831,56 @@ single-season numbers for those specific constants.
       is confirmed better than any recency-weighted alternative, standalone
       OR inside blendedScore.
 
-### Open items (as of item 107 — pick up here)
+108. **Redesigned the Waiver Wire results into a "buy-low board" built
+    around an opportunity-vs-production gap visualization — presentation
+    only, real data, both themes.** The prior results were a competent
+    collapsible row-list (item 83) but buried the tool's actual insight
+    (volume rank vs. points rank) in text. Built a full-page Artifact
+    mockup first (the items 64/95/96 pattern), iterated with the user
+    (removed a summary strip, then the editorial "Opportunity is
+    outrunning production" headline, then the board sub-header/framing
+    text, all on request — the results now lead straight into the
+    spotlight, with only the dynamic status note kept), then implemented
+    into `WaiverResult.tsx` / `WaiverTool.tsx`.
+    - **The signature device — a gap bar** (new): a position-rank axis
+      with a green "opportunity" node (recent volume rank; this-week
+      matchup for streaming) sitting ahead of a hollow "production" node
+      (recent points rank; season rank), the green span between = the
+      buy-low gap. Driven by the real `volumeRank`/`pointsRank` the
+      `/api/waivers` response already returned (previously unused by the
+      frontend). A per-position track scale (`GAP_SCALE`) keeps the span
+      proportional and readable.
+    - **A spotlight** for the biggest-gap skill candidate (streaming
+      excluded — a different kind of gap) with metrics (touches/gm, recent
+      PPR, consensus proj), the reasoning lead, a matchup pill, and the
+      real suggested drop. **Position tabs** with counts (All +
+      per-position). **Streaming D/ST/K** kept their honest "this week's
+      matchup vs. season baseline — a spot start" framing. Position-colored
+      avatars/chips (`--pos-*` tokens, reusing `PlayerMultiSelect`'s
+      gradient pattern), Favorable/Tough matchup pills (from
+      `breakdown.matchupContext`), injury pills, and a "how to read it"
+      footer.
+    - **All existing functionality preserved**: expand-for-reasoning, drop
+      suggestions (`DropSuggestion`/`moveHeadline`), "already rostered"
+      (manual mode only), and the `POSITION_ORDER`/`isStreamingPosition`/
+      `moveHeadline` exports the Home waiver widget depends on. `WaiverTool`
+      widened `max-w-3xl` -> `max-w-5xl` (pre-search controls kept in a
+      centered `max-w-xl` block); the dynamic `contextNote` (e.g. the
+      offseason "ranked on 2025 form" note) renders as a small status line
+      above the board.
+    - **Caught and fixed a real bug during live verification**: a deep
+      candidate with no FantasyPros consensus (`expertConsensusR2pPts`
+      0.0) rendered "0.0 pts consensus proj" as a bright-green highlighted
+      stat — now hidden unless the projection is > 0.
+    - **Verified live end-to-end** against the user's real connected
+      Sleeper roster (29 players), both light and dark (dark via
+      prefers-color-scheme, the app's real mechanism) — spotlight, tabs,
+      gap bars, matchup/injury pills, streaming sections, and real drop
+      suggestions all rendering correctly. No API/engine change
+      (presentation only, reusing data the response already carried).
+      `tsc`/lint clean.
+
+### Open items (as of item 108 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -7025,8 +7074,11 @@ finding (nothing cleared the bar; the diagnostic route was deleted), so its
 only artifact is this CLAUDE.md write-up. Item 107's EWMA-inside-blendedScore
 test (Open Item #8) also shipped NO code — recency-weighting monotonically
 hurt accuracy, so the config/engine changes were reverted; its only artifact
-is this CLAUDE.md write-up. Everything above (items
-96-107, all code and write-ups) is committed and pushed to `main` — the
+is this CLAUDE.md write-up. Item 108's Waiver Wire "buy-low board" redesign
+(`WaiverResult.tsx` rebuilt around the gap-bar visualization + spotlight +
+tabs, `WaiverTool.tsx` widened) plus this CLAUDE.md write-up are committed
+together. Everything above (items
+96-108, all code and write-ups) is committed and pushed to `main` — the
 working tree is clean. (Per this project's standing rule, commit/push only
 once the user explicitly asks.) Nothing below is started or fixed yet:
 
