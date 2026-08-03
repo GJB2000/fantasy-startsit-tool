@@ -6789,7 +6789,49 @@ single-season numbers for those specific constants.
       future season changes the picture, but the four-season read is clear
       enough not to revisit soon.
 
-### Open items (as of item 106 — pick up here)
+107. **Ran the properly-scoped EWMA test (Open Item #8): recency-weighting
+    the recent-form average INSIDE blendedScore, not as a standalone pick
+    signal (item 54's inconclusive test). Clean negative — it monotonically
+    HURTS pick accuracy; the flat average is better.** Item 54 only tested
+    EWMA as a standalone "pick whoever has the higher weighted average"
+    signal (weak, no unifying story across formats); Open Item #8 flagged
+    the real test — reweighting the recent-vs-season blend the way the
+    engine actually consumes `recentPprAvg` — as never run.
+    - Implemented as a config-gated `RECENT_EWMA_DECAY` (1.0 = flat average
+      = current behavior; below 1 weights the most recent game highest,
+      decaying geometrically) feeding a `weightedRecentAverage` helper in
+      the recentPprAvg computation. Verified decay=1.0 is byte-identical to
+      baseline (a clean no-op) before trusting the sweep.
+    - **Swept against the real engine end-to-end** (config edit + real
+      backtest routes — no re-implemented harness, so no divergence risk):
+
+      | decay | primary 2025 | pooled 2022-2025 |
+      |---|---|---|
+      | 1.0 (flat, baseline) | 58.76 | 57.78 |
+      | 0.9 | 58.76 | — |
+      | 0.8 | 58.67 | 57.32 |
+      | 0.7 | 58.57 | — |
+      | 0.6 | 58.48 | — |
+      | 0.5 | 58.39 | — |
+
+      Monotonic: every step of recency-weighting makes the primary pipeline
+      worse (QB 61.8->60.8, RB 58.6->57.6, WR/TE flat), and pooled
+      2022-2025 is worse too at even a mild 0.8 (57.78->57.32, QB and RB
+      both down). No decay, format, or season preferred recency-weighting.
+    - **Why**: with only up to 4 recent games, a flat average is already a
+      small sample; recency-weighting over-weights the single most-recent
+      game — the noisiest one, not the most predictive — effectively
+      shrinking an already-thin sample and adding variance without signal
+      (consistent with item 2's original "raw recent points are noisy"
+      finding).
+    - **Not shipped — code fully reverted** (config constant, helper, and
+      engine usage all removed to the item-105 state, baseline re-confirmed
+      at 58.76), matching item 54's own precedent (its standalone EWMA code
+      was deleted too). Resolves Open Item #8: the flat recent-form average
+      is confirmed better than any recency-weighted alternative, standalone
+      OR inside blendedScore.
+
+### Open items (as of item 107 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6980,8 +7022,11 @@ surfaced by a since-deleted score-distribution diagnostic route) plus this
 CLAUDE.md write-up are committed together. Item 106's game-context signal
 investigation (dome/home-away/rest) shipped NO code — a documented negative
 finding (nothing cleared the bar; the diagnostic route was deleted), so its
-only artifact is this CLAUDE.md write-up. Everything above (items
-96-106, all code and write-ups) is committed and pushed to `main` — the
+only artifact is this CLAUDE.md write-up. Item 107's EWMA-inside-blendedScore
+test (Open Item #8) also shipped NO code — recency-weighting monotonically
+hurt accuracy, so the config/engine changes were reverted; its only artifact
+is this CLAUDE.md write-up. Everything above (items
+96-107, all code and write-ups) is committed and pushed to `main` — the
 working tree is clean. (Per this project's standing rule, commit/push only
 once the user explicitly asks.) Nothing below is started or fixed yet:
 
@@ -7050,17 +7095,12 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
    (pooled 2024 QB wants high weight, 2022/2023/2025 QB want low) still
    holds — so 0.3 stays as the balanced compromise, now confirmed as the
    pooled optimum rather than a legacy compromise. No longer open.
-8. **Exponentially-weighted recent performance, tested and dropped
-   standalone in item 54** — the real, more relevant test was never run.
-   Item 54 only judged the raw recent-average signal in total isolation
-   (pick whoever has the higher weighted average, nothing else), which
-   found no consistent per-format story and weak standalone accuracy
-   throughout. Worth revisiting by testing it INSIDE `blendedScore`
-   instead — reweighting the actual recent-vs-season blend the way
-   `scorePlayer` uses `recentPprAvg`, rather than judging the reweighted
-   average as a standalone signal — since standalone accuracy this low
-   doesn't say much about what happens once it's blended with season
-   average and run through the rest of the pipeline.
+8. **Exponentially-weighted recent performance — RESOLVED, see item 107.**
+   Item 54 tested EWMA standalone (inconclusive); item 107 ran the real
+   test flagged here — recency-weighting `recentPprAvg` INSIDE blendedScore
+   — and found it monotonically HURTS pick accuracy on both pipelines (no
+   decay/season/format preferred it). The flat recent-form average is
+   confirmed better; code was reverted, no engine change. Closed.
 9. **The Waiver Wire tool's gap ranking (item 58) has never itself been
    directly backtested as a ranking heuristic** — only its underlying
    primitive (recent volume beats recent points as a forward signal) has
