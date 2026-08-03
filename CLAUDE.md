@@ -6430,6 +6430,38 @@ single-season numbers for those specific constants.
       pooled curve is cleaner/better-populated; per-position is a possible
       refinement (Open Item #26). `tsc`, lint, and a full production build
       all clean throughout.
+    - **Follow-on (committed `90151e1`): depth-chart confidence floor — "a
+      backup should never be close to a starter."** The gap curve tops out
+      ~79% because it's calibrated on *startable-pool* pairs; a genuine
+      starter over a deep backup is a higher-confidence regime than any
+      startable comparison, and the season-gap guardrail fixes the *pick*
+      but confidence still read only ~76%. Added a live depth-chart signal:
+      `getCurrentDepthChartRankByNormalizedName` reads the LATEST snapshot
+      of nflverse's `depth_charts` release — the 2025+ ESPN-scrape schema
+      (keyed by `dt`/`pos_abb`/`pos_rank`) that
+      `getDepthChartByNormalizedNameWeek` deliberately can't use for the
+      backtest (snapshot->week mapping is leakage-prone, item 37), but
+      "who's the starter right now" needs no such mapping — just the most
+      recent snapshot. Confirmed live: Lamar = BAL QB1, star RB/WR/TEs rank
+      1, deep backups (journeyman QBs like Josh Johnson) absent entirely
+      (so "not on the chart" is itself a backup signal). The `/api/compare`
+      route resolves it to a `playerId -> rank` map and passes it to
+      `compareBreakdowns` (a new optional param), which floors confidence to
+      `DEPTH_STARTER_CONFIDENCE` (90) when the pick is a rank-1 starter and
+      the best alternative is a clear backup (rank >= 3, or off-chart AND
+      >= `SEASON_GAP_GUARDRAIL_ABS` behind on season average — the latter
+      guards against a name-match miss looking like a scrub). Verified:
+      Lamar-vs-Johnson now 90%, Lamar-vs-Allen (two starters) stays 71%
+      (floor doesn't apply). **No-op on the backtest by construction** —
+      depth rank is live-only (the map is omitted in backtest) and the
+      floor only touches the confidence number, never the pick or the
+      confidence *buckets* the backtest measures. SportsDataIO depth charts
+      were checked first and are paywalled (401 on the `scores` product).
+      Two caveats: the `depth_charts` file is large (~554k rows), so the
+      first live request cold-loads it (cached 24h after); and it reads the
+      last-completed season's file (fine in the offseason — the 2025 file
+      already carries a March-2026 snapshot — season-rollforward a future
+      refinement, Open Item #26).
 
 ### Open items (as of item 100 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
@@ -6590,10 +6622,14 @@ Open Item #25) as `18f8e44`. Item 100's player-aware Start/Sit pick +
 confidence — the season-gap ranking guardrail (`SEASON_GAP_GUARDRAIL_*`
 in config.ts, `compareBreakdowns`) committed as `aefad1a`, and the
 gap-calibrated confidence (`GAP_CONFIDENCE_CURVE`, the new `confidence`
-field on `ComparisonResult`, the UI wiring) as `026efa5` — has its
-CLAUDE.md write-up (and the new Open Item #26) **not yet committed as of
-this writing** — commit only once the user explicitly asks, per this
-project's standing rule. Nothing below is started or fixed yet:
+field on `ComparisonResult`, the UI wiring) as `026efa5`, its CLAUDE.md
+write-up (and Open Item #26) as `2777d22`. Item 100's depth-chart
+confidence-floor follow-on (`getCurrentDepthChartRankByNormalizedName`,
+`DEPTH_STARTER_CONFIDENCE`, the `compareBreakdowns` floor + `/api/compare`
+wiring) is committed as `90151e1`; its CLAUDE.md write-up is **not yet
+committed as of this writing** — commit only once the user explicitly
+asks, per this project's standing rule. Nothing below is started or fixed
+yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -6956,7 +6992,17 @@ project's standing rule. Nothing below is started or fixed yet:
     season-avg gap through a curve calibrated on finalScore gaps — a
     reasoned approximation, not separately calibrated (the guardrail
     doesn't fire on the backtest, so there's no clean sample to calibrate
-    it against).
+    it against). And the depth-chart floor's `DEPTH_STARTER_CONFIDENCE`
+    (90) is a reasoned value, not backtest-calibrated (the backtest never
+    pairs a starter with a scrub). The depth-chart reader
+    (`getCurrentDepthChartRankByNormalizedName`) reads the last-completed
+    season's `depth_charts` file — fine in the offseason (the 2025 file
+    carries a March-2026 snapshot), but once the 2026 season is underway a
+    season-rollforward (try the in-progress season's file, fall back to
+    last-completed) would keep the "current starter" signal fresher; also
+    the ~554k-row file cold-loads on the first live compare (cached 24h),
+    which a lighter fetch (early-stop at the latest snapshot, if the file
+    stays sorted latest-first) could avoid.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
