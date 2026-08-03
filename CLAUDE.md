@@ -6463,7 +6463,90 @@ single-season numbers for those specific constants.
       already carries a March-2026 snapshot — season-rollforward a future
       refinement, Open Item #26).
 
-### Open items (as of item 100 — pick up here)
+101. **Fixed injury-poisoned OFFSEASON projections by backfilling the
+    recent-form window to the last N games actually PLAYED — gated to the
+    offseason after the backtest showed a blanket version isn't a win.**
+    User report: Lamar Jackson projected only ~8 points for Week 1, "way
+    too low." Root-caused against his real 2025 game log (pulled directly
+    from SportsDataIO, not assumed): the recent-form window is a fixed
+    last-4-CALENDAR-weeks window (weeks 15-18), and Lamar was **Out** weeks
+    5-8 and 17 and clearly limited weeks 15-16 (12 and 10 pass attempts —
+    roughly half a healthy starter's ~30). So his window was three
+    half-games at ~13 attempts; his genuinely healthy games (weeks 9-14,
+    23-35 attempts) sat just outside it. The `blendedScore` (14.6) was
+    fine — the entire collapse to 8.6 was `volumeModifier = -7.05`, the
+    0.9-weight volume signal reading 13 attempts and concluding "expect ~7
+    points." (Mahomes was worse: only 1 of the last 4 weeks played,
+    projected 12.0.)
+    - **Tested the fix in the backtest FIRST, at the user's explicit
+      request, before applying anything.** Temporarily changed
+      `weekData.ts`'s `recentGamesByPlayer` from "last 4 calendar weeks
+      played" to "last 4 games actually PLAYED over a 2x lookback"
+      (backfilling past injury gaps) and re-ran both pipelines:
+
+      | | overall | QB | RB | WR | TE |
+      |---|---|---|---|---|---|
+      | Primary 2025 before | 58.76 | 61.76 | 58.62 | 58.33 | 56.44 |
+      | Primary 2025 after | 58.48 | 59.80 | 59.61 | 59.31 | 57.43 |
+      | Pooled 22-25 before | 57.78 | 60.54 | 58.99 | 55.67 | 56.79 |
+      | Pooled 22-25 after | 57.73 | 58.58 | 58.13 | 56.90 | 57.78 |
+
+      **A blanket backfill is not a win**: overall flat (-0.05 to -0.28pp),
+      WR/TE +1pp, RB mixed, and QB **-2pp in both** — the exact position
+      the motivating case (Lamar) is.
+    - **The reason is a genuine regime mismatch, not noise** (QB's -2pp is
+      directionally consistent across both pipelines, on a decent sample):
+      the backtest predicts the *immediate next week*, when a player who
+      missed recent games is very often STILL hurt/limited — so those
+      half-games genuinely predict it, and backfilling with older
+      pre-injury games misleads (QB, where mid-season injuries like Lamar's
+      dominate, regresses most). The live OFFSEASON case is the opposite:
+      projecting Week 1 months after the injury healed, the injured tail is
+      stale noise and the pre-injury healthy games are the right baseline.
+      In broad backtest mode every paired player played the target week, so
+      "recently injured but now fully recovered" can't be isolated from
+      "recently injured and still ramping" — the two are fused, which is
+      why gating the backtest version on current health wouldn't have
+      recovered the QB loss either. The backtest structurally can't
+      represent the healed-months-later regime, so it under-credits the fix
+      for exactly the case raised.
+    - **Reverted the backtest experiment** (working tree left clean, same
+      discipline as every other one-off in this document) and shipped a
+      **LIVE-ONLY, offseason-gated** version instead — the only regime the
+      backtest can't validate, so applying it there has zero in-season risk
+      and cannot regress any backtest number. `buildInput.ts` gates on
+      `!context.isInSeason`: in-season, the recent window stays the exact
+      calendar-window behavior the backtest validates; in the offseason, it
+      becomes the player's last `RECENT_WEEK_COUNT` (4) games actually
+      played over a `2*RECENT_WEEK_COUNT` (8-week) lookback.
+      `getRecentGameStatsForPlayer` (`weeklyStats.ts`) gained an optional
+      `limit` param that returns only the last N played games from a wider
+      lookback (omitted by every other caller — kicker/defense/rankings/
+      waivers — so their behavior is unchanged). Also aligned the nflverse
+      recent-signal window to the exact games `recentGames` used (so the
+      backfill's older games carry their nflverse signals too, and the two
+      windows never diverge) — a structural no-op in-season for a healthy
+      player, since their played weeks ARE `context.recentWeeks`.
+    - **No-op for healthy players by construction**: a player who played
+      all of the last 4 weeks has "last 4 played" == "last 4 calendar
+      weeks," so the backfill changes nothing. Verified live: Jonathan
+      Taylor (healthy) unchanged at 16.9 / `full` data quality, while Lamar
+      went 8.6 -> 11.7 (window backfilled to weeks 14/15/16/18, recent
+      volume 13.3 -> 18.75) and Mahomes 12.0 -> 16.75. Trade route still
+      correct; `tsc`/lint clean.
+    - **The window fix only gets Lamar partway (to ~11.7), deliberately.**
+      His residual drag is a SEPARATE, pre-existing issue — the
+      pass-attempts-only QB volume signal structurally undervalues rushing
+      QBs (item 24) — not the injury poisoning this item fixes. Kept out of
+      scope rather than conflated.
+    - **Scoped to the live scoring path** (`buildComparisonInput` ->
+      `scoreExtendedPlayer`), so it covers Start/Sit, the Trade Analyzer,
+      and the Lineup Optimizer. Legit Rankings and Waivers use their own
+      bulk recent-week fetch and would still rank an injured player low for
+      the same reason — deliberately left untouched this pass (see Open
+      Item #27).
+
+### Open items (as of item 101 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6627,10 +6710,16 @@ write-up (and Open Item #26) as `2777d22`. Item 100's depth-chart
 confidence-floor follow-on (`getCurrentDepthChartRankByNormalizedName`,
 `DEPTH_STARTER_CONFIDENCE`, the `compareBreakdowns` floor + `/api/compare`
 wiring) is committed as `90151e1`, its CLAUDE.md write-up as `6f4a662`.
-Everything above (items 96-100, all code and write-ups) is committed and
-pushed to `main` — the working tree is clean. (Per this project's standing
-rule, commit/push only once the user explicitly asks.) Nothing below is
-started or fixed yet:
+Item 101's offseason injury-window backfill (the `getRecentGameStatsForPlayer`
+`limit` param in `weeklyStats.ts` and the `!context.isInSeason`-gated
+last-N-played backfill + nflverse-window alignment in `buildInput.ts`) plus
+this CLAUDE.md write-up (and Open Item #27) are committed together — the
+backtest experiment behind it (a temporary `weekData.ts` change) was reverted
+before shipping, leaving no repo artifact, same discipline as every other
+one-off in this document. Everything above (items 96-101, all code and
+write-ups) is committed and pushed to `main` — the working tree is clean.
+(Per this project's standing rule, commit/push only once the user explicitly
+asks.) Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -7004,6 +7093,22 @@ started or fixed yet:
     the ~554k-row file cold-loads on the first live compare (cached 24h),
     which a lighter fetch (early-stop at the latest snapshot, if the file
     stays sorted latest-first) could avoid.
+27. **The offseason injury-window backfill (item 101) is scoped to the
+    live scoring path only — Legit Rankings and Waivers still use their
+    own bulk `context.recentWeeks` fetch** (`buildRankings.ts`,
+    `rankCandidates.ts`), so an injured player (Lamar-type) whose recent
+    window is poisoned by a late-season injury still ranks low there in the
+    offseason, for the exact reason item 101 fixed for Start/Sit/Trade/
+    Lineup. Extending the same offseason-gated "last N played games"
+    backfill to those two paths is a real, self-contained follow-up. Also
+    unaddressed (deliberately, item 101): the residual undervaluation of
+    rushing QBs from the pass-attempts-only volume signal (item 24) — a
+    separate issue from injury poisoning, not something the window fix
+    touches. And the backfill only fixes the OFFSEASON regime; the backtest
+    showed a blanket in-season version costs QB accuracy (regime mismatch —
+    see item 101), so there's no clean in-season equivalent unless a way is
+    found to distinguish "recovered" from "still ramping" that the backtest
+    can actually validate.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
