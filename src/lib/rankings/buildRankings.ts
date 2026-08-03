@@ -4,6 +4,7 @@ import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
 import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { toSdioTeam } from "@/lib/recommendation/restOfSeason";
+import { getRecentWindow } from "@/lib/recommendation/recentWindow";
 import { scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
 import type { DataQuality, PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import { getFantasyDefenseByWeek } from "@/lib/sportsdata/defense";
@@ -127,8 +128,15 @@ async function getEligiblePlayerIds(position: ExtendedPosition, context: SeasonC
 }
 
 async function filterByRecentGames(players: Player[], context: SeasonContext): Promise<number[]> {
+  // Use the same recent-form window the scoring path does (getRecentWindow):
+  // in the offseason that's a wider lookback, so a player who last played
+  // 5-8 weeks before season end (an injury they've since recovered from)
+  // isn't dropped from the rankings entirely for having no game in the
+  // narrow last-4-weeks window. The limit doesn't matter for a >= 1-game
+  // eligibility count, so only the weeks are widened.
+  const { weeks } = getRecentWindow(context);
   const weeklyRows = await Promise.all(
-    context.recentWeeks.map((w) => getPlayerGameStatsByWeek(context.lastCompletedApiSeason, w))
+    weeks.map((w) => getPlayerGameStatsByWeek(context.lastCompletedApiSeason, w))
   );
   const counts = countPlayedGames(weeklyRows);
   return players.filter((p) => (counts.get(p.PlayerID) ?? 0) >= MIN_RECENT_GAMES).map((p) => p.PlayerID);

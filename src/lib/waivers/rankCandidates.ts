@@ -1,3 +1,4 @@
+import { getRecentWindow, takeRecentPlayed } from "@/lib/recommendation/recentWindow";
 import { getVolumeStat } from "@/lib/recommendation/volume";
 import { getPlayerSeasonStats } from "@/lib/sportsdata/seasonStats";
 import { getActivePlayers } from "@/lib/sportsdata/players";
@@ -142,9 +143,15 @@ export async function rankWaiverCandidates(
   format: ScoringFormat,
   excludePlayerIds: Set<number>
 ): Promise<Record<SkillPosition, WaiverCandidateRank[]>> {
+  // Same recent-form window the scoring path uses (getRecentWindow): in
+  // the offseason a wider lookback, from which each player keeps only
+  // their last N games actually PLAYED — so a candidate whose recent
+  // volume/production would otherwise be judged off injury-thinned
+  // half-games is ranked on real pre-injury games instead.
+  const recentWindow = getRecentWindow(context);
   const [activePlayers, weeklyRows, seasonStats] = await Promise.all([
     getActivePlayers(),
-    Promise.all(context.recentWeeks.map((week) => getPlayerGameStatsByWeek(context.lastCompletedApiSeason, week))),
+    Promise.all(recentWindow.weeks.map((week) => getPlayerGameStatsByWeek(context.lastCompletedApiSeason, week))),
     getPlayerSeasonStats(context.lastCompletedSeason),
   ]);
   const seasonEfficiencyBaseline = computeSeasonEfficiencyBaseline(seasonStats);
@@ -158,7 +165,10 @@ export async function rankWaiverCandidates(
       else recentGamesByPlayer.set(row.PlayerID, [row]);
     }
   }
-  for (const list of recentGamesByPlayer.values()) list.sort((a, b) => a.Week - b.Week);
+  for (const [playerId, list] of recentGamesByPlayer) {
+    list.sort((a, b) => a.Week - b.Week);
+    recentGamesByPlayer.set(playerId, takeRecentPlayed(list, recentWindow.limit));
+  }
 
   const byPosition = {} as Record<SkillPosition, WaiverCandidateRank[]>;
 

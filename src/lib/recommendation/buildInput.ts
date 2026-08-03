@@ -19,7 +19,7 @@ import { getRecentGameStatsForPlayer } from "@/lib/sportsdata/weeklyStats";
 import type { SeasonContext } from "@/lib/sportsdata/timeframes";
 import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
 import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
-import { RECENT_WEEK_COUNT } from "./config";
+import { getRecentWindow } from "./recentWindow";
 import type { NflversePlayerWeekTable } from "./nflverseLive";
 import { toNflverseTeam, toSdioTeam } from "./restOfSeason";
 import { EMPTY_NFLVERSE_SIGNALS, type NextOpponent, type PlayerComparisonInput } from "./types";
@@ -59,33 +59,19 @@ export async function buildComparisonInput(
     };
   }
 
-  // In-season, the recent-form window is the last few calendar weeks — the
-  // behavior the backtest validates, where a recently-injured player is
-  // often still limited the next week, so those games genuinely predict it.
-  // In the OFFSEASON, we're projecting a future season's Week 1 off last
-  // season's tail: a recent injury there is long healed and its half-games
-  // are stale noise, so instead take the player's last RECENT_WEEK_COUNT
-  // games actually PLAYED over a wider lookback — backfilling past the
-  // injury with real pre-absence games (e.g. Lamar Jackson: out/limited
-  // weeks 15-18, whose calendar window was three half-games at ~13 pass
-  // attempts, tanking the volume signal). Gated on isInSeason so it can
-  // only change the offseason regime the backtest can't represent.
-  const offseasonBackfill = !context.isInSeason;
-  const recentLookbackStart = Math.max(1, context.lastCompletedWeek - RECENT_WEEK_COUNT * 2 + 1);
-  const recentLookbackWeeks = Array.from(
-    { length: context.lastCompletedWeek - recentLookbackStart + 1 },
-    (_, i) => recentLookbackStart + i
-  );
-  const recentWeeksForGames = offseasonBackfill ? recentLookbackWeeks : context.recentWeeks;
-  const recentGamesLimit = offseasonBackfill ? RECENT_WEEK_COUNT : undefined;
+  // Recent-form window: in-season the last few calendar weeks; in the
+  // offseason the last N games actually PLAYED over a wider lookback, so a
+  // healed-months-ago injury doesn't leave a thin/poisoned sample for the
+  // 0.9-weight volume signal to tank. See getRecentWindow's doc comment.
+  const recentWindow = getRecentWindow(context);
 
   const [seasonStat, recentGames, byeWeek, allPlayers] = await Promise.all([
     getPlayerSeasonStat(context.lastCompletedSeason, playerId).catch(() => null),
     getRecentGameStatsForPlayer(
       context.lastCompletedApiSeason,
-      recentWeeksForGames,
+      recentWindow.weeks,
       playerId,
-      recentGamesLimit
+      recentWindow.limit ?? undefined
     ).catch(() => []),
     player.Team
       ? getByeWeekForTeam(context.lastCompletedSeason, player.Team).catch(() => null)

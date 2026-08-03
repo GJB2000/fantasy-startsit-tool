@@ -6546,7 +6546,49 @@ single-season numbers for those specific constants.
       the same reason — deliberately left untouched this pass (see Open
       Item #27).
 
-### Open items (as of item 101 — pick up here)
+102. **Extended item 101's offseason injury-window backfill to Legit
+    Rankings and Waivers (resolving Open Item #27), and extracted the
+    offseason/lookback logic into one shared helper along the way.** The
+    key finding, verified before writing much code: both tools' actual
+    SCORING was ALREADY fixed transitively by item 101 — Legit Rankings
+    scores every player through `scoreExtendedPlayer` -> `buildComparisonInput`
+    (item 78), and Waivers' surfaced-candidate detail (`buildWaiverReport`)
+    and drop suggestions (`suggestDrop`) do too. What remained was each
+    tool's OWN bulk recent-week scan, which never went through
+    `buildComparisonInput`.
+    - **New shared helper `recommendation/recentWindow.ts`** (`getRecentWindow`
+      / `takeRecentPlayed`) — one source of truth for the "in-season =
+      last few calendar weeks; offseason = last N games actually PLAYED
+      over a 2x lookback, gated on `isInSeason`" rule that item 101 had
+      inlined in `buildInput.ts`. `buildInput.ts` was refactored to use it
+      (verified a byte-for-byte no-op: Lamar still 11.69 post-refactor).
+    - **Legit Rankings**: `filterByRecentGames` (the eligibility gate,
+      `MIN_RECENT_GAMES=1`) now counts played games over the wider
+      offseason window instead of just the last 4 calendar weeks. This
+      surfaced a real, previously-INVISIBLE bug: **Jayden Daniels** (an
+      elite QB, injured late in 2025) was being **excluded from the QB
+      rankings entirely** for having zero games in the narrow last-4-weeks
+      window — even though his scoring would have been fine. He now
+      correctly ranks QB #6 (legit 81, carried by the FantasyPros
+      season-consensus blend since his own engine snapshot is still
+      `limited`/injury-thin — exactly the blend item 78 built for this).
+      Widening the eligible pool re-normalizes the min-max legit scores
+      (e.g. Burrow 96 -> 88) — not a regression but a fuller, more correct
+      pool. Only the weeks widen; the per-player `limit` is irrelevant to a
+      `>= 1`-game eligibility count.
+    - **Waivers**: `rankCandidates.ts`'s candidate-ranking window (its own
+      opportunity-vs-production + efficiency-floor scan, genuinely separate
+      from `scoreExtendedPlayer`) now fetches the wider offseason window and
+      keeps each player's last N games actually played (`takeRecentPlayed`),
+      so a candidate isn't ranked off injury-thinned half-games. Verified
+      the route still returns full, sane candidate lists per position.
+    - **In-season no-op by construction** for all three (getRecentWindow
+      returns `{weeks: recentWeeks, limit: null}` in-season, which reduces
+      each call site to its exact prior behavior) — so, like item 101, this
+      changes only the offseason regime the backtest can't represent and
+      touches zero validated numbers. `tsc`/lint clean.
+
+### Open items (as of item 102 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6716,10 +6758,16 @@ last-N-played backfill + nflverse-window alignment in `buildInput.ts`) plus
 this CLAUDE.md write-up (and Open Item #27) are committed together — the
 backtest experiment behind it (a temporary `weekData.ts` change) was reverted
 before shipping, leaving no repo artifact, same discipline as every other
-one-off in this document. Everything above (items 96-101, all code and
-write-ups) is committed and pushed to `main` — the working tree is clean.
-(Per this project's standing rule, commit/push only once the user explicitly
-asks.) Nothing below is started or fixed yet:
+one-off in this document. Item 101 is committed and pushed as `68b4a36`.
+Item 102's extension of that backfill to Rankings and Waivers (the shared
+`recommendation/recentWindow.ts` helper, the `buildInput.ts` refactor onto
+it, the `filterByRecentGames` widening in `buildRankings.ts`, and the
+candidate-window backfill in `rankCandidates.ts`) plus this CLAUDE.md
+write-up (and the Open Item #27 resolution) are committed together.
+Everything above (items 96-102, all code and write-ups) is committed and
+pushed to `main` — the working tree is clean. (Per this project's standing
+rule, commit/push only once the user explicitly asks.) Nothing below is
+started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything
@@ -7093,22 +7141,21 @@ asks.) Nothing below is started or fixed yet:
     the ~554k-row file cold-loads on the first live compare (cached 24h),
     which a lighter fetch (early-stop at the latest snapshot, if the file
     stays sorted latest-first) could avoid.
-27. **The offseason injury-window backfill (item 101) is scoped to the
-    live scoring path only — Legit Rankings and Waivers still use their
-    own bulk `context.recentWeeks` fetch** (`buildRankings.ts`,
-    `rankCandidates.ts`), so an injured player (Lamar-type) whose recent
-    window is poisoned by a late-season injury still ranks low there in the
-    offseason, for the exact reason item 101 fixed for Start/Sit/Trade/
-    Lineup. Extending the same offseason-gated "last N played games"
-    backfill to those two paths is a real, self-contained follow-up. Also
-    unaddressed (deliberately, item 101): the residual undervaluation of
+27. **Extending item 101's backfill to Rankings and Waivers — RESOLVED,
+    see item 102.** Both tools' scoring was already fixed transitively (they
+    score via `scoreExtendedPlayer`); item 102 extended the same
+    offseason-gated window to each tool's own recent-week scan (Rankings'
+    eligibility filter, Waivers' candidate ranking) via a shared
+    `recentWindow.ts` helper, and surfaced/fixed a real bug — Jayden Daniels
+    was excluded from QB rankings entirely for an injury gap. Two related
+    threads remain genuinely open: (a) the residual undervaluation of
     rushing QBs from the pass-attempts-only volume signal (item 24) — a
     separate issue from injury poisoning, not something the window fix
-    touches. And the backfill only fixes the OFFSEASON regime; the backtest
-    showed a blanket in-season version costs QB accuracy (regime mismatch —
-    see item 101), so there's no clean in-season equivalent unless a way is
-    found to distinguish "recovered" from "still ramping" that the backtest
-    can actually validate.
+    touches; and (b) the backfill only fixes the OFFSEASON regime — the
+    backtest showed a blanket in-season version costs QB accuracy (regime
+    mismatch, item 101), so there's no clean in-season equivalent unless a
+    way is found to distinguish "recovered" from "still ramping" that the
+    backtest can actually validate.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
