@@ -6742,7 +6742,54 @@ single-season numbers for those specific constants.
       and the multi-season/format projection-mode extensions there remain
       open).
 
-### Open items (as of item 105 — pick up here)
+106. **Tested dome / home-away / rest game-context signals standalone
+    (pooled 2022-2025) — the one genuinely-untested signal family in this
+    document — and closed it as a documented negative finding: none clears
+    the bar, and the one strong number is a confound.** All three come from
+    nflverse's `schedules` release games.csv (`roof`, `home_team`/
+    `away_team`, `home_rest`/`away_rest`), tested the same way as every
+    other standalone baseline (adjacent-rank startable pairs, favor the
+    player with the favorable context when the pair differs), via a
+    temporary diagnostic route that reused the real nflverse-only pipeline
+    (loader + `buildAllPairsForWeek`), deleted after recording the numbers.
+    - **Results (pooled standalone accuracy):**
+
+      | signal | ALL | QB | RB | WR | TE |
+      |---|---|---|---|---|---|
+      | indoor (dome/closed) | 52.6% | 53.3% | 50.6% | 54.5% | 52.0% |
+      | home | 51.8% | 59.3% | 53.4% | 47.4% | 50.0% |
+      | rest (more days) | 49.7% | 48.2% | 54.8% | 47.2% | 45.6% |
+
+    - **The two mechanistically-clean, cross-season-STABLE signals are too
+      weak.** WR indoor (54.5%, positive all four seasons — passing plays
+      better indoors) and RB rest (54.8%, positive all four seasons — rest
+      helps a workload back) are both real but modest, and WEAKER than
+      signals the engine already has (recentVolume 56.6%, expertConsensus
+      57-60%). Per this document's repeated finding (items 33/35), a ~54%
+      standalone signal adds nothing once blended into the already-tuned
+      score.
+    - **The one strong number — QB home 59.3% — is almost certainly a
+      confound, not a home-field effect.** On the SAME home games, QBs
+      overperform (59.3%) but WRs UNDERperform (47.4%, below chance every
+      season). A real home-field scoring boost would lift both — they share
+      an offense. That contradiction is the exact "team-level signal is
+      blind to individual role" failure that sank the game-script baseline
+      (item 12); the QB number also dips to 48.9% in 2022, the cross-season
+      instability repeatedly rejected elsewhere (items 26/34). WR rest
+      shows the same swing (41.1% in 2022 to 55.8% in 2025).
+    - **The genuinely useful part is already captured.** Home field, dome,
+      and rest are all priced into the Vegas implied team total, and item
+      97 already found implied-total×usage mostly redundant with the
+      expert-consensus blend for skill positions — so even the real bits
+      would be near-orthogonal-to-nothing on integration.
+    - **Not integrated — closed as a documented standalone finding**, same
+      discipline as items 12/34/97. No code shipped; the temporary
+      diagnostic route was deleted after recording these numbers. The
+      schedule data (roof/home-away/rest) stays available in games.csv if a
+      future season changes the picture, but the four-season read is clear
+      enough not to revisit soon.
+
+### Open items (as of item 106 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6930,8 +6977,11 @@ surfaced by a since-deleted consensus coverage audit route) plus this
 CLAUDE.md write-up are committed together. Item 105's finalScore floor+bound
 (`FINAL_SCORE_DEVIATION_CAP` in `config.ts`, the clamp in `engine.ts`,
 surfaced by a since-deleted score-distribution diagnostic route) plus this
-CLAUDE.md write-up are committed together. Everything above (items
-96-105, all code and write-ups) is committed and pushed to `main` — the
+CLAUDE.md write-up are committed together. Item 106's game-context signal
+investigation (dome/home-away/rest) shipped NO code — a documented negative
+finding (nothing cleared the bar; the diagnostic route was deleted), so its
+only artifact is this CLAUDE.md write-up. Everything above (items
+96-106, all code and write-ups) is committed and pushed to `main` — the
 working tree is clean. (Per this project's standing rule, commit/push only
 once the user explicitly asks.) Nothing below is started or fixed yet:
 
