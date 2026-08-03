@@ -18,6 +18,21 @@ export const MATCHUP_MODIFIER_SCALE = 6;
 /** Cap on the matchup modifier's swing, so it nudges the score rather than dominating it. */
 export const MATCHUP_MODIFIER_CAP = 2.5;
 
+/**
+ * Max points the full modifier stack may move a skill player's projection
+ * away from the recent/season-form baseline (blendedScore), in either
+ * direction — combined with a hard floor at 0 (skill fantasy points are
+ * never negative). A no-op for realistic players: the startable pool
+ * never deviates more than ~8 points, so this never touches the backtest.
+ * It exists to clip a real thin-sample pathology the live tool can
+ * otherwise expose — a deep player with a fluky 1-target drop rate hits
+ * the big POINTS_PER_DROP_RATE_UNIT factor and can project as low as -37
+ * (the same uncapped-big-factor bug class item 66 fixed for qbRushEpa,
+ * invisible to the pool-based projection backtest). 15 sits comfortably
+ * above the pool's real range while still bounding the pathologies.
+ */
+export const FINAL_SCORE_DEVIATION_CAP = 15;
+
 /** Absolute point gap at or below which two players are called a "close call". */
 export const CLOSE_CALL_ABS_POINTS = 1.5;
 

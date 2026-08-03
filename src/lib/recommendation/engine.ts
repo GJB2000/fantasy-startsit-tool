@@ -5,6 +5,7 @@ import {
   DROP_RATE_BLEND_WEIGHT,
   ENSEMBLE_VOLUME_BLEND_RATIO,
   EXPERT_CONSENSUS_BLEND_WEIGHT,
+  FINAL_SCORE_DEVIATION_CAP,
   GAP_CONFIDENCE_CURVE,
   MATCHUP_MODIFIER_CAP,
   MATCHUP_MODIFIER_SCALE,
@@ -367,6 +368,23 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
       const ratio = ENSEMBLE_VOLUME_BLEND_RATIO[format][skillPosition];
       finalScore = ratio * preEnsembleFinalScore + (1 - ratio) * volumeImpliedScore;
     }
+  }
+
+  // Floor and bound the projection. Skill fantasy points are never
+  // negative, and no combination of signals should move the estimate more
+  // than FINAL_SCORE_DEVIATION_CAP points from the recent/season-form
+  // baseline (blendedScore). A no-op for realistic players (see the
+  // constant's doc comment) but it clips a real thin-sample pathology the
+  // live tool can otherwise expose (a deep player projecting as low as
+  // -37 on a fluky drop rate). Skill-only by construction: D/ST and K use
+  // their own scorers (scoreDefense/scoreKicker) and can legitimately go
+  // negative.
+  if (finalScore != null && blendedScore != null) {
+    finalScore = clamp(
+      finalScore,
+      Math.max(0, blendedScore - FINAL_SCORE_DEVIATION_CAP),
+      blendedScore + FINAL_SCORE_DEVIATION_CAP
+    );
   }
 
   const injuryStatus = input.player?.InjuryStatus ?? null;

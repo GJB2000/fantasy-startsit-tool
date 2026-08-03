@@ -6698,7 +6698,51 @@ single-season numbers for those specific constants.
       games, via item 101's offseason backfill) plus real redraft consensus
       (item 103). `tsc`/lint clean.
 
-### Open items (as of item 104 — pick up here)
+105. **Floored and bounded `finalScore` — fixing a real thin-sample
+    projection pathology (down to -37 points) the live tool could expose,
+    while leaving pick accuracy byte-identical.** Item 65 flagged negative
+    projections; item 66 fixed the worst offender (qbRushEpa) but the
+    general "no modifier except matchup is bounded" issue stayed open
+    (Open Item #12). Measured the actual distribution first (temporary
+    diagnostic route, deleted after — same discipline as every one-off in
+    this document):
+    - **In the startable pool** (the projection backtest's own scope,
+      n=1224): already clean post-item-66 — min finalScore 4.9, ZERO
+      negatives. So the pool-based projection mode never saw a problem.
+    - **Unrestricted** (every played skill player the live tool lets a
+      user pick, n=6230): **7.4% (462) projected NEGATIVE, down to
+      -37.1.** Driver confirmed by elimination: NOT the volume signal
+      (legit ±7) but `dropRateModifier` — its big
+      `POINTS_PER_DROP_RATE_UNIT` (182.75) factor applied to a fluky
+      1-target drop rate on a deep WR, the exact uncapped-big-factor bug
+      class item 66 fixed for qbRushEpa, invisible to the startable pool
+      (where samples are real).
+    - **Fix**: a single clamp at the end of `scorePlayer` —
+      `finalScore ∈ [max(0, blendedScore - CAP), blendedScore + CAP]`,
+      `FINAL_SCORE_DEVIATION_CAP=15` in `config.ts`. Floors skill fantasy
+      points at 0 (never negative) AND bounds how far the whole modifier
+      stack can move the projection from the recent/season-form baseline
+      (blendedScore). Deliberately caps the AGGREGATE deviation, not
+      individual modifiers — so no validated weight (volume 0.9, dropRate
+      0.2, etc.) is touched, and dropRate itself (fine in the pool) is
+      left alone; the pathology is only ever a thin-sample artifact.
+      Skill-only by construction: D/ST and K use their own scorers
+      (scoreDefense/scoreKicker) and can legitimately go negative.
+    - **Why 15**: the startable pool never deviates more than ~8 points
+      from blendedScore, so a 15-point cap never engages for a realistic
+      player — making it a PROVABLE no-op for the backtest while still
+      clipping the -37 pathologies.
+    - **Verified**: unrestricted negatives 462 -> 0, min -37.1 -> 0.0,
+      legitimate range unchanged (median 4.9, max 29.7). Both headline
+      backtests byte-identical after the change — primary 2025 broad
+      58.76% (QB 61.76 / RB 58.62 / WR 58.33 / TE 56.44) and pooled
+      2022-2025 57.78% (QB 60.54 / RB 58.99 / WR 55.67 / TE 56.79) —
+      confirming zero pick-accuracy impact. `tsc`/lint clean. Resolves the
+      finalScore-floor half of Open Item #12 (D/ST/K projection grading
+      and the multi-season/format projection-mode extensions there remain
+      open).
+
+### Open items (as of item 105 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6883,8 +6927,11 @@ volume-signal change it investigated was NOT built (rushing QBs are already
 over-projected — a documented rejection, no code). Item 104's PUP/IR/NFI
 player-availability fix (the `isRosterable` predicate in `players.ts`,
 surfaced by a since-deleted consensus coverage audit route) plus this
+CLAUDE.md write-up are committed together. Item 105's finalScore floor+bound
+(`FINAL_SCORE_DEVIATION_CAP` in `config.ts`, the clamp in `engine.ts`,
+surfaced by a since-deleted score-distribution diagnostic route) plus this
 CLAUDE.md write-up are committed together. Everything above (items
-96-104, all code and write-ups) is committed and pushed to `main` — the
+96-105, all code and write-ups) is committed and pushed to `main` — the
 working tree is clean. (Per this project's standing rule, commit/push only
 once the user explicitly asks.) Nothing below is started or fixed yet:
 
