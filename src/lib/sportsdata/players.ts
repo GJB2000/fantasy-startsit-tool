@@ -9,9 +9,31 @@ export async function getAllPlayers(): Promise<Player[]> {
   });
 }
 
+/**
+ * SportsDataIO `Status` values that still represent a real, rostered
+ * player who will play — beyond plain "Active". PUP and NFI are routine
+ * camp/preseason designations and IR keeps a player on the team, so a
+ * player with one of these AND a real `Team` (e.g. George Kittle on PUP
+ * in August) is rosterable and belongs in the tool. Without this they're
+ * silently dropped from EVERY surface — search, comparison, rankings,
+ * lineup — as a name-join coverage audit surfaced. An "Inactive" player
+ * with no team is an unsigned free agent and stays excluded; in-season
+ * startability is handled separately by the engine's Out/Doubtful
+ * injury exclusion and thin-data handling, so this isn't offseason-gated.
+ */
+const ROSTERABLE_INJURY_STATUSES = new Set([
+  "Physically Unable to Perform",
+  "Injured Reserve",
+  "Non Football Injury",
+]);
+
+function isRosterable(p: Player): boolean {
+  return p.Status === "Active" || (ROSTERABLE_INJURY_STATUSES.has(p.Status) && !!p.Team);
+}
+
 export async function getActivePlayers(): Promise<Player[]> {
   const all = await getAllPlayers();
-  return all.filter((p) => p.Status === "Active" && isSkillPosition(p.Position));
+  return all.filter((p) => isRosterable(p) && isSkillPosition(p.Position));
 }
 
 export async function searchActivePlayers(query: string, limit = 20): Promise<Player[]> {
@@ -53,7 +75,7 @@ export async function getAnyPlayerById(id: number): Promise<Player | null> {
  */
 export async function getActiveExtendedPlayers(): Promise<Player[]> {
   const [all, dstPlayers] = await Promise.all([getAllPlayers(), getAllDstPlayers()]);
-  const skillAndK = all.filter((p) => p.Status === "Active" && (isSkillPosition(p.Position) || p.Position === "K"));
+  const skillAndK = all.filter((p) => isRosterable(p) && (isSkillPosition(p.Position) || p.Position === "K"));
   return [...skillAndK, ...dstPlayers];
 }
 

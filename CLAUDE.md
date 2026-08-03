@@ -6657,7 +6657,48 @@ single-season numbers for those specific constants.
       it's not a net-undervaluation once the rush term + consensus blend
       are accounted for, and the data says re-tuning it would hurt.
 
-### Open items (as of item 103 — pick up here)
+104. **Fixed a whole-app player-availability gap surfaced by a FantasyPros
+    consensus coverage audit: PUP/IR/NFI players were silently excluded
+    from every tool.** Ran a coverage audit (temporary diagnostic route,
+    deleted after — same discipline as every other one-off in this
+    document) checking whether FantasyPros-ranked players actually join
+    into the app's player set. Two findings:
+    - **The name-join is HEALTHY** — every relevant-rank miss was a simple
+      would-match name (George Kittle, Stefon Diggs, Alec Pierce…), no
+      apostrophe/suffix/nickname `normalizePlayerName` bugs. Relevant-rank
+      match rate was 95-100% (redraft) / 87-97% (weekly), and the shortfall
+      wasn't the join.
+    - **The real bug**: `getActivePlayers()`/`getActiveExtendedPlayers()`
+      filtered to `Status === "Active"`, which drops SportsDataIO's
+      `Physically Unable to Perform` / `Injured Reserve` / `Non Football
+      Injury` designations. In the offseason those are routine camp/roster
+      tags on real rostered players — so **George Kittle** (PUP, SF — an
+      elite TE), Alec Pierce (PUP), Zach Charbonnet (PUP), Ricky Pearsall
+      (IR) and ~25 others were entirely absent from search, comparison,
+      Legit Rankings, and lineup. Confirmed against SportsDataIO's raw
+      `/Players` Status distribution (Active 880, Inactive 1113, PUP 10, IR
+      14, NFI 5, Exempt/Left Team 1).
+    - **Fix (`players.ts`)**: a shared `isRosterable` predicate —
+      `Status === "Active" OR (Status ∈ {PUP, IR, NFI} AND Team != null)` —
+      used by both `getActivePlayers` and `getActiveExtendedPlayers`. An
+      `Inactive`/no-team player (unsigned free agent, e.g. Stefon Diggs)
+      stays excluded, as does `Exempt/Left Team`. Applied unconditionally,
+      NOT offseason-gated: in-season startability is already handled by the
+      engine's Out/Doubtful injury exclusion + thin-data handling, so an IR
+      player appearing in search/rankings is harmless (flagged and
+      low-ranked), and gating would add complexity for no real benefit.
+    - Flows to every surface at once (search, Legit Rankings, waivers,
+      lineup) since they all read these two functions.
+      `hasLimitedTeammate`/`getAnyPlayerById` use the unfiltered
+      `getAllPlayers`, unaffected.
+    - **Verified live**: Kittle/Pierce/Charbonnet/Pearsall now searchable
+      (were NONE before); Diggs (unsigned FA) still correctly excluded;
+      Kittle now ranks Legit **TE #7** (was absent entirely) and compares
+      with real backfilled recent data (`dataQuality` full — his 2025
+      games, via item 101's offseason backfill) plus real redraft consensus
+      (item 103). `tsc`/lint clean.
+
+### Open items (as of item 104 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6839,8 +6880,11 @@ compare/trade/lineup/waivers/trade-suggestion — switched to
 `getLiveExpertConsensusByNormalizedName`; rankings deliberately kept on the
 weekly path) plus this CLAUDE.md write-up are committed together. The
 volume-signal change it investigated was NOT built (rushing QBs are already
-over-projected — a documented rejection, no code). Everything above (items
-96-103, all code and write-ups) is committed and pushed to `main` — the
+over-projected — a documented rejection, no code). Item 104's PUP/IR/NFI
+player-availability fix (the `isRosterable` predicate in `players.ts`,
+surfaced by a since-deleted consensus coverage audit route) plus this
+CLAUDE.md write-up are committed together. Everything above (items
+96-104, all code and write-ups) is committed and pushed to `main` — the
 working tree is clean. (Per this project's standing rule, commit/push only
 once the user explicitly asks.) Nothing below is started or fixed yet:
 
