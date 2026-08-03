@@ -2,6 +2,8 @@ import { getPositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat } from "@/lib/sportsdata/types";
 import { getCurrentExpertConsensusByNormalizedName } from "@/lib/fantasypros/weeklyConsensus";
+import { getCurrentDepthChartRankByNormalizedName } from "@/lib/nflverse/depthCharts";
+import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
 import { compareBreakdowns } from "@/lib/recommendation/engine";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { getPropsForPlayers } from "@/lib/oddsapi/props";
@@ -36,7 +38,7 @@ export async function GET(request: Request) {
 
   try {
     const context = await getSeasonContext();
-    const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt, expertConsensusByNormalizedName] =
+    const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt, expertConsensusByNormalizedName, depthRankByName] =
       await Promise.all([
         getPositionDefenseTable(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
         getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
@@ -44,6 +46,7 @@ export async function GET(request: Request) {
           () => new Map<string, RemainingGame[]>()
         ),
         getCurrentExpertConsensusByNormalizedName().catch(() => new Map()),
+        getCurrentDepthChartRankByNormalizedName(context.lastCompletedSeason).catch(() => new Map<string, number>()),
       ]);
 
     // Same season-rollforward pattern as /api/trade — try continuing the
@@ -79,7 +82,16 @@ export async function GET(request: Request) {
       )
     );
 
-    const result = compareBreakdowns(breakdowns);
+    // Resolve current depth-chart rank onto each scored player, for the
+    // depth-chart confidence floor (a listed starter over a clear backup).
+    const depthRankByPlayerId = new Map<number, number>();
+    for (const b of breakdowns) {
+      if (b.playerId == null) continue;
+      const rank = depthRankByName.get(normalizePlayerName(b.displayName));
+      if (rank != null) depthRankByPlayerId.set(b.playerId, rank);
+    }
+
+    const result = compareBreakdowns(breakdowns, depthRankByPlayerId);
 
     // Display-only betting-line context for the cards (The Odds API,
     // current/upcoming games). Fails open to {} — never blocks the

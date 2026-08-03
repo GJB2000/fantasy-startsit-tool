@@ -1,6 +1,7 @@
 import {
   CLOSE_CALL_ABS_POINTS,
   CLOSE_CALL_RELATIVE_PCT,
+  DEPTH_STARTER_CONFIDENCE,
   DROP_RATE_BLEND_WEIGHT,
   ENSEMBLE_VOLUME_BLEND_RATIO,
   EXPERT_CONSENSUS_BLEND_WEIGHT,
@@ -477,7 +478,11 @@ export function comparePlayers(inputs: PlayerComparisonInput[], format: ScoringF
  * no-op for D/ST/K, since their breakdowns always have
  * targetShare/separation null.
  */
-export function compareBreakdowns(breakdowns: PlayerScoreBreakdown[]): ComparisonResult {
+export function compareBreakdowns(
+  breakdowns: PlayerScoreBreakdown[],
+  /** Live-only: playerId -> current depth-chart rank (1=starter). Omitted in backtest, so the depth-chart confidence floor never fires there. */
+  depthRankByPlayerId?: Map<number, number>
+): ComparisonResult {
   const found = breakdowns.filter((b) => b.playerId !== null);
   const notFoundNames = breakdowns.filter((b) => b.playerId === null).map((b) => b.displayName);
 
@@ -659,7 +664,32 @@ export function compareBreakdowns(breakdowns: PlayerScoreBreakdown[]): Compariso
   } else if (ranked.length >= 2 && ranked[0].finalScore != null && ranked[1].finalScore != null) {
     confidenceGap = ranked[0].finalScore - ranked[1].finalScore;
   }
-  const confidence = confidenceFromGap(confidenceGap);
+  let confidence = confidenceFromGap(confidenceGap);
+
+  // Depth-chart confidence floor: a listed starter over a clear backup is
+  // a much higher-confidence regime than any startable-pool comparison the
+  // gap curve is calibrated on (which tops out ~79%). When the pick is a
+  // rank-1 starter and the best alternative is a clear backup (3rd string+
+  // or not on the chart at all AND well behind on season average — the
+  // latter guards against a mere name-match miss looking like a scrub),
+  // floor it. Live-only (depthRankByPlayerId is omitted in backtest).
+  if (depthRankByPlayerId && winner.playerId != null) {
+    const winnerRank = depthRankByPlayerId.get(winner.playerId) ?? null;
+    const alt = ranked.find((c) => c.playerId !== winner.playerId);
+    const altRank = alt?.playerId != null ? (depthRankByPlayerId.get(alt.playerId) ?? null) : null;
+    const winnerIsStarter = winnerRank === 1;
+    const altIsClearBackup =
+      alt != null &&
+      (altRank != null
+        ? altRank >= 3
+        : winnerIsStarter &&
+          winner.seasonPprAvg != null &&
+          alt.seasonPprAvg != null &&
+          winner.seasonPprAvg - alt.seasonPprAvg >= SEASON_GAP_GUARDRAIL_ABS);
+    if (winnerIsStarter && altIsClearBackup) {
+      confidence = Math.max(confidence, DEPTH_STARTER_CONFIDENCE);
+    }
+  }
 
   return {
     players: breakdowns,

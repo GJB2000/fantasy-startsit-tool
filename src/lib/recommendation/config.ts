@@ -62,6 +62,21 @@ export const SEASON_GAP_GUARDRAIL_ABS = 5;
  * season-gap guardrail, whose confidence feeds the SEASON-long gap through
  * this same curve.
  */
+/**
+ * Confidence floor when the recommended player is a listed depth-chart
+ * starter (rank 1) and the alternative is a clear backup (3rd string or
+ * deeper, or not on the chart at all AND well behind on season average).
+ * The gap→accuracy curve tops out ~79% because it's calibrated on
+ * *startable-pool* pairs (two rosterable players); a genuine starter over
+ * a deep backup is a much higher-confidence regime than any startable
+ * comparison, so it gets its own floor. A reasoned value (not backtest-
+ * calibrated — the backtest never pairs a starter with a scrub), sized to
+ * leave real headroom for the starter being injured/rested or a fluke
+ * week. Live-only: depth-chart rank isn't populated in backtest mode, so
+ * this never fires there. See CLAUDE.md.
+ */
+export const DEPTH_STARTER_CONFIDENCE = 90;
+
 export const GAP_CONFIDENCE_CURVE: readonly (readonly [number, number])[] = [
   [0.5, 52],
   [1.5, 53],

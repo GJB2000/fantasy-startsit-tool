@@ -6,6 +6,52 @@ const REVALIDATE_SECONDS = 24 * 60 * 60;
 const OFFENSE_SKILL_POSITIONS = new Set(["QB", "RB", "WR", "TE"]);
 
 /**
+ * Current depth-chart rank (1 = starter, 2 = backup, ...) per player, from
+ * the LATEST snapshot of nflverse's `depth_charts` release — for the live
+ * tool's "is this a starter or a backup" signal. Uses the 2025+
+ * ESPN-scrape schema (keyed by `dt`/`pos_abb`/`pos_rank`) that
+ * getDepthChartByNormalizedNameWeek above deliberately can't use: that one
+ * needs to map snapshots to specific past weeks (a leakage-prone inference
+ * problem — item 37), but "who's the starter right now" needs no such
+ * mapping — it's just the most recent snapshot, a genuine current fact.
+ * Scoped to offensive skill positions; a player's rank is the best (lowest)
+ * slot they appear at. Returns `normalizedName -> rank`. Confirmed live:
+ * the latest 2025 snapshot correctly has Lamar Jackson at BAL QB1, star
+ * RB/WR/TEs at rank 1, and deep backups (e.g. journeyman 4th-string QBs)
+ * absent entirely — so "not on the chart" is itself a meaningful
+ * backup/scrub signal.
+ *
+ * Only the current season carries this ESPN-scrape schema; a season <2025
+ * uses the older week-based format and returns empty here (its data is
+ * available via getDepthChartByNormalizedNameWeek instead).
+ */
+export async function getCurrentDepthChartRankByNormalizedName(season: number): Promise<Map<string, number>> {
+  const byName = new Map<string, number>();
+  if (season < 2025) return byName;
+
+  const rows = await fetchNflverseCsv("depth_charts", `depth_charts_${season}.csv`, REVALIDATE_SECONDS, [
+    "dt",
+    "player_name",
+    "pos_abb",
+    "pos_rank",
+  ]);
+
+  let latest = "";
+  for (const r of rows) if (r.dt > latest) latest = r.dt;
+  if (!latest) return byName;
+
+  for (const r of rows) {
+    if (r.dt !== latest || !OFFENSE_SKILL_POSITIONS.has(r.pos_abb)) continue;
+    const rank = Number(r.pos_rank);
+    if (!Number.isFinite(rank)) continue;
+    const name = normalizePlayerName(r.player_name);
+    const existing = byName.get(name);
+    if (existing == null || rank < existing) byName.set(name, rank);
+  }
+  return byName;
+}
+
+/**
  * nflverse's `depth_charts` release — official weekly starter/backup
  * role designation (`depth_team`: 1=starter, 2=backup, 3=third string,
  * ...), scoped to offensive skill positions. A current-week role fact,
