@@ -1,7 +1,7 @@
 import { getPositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat } from "@/lib/sportsdata/types";
-import { getCurrentExpertConsensusByNormalizedName } from "@/lib/fantasypros/weeklyConsensus";
+import { getLiveExpertConsensusByNormalizedName } from "@/lib/fantasypros/liveConsensus";
 import { getCurrentDepthChartRankByNormalizedName } from "@/lib/nflverse/depthCharts";
 import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
 import { compareBreakdowns } from "@/lib/recommendation/engine";
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
         getRemainingOpponentsByTeam(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
           () => new Map<string, RemainingGame[]>()
         ),
-        getCurrentExpertConsensusByNormalizedName().catch(() => new Map()),
+        getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
         getCurrentDepthChartRankByNormalizedName(context.lastCompletedSeason).catch(() => new Map<string, number>()),
       ]);
 

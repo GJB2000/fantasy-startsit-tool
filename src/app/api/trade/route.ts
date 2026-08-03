@@ -1,7 +1,7 @@
 import { getPositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat } from "@/lib/sportsdata/types";
-import { getCurrentExpertConsensusByNormalizedName } from "@/lib/fantasypros/weeklyConsensus";
+import { getLiveExpertConsensusByNormalizedName } from "@/lib/fantasypros/liveConsensus";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { projectExtendedRestOfSeason, scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
 import {
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
         getRemainingOpponentsByTeam(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
           () => new Map<string, RemainingGame[]>()
         ),
-        getCurrentExpertConsensusByNormalizedName().catch(() => new Map()),
+        getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
       ]);
 
     // Try continuing the season lastCompletedWeek belongs to first; if it

@@ -6588,7 +6588,76 @@ single-season numbers for those specific constants.
       changes only the offseason regime the backtest can't represent and
       touches zero validated numbers. `tsc`/lint clean.
 
-### Open items (as of item 102 — pick up here)
+103. **Investigated the "pass-attempts-only volume undervalues rushing
+    QBs" problem (item 24) through the calibration lens — found the
+    premise doesn't hold, root-caused the real offseason symptom to
+    FantasyPros coverage, and built an offseason redraft-consensus fix
+    instead of touching the volume signal.** The ask (prompted by Lamar
+    Jackson's low Week-1 projection) was to boost rushing QBs the
+    pass-attempts-only volume signal undervalues. Measured FIRST, per the
+    item-65/66 discipline — "projected too low" is a calibration/bias
+    question, not a pick-accuracy one (pick accuracy is already optimized,
+    item 89).
+    - **The premise doesn't hold.** Projection Accuracy mode (2025, PPR,
+      per-QB bias) shows rushing QBs are already OVER-projected: mean bias
+      **+2.31** vs pocket passers +0.24, and every well-sampled rushing QB
+      is neutral-to-over (Lamar +2.30, Hurts +2.78, Allen +1.30, Daniels
+      +3.82; only rookies Maye -0.85 / C. Williams -0.24 slightly under).
+      The 0.3-weight rush term (item 30/89) plus the 0.5-weight FantasyPros
+      consensus blend (item 70) already over-compensate for the
+      pass-attempts-only signal — boosting volume further would WORSEN QB
+      calibration. So the volume-signal change was NOT built (a documented
+      rejection, the same "measure before shipping" discipline as items
+      53/89). This is the classic ranking-vs-calibration split (items
+      65/66): two rushing QBs still rank correctly relative to each other
+      even while both point estimates run a touch high.
+    - **The real cause of Lamar's low LIVE number was FantasyPros
+      coverage, not the volume signal.** The live consensus path
+      (`getCurrentExpertConsensusByNormalizedName`) reads the CURRENT
+      weekly snapshot (`fp_latest_weekly.csv`), which in the offseason is
+      frozen at last season's final week (dated 2025-12-30) — and Lamar,
+      injured at season's end, ISN'T IN IT (Tyler Huntley is listed as
+      Baltimore's starter, confirmed by pulling the raw file). So his
+      0.5-weight consensus stabilizer was silently `null` live, while
+      in-season and in the backtest (which use per-week snapshots when he's
+      healthy and ranked) it fires and he's fine. That's the whole gap:
+      injured at season's end -> absent from the frozen final snapshot ->
+      no consensus rescue live.
+    - **Fix (`fantasypros/liveConsensus.ts`): in the offseason, feed the
+      live consensus from FantasyPros' CURRENT season-long REDRAFT
+      rankings** (`db_fpecr_latest.csv`, dated 2026-07-31, forward-looking
+      for the upcoming season — already read for Legit Rankings via
+      `seasonProjections.ts`) instead of the stale weekly snapshot. The
+      redraft file is rank-only (no `r2p_pts`), so each player's redraft
+      position rank is converted to a points estimate via the weekly
+      file's OWN rank->`r2p_pts` curve (the per-rank points scale is
+      time-stable — QB5 ~ 19-20 — even when the snapshot's player->rank
+      assignments are stale, so it's a valid bridge).
+      `getLiveExpertConsensusByNormalizedName(context)` is the single gated
+      entry point (weekly in-season, redraft in offseason, same isInSeason
+      gate as item 101's `getRecentWindow`).
+    - **Wired into the five SCORING routes** (compare/trade/lineup/
+      waivers/trade-suggestion) via that one entry point. **Legit Rankings
+      deliberately EXCLUDED** — it already has its own tuned redraft blend
+      (item 78's `ENGINE_WEIGHT`, calibrated assuming the offseason engine
+      snapshot has no consensus); feeding offseason consensus into its
+      engine snapshot too would double-weight redraft and distort that
+      tuning, so it keeps the weekly path.
+    - **Backtest-neutral by construction**: the backtest uses the
+      HISTORICAL per-week consensus path
+      (`getExpertConsensusByNormalizedNameWeek`), never this live
+      current-snapshot path, so zero backtest numbers move; the consensus
+      term's 0.5 weight is already validated (item 70). In-season is a
+      clean no-op branch. Verified live end-to-end: Lamar 11.7 -> **16.49**
+      (consensus r2p 21.3, +4.81 modifier), Ja'Marr Chase 20.87 (22.7),
+      Bijan Robinson 21.39 (22.0), Brock Bowers 13.34 (15.8) — all
+      sensible across positions. `tsc`/lint clean.
+    - **Resolves the long-standing item-24 concern in understanding**:
+      the pass-attempts-only volume signal is left as-is deliberately —
+      it's not a net-undervaluation once the rush term + consensus blend
+      are accounted for, and the data says re-tuning it would hurt.
+
+### Open items (as of item 103 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -6764,10 +6833,16 @@ Item 102's extension of that backfill to Rankings and Waivers (the shared
 it, the `filterByRecentGames` widening in `buildRankings.ts`, and the
 candidate-window backfill in `rankCandidates.ts`) plus this CLAUDE.md
 write-up (and the Open Item #27 resolution) are committed together.
-Everything above (items 96-102, all code and write-ups) is committed and
-pushed to `main` — the working tree is clean. (Per this project's standing
-rule, commit/push only once the user explicitly asks.) Nothing below is
-started or fixed yet:
+Item 103's offseason redraft-consensus fix (the new
+`fantasypros/liveConsensus.ts`, and the five scoring routes —
+compare/trade/lineup/waivers/trade-suggestion — switched to
+`getLiveExpertConsensusByNormalizedName`; rankings deliberately kept on the
+weekly path) plus this CLAUDE.md write-up are committed together. The
+volume-signal change it investigated was NOT built (rushing QBs are already
+over-projected — a documented rejection, no code). Everything above (items
+96-103, all code and write-ups) is committed and pushed to `main` — the
+working tree is clean. (Per this project's standing rule, commit/push only
+once the user explicitly asks.) Nothing below is started or fixed yet:
 
 1. **TE drop rate remains unresolved** — noisy and non-monotonic at
    every weight tested in item 33 (smallest sample of anything

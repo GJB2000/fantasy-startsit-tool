@@ -1,4 +1,4 @@
-import { getCurrentExpertConsensusByNormalizedName } from "@/lib/fantasypros/weeklyConsensus";
+import { getLiveExpertConsensusByNormalizedName } from "@/lib/fantasypros/liveConsensus";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import {
   getGameWeatherByTeamWeek,
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
         getRemainingOpponentsByTeam(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
           () => new Map<string, RemainingGame[]>()
         ),
-        getCurrentExpertConsensusByNormalizedName().catch(() => new Map()),
+        getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
       ]);
 
     // Same season-rollforward fallback as /api/trade: try the current
