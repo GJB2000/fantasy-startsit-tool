@@ -6920,7 +6920,66 @@ single-season numbers for those specific constants.
       mobile dark (stacked, no overflow after the fix), zero console errors,
       `tsc`/lint clean. Committed as `28e63e9`.
 
-### Open items (as of item 109 — pick up here)
+110. **Redesigned the Lineup Optimizer — results into a real lineup board,
+    and the pre-build controls into a compact control deck. Presentation
+    only, no engine/API change; reuses data `/api/lineup` already returns.**
+    The results were competent 2-up cards (item 76) with an always-expanded
+    wall of reasoning; the pre-build state was plain controls. Rebuilt both
+    across a few user-directed iterations.
+    - **Results board** (`LineupResult.tsx`): a **projected-team-total
+      header** (summed from the starters' real `finalScore`s — a genuinely
+      new number, ~153.5 in the live test) with a slots-filled count; then
+      **position-colored starter cards** stacked full-width (the shared
+      `--pos-*` tokens — colored left border + gradient avatar, a slot chip
+      QB/RB 1/WR 2/FLEX 1/SUPER FLEX, big mono projected score, opponent
+      line, and a Favorable/Tough/Neutral matchup pill from
+      `matchupContext.diffFromAverage`); **per-card collapsible "Why this
+      pick"** (`ChevronIcon` from `CollapsibleSection`) so a full 10-starter
+      lineup is scannable instead of a wall of text; and a clean sorted
+      **bench** list with mini position-avatars. Empty slots keep the honest
+      dashed "no eligible player" card.
+    - **Cards stacked, not 2-up, on user request** — full width means names
+      never truncate (the 2-up grid squeezed them). Cards are ordered by the
+      slot order the optimizer returns.
+    - **Control deck** (`LineupTool.tsx`): the original pre-build state grew
+      a hero + a bulky numbered-step "Build your lineup" card; the user
+      disliked both ("takes too much space and looks generic… it looks the
+      same"). Landed, after two iterations, on: no hero at all, and a single
+      **unified deck** — two mono stat tiles (**Roster** count + league,
+      **Slots** starters + shape) stacked on mobile / side-by-side at `sm`,
+      an inline expand that drops the `RosterSlotsEditor` into the deck, and
+      a **scoring strip** at the bottom — replacing the three look-alike
+      bordered rows. Roster tile opens the shared roster modal
+      (`useRosterModal`); slots use a local `slotsOpen` toggle rather than
+      `CollapsibleSection` so the editor renders full-width inside the deck.
+      `RosterSummaryButton`/`CollapsibleSection` are no longer used here
+      (still used by Waivers). Layout is one centered column (controls
+      `max-w-2xl`, results up to `max-w-3xl`).
+    - **Two real layout bugs caught during live verification** (both only
+      visible once actually screenshotted, not in the code): (1) a first
+      controls pass put all three controls in one `sm:flex-row` — the fixed-
+      width scoring toggle didn't shrink, so it clipped and pushed the Slots
+      segment off-screen; fixed by splitting into two flex-1 stat tiles plus
+      a separate full-width scoring strip. (2) The two tiles side-by-side
+      clipped the Slots summary on mobile ("10 star…"); fixed by stacking
+      them (`flex-col … sm:flex-row`) below `sm`.
+    - **Iteration history worth recording** (the doc's own "what was tried"
+      discipline): a first build also added a **landing hero** (an "Optimal
+      lineup" explainer with an illustrative position-colored slot strip and
+      feature bullets) — the user asked to remove it ("the tool is
+      self-explanatory"), and clarified the "optimal lineup card" they
+      wanted gone was that **landing hero**, NOT the post-search
+      projected-total header (which was briefly removed on a misread, then
+      restored). Net: landing hero deleted, post-search header kept.
+    - **Verified live end-to-end** against the real connected Sleeper roster
+      (29 players → 10 starters, 19 bench; correct flex/superflex
+      assignment, a "Limited data" pill on a thin-sample player, reasoning
+      expanding correctly, slots editor expanding inside the deck), desktop
+      light + mobile dark, no horizontal overflow, zero console errors,
+      `tsc`/lint clean. Committed across `a8fd7ce` (results board + first
+      compact controls) and `ce998c4` (the control-deck rework).
+
+### Open items (as of item 110 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -7119,9 +7178,13 @@ is this CLAUDE.md write-up. Item 108's Waiver Wire "buy-low board" redesign
 tabs, `WaiverTool.tsx` widened) plus its CLAUDE.md write-up are committed
 together, as `28e63e9`. Item 109's Waiver Wire PRE-search redesign
 (`WaiverTool.tsx`'s new `MethodHero`/`SchematicGapBar`/`StepDot` landing +
-the mobile grid-overflow fix) is also committed as `28e63e9` (the code) with
-this CLAUDE.md write-up following it. Everything above (items
-96-109, all code and write-ups) is committed and pushed to `main` — the
+the mobile grid-overflow fix) is also committed as `28e63e9` (the code),
+its CLAUDE.md write-up as `579d5ab`. Item 110's Lineup Optimizer redesign —
+the results board + first compact controls (`LineupResult.tsx` +
+`LineupTool.tsx`) as `a8fd7ce`, and the control-deck rework
+(`LineupTool.tsx`) as `ce998c4` — with this CLAUDE.md write-up following it.
+Everything above (items
+96-110, all code and write-ups) is committed and pushed to `main` — the
 working tree is clean. (Per this project's standing rule, commit/push only
 once the user explicitly asks.) Nothing below is started or fixed yet:
 
