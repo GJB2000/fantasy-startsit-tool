@@ -6880,7 +6880,47 @@ single-season numbers for those specific constants.
       (presentation only, reusing data the response already carried).
       `tsc`/lint clean.
 
-### Open items (as of item 108 — pick up here)
+109. **Redesigned the Waiver Wire PRE-search screen to match item 108's
+    buy-low board — presentation only, no engine/API change.** Item 108
+    redesigned the RESULTS; the landing state a user sees before clicking
+    "Find waiver targets" was still three bare stacked controls (scoring
+    toggle, roster summary, Find button) under the page header — the user
+    flagged it as "way too plain." All changes are in `WaiverTool.tsx`; the
+    hooks/fetch/logic are untouched.
+    - **A "buy-low signal" hero** (new `MethodHero`) teaches the tool's
+      actual insight before any search runs: an eyebrow, a `font-display`
+      headline, a one-line explanation, and a **schematic gap bar** (new
+      `SchematicGapBar`) that deliberately mirrors item 108's signature
+      `GapBar` device — green "opportunity" node ahead of a hollow
+      "production" node with a "buy-low gap" tag — but with GENERIC axis
+      labels ("Recent usage" / "Recent points"), NOT fabricated player
+      data, so it reads as an instructional diagram, not a fake result (the
+      project's standing "no dummy data" rule — a labeled schematic is
+      explanation, not placeholder data). Three honest feature bullets
+      (opportunity-over-output, a paired same-position drop, league-aware
+      filtering) describe what the tool really does.
+    - **A cohesive "Set up your search" controls panel** replaces the loose
+      stack: scoring format and roster are now numbered steps (a small
+      `StepDot`) inside one bordered card, capped by the Find CTA.
+    - **Layout**: pre-search is a 2-column grid (hero + controls) at the
+      `lg` breakpoint, collapsing to a single stacked column below it;
+      once results exist, it collapses back to the centered single-column
+      controls so item 108's board stays the focus. `WaiverResult.tsx` is
+      untouched.
+    - **Caught and fixed a real mobile horizontal-overflow bug during live
+      verification**: the grid used bare `fr` columns
+      (`lg:grid-cols-[1.15fr_0.85fr]`), which are `minmax(auto, …)` and
+      can't shrink below content width — the hero card overflowed the
+      viewport on mobile (only visible once actually screenshotted at 375px,
+      not in the desktop check). Fixed with explicit `grid-cols-1` for
+      mobile plus `minmax(0,…)` on the `lg` columns — the standard
+      shrinkable-grid fix (same class of fix as the page-body-scroll
+      guidance this app already follows).
+    - **Verified live end-to-end**: desktop light (2-column, aligned) and
+      mobile dark (stacked, no overflow after the fix), zero console errors,
+      `tsc`/lint clean. Committed as `28e63e9`.
+
+### Open items (as of item 109 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -7076,9 +7116,12 @@ test (Open Item #8) also shipped NO code — recency-weighting monotonically
 hurt accuracy, so the config/engine changes were reverted; its only artifact
 is this CLAUDE.md write-up. Item 108's Waiver Wire "buy-low board" redesign
 (`WaiverResult.tsx` rebuilt around the gap-bar visualization + spotlight +
-tabs, `WaiverTool.tsx` widened) plus this CLAUDE.md write-up are committed
-together. Everything above (items
-96-108, all code and write-ups) is committed and pushed to `main` — the
+tabs, `WaiverTool.tsx` widened) plus its CLAUDE.md write-up are committed
+together, as `28e63e9`. Item 109's Waiver Wire PRE-search redesign
+(`WaiverTool.tsx`'s new `MethodHero`/`SchematicGapBar`/`StepDot` landing +
+the mobile grid-overflow fix) is also committed as `28e63e9` (the code) with
+this CLAUDE.md write-up following it. Everything above (items
+96-109, all code and write-ups) is committed and pushed to `main` — the
 working tree is clean. (Per this project's standing rule, commit/push only
 once the user explicitly asks.) Nothing below is started or fixed yet:
 
