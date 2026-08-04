@@ -80,10 +80,16 @@ export function LineupTool() {
     }
   }
 
-  return (
-    <div className="mx-auto mt-10 w-full max-w-3xl">
-      <div className="mb-6 flex items-center justify-center gap-3">
-        <span className="text-xs font-medium uppercase tracking-wide text-foreground/40">Scoring</span>
+  const controls = (
+    <div className="space-y-2.5">
+      <RosterSummaryButton
+        count={rostered.length}
+        connection={sleeperConnection}
+        onManage={() => setRosterOpen(true)}
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-foreground/10 bg-surface px-4 py-3 shadow-sm">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-foreground/45">Scoring</span>
         <ScoringFormatToggle
           value={scoringFormat}
           onChange={(format) => {
@@ -93,13 +99,7 @@ export function LineupTool() {
         />
       </div>
 
-      <RosterSummaryButton
-        count={rostered.length}
-        connection={sleeperConnection}
-        onManage={() => setRosterOpen(true)}
-      />
-
-      <div className="mt-5 rounded-3xl border border-foreground/10 bg-surface p-5 shadow-sm">
+      <div className="rounded-2xl border border-foreground/10 bg-surface px-4 py-3 shadow-sm">
         <CollapsibleSection
           defaultOpen={false}
           label={
@@ -119,16 +119,25 @@ export function LineupTool() {
         type="button"
         onClick={handleBuildLineup}
         disabled={loading || rostered.length === 0}
-        className="mt-5 w-full rounded-full bg-accent px-4 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
+        className="mt-1 w-full rounded-full bg-accent px-4 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
       >
         {loading ? "Building your lineup…" : "Build my lineup"}
       </button>
 
-      {error && <p className="mt-3 text-sm text-bad">{error}</p>}
+      {rostered.length === 0 && !error && (
+        <p className="text-center text-[12px] text-foreground/45">Add players to your roster to build a lineup.</p>
+      )}
+      {error && <p className="text-sm text-bad">{error}</p>}
+    </div>
+  );
+
+  return (
+    <div className="mx-auto mt-10 w-full max-w-3xl">
+      <div className="mx-auto w-full max-w-xl">{controls}</div>
 
       {response && (
         <>
-          <p className="mt-6 text-center text-xs text-foreground/45">{response.context.contextNote}</p>
+          <p className="mt-8 text-center text-xs text-foreground/45">{response.context.contextNote}</p>
           <LineupResult slots={response.slots} bench={response.bench} scoringFormat={scoringFormat} />
         </>
       )}
