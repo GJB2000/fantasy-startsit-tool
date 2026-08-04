@@ -14,10 +14,9 @@ import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useRosterModal } from "@/lib/useRosterModal";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { useSleeperConnection } from "@/lib/useSleeperConnection";
-import { CollapsibleSection } from "./CollapsibleSection";
+import { ChevronIcon } from "./CollapsibleSection";
 import { LineupResult, type LineupSlotResponse } from "./LineupResult";
 import { RosterSlotsEditor } from "./RosterSlotsEditor";
-import { RosterSummaryButton } from "./RosterSummaryButton";
 import { ScoringFormatToggle } from "./ScoringFormatToggle";
 
 interface LineupResponse {
@@ -35,6 +34,7 @@ export function LineupTool() {
   const [response, setResponse] = useState<LineupResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slotsOpen, setSlotsOpen] = useState(false);
 
   // Re-derive slot counts from the real, connected Sleeper league whenever
   // the connected league actually changes — a starting point, not a lock
@@ -81,45 +81,73 @@ export function LineupTool() {
   }
 
   const controls = (
-    <div className="space-y-2.5">
-      <RosterSummaryButton
-        count={rostered.length}
-        connection={sleeperConnection}
-        onManage={() => setRosterOpen(true)}
-      />
-
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-foreground/10 bg-surface px-4 py-3 shadow-sm">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-foreground/45">Scoring</span>
-        <ScoringFormatToggle
-          value={scoringFormat}
-          onChange={(format) => {
-            setScoringFormat(format);
-            setResponse(null);
-          }}
-        />
-      </div>
-
-      <div className="rounded-2xl border border-foreground/10 bg-surface px-4 py-3 shadow-sm">
-        <CollapsibleSection
-          defaultOpen={false}
-          label={
-            <span className="normal-case">
-              <span className="font-semibold uppercase tracking-wide text-foreground/60">
-                Roster slots · {totalStarters(slotCounts)} starters
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-surface shadow-sm">
+        <div className="flex flex-col divide-y divide-foreground/[0.07] sm:flex-row sm:divide-x sm:divide-y-0">
+          {/* Roster */}
+          <button
+            type="button"
+            onClick={() => setRosterOpen(true)}
+            className="group flex flex-1 items-center justify-between gap-2 px-4 py-3.5 text-left transition-colors hover:bg-foreground/[0.02]"
+          >
+            <span className="min-w-0">
+              <span className="block text-[10px] font-semibold uppercase tracking-wider text-foreground/40">Roster</span>
+              <span className="mt-1 block leading-none">
+                <span className="font-mono text-[19px] font-bold">{rostered.length}</span>
+                <span className="ml-1 text-[12px] text-foreground/50">players</span>
               </span>
-              <span className="ml-1.5 hidden text-foreground/40 sm:inline">{summarizeSlots(slotCounts)}</span>
+              <span className="mt-1 block truncate text-[11px] text-foreground/45">
+                {sleeperConnection ? sleeperConnection.leagueName : "Tap to connect or add"}
+              </span>
             </span>
-          }
-        >
-          <RosterSlotsEditor slots={slotCounts} onChange={setSlotCounts} />
-        </CollapsibleSection>
+            <span className="shrink-0 rounded-full border border-foreground/12 px-2.5 py-1 text-[11px] font-medium text-foreground/60 transition-colors group-hover:border-accent/40 group-hover:text-foreground">
+              Manage
+            </span>
+          </button>
+
+          {/* Slots */}
+          <button
+            type="button"
+            onClick={() => setSlotsOpen((v) => !v)}
+            className="flex flex-1 items-center justify-between gap-2 px-4 py-3.5 text-left transition-colors hover:bg-foreground/[0.02]"
+            aria-expanded={slotsOpen}
+          >
+            <span className="min-w-0">
+              <span className="block text-[10px] font-semibold uppercase tracking-wider text-foreground/40">Slots</span>
+              <span className="mt-1 block leading-none">
+                <span className="font-mono text-[19px] font-bold">{totalStarters(slotCounts)}</span>
+                <span className="ml-1 text-[12px] text-foreground/50">starters</span>
+              </span>
+              <span className="mt-1 block truncate text-[11px] text-foreground/45">{summarizeSlots(slotCounts)}</span>
+            </span>
+            <ChevronIcon open={slotsOpen} />
+          </button>
+        </div>
+
+        {slotsOpen && (
+          <div className="border-t border-foreground/[0.07] bg-surface-sunken p-4">
+            <RosterSlotsEditor slots={slotCounts} onChange={setSlotCounts} />
+          </div>
+        )}
+
+        {/* Scoring */}
+        <div className="flex items-center justify-between gap-3 border-t border-foreground/[0.07] px-4 py-3">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground/40">Scoring</span>
+          <ScoringFormatToggle
+            value={scoringFormat}
+            onChange={(format) => {
+              setScoringFormat(format);
+              setResponse(null);
+            }}
+          />
+        </div>
       </div>
 
       <button
         type="button"
         onClick={handleBuildLineup}
         disabled={loading || rostered.length === 0}
-        className="mt-1 w-full rounded-full bg-accent px-4 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
+        className="w-full rounded-full bg-accent px-4 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
       >
         {loading ? "Building your lineup…" : "Build my lineup"}
       </button>
@@ -133,7 +161,7 @@ export function LineupTool() {
 
   return (
     <div className="mx-auto mt-10 w-full max-w-3xl">
-      <div className="mx-auto w-full max-w-xl">{controls}</div>
+      <div className="mx-auto w-full max-w-2xl">{controls}</div>
 
       {response && (
         <>
