@@ -14,16 +14,21 @@ export function RosterSummaryButton({
   count,
   connection,
   onManage,
+  editorial = false,
 }: {
   count: number;
   connection: SleeperConnection | null;
   onManage: () => void;
+  /** Editorial ("almanac") variant — squared corners. */
+  editorial?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onManage}
-      className="flex w-full items-center justify-between gap-3 rounded-3xl border border-foreground/10 bg-surface px-5 py-4 text-left shadow-sm transition-colors hover:border-accent/40"
+      className={`flex w-full items-center justify-between gap-3 border border-foreground/10 bg-surface px-5 py-4 text-left shadow-sm transition-colors hover:border-accent/40 ${
+        editorial ? "rounded-[4px]" : "rounded-3xl"
+      }`}
     >
       <span className="min-w-0">
         <span className="block text-sm font-semibold">
@@ -33,7 +38,11 @@ export function RosterSummaryButton({
           {connection ? `Synced from ${connection.leagueName}` : "Connect Sleeper or add players manually"}
         </span>
       </span>
-      <span className="shrink-0 rounded-full border border-foreground/10 px-3.5 py-1.5 text-xs font-medium text-foreground/70">
+      <span
+        className={`shrink-0 border border-foreground/15 px-3.5 py-1.5 text-xs font-medium text-foreground/70 ${
+          editorial ? "rounded-[3px]" : "rounded-full"
+        }`}
+      >
         Manage
       </span>
     </button>

@@ -17,7 +17,7 @@ interface WaiverResponse {
 
 function StepDot({ n }: { n: number }) {
   return (
-    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent/15 font-mono text-[11px] font-bold text-accent">
+    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[3px] bg-accent/15 font-mono text-[11px] font-bold text-accent">
       {n}
     </span>
   );
@@ -34,12 +34,18 @@ function SchematicGapBar() {
   const op = 24; // opportunity node position (recent usage rank — better)
   const pr = 66; // production node position (recent points rank — lagging)
   return (
-    <div className="rounded-2xl border border-foreground/10 bg-surface-sunken p-4">
+    <div className="rounded-[3px] border border-foreground/10 bg-surface-sunken p-4">
       <div className="mb-3 flex items-baseline justify-between">
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-foreground/40">
+        <span
+          className="text-[10.5px] uppercase tracking-[0.14em] text-foreground/50"
+          style={{ fontFamily: "var(--font-engraved)" }}
+        >
           Usage vs. output · position rank
         </span>
-        <span className="rounded-full border border-accent/45 bg-accent/12 px-2.5 py-0.5 font-mono text-[12px] font-bold text-accent">
+        <span
+          className="rounded-[3px] border border-accent/45 bg-accent/12 px-2.5 py-0.5 text-[10.5px] uppercase tracking-[0.08em] text-accent"
+          style={{ fontFamily: "var(--font-engraved)" }}
+        >
           buy-low gap
         </span>
       </div>
@@ -81,11 +87,17 @@ const HERO_FEATURES: { title: string; body: string }[] = [
 
 function MethodHero() {
   return (
-    <section className="overflow-hidden rounded-3xl border border-foreground/10 p-6 shadow-sm sm:p-7 [background:radial-gradient(120%_140%_at_0%_0%,color-mix(in_srgb,var(--accent)_11%,transparent),transparent_55%),var(--surface)]">
-      <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-accent">
+    <section className="overflow-hidden rounded-[6px] border border-foreground/12 p-6 shadow-sm sm:p-7 [background:radial-gradient(120%_140%_at_0%_0%,color-mix(in_srgb,var(--accent)_11%,transparent),transparent_55%),var(--surface)]">
+      <span
+        className="text-[11px] uppercase tracking-[0.16em] text-accent"
+        style={{ fontFamily: "var(--font-engraved)" }}
+      >
         The buy-low signal
       </span>
-      <h2 className="mt-2 font-display text-[26px] font-bold leading-[1.05] sm:text-[30px]">
+      <h2
+        className="mt-2 text-[27px] leading-[1.05] tracking-[-0.01em] sm:text-[31px]"
+        style={{ fontFamily: "var(--font-jost)", fontWeight: 600 }}
+      >
         Catch the breakout before your league does
       </h2>
       <p className="mt-2.5 max-w-[52ch] text-[13.5px] leading-relaxed text-foreground/60">
@@ -163,18 +175,24 @@ export function WaiverTool() {
     : null;
 
   const controls = (
-    <div className="rounded-3xl border border-foreground/10 bg-surface p-5 shadow-sm sm:p-6">
-      <div className="font-display text-[15px] font-bold uppercase tracking-wide text-foreground/60">
-        Set up your search
+    <div className="rounded-[6px] border border-foreground/12 bg-surface p-5 shadow-sm sm:p-6">
+      <div className="border-b border-foreground/15 pb-3">
+        <div
+          className="text-[12px] uppercase tracking-[0.1em] text-foreground/70"
+          style={{ fontFamily: "var(--font-engraved)" }}
+        >
+          Set up your search
+        </div>
+        <p className="mt-1.5 text-[12.5px] text-foreground/45">Two quick inputs, then we scan the pool.</p>
       </div>
-      <p className="mt-1 text-[12.5px] text-foreground/45">Two quick inputs, then we scan the pool.</p>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-foreground/[0.07] pt-4">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <span className="flex items-center gap-2.5">
           <StepDot n={1} />
           <span className="text-[13.5px] font-semibold">Scoring format</span>
         </span>
         <ScoringFormatToggle
+          editorial
           value={scoringFormat}
           onChange={(format) => {
             setScoringFormat(format);
@@ -183,12 +201,13 @@ export function WaiverTool() {
         />
       </div>
 
-      <div className="mt-4 border-t border-foreground/[0.07] pt-4">
+      <div className="mt-4 border-t border-foreground/[0.09] pt-4">
         <span className="mb-2.5 flex items-center gap-2.5">
           <StepDot n={2} />
           <span className="text-[13.5px] font-semibold">Your roster</span>
         </span>
         <RosterSummaryButton
+          editorial
           count={rostered.length}
           connection={sleeperConnection}
           onManage={() => setRosterOpen(true)}
@@ -199,7 +218,8 @@ export function WaiverTool() {
         type="button"
         onClick={handleFind}
         disabled={loading}
-        className="mt-5 w-full rounded-full bg-accent px-4 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
+        style={{ fontFamily: "var(--font-engraved)" }}
+        className="mt-5 w-full rounded-[4px] bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
       >
         {loading ? "Scanning the player pool…" : "Find waiver targets"}
       </button>

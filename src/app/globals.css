@@ -159,6 +159,16 @@ body {
  * night edition falls out for free. Each result sheet carries its own full
  * editorial typography via its scoped CSS Module.
  */
+/* Almanac typography utilities — Jost for display figures/headings, Cinzel
+   for engraved small-caps labels. Unlayered, so they win over any Tailwind
+   font utility. Used across the editorial tool pages. */
+.font-jost {
+  font-family: var(--font-jost), "Futura", "Century Gothic", sans-serif;
+}
+.font-engraved {
+  font-family: var(--font-engraved), "Copperplate", "Optima", serif;
+}
+
 .matchup-page {
   --background: var(--alm-page-bg);
   --foreground: var(--alm-ink);

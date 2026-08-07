@@ -201,11 +201,11 @@ function GapBar({ candidate, size }: { candidate: WaiverCandidateResponse; size:
     <div>
       {size === "lg" && (
         <div className="mb-3 flex items-baseline justify-between">
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-foreground/40">
+          <span className="font-engraved text-[10.5px] uppercase tracking-[0.14em] text-foreground/50">
             {streaming ? "This week vs. season · " : "Usage vs. output · "}
             {candidate.position} rank
           </span>
-          <span className="rounded-full border border-accent/45 bg-accent/12 px-2.5 py-0.5 font-mono text-[12px] font-bold text-accent">
+          <span className="rounded-[3px] border border-accent/45 bg-accent/12 px-2 py-0.5 font-mono text-[11px] font-bold text-accent">
             +{gap} gap
           </span>
         </div>
@@ -249,7 +249,7 @@ function RosteredButton({
     <button
       type="button"
       onClick={() => onMarkRostered(candidate.playerId, candidate.displayName, candidate.position, candidate.team)}
-      className="whitespace-nowrap rounded-full border border-foreground/10 px-2.5 py-1 text-[11px] font-medium text-foreground/50 transition-colors hover:border-foreground/20 hover:text-foreground"
+      className="whitespace-nowrap rounded-[3px] border border-foreground/15 px-2.5 py-1 text-[11px] font-medium text-foreground/50 transition-colors hover:border-foreground/30 hover:text-foreground"
     >
       Already rostered
     </button>
@@ -260,10 +260,10 @@ function DropSuggestion({ evaluation, formatLabel }: { evaluation: TradeEvaluati
   const dropped = evaluation.give[0];
   if (!dropped) return null;
   return (
-    <div className="mt-4 rounded-2xl border border-foreground/[0.07] bg-foreground/[0.025] p-3.5">
+    <div className="mt-4 rounded-[3px] border border-foreground/12 bg-foreground/[0.025] p-3.5">
       <div className="flex items-center gap-2">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${VERDICT_DOT[evaluation.verdict]}`} />
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">
+        <span className="font-engraved text-[11px] uppercase tracking-[0.08em] text-foreground/50">
           Suggested drop: {dropped.displayName}
         </span>
       </div>
@@ -289,8 +289,8 @@ function SpotlightCard({
   const matchup = matchupPill(candidate);
 
   return (
-    <div className="relative mt-6 overflow-hidden rounded-3xl border border-premium/40 bg-surface p-6 shadow-[0_20px_44px_-26px_rgba(0,0,0,0.55)] [background:radial-gradient(120%_140%_at_100%_0%,color-mix(in_srgb,var(--premium)_12%,transparent),transparent_55%),var(--surface)]">
-      <span className="absolute right-6 top-0 rounded-b-lg bg-premium px-3 py-1 font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-premium-ink">
+    <div className="relative mt-6 overflow-hidden rounded-[6px] border border-premium/50 bg-surface p-6 shadow-[0_20px_44px_-26px_rgba(0,0,0,0.55)] [background:radial-gradient(120%_140%_at_100%_0%,color-mix(in_srgb,var(--premium)_12%,transparent),transparent_55%),var(--surface)]">
+      <span className="absolute right-6 top-0 rounded-b-[3px] bg-premium px-3 py-1 font-engraved text-[10.5px] uppercase tracking-[0.16em] text-premium-ink">
         Top target this week
       </span>
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-[1.35fr_1fr] sm:items-center">
@@ -298,7 +298,7 @@ function SpotlightCard({
           <div className="flex items-center gap-4">
             <Avatar candidate={candidate} size={54} />
             <div className="min-w-0">
-              <h3 className="font-display text-[28px] font-bold leading-none">{candidate.displayName}</h3>
+              <h3 className="font-jost text-[28px] font-semibold leading-none tracking-[-0.01em]">{candidate.displayName}</h3>
               <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[13px] text-foreground/55">
                 <PosChip position={candidate.position} />
                 <span>
@@ -316,14 +316,14 @@ function SpotlightCard({
 
           <div className="mt-5 flex flex-wrap gap-x-7 gap-y-3">
             <div>
-              <div className="font-mono text-[24px] font-bold leading-none">
+              <div className="font-jost text-[26px] font-semibold leading-none">
                 {candidate.recentVolumeAvg.toFixed(1)}
                 <span className="ml-1 text-[13px] font-medium text-foreground/40">/gm</span>
               </div>
               <div className="mt-1 text-[11px] text-foreground/40">{unit}, last {candidate.gamesUsedForRecent}</div>
             </div>
             <div>
-              <div className="font-mono text-[24px] font-bold leading-none">
+              <div className="font-jost text-[26px] font-semibold leading-none">
                 {candidate.recentPprAvg.toFixed(1)}
                 <span className="ml-1 text-[13px] font-medium text-foreground/40">pts</span>
               </div>
@@ -331,7 +331,7 @@ function SpotlightCard({
             </div>
             {consensus != null && consensus > 0 && (
               <div>
-                <div className="font-mono text-[24px] font-bold leading-none text-accent">
+                <div className="font-jost text-[26px] font-semibold leading-none text-accent">
                   {consensus.toFixed(1)}
                   <span className="ml-1 text-[13px] font-medium text-foreground/40">pts</span>
                 </div>
@@ -351,7 +351,7 @@ function SpotlightCard({
           <GapBar candidate={candidate} size="lg" />
           {matchup && (
             <div className="mt-4">
-              <span className={`rounded-full border px-2.5 py-1 text-[11.5px] font-semibold ${MATCHUP_PILL[matchup.tone]}`}>
+              <span className={`rounded-[3px] border px-2.5 py-1 text-[11.5px] font-semibold ${MATCHUP_PILL[matchup.tone]}`}>
                 {matchup.text} matchup
               </span>
             </div>
@@ -402,13 +402,13 @@ function WaiverCandidateRow({
         className="grid w-full grid-cols-[36px_1fr_auto] items-center gap-x-4 gap-y-4 px-4 py-4 text-left transition-colors hover:bg-foreground/[0.02] sm:grid-cols-[36px_minmax(150px,1.4fr)_minmax(0,1.7fr)_auto]"
         aria-expanded={expanded}
       >
-        <span className="text-center font-mono text-[14px] font-bold text-foreground/35">{String(rank).padStart(2, "0")}</span>
+        <span className="text-center font-jost text-[16px] font-semibold text-foreground/40">{String(rank).padStart(2, "0")}</span>
 
         <div className="flex min-w-0 items-center gap-3">
           <Avatar candidate={candidate} size={38} />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <h3 className="truncate text-[14px] font-semibold tracking-tight">{candidate.displayName}</h3>
+              <h3 className="truncate font-jost text-[15px] font-semibold tracking-tight">{candidate.displayName}</h3>
               {candidate.injuryStatus && (
                 <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${injuryBadgeClasses(candidate.injuryStatus)}`}>
                   {candidate.injuryStatus}
@@ -428,12 +428,12 @@ function WaiverCandidateRow({
 
         <div className="col-start-3 row-start-1 flex items-center justify-end gap-3 sm:col-start-4 sm:row-start-auto">
           {matchup && (
-            <span className={`hidden shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold sm:inline ${MATCHUP_PILL[matchup.tone]}`}>
+            <span className={`hidden shrink-0 rounded-[3px] border px-2.5 py-1 text-[11px] font-semibold sm:inline ${MATCHUP_PILL[matchup.tone]}`}>
               {matchup.text}
             </span>
           )}
           <div className="text-right">
-            <div className="font-mono text-[16px] font-bold tabular-nums">{stat.toFixed(1)}</div>
+            <div className="font-jost text-[18px] font-semibold tabular-nums">{stat.toFixed(1)}</div>
             <div className="text-[10px] text-foreground/40">{statLabel}</div>
           </div>
           <ChevronIcon open={expanded} />
@@ -447,8 +447,8 @@ function WaiverCandidateRow({
               <RosteredButton candidate={candidate} onMarkRostered={onMarkRostered} />
             </div>
           )}
-          <div className="border-t border-foreground/[0.07] pt-3.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">Why</span>
+          <div className="border-t border-foreground/[0.09] pt-3.5">
+            <span className="font-engraved text-[11px] uppercase tracking-[0.1em] text-foreground/50">Why</span>
             <ul className="mt-3 flex flex-col gap-2.5">
               {candidate.reasoning.map((line, i) => (
                 <li key={i} className="relative pl-4 text-sm leading-relaxed text-foreground/70">
@@ -484,15 +484,15 @@ function Section({
     <div>
       <div className="mb-3 flex items-center gap-2.5">
         <PosChip position={position} />
-        <span className="font-display text-[15px] font-bold uppercase tracking-wide text-foreground/55">{POSITION_FULL[position]}</span>
-        <span className="h-px flex-1 bg-foreground/10" />
+        <span className="font-engraved text-[13px] uppercase tracking-[0.1em] text-foreground/60">{POSITION_FULL[position]}</span>
+        <span className="h-px flex-1 bg-foreground/15" />
       </div>
       {streaming && (
         <p className="mb-3 text-[12px] text-foreground/40">
           Defenses swing week to week, so these rank by <b className="font-semibold text-foreground/60">this week&apos;s matchup</b> against their season baseline — a spot start, not a season hold.
         </p>
       )}
-      <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-surface">
+      <div className="overflow-hidden rounded-[6px] border border-foreground/12 bg-surface">
         {candidates.map((candidate, i) => (
           <WaiverCandidateRow
             key={candidate.playerId}
@@ -569,16 +569,16 @@ export function WaiverResult({
       )}
 
       {/* tabs */}
-      <div className="mt-8 flex flex-wrap gap-x-6 border-b border-foreground/10" role="tablist" aria-label="Positions">
+      <div className="mt-8 flex flex-wrap gap-x-6 border-b border-foreground/15" role="tablist" aria-label="Positions">
         <button
           type="button"
           role="tab"
           aria-selected={tab === "ALL"}
           onClick={() => setTab("ALL")}
-          className={`relative -mb-px py-2.5 text-[13.5px] font-semibold transition-colors ${tab === "ALL" ? "text-foreground" : "text-foreground/50 hover:text-foreground/80"}`}
+          className={`relative -mb-px py-2.5 font-engraved text-[12px] uppercase tracking-[0.08em] transition-colors ${tab === "ALL" ? "text-foreground" : "text-foreground/50 hover:text-foreground/80"}`}
         >
           All <span className="font-mono text-[11px] text-foreground/40">{total}</span>
-          {tab === "ALL" && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-t bg-accent" />}
+          {tab === "ALL" && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-accent" />}
         </button>
         {availablePositions.map((p) => {
           const count = (candidatesByPosition[p] ?? []).length;
@@ -590,10 +590,10 @@ export function WaiverResult({
               role="tab"
               aria-selected={active}
               onClick={() => setTab(p)}
-              className={`relative -mb-px py-2.5 text-[13.5px] font-semibold transition-colors ${active ? "text-foreground" : "text-foreground/50 hover:text-foreground/80"}`}
+              className={`relative -mb-px py-2.5 font-engraved text-[12px] uppercase tracking-[0.08em] transition-colors ${active ? "text-foreground" : "text-foreground/50 hover:text-foreground/80"}`}
             >
               {p === "DST" ? "D/ST" : p} <span className="font-mono text-[11px] text-foreground/40">{count}</span>
-              {active && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-t bg-accent" />}
+              {active && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-accent" />}
             </button>
           );
         })}
