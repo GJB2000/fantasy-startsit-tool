@@ -98,7 +98,7 @@ function Avatar({ breakdown, size }: { breakdown: PlayerScoreBreakdown; size: nu
 
 function SlotChip({ heading }: { heading: string }) {
   return (
-    <span className="rounded-md bg-foreground/[0.06] px-2 py-0.5 font-mono text-[10.5px] font-bold uppercase tracking-wider text-foreground/55">
+    <span className="rounded-[3px] bg-foreground/[0.06] px-2 py-0.5 font-engraved text-[10.5px] uppercase tracking-[0.08em] text-foreground/60">
       {heading}
     </span>
   );
@@ -115,15 +115,15 @@ function StatusPills({ breakdown }: { breakdown: PlayerScoreBreakdown }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {breakdown.isOnByeThisWeek && (
-        <span className="rounded-full bg-foreground/8 px-2 py-0.5 text-[11px] text-foreground/55">Bye week</span>
+        <span className="rounded-[3px] bg-foreground/8 px-2 py-0.5 text-[11px] text-foreground/55">Bye week</span>
       )}
       {breakdown.injuryStatus && (
-        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${injuryBadgeClasses(breakdown.injuryStatus)}`}>
+        <span className={`rounded-[3px] px-2 py-0.5 text-[11px] font-medium ${injuryBadgeClasses(breakdown.injuryStatus)}`}>
           {breakdown.injuryStatus}
         </span>
       )}
       {showData && (
-        <span className="rounded-full bg-foreground/8 px-2 py-0.5 text-[11px] text-foreground/55">
+        <span className="rounded-[3px] bg-foreground/8 px-2 py-0.5 text-[11px] text-foreground/55">
           {breakdown.dataQuality === "limited" ? "Limited data" : "Insufficient data"}
         </span>
       )}
@@ -133,7 +133,7 @@ function StatusPills({ breakdown }: { breakdown: PlayerScoreBreakdown }) {
 
 function EmptySlotCard({ heading }: { heading: string }) {
   return (
-    <div className="rounded-3xl border border-dashed border-foreground/15 bg-surface p-5">
+    <div className="rounded-[6px] border border-dashed border-foreground/20 bg-surface p-5">
       <SlotChip heading={heading} />
       <p className="mt-3 text-sm text-foreground/50">
         No eligible player on your roster for this slot — add one to fill it.
@@ -159,24 +159,24 @@ function StarterCard({
 
   return (
     <div
-      className="overflow-hidden rounded-3xl border border-foreground/10 bg-surface shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+      className="overflow-hidden rounded-[6px] border border-foreground/12 bg-surface shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
       style={{ borderLeft: `3px solid ${color}` }}
     >
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <SlotChip heading={heading} />
           <div className="text-right">
-            <div className="font-mono text-[26px] font-bold leading-none tabular-nums">
+            <div className="font-jost text-[28px] font-semibold leading-none tabular-nums">
               {breakdown.finalScore != null ? breakdown.finalScore.toFixed(1) : "—"}
             </div>
-            <div className="mt-1 text-[10.5px] uppercase tracking-wide text-foreground/40">proj · {formatLabel}</div>
+            <div className="mt-1 font-engraved text-[10.5px] uppercase tracking-[0.08em] text-foreground/40">proj · {formatLabel}</div>
           </div>
         </div>
 
         <div className="mt-3 flex items-center gap-3">
           <Avatar breakdown={breakdown} size={44} />
           <div className="min-w-0 flex-1">
-            <h3 className="truncate font-semibold tracking-tight">{breakdown.displayName}</h3>
+            <h3 className="truncate font-jost text-[16px] font-semibold tracking-tight">{breakdown.displayName}</h3>
             <p className="mt-0.5 truncate text-[12.5px] text-foreground/45">
               {breakdown.position ?? ""}
               {breakdown.team ? ` · ${breakdown.team}` : ""}
@@ -184,7 +184,7 @@ function StarterCard({
             </p>
           </div>
           {matchup && (
-            <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${MATCHUP_PILL[matchup.tone]}`}>
+            <span className={`shrink-0 rounded-[3px] border px-2.5 py-1 text-[11px] font-semibold ${MATCHUP_PILL[matchup.tone]}`}>
               {matchup.text}
             </span>
           )}
@@ -234,7 +234,7 @@ function BenchRow({ breakdown }: { breakdown: PlayerScoreBreakdown }) {
           {breakdown.team ? ` · ${breakdown.team}` : ""}
         </p>
       </div>
-      <span className="shrink-0 font-mono text-[14px] font-semibold tabular-nums text-foreground/70">
+      <span className="shrink-0 font-jost text-[16px] font-semibold tabular-nums text-foreground/70">
         {breakdown.finalScore != null ? breakdown.finalScore.toFixed(1) : "—"}
       </span>
     </div>
@@ -257,28 +257,28 @@ export function LineupResult({ slots, bench, scoringFormat }: LineupResultProps)
   return (
     <div className="mt-6 space-y-8">
       {/* projected-total header */}
-      <div className="flex items-center justify-between gap-4 overflow-hidden rounded-3xl border border-foreground/10 p-6 shadow-sm [background:radial-gradient(120%_140%_at_100%_0%,color-mix(in_srgb,var(--accent)_11%,transparent),transparent_55%),var(--surface)]">
+      <div className="flex items-center justify-between gap-4 overflow-hidden rounded-[6px] border border-foreground/12 p-6 shadow-sm [background:radial-gradient(120%_140%_at_100%_0%,color-mix(in_srgb,var(--accent)_11%,transparent),transparent_55%),var(--surface)]">
         <div>
-          <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-accent">
+          <div className="font-engraved text-[11px] uppercase tracking-[0.16em] text-accent">
             Optimal lineup
           </div>
-          <h2 className="mt-1.5 font-display text-[24px] font-bold leading-none">Your best starting lineup</h2>
+          <h2 className="mt-1.5 font-jost text-[25px] font-semibold leading-none tracking-[-0.01em]">Your best starting lineup</h2>
           <p className="mt-2 text-[12.5px] text-foreground/50">
             {filled.length} of {slots.length} slots filled
             {emptyCount > 0 ? ` · ${emptyCount} still open` : ""} · {formatLabel}
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <div className="font-mono text-[38px] font-bold leading-none tabular-nums text-accent">
+          <div className="font-jost text-[40px] font-semibold leading-none tabular-nums text-accent">
             {projectedTotal.toFixed(1)}
           </div>
-          <div className="mt-1 text-[10.5px] uppercase tracking-wide text-foreground/40">projected points</div>
+          <div className="mt-1 font-engraved text-[10.5px] uppercase tracking-[0.08em] text-foreground/40">projected points</div>
         </div>
       </div>
 
       {/* starters */}
       <div>
-        <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-foreground/40">Starters</h3>
+        <h3 className="mb-3 font-engraved text-[12px] uppercase tracking-[0.1em] text-foreground/50">Starters</h3>
         <div className="flex flex-col gap-4">
           {slots.map((slot, i) => {
             const heading = slotHeading(slot, countBySlotType[slot.slotType] ?? 1);
@@ -294,10 +294,10 @@ export function LineupResult({ slots, bench, scoringFormat }: LineupResultProps)
       {/* bench */}
       {sortedBench.length > 0 && (
         <div>
-          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-foreground/40">
+          <h3 className="mb-3 font-engraved text-[12px] uppercase tracking-[0.1em] text-foreground/50">
             Bench <span className="font-mono text-foreground/35">{sortedBench.length}</span>
           </h3>
-          <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-surface">
+          <div className="overflow-hidden rounded-[6px] border border-foreground/12 bg-surface">
             {sortedBench.map((breakdown) => (
               <BenchRow key={breakdown.playerId} breakdown={breakdown} />
             ))}

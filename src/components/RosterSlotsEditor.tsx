@@ -17,13 +17,13 @@ function StepperRow({
   onChange: (next: number) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-2xl border border-foreground/10 bg-surface px-3 py-2">
+    <div className="flex items-center justify-between gap-2 rounded-[3px] border border-foreground/12 bg-surface px-3 py-2">
       <span className="text-[13px] font-medium text-foreground/70">{SLOT_LABEL[slotType]}</span>
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => onChange(Math.max(0, count - 1))}
-          className="flex h-6 w-6 items-center justify-center rounded-full border border-foreground/10 text-foreground/50 transition-colors hover:border-foreground/25 hover:text-foreground"
+          className="flex h-6 w-6 items-center justify-center rounded-[3px] border border-foreground/15 text-foreground/50 transition-colors hover:border-foreground/30 hover:text-foreground"
           aria-label={`Fewer ${SLOT_LABEL[slotType]} slots`}
         >
           −
@@ -32,7 +32,7 @@ function StepperRow({
         <button
           type="button"
           onClick={() => onChange(count + 1)}
-          className="flex h-6 w-6 items-center justify-center rounded-full border border-foreground/10 text-foreground/50 transition-colors hover:border-foreground/25 hover:text-foreground"
+          className="flex h-6 w-6 items-center justify-center rounded-[3px] border border-foreground/15 text-foreground/50 transition-colors hover:border-foreground/30 hover:text-foreground"
           aria-label={`More ${SLOT_LABEL[slotType]} slots`}
         >
           +
