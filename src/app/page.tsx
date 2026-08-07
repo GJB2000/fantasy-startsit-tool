@@ -4,7 +4,6 @@ import { HomeRankingsBoard } from "@/components/HomeRankingsBoard";
 import { HomeTradeWidget } from "@/components/HomeTradeWidget";
 import { HomeWaiverWidget } from "@/components/HomeWaiverWidget";
 import { NewsletterSignup } from "@/components/NewsletterSignup";
-import { PageHeader } from "@/components/PageHeader";
 import { RecentComparisonsHomeCard } from "@/components/RecentComparisonsHomeCard";
 
 const TOOLS = [
@@ -84,19 +83,32 @@ const TOOLS = [
 
 export default function HomePage() {
   return (
-    <main className="bg-background px-6 py-10 font-sans text-foreground sm:px-10 sm:py-12">
-      <PageHeader
-        eyebrow="Legitfootball"
-        title="Your fantasy toolkit"
-        description="Six tools, one engine — start/sit calls, trade grades, waiver targets, full-lineup optimization, position rankings, and the backtested accuracy behind all of it."
-      />
+    <main className="matchup-page min-h-full px-6 py-10 font-sans sm:px-10 sm:py-12">
+      <header className="mb-7">
+        <span
+          className="text-[11px] uppercase tracking-[0.14em] text-accent"
+          style={{ fontFamily: "var(--font-engraved)" }}
+        >
+          Legitfootball
+        </span>
+        <h1
+          className="mt-2 text-[34px] leading-none tracking-[-0.01em] text-foreground"
+          style={{ fontFamily: "var(--font-jost)", fontWeight: 600 }}
+        >
+          Your fantasy toolkit
+        </h1>
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-foreground/60">
+          Six tools, one engine — start/sit calls, trade grades, waiver targets, full-lineup optimization, position
+          rankings, and the backtested accuracy behind all of it.
+        </p>
+      </header>
 
       <NewsletterSignup />
 
       <HomeRankingsBoard />
 
       <div className="mb-8">
-        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-foreground/40">This week</h2>
+        <h2 className="mb-3 font-engraved text-[12px] uppercase tracking-[0.1em] text-foreground/50">This week</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <HomeLineupWidget />
           <HomeWaiverWidget />
@@ -110,17 +122,17 @@ export default function HomePage() {
           <Link
             key={tool.href}
             href={tool.href}
-            className="group rounded-2xl border border-foreground/10 bg-surface p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+            className="group rounded-[6px] border border-foreground/12 bg-surface p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
           >
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/12 text-accent">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] bg-accent/12 text-accent">
                 <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
                   {tool.icon}
                 </svg>
               </span>
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground/40">{tool.label}</span>
+              <span className="font-engraved text-[11px] uppercase tracking-[0.1em] text-foreground/50">{tool.label}</span>
             </div>
-            <h2 className="mt-3 text-lg font-semibold tracking-tight">{tool.title}</h2>
+            <h2 className="mt-3 font-jost text-[19px] font-semibold tracking-[-0.01em]">{tool.title}</h2>
             <p className="mt-1.5 text-sm leading-relaxed text-foreground/55">{tool.description}</p>
             <span className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-accent">
               Open

@@ -24,9 +24,9 @@ const VERDICT_DOT: Record<TradeVerdict, string> = {
 
 function WidgetShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-foreground/10 bg-surface p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-[12.5px] font-semibold">
+    <div className="rounded-[6px] border border-foreground/12 bg-surface p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-2 border-b border-foreground/[0.09] pb-2.5">
+        <div className="flex items-center gap-2 font-engraved text-[11px] uppercase tracking-[0.08em] text-foreground/70">
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-accent" fill="none">
             <path
               d="M4 8h13M17 8l-3.5-3.5M17 8l-3.5 3.5M20 16H7M7 16l3.5-3.5M7 16l3.5 3.5"
@@ -143,8 +143,8 @@ export function HomeTradeWidget() {
 
   return (
     <WidgetShell>
-      <p className="text-[11px] font-medium text-foreground/45">With {otherTeamName}</p>
-      <div className="mt-1.5 flex items-center gap-2 text-[13px] font-semibold tracking-tight">
+      <p className="font-engraved text-[10px] uppercase tracking-[0.08em] text-foreground/45">With {otherTeamName}</p>
+      <div className="mt-1.5 flex items-center gap-2 font-jost text-[14px] font-semibold tracking-tight">
         <span className="truncate">{give?.displayName ?? "—"}</span>
         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-foreground/35" fill="none">
           <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

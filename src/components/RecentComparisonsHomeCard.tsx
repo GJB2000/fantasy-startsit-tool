@@ -16,5 +16,5 @@ export function RecentComparisonsHomeCard() {
     router.push("/start-sit");
   }
 
-  return <RecentComparisonsPanel recent={recent} onSelect={handleSelect} />;
+  return <RecentComparisonsPanel recent={recent} onSelect={handleSelect} editorial />;
 }

@@ -32,12 +32,12 @@ function BoardShell({ children }: { children: React.ReactNode }) {
   return (
     <section className="mb-8">
       <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">Top of the board</h2>
+        <h2 className="font-engraved text-[12px] uppercase tracking-[0.1em] text-foreground/50">Top of the board</h2>
         <Link href="/rankings" className="text-[12px] font-semibold text-accent hover:underline">
           Full Top 100 →
         </Link>
       </div>
-      <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-surface shadow-sm">{children}</div>
+      <div className="overflow-hidden rounded-[6px] border border-foreground/12 bg-surface shadow-sm">{children}</div>
     </section>
   );
 }
@@ -116,19 +116,19 @@ export function HomeRankingsBoard() {
           <Link
             key={entry.playerId ?? entry.displayName}
             href="/rankings"
-            className="flex items-center gap-3 border-t border-foreground/[0.07] px-4 py-3 transition-colors first:border-none hover:bg-surface-sunken"
+            className="flex items-center gap-3 border-t border-foreground/[0.09] px-4 py-3 transition-colors first:border-none hover:bg-surface-sunken"
           >
-            <span className="w-5 shrink-0 text-right font-mono text-[13px] font-semibold tabular-nums text-foreground/35">
+            <span className="w-5 shrink-0 text-right font-jost text-[15px] font-semibold tabular-nums text-foreground/40">
               {i + 1}
             </span>
-            <span className="inline-flex h-8 min-w-[44px] shrink-0 items-center justify-center rounded-lg bg-surface-sunken px-2 text-[11px] font-bold tracking-wide text-foreground/55">
+            <span className="inline-flex h-8 min-w-[44px] shrink-0 items-center justify-center rounded-[3px] bg-surface-sunken px-2 font-engraved text-[10px] uppercase tracking-[0.08em] text-foreground/55">
               {entry.position}
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="truncate font-display text-[18px] font-semibold leading-tight">{entry.displayName}</span>
+                <span className="truncate font-jost text-[18px] font-semibold leading-tight">{entry.displayName}</span>
                 {elite && (
-                  <span className="shrink-0 rounded-full bg-premium px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-premium-ink">
+                  <span className="shrink-0 rounded-[3px] bg-premium px-1.5 py-0.5 font-engraved text-[9px] uppercase tracking-[0.08em] text-premium-ink">
                     Elite
                   </span>
                 )}
@@ -152,7 +152,7 @@ export function HomeRankingsBoard() {
               />
             </span>
             <span
-              className={`w-10 shrink-0 text-right font-mono text-[24px] font-bold tabular-nums ${elite ? "text-premium" : "text-foreground"}`}
+              className={`w-10 shrink-0 text-right font-jost text-[24px] font-semibold tabular-nums ${elite ? "text-premium" : "text-foreground"}`}
             >
               {entry.legitScore}
             </span>

@@ -16,9 +16,9 @@ interface LineupResponse {
 
 function WidgetShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-foreground/10 bg-surface p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-[12.5px] font-semibold">
+    <div className="rounded-[6px] border border-foreground/12 bg-surface p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-2 border-b border-foreground/[0.09] pb-2.5">
+        <div className="flex items-center gap-2 font-engraved text-[11px] uppercase tracking-[0.08em] text-foreground/70">
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-accent" fill="none">
             <rect x="3" y="4" width="18" height="4" rx="1.3" stroke="currentColor" strokeWidth="1.6" />
             <rect x="3" y="10" width="18" height="4" rx="1.3" stroke="currentColor" strokeWidth="1.6" />
@@ -40,7 +40,7 @@ function SlotRow({ slot }: { slot: LineupSlotResponse }) {
   return (
     <div className="flex items-center justify-between gap-2 border-t border-foreground/[0.07] py-2 first:border-none first:pt-0">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="w-9 shrink-0 text-[10.5px] font-semibold uppercase tracking-wide text-foreground/40">
+        <span className="w-9 shrink-0 font-engraved text-[9.5px] uppercase tracking-[0.06em] text-foreground/45">
           {slot.label}
         </span>
         {b ? (
@@ -50,7 +50,7 @@ function SlotRow({ slot }: { slot: LineupSlotResponse }) {
         )}
       </div>
       {b?.finalScore != null && (
-        <span className="font-mono shrink-0 text-[12.5px] font-semibold tabular-nums text-foreground/70">
+        <span className="font-jost shrink-0 text-[13.5px] font-semibold tabular-nums text-foreground/70">
           {b.finalScore.toFixed(1)}
         </span>
       )}
