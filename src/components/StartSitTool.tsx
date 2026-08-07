@@ -102,10 +102,16 @@ export function StartSitTool() {
   return (
     <div className="mx-auto grid w-full max-w-5xl grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_300px]">
       <div className="flex flex-col gap-4">
-        <div className="rounded-2xl border border-foreground/10 bg-surface p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground/40">Comparing</span>
+        <div className="rounded-[6px] border border-foreground/12 bg-surface p-5 shadow-sm sm:p-6">
+          <div className="mb-5 flex items-baseline justify-between gap-3 border-b border-foreground/15 pb-3">
+            <span
+              className="text-[12px] uppercase tracking-[0.1em] text-foreground/70"
+              style={{ fontFamily: "var(--font-engraved)" }}
+            >
+              Set the Matchup
+            </span>
             <ScoringFormatToggle
+              editorial
               value={scoringFormat}
               onChange={(format) => {
                 setScoringFormat(format);
@@ -115,6 +121,7 @@ export function StartSitTool() {
           </div>
 
           <PlayerMultiSelect
+            editorial
             selected={selectedPlayers}
             onAdd={addPlayer}
             onRemove={removePlayer}
@@ -126,7 +133,8 @@ export function StartSitTool() {
             type="button"
             onClick={handleCompare}
             disabled={selectedPlayers.length < 2 || loading}
-            className="mt-5 w-full rounded-full bg-accent px-4 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
+            style={{ fontFamily: "var(--font-engraved)" }}
+            className="mt-5 w-full rounded-[4px] bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
           >
             {loading ? "Comparing…" : "Compare"}
           </button>

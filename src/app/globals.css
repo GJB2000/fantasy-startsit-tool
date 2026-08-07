@@ -91,30 +91,89 @@ body {
 }
 
 /*
- * Editorial "almanac" skin, scoped to the Start/Sit page. The whole app is
- * token-driven, so overriding the color tokens on this one wrapper recolors
- * every token-consuming component inside it (search panel, scoring toggle,
- * player chips, recent-comparisons rail) to the warm-paper / pine-green /
- * espresso editorial palette — without changing any of those shared
- * components. Wins over the light and dark :root definitions because a
- * descendant's nearest ancestor sets the custom property. The result sheet
- * (ComparisonResult.module.css) carries its own full editorial typography.
+ * Editorial "almanac" palette — one shared token set consumed both by the
+ * .matchup-page token-override wrapper (below) AND by each tool's result CSS
+ * Module (ComparisonResult.module.css, TradeResult.module.css, …), which read
+ * these --alm-* tokens through ordinary custom-property inheritance (module
+ * class scoping doesn't affect custom-property resolution). Defining the
+ * palette once here — with a light default and a "night edition" variant under
+ * prefers-color-scheme: dark — means the whole editorial world themes from a
+ * single place: warm porcelain paper / pine-green / espresso ink by day, warm
+ * espresso-charcoal by night, with brightened green/brass/red accents.
+ */
+:root {
+  --alm-page-bg: #e7e1d2;
+  --alm-paper: #ede8dd;
+  --alm-card: #f6f2e8;
+  --alm-surface: #f5f1e7;
+  --alm-sunken: #e7e1d3;
+  --alm-surface-sunken: #e4decd;
+  --alm-ink: #211f19;
+  --alm-muted: #6c685c;
+  --alm-faint: #9a9384;
+  --alm-line: #d8d1c1;
+  --alm-line2: #e2dccd;
+  --alm-green: #0b6a47;
+  --alm-green-2: #0a5a3d;
+  --alm-pine: #0f3025;
+  --alm-pine-ink: #f1ece1;
+  --alm-brass: #b58a46;
+  --alm-red: #b44230;
+  --alm-info: #4a6d7a;
+  --alm-accent-ink: #f5f1e7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --alm-page-bg: #14120e;
+    --alm-paper: #1c1913;
+    --alm-card: #262219;
+    --alm-surface: #211d16;
+    --alm-sunken: #15130e;
+    --alm-surface-sunken: #100e0a;
+    --alm-ink: #ece5d5;
+    --alm-muted: #a89f8c;
+    --alm-faint: #726b5b;
+    --alm-line: #39342a;
+    --alm-line2: #2b271f;
+    --alm-green: #4fd09a;
+    --alm-green-2: #2f9e73;
+    --alm-pine: #124030;
+    --alm-pine-ink: #f1ece1;
+    --alm-brass: #d0a45c;
+    --alm-red: #d8664f;
+    --alm-info: #86adbc;
+    --alm-accent-ink: #14120e;
+  }
+}
+
+/*
+ * Editorial "almanac" skin, applied per page (Start/Sit, Trade, …). The whole
+ * app is token-driven, so mapping the app's color tokens from the --alm-*
+ * palette on this one wrapper recolors every token-consuming component inside
+ * it (search panel, scoring toggle, player chips, rails) — without changing
+ * any of those shared components. Wins over the light and dark :root token
+ * definitions because a descendant's nearest ancestor sets the custom
+ * property; and because it sources from --alm-* (which themselves switch under
+ * prefers-color-scheme), the wrapper needs no media query of its own — the
+ * night edition falls out for free. Each result sheet carries its own full
+ * editorial typography via its scoped CSS Module.
  */
 .matchup-page {
-  --background: #e7e1d2;
-  --foreground: #211f19;
-  --surface: #f5f1e7;
-  --surface-glass: rgba(245, 241, 231, 0.82);
-  --surface-sunken: #e4decd;
-  --accent: #0b6a47;
-  --accent-secondary: #0a5a3d;
-  --accent-ink: #f5f1e7;
-  --good: #0b6a47;
-  --bad: #b44230;
-  --caution: #b58a46;
-  --info: #4a6d7a;
-  --premium: #b58a46;
-  --premium-ink: #f5f1e7;
+  --background: var(--alm-page-bg);
+  --foreground: var(--alm-ink);
+  --surface: var(--alm-surface);
+  --surface-glass: color-mix(in srgb, var(--alm-surface) 84%, transparent);
+  --surface-sunken: var(--alm-surface-sunken);
+  --accent: var(--alm-green);
+  --accent-secondary: var(--alm-green-2);
+  --accent-ink: var(--alm-accent-ink);
+  --good: var(--alm-green);
+  --bad: var(--alm-red);
+  --caution: var(--alm-brass);
+  --info: var(--alm-info);
+  --premium: var(--alm-brass);
+  --premium-ink: var(--alm-accent-ink);
   background: var(--background);
   color: var(--foreground);
   min-height: 100%;

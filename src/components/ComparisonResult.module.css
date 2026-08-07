@@ -6,18 +6,22 @@
  * Copperplate-style labels; Inter/JetBrains from the app for body/mono).
  */
 .sheet {
-  --paper: #ede8dd;
-  --card: #f6f2e8;
-  --sunken: #e7e1d3;
-  --ink: #211f19;
-  --muted: #6c685c;
-  --faint: #9a9384;
-  --line: #d8d1c1;
-  --line2: #e2dccd;
-  --green: #0b6a47;
-  --pine: #0f3025;
-  --brass: #b58a46;
-  --red: #b44230;
+  /* Editorial palette now sourced from the shared --alm-* tokens (globals.css)
+     so this sheet themes with the app's light / night-edition switch instead
+     of being committed-light. Local names kept so the rest of the module is
+     unchanged. */
+  --paper: var(--alm-paper);
+  --card: var(--alm-card);
+  --sunken: var(--alm-sunken);
+  --ink: var(--alm-ink);
+  --muted: var(--alm-muted);
+  --faint: var(--alm-faint);
+  --line: var(--alm-line);
+  --line2: var(--alm-line2);
+  --green: var(--alm-green);
+  --pine: var(--alm-pine);
+  --brass: var(--alm-brass);
+  --red: var(--alm-red);
 
   --fd: var(--font-jost), "Futura", "Century Gothic", sans-serif;
   --fl: var(--font-engraved), "Copperplate", "Optima", serif;

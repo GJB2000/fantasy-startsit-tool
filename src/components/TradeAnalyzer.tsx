@@ -60,46 +60,57 @@ export function TradeAnalyzer() {
 
   return (
     <div className="mx-auto mt-10 w-full max-w-3xl">
-      <div className="mb-4 flex items-center justify-center gap-3">
-        <span className="text-xs font-medium uppercase tracking-wide text-foreground/40">Scoring</span>
-        <ScoringFormatToggle
-          value={scoringFormat}
-          onChange={(format) => {
-            setScoringFormat(format);
-            setResponse(null);
-          }}
-        />
+      <div className="rounded-[6px] border border-foreground/12 bg-surface p-5 shadow-sm sm:p-6">
+        <div className="mb-5 flex items-baseline justify-between gap-3 border-b border-foreground/15 pb-3">
+          <span
+            className="text-[12px] uppercase tracking-[0.1em] text-foreground/70"
+            style={{ fontFamily: "var(--font-engraved)" }}
+          >
+            Build the Trade
+          </span>
+          <ScoringFormatToggle
+            editorial
+            value={scoringFormat}
+            onChange={(format) => {
+              setScoringFormat(format);
+              setResponse(null);
+            }}
+          />
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2">
+          <PlayerMultiSelect
+            editorial
+            label="You give"
+            selected={givePlayers}
+            max={MAX_PER_SIDE}
+            extraExcludeIds={getPlayers.map((p) => p.playerId)}
+            onAdd={addTo(setGivePlayers)}
+            onRemove={removeFrom(setGivePlayers)}
+          />
+          <PlayerMultiSelect
+            editorial
+            label="You get"
+            selected={getPlayers}
+            max={MAX_PER_SIDE}
+            extraExcludeIds={givePlayers.map((p) => p.playerId)}
+            onAdd={addTo(setGetPlayers)}
+            onRemove={removeFrom(setGetPlayers)}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleAnalyze}
+          disabled={givePlayers.length === 0 || getPlayers.length === 0 || loading}
+          style={{ fontFamily: "var(--font-engraved)" }}
+          className="mt-5 w-full rounded-[4px] bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
+        >
+          {loading ? "Analyzing…" : "Analyze trade"}
+        </button>
+
+        {error && <p className="mt-3 text-sm text-bad">{error}</p>}
       </div>
-
-      <div className="grid gap-6 sm:grid-cols-2">
-        <PlayerMultiSelect
-          label="You give"
-          selected={givePlayers}
-          max={MAX_PER_SIDE}
-          extraExcludeIds={getPlayers.map((p) => p.playerId)}
-          onAdd={addTo(setGivePlayers)}
-          onRemove={removeFrom(setGivePlayers)}
-        />
-        <PlayerMultiSelect
-          label="You get"
-          selected={getPlayers}
-          max={MAX_PER_SIDE}
-          extraExcludeIds={givePlayers.map((p) => p.playerId)}
-          onAdd={addTo(setGetPlayers)}
-          onRemove={removeFrom(setGetPlayers)}
-        />
-      </div>
-
-      <button
-        type="button"
-        onClick={handleAnalyze}
-        disabled={givePlayers.length === 0 || getPlayers.length === 0 || loading}
-        className="mt-5 w-full rounded-full bg-accent px-4 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
-      >
-        {loading ? "Analyzing…" : "Analyze trade"}
-      </button>
-
-      {error && <p className="mt-3 text-sm text-bad">{error}</p>}
 
       {response && (
         <TradeResult

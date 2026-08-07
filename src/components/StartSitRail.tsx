@@ -3,14 +3,20 @@ import type { RecentComparison } from "@/lib/useRecentComparisons";
 export function RecentComparisonsPanel({
   recent,
   onSelect,
+  editorial = false,
 }: {
   recent: RecentComparison[];
   /** When provided, each entry with stored players becomes clickable — re-opening that comparison. */
   onSelect?: (entry: RecentComparison) => void;
+  /** Editorial ("almanac") variant — squared, engraved-caps header. */
+  editorial?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-foreground/10 bg-surface p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2 text-[12.5px] font-semibold">
+    <div className={`border border-foreground/10 bg-surface p-4 shadow-sm ${editorial ? "rounded-[6px]" : "rounded-2xl"}`}>
+      <div
+        className={`mb-3 flex items-center gap-2 ${editorial ? "border-b border-foreground/15 pb-2.5 text-[11px] uppercase tracking-[0.1em] text-foreground/70" : "text-[12.5px] font-semibold"}`}
+        style={editorial ? { fontFamily: "var(--font-engraved)" } : undefined}
+      >
         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-accent" fill="none">
           <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
           <path d="M12 7v5l3.5 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -84,7 +90,8 @@ export function StartSitRail({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <RecentComparisonsPanel recent={recent} onSelect={onSelectRecent} />
+      {/* StartSitRail only renders on the editorial Start/Sit page. */}
+      <RecentComparisonsPanel recent={recent} onSelect={onSelectRecent} editorial />
     </div>
   );
 }

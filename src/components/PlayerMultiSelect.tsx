@@ -14,6 +14,8 @@ interface PlayerMultiSelectProps {
   extraExcludeIds?: number[];
   placeholder?: (selectedCount: number) => string;
   maxReachedPlaceholder?: string;
+  /** Editorial ("almanac") variant — squared corners, hairline borders, engraved-caps label. */
+  editorial?: boolean;
 }
 
 function initials(name: string): string {
@@ -66,9 +68,13 @@ function Avatar({ player, size }: { player: PlayerSummary; size: number }) {
   );
 }
 
-function SelectedCard({ player, onRemove }: { player: PlayerSummary; onRemove: () => void }) {
+function SelectedCard({ player, onRemove, editorial }: { player: PlayerSummary; onRemove: () => void; editorial?: boolean }) {
   return (
-    <div className="relative flex items-center gap-2.5 rounded-2xl border border-foreground/10 bg-surface-sunken py-2 pl-2 pr-3.5 shadow-sm">
+    <div
+      className={`relative flex items-center gap-2.5 border border-foreground/10 bg-surface-sunken py-2 pl-2 pr-3.5 shadow-sm ${
+        editorial ? "rounded-[3px]" : "rounded-2xl"
+      }`}
+    >
       <Avatar player={player} size={36} />
       <div className="min-w-0">
         <div className="truncate text-[13.5px] font-semibold leading-tight tracking-tight">{player.name}</div>
@@ -106,6 +112,7 @@ export function PlayerMultiSelect({
   extraExcludeIds,
   placeholder = defaultPlaceholder,
   maxReachedPlaceholder,
+  editorial = false,
 }: PlayerMultiSelectProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PlayerSummary[]>([]);
@@ -168,7 +175,12 @@ export function PlayerMultiSelect({
       {(label || max != null) && (
         <div className="mb-2.5 flex items-center justify-between gap-3">
           {label ? (
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground/40">{label}</span>
+            <span
+              className={`uppercase text-foreground/40 ${editorial ? "text-[11px] tracking-[0.1em]" : "text-[11px] font-semibold tracking-wide"}`}
+              style={editorial ? { fontFamily: "var(--font-engraved)" } : undefined}
+            >
+              {label}
+            </span>
           ) : (
             <span />
           )}
@@ -195,7 +207,7 @@ export function PlayerMultiSelect({
       {selected.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-2.5">
           {selected.map((player) => (
-            <SelectedCard key={player.playerId} player={player} onRemove={() => onRemove(player.playerId)} />
+            <SelectedCard key={player.playerId} player={player} onRemove={() => onRemove(player.playerId)} editorial={editorial} />
           ))}
         </div>
       )}
@@ -220,10 +232,16 @@ export function PlayerMultiSelect({
               ? (maxReachedPlaceholder ?? `Maximum ${max} selected — remove one to add another`)
               : placeholder(selected.length)
           }
-          className="w-full rounded-2xl border border-foreground/15 bg-surface pl-11 pr-4 py-3.5 text-sm text-foreground shadow-sm outline-none transition-shadow placeholder:text-foreground/35 focus:border-accent focus:ring-4 focus:ring-accent/15 disabled:cursor-not-allowed disabled:opacity-60"
+          className={`w-full border border-foreground/15 bg-surface pl-11 pr-4 py-3.5 text-sm text-foreground shadow-sm outline-none transition-shadow placeholder:text-foreground/35 focus:border-accent focus:ring-4 focus:ring-accent/15 disabled:cursor-not-allowed disabled:opacity-60 ${
+            editorial ? "rounded-[3px]" : "rounded-2xl"
+          }`}
         />
         {isOpen && !atMax && query.trim() && (loading || visibleResults.length > 0) && (
-          <ul className="absolute z-10 mt-2 max-h-80 w-full overflow-auto rounded-2xl border border-foreground/10 bg-surface shadow-xl">
+          <ul
+            className={`absolute z-10 mt-2 max-h-80 w-full overflow-auto border border-foreground/10 bg-surface shadow-xl ${
+              editorial ? "rounded-[3px]" : "rounded-2xl"
+            }`}
+          >
             {loading && <li className="px-4 py-3 text-sm text-foreground/50">Searching…</li>}
             {!loading &&
               visibleResults.map((player) => (
