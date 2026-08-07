@@ -51,37 +51,37 @@ function injuryBadgeClasses(status: string) {
  * documented elsewhere in this app (TradeResult.tsx/WaiverResult.tsx).
  *
  * 90+ gets the gold "premium" treatment — a real blue-chip tier on top
- * of an already-real 1-100 number, not a new grading concept. `--accent`
- * and `--good` are the same emerald in this design system (deliberately
- * — brand and "good" reinforce each other here), so the old accent/good
- * split at 60/85 would now render as two identical-looking greens;
- * collapsed into one 70+ tier instead so every band still reads as
- * visually distinct.
+ * of an already-real 1-100 number, not a new grading concept. The middle
+ * tier uses `--info` rather than `--caution` on purpose: in the editorial
+ * "almanac" palette this page renders in, `--caution` and `--premium` are
+ * both brass, so a caution middle tier would be indistinguishable from
+ * the 90+ elite band — `--info` (a muted blue) keeps all four bands
+ * visually distinct (premium/good/info/bad).
  */
 function legitScoreClasses(score: number): string {
   if (score >= 90) return "bg-premium/15 text-premium";
   if (score >= 70) return "bg-good/15 text-good";
-  if (score >= 45) return "bg-caution/15 text-caution";
+  if (score >= 45) return "bg-info/15 text-info";
   return "bg-bad/12 text-bad";
 }
 
 function RankingRow({ entry, formatLabel }: { entry: RankingEntryResponse; formatLabel: string }) {
   return (
-    <div className="flex items-center gap-3 border-t border-foreground/[0.07] px-4 py-3.5 first:border-none">
-      <span className="w-6 shrink-0 text-right font-mono text-[13px] font-bold text-foreground/35">
+    <div className="flex items-center gap-3 border-t border-foreground/[0.09] px-4 py-3.5 first:border-none">
+      <span className="w-6 shrink-0 text-right font-jost text-[16px] font-semibold text-foreground/40">
         {entry.positionRank}
       </span>
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent/12 text-[13px] font-bold text-accent">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] bg-accent/12 font-jost text-[13px] font-semibold text-accent">
         {initials(entry.displayName)}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
-          <h3 className="truncate text-[14px] font-semibold tracking-tight">{entry.displayName}</h3>
+          <h3 className="truncate font-jost text-[15px] font-semibold tracking-tight">{entry.displayName}</h3>
           {entry.isOnByeThisWeek && (
-            <span className="rounded-full bg-foreground/8 px-1.5 py-0.5 text-[10px] text-foreground/55">Bye</span>
+            <span className="rounded-[3px] bg-foreground/8 px-1.5 py-0.5 text-[10px] text-foreground/55">Bye</span>
           )}
           {entry.injuryStatus && (
-            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${injuryBadgeClasses(entry.injuryStatus)}`}>
+            <span className={`rounded-[3px] px-1.5 py-0.5 text-[10px] font-medium ${injuryBadgeClasses(entry.injuryStatus)}`}>
               {entry.injuryStatus}
             </span>
           )}
@@ -94,7 +94,7 @@ function RankingRow({ entry, formatLabel }: { entry: RankingEntryResponse; forma
         </p>
         {entry.notes[0] && <p className="mt-1 truncate text-[12px] leading-snug text-foreground/55">{entry.notes[0]}</p>}
       </div>
-      <span className={`font-mono shrink-0 rounded-2xl px-3 py-2 text-center text-[18px] font-bold tabular-nums ${legitScoreClasses(entry.legitScore)}`}>
+      <span className={`font-jost shrink-0 rounded-[4px] px-3 py-2 text-center text-[19px] font-semibold tabular-nums ${legitScoreClasses(entry.legitScore)}`}>
         {entry.legitScore}
       </span>
     </div>
@@ -113,7 +113,7 @@ export function RankingsResult({ rankings, positionLabel, scoringFormat }: Ranki
   }
 
   return (
-    <div className="mt-6 overflow-hidden rounded-3xl border border-foreground/10 bg-surface shadow-sm">
+    <div className="mt-6 overflow-hidden rounded-[6px] border border-foreground/12 bg-surface shadow-sm">
       {rankings.map((entry) => (
         <RankingRow key={entry.playerId ?? entry.displayName} entry={entry} formatLabel={formatLabel} />
       ))}

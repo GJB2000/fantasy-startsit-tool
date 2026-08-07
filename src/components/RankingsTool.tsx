@@ -68,13 +68,14 @@ export function RankingsTool() {
   return (
     <div className="mx-auto mt-6 w-full max-w-3xl">
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <div className="inline-flex rounded-full border border-foreground/10 bg-surface p-1 shadow-sm">
+        <div className="inline-flex overflow-hidden rounded-[3px] border border-foreground/25 shadow-sm">
           {TABS.map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+              style={{ fontFamily: "var(--font-engraved)" }}
+              className={`whitespace-nowrap px-3.5 py-1.5 text-[11px] uppercase tracking-[0.08em] transition-colors [&:not(:first-child)]:border-l [&:not(:first-child)]:border-foreground/20 ${
                 tab === t ? "bg-accent text-accent-ink" : "text-foreground/55 hover:text-foreground"
               }`}
             >
@@ -82,7 +83,7 @@ export function RankingsTool() {
             </button>
           ))}
         </div>
-        <ScoringFormatToggle value={scoringFormat} onChange={setScoringFormat} />
+        <ScoringFormatToggle editorial value={scoringFormat} onChange={setScoringFormat} />
       </div>
 
       {loading && <p className="mt-8 text-center text-sm text-foreground/50">Ranking every {TAB_LABEL[tab]}…</p>}
