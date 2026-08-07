@@ -6979,7 +6979,106 @@ single-season numbers for those specific constants.
       `tsc`/lint clean. Committed across `a8fd7ce` (results board + first
       compact controls) and `ce998c4` (the control-deck rework).
 
-### Open items (as of item 110 — pick up here)
+111. **Explored four full visual directions for the Start/Sit result as
+    Artifact mockups, then wired the chosen one — an editorial "almanac" —
+    into the real app, first the result component and then the whole
+    Start/Sit page.** Same layout/statistics throughout; this is a
+    presentation/design-system change, not an engine change. The mockups
+    were built with the `artifact-design` skill and iterated live in the
+    in-app browser (served through the dev server so the JS/animation ran,
+    since a raw `file://` static-snapshot doesn't execute scripts).
+    - **The four exploratory Artifact mockups** (all reproduce the exact
+      current result layout — verdict + confidence + stacked player cards
+      with opponent/def-rank, projection + floor→ceiling, per-position 2x2
+      stat grid, weather/health, case for/against, betting lines — with
+      illustrative sample data): (a) **B&W + accent (sharp)** — near-
+      monochrome, squared edges, one selectable accent (mono/gold/blue),
+      independent "sliders" color, a reserved danger-red toggle, plus a
+      full **desktop-page** variant (sidebar + picker + result + rail) with
+      wider cards and a glow toggle; (b) **cinematic broadcast showpiece** —
+      dark, poster-scale condensed name, a real radial confidence gauge,
+      gold/cyan/red, grain + ghost glyphs, orchestrated count-up/arc motion,
+      committed single-DARK theme; (c) **modern product** — bright airy
+      light/dark, a clean geometric sans (Avenir Next), a violet-indigo
+      accent with SEPARATE semantic green/red, a live accent switcher
+      (violet/blue/teal/pink), and a high-contrast inverted-dark verdict
+      panel added on request; (d) **editorial "The Matchup" almanac** —
+      warm porcelain paper, espresso ink, a deep **pine-green** verdict
+      panel (the field) as the high-contrast anchor, **brass** detail,
+      engraved **Copperplate** small-caps labels + big **Futura** display
+      figures as the typographic heroes, hairline rules, paper grain, a
+      committed single-LIGHT/print world. The user picked **(d)**, "use the
+      mockup's default" palette.
+    - **Fonts — the one real production caveat, flagged up front.** The
+      mockups lean on Mac-only faces (Futura, Copperplate, Didot, Avenir
+      Next) as stand-ins that won't exist on most users' machines/servers.
+      For the shipped version they were swapped for web-embeddable
+      equivalents loaded via `next/font/google` (self-hosted at build, same
+      privacy/perf posture as the app's existing Barlow/Inter/JetBrains):
+      **Jost** for the Futura role (display name + big figures), **Cinzel**
+      for the engraved Copperplate-style labels. Added in `layout.tsx` as
+      `--font-jost`/`--font-engraved` on `<html>` (loaded app-wide, used
+      only by Start/Sit). Result is ~95% the mockup look, licensable and
+      cross-platform.
+    - **Step 1 — the result component** (`ComparisonResult.tsx` +
+      new `ComparisonResult.module.css`). Rewrote the component's
+      presentation to the almanac sheet (masthead + dateline, pine verdict
+      panel with the confidence % + a thin meter using the same
+      `CONFIDENCE_SCALE_MARKS`, ranked player cards where the recommended
+      pick is a solid ink-framed feature block and the rest are lighter/
+      quiet, editorial hairline-divided stat grid, green/red case columns,
+      betting, colophon, real context note). **Every piece of data logic
+      was kept** — `getConfidencePct` (the item-100 gap-calibrated number,
+      with the item-86 per-position bucket fallback), `buildStatSlots` and
+      all its per-position sub-builders (QB passing profile included), the
+      floor/ceiling scale math, `buildCaseFor`/`buildCaseAgainst`, weather/
+      health, betting props, and multi-player ranking. Styling is a scoped
+      **CSS Module** (a self-contained `.sheet` with its own porcelain
+      palette + the font vars) specifically so none of it touches the app's
+      global token system. One layering detail worth noting: the paper
+      **grain** is a `::after` overlay with `mix-blend-mode: multiply` and
+      `z-index: 5` so it paints OVER the porcelain surfaces (an earlier
+      `::before` version sat behind the cards and only textured the
+      margins).
+    - **Step 2 — the rest of the Start/Sit page**, on the user's explicit
+      follow-up ("extend to rest of page"). Done the cheap, robust way:
+      the whole app is token-driven (item 80's design system), so a single
+      page-scoped wrapper class `.matchup-page` (in `globals.css`) that
+      **overrides the app's color tokens** (`--background`/`--surface`/
+      `--foreground`/`--accent`/`--accent-ink`/`--good`/`--bad`/`--caution`/
+      `--premium`/…) to the editorial palette recolors every token-consuming
+      component inside it — the search/compare panel, the scoring toggle,
+      the player chips, the Recent-comparisons rail — WITHOUT editing any of
+      those shared components. Works regardless of the viewer's OS theme,
+      because a descendant's nearest ancestor sets the custom property (the
+      wrapper beats both the light and dark `:root` token blocks for its
+      subtree). `start-sit/page.tsx` applies the wrapper and replaces the
+      shared `PageHeader` with an inline editorial header (Cinzel eyebrow +
+      Jost title). The **sidebar (`AppShell`) was deliberately left dark/
+      emerald** — it's shared chrome across all six tools — so the page
+      reads as "a dark app with an editorial document section," not a
+      half-converted app. Page ground `#e7e1d2` (deeper) vs. surface
+      `#f5f1e7` (porcelain cards) vs. the result sheet's own `#ede8dd`
+      (with a shadow) gives three tonal layers so cards/sheet still pop.
+    - **Verified live end-to-end against the REAL app with REAL data**
+      (not just the mockup): drove `/start-sit`, ran a real comparison
+      (Bijan Robinson vs. Christian McCaffrey via the clickable
+      recent-comparisons rail — the manual player-search add wouldn't fire
+      through the in-app browser's synthetic clicks, a known
+      click-desync quirk, so the rail re-run was the reliable path),
+      confirmed real confidence (53%, close call), real projections/ranges/
+      matchup chips, weather "Forecast pending" (offseason), the real
+      offseason context note, both cards, the whole page recolored, sidebar
+      still dark. Desktop; zero console errors; `npx tsc --noEmit -p .` and
+      `npm run lint` clean; **a full `next build` compiles** (fonts +
+      CSS module + the page all build for production).
+    - **Deliberately scoped to Start/Sit only** — the other five tools
+      (Trade, Waivers, Lineup, Rankings, Backtest) are untouched and still
+      dark/emerald. Applying the almanac look app-wide is a real, separate
+      design-system undertaking, not a token tweak — see the new Open Item
+      #28 for exactly what that would involve.
+
+### Open items (as of item 111 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -7183,8 +7282,14 @@ its CLAUDE.md write-up as `579d5ab`. Item 110's Lineup Optimizer redesign —
 the results board + first compact controls (`LineupResult.tsx` +
 `LineupTool.tsx`) as `a8fd7ce`, and the control-deck rework
 (`LineupTool.tsx`) as `ce998c4` — with this CLAUDE.md write-up following it.
+Item 111's editorial "almanac" redesign of Start/Sit (the four exploratory
+Artifact mockups shipped no repo code — they live only as the artifacts and
+this write-up; the wired-in code is `layout.tsx`'s Jost/Cinzel fonts, the new
+`ComparisonResult.module.css`, the rewritten `ComparisonResult.tsx`,
+`globals.css`'s `.matchup-page` token-override skin, and the re-skinned
+`start-sit/page.tsx`) plus this CLAUDE.md write-up are committed together.
 Everything above (items
-96-110, all code and write-ups) is committed and pushed to `main` — the
+96-111, all code and write-ups) is committed and pushed to `main` — the
 working tree is clean. (Per this project's standing rule, commit/push only
 once the user explicitly asks.) Nothing below is started or fixed yet:
 
@@ -7570,6 +7675,45 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     mismatch, item 101), so there's no clean in-season equivalent unless a
     way is found to distinguish "recovered" from "still ramping" that the
     backtest can actually validate.
+28. **Extend the editorial "almanac" look (item 111) to the rest of the
+    app.** Right now only Start/Sit is editorial (warm paper / pine-green /
+    espresso, Jost + Cinzel); the other five tools (Trade, Waivers, Lineup,
+    Legit Rankings, Backtest) and the Home page are still the dark/emerald
+    "data-grade" system, and the shared sidebar (`AppShell`) is deliberately
+    still dark. This is a real design-system undertaking, not a token tweak
+    — here's the map for whoever picks it up:
+    - **The cheap 80% is already proven** (item 111): the whole app is
+      token-driven (item 80), so wrapping each page's `<main>` in the
+      `.matchup-page` class (in `globals.css`) recolors every token-consuming
+      shared component inside it (cards, buttons, chips, toggles, tables)
+      without touching those components. So the fastest path is: add that
+      wrapper (or a renamed app-wide equivalent) to the other five tool
+      pages + Home, and swap each page's `PageHeader` for the editorial
+      header treatment used in `start-sit/page.tsx` (Cinzel eyebrow + Jost
+      title). Each page's own result component (e.g. `TradeResult.tsx`,
+      `WaiverResult.tsx`, `LineupResult.tsx`, `RankingsResult.tsx`, the
+      Backtest tables) would still look "recolored dark-design" rather than
+      truly editorial until restyled — the almanac *typography/rules/paper*
+      treatment (like `ComparisonResult.module.css`) is per-component work.
+    - **Real decisions to make first**, not just execution: (a) the sidebar
+      — keep it dark as a deliberate "chrome vs. document" contrast (current
+      choice) or make it editorial too (bigger visual commitment; the sidebar
+      is fixed-dark in `AppShell` in both themes today); (b) whether to keep
+      the app's dark/emerald as a real theme option or fully replace it (the
+      almanac is a committed LIGHT/print world with no dark variant — going
+      app-wide means either dropping dark mode or designing a "night edition"
+      of the almanac, which is substantial); (c) the `--pos-*` position
+      colors (violet/teal/blue player-avatar dots) currently sit unchanged on
+      the porcelain — fine in small doses, but app-wide they may want muting
+      to stay on-palette; (d) the two fonts (Jost, Cinzel) already load
+      app-wide via `layout.tsx`, so no new font work is needed.
+    - **Recommended approach**: do it one tool at a time (Trade Analyzer
+      next is the closest analog to Start/Sit — verdict + sides), each as
+      its own component-level editorial restyle mirroring
+      `ComparisonResult.module.css`'s pattern (a scoped CSS Module + the
+      shared `.matchup-page` token skin on the page), verifying live against
+      real data per the project's standing discipline — rather than one
+      giant global flip.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that

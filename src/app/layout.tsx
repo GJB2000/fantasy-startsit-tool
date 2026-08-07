@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Barlow_Condensed, Inter, JetBrains_Mono } from "next/font/google";
+import { Barlow_Condensed, Cinzel, Inter, JetBrains_Mono, Jost } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
 import "./globals.css";
 
@@ -29,6 +29,23 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+// Editorial "almanac" faces, used only by the Start/Sit result sheet
+// (ComparisonResult.module.css): Jost stands in for Futura (display name +
+// big figures), Cinzel for the engraved Copperplate-style small-caps labels.
+const jost = Jost({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-jost",
+  display: "swap",
+});
+
+const cinzel = Cinzel({
+  subsets: ["latin"],
+  weight: ["500", "600"],
+  variable: "--font-engraved",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Legitfootball — Fantasy Football Tools",
   description: "Start/sit calls, trade grades, and waiver targets — real data, a straight answer, and the reasoning behind it.",
@@ -42,7 +59,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`h-full antialiased ${barlowCondensed.variable} ${inter.variable} ${jetbrainsMono.variable}`}
+      className={`h-full antialiased ${barlowCondensed.variable} ${inter.variable} ${jetbrainsMono.variable} ${jost.variable} ${cinzel.variable}`}
     >
       <body className="min-h-full font-sans">
         <AppShell>{children}</AppShell>

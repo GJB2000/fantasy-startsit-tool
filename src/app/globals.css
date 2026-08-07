@@ -89,3 +89,33 @@ body {
 ::selection {
   background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
+
+/*
+ * Editorial "almanac" skin, scoped to the Start/Sit page. The whole app is
+ * token-driven, so overriding the color tokens on this one wrapper recolors
+ * every token-consuming component inside it (search panel, scoring toggle,
+ * player chips, recent-comparisons rail) to the warm-paper / pine-green /
+ * espresso editorial palette — without changing any of those shared
+ * components. Wins over the light and dark :root definitions because a
+ * descendant's nearest ancestor sets the custom property. The result sheet
+ * (ComparisonResult.module.css) carries its own full editorial typography.
+ */
+.matchup-page {
+  --background: #e7e1d2;
+  --foreground: #211f19;
+  --surface: #f5f1e7;
+  --surface-glass: rgba(245, 241, 231, 0.82);
+  --surface-sunken: #e4decd;
+  --accent: #0b6a47;
+  --accent-secondary: #0a5a3d;
+  --accent-ink: #f5f1e7;
+  --good: #0b6a47;
+  --bad: #b44230;
+  --caution: #b58a46;
+  --info: #4a6d7a;
+  --premium: #b58a46;
+  --premium-ink: #f5f1e7;
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100%;
+}
