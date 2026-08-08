@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Barlow_Condensed, Cinzel, Inter, JetBrains_Mono, Jost } from "next/font/google";
+import { Archivo, Barlow_Condensed, Inter, JetBrains_Mono, Jost } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
 import "./globals.css";
 
@@ -29,9 +29,12 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-// Editorial "almanac" faces, used only by the Start/Sit result sheet
-// (ComparisonResult.module.css): Jost stands in for Futura (display name +
-// big figures), Cinzel for the engraved Copperplate-style small-caps labels.
+// Editorial "almanac" faces (app-wide, via --font-jost / --font-engraved and
+// the CSS-module result sheets): Jost stands in for Futura for display names +
+// big figures, and Archivo — a modern grotesk — for the uppercase, letter-
+// spaced labels (eyebrows / section headers / stat labels). The --font-engraved
+// variable name is kept for historical reasons (it previously held Cinzel);
+// everything downstream routes through that one var.
 const jost = Jost({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
@@ -39,9 +42,9 @@ const jost = Jost({
   display: "swap",
 });
 
-const cinzel = Cinzel({
+const cinzel = Archivo({
   subsets: ["latin"],
-  weight: ["500", "600"],
+  weight: ["600"],
   variable: "--font-engraved",
   display: "swap",
 });

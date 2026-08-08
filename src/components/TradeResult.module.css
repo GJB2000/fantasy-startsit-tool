@@ -26,7 +26,7 @@
   --red: var(--alm-red);
 
   --fd: var(--font-jost), "Futura", "Century Gothic", sans-serif;
-  --fl: var(--font-engraved), "Copperplate", "Optima", serif;
+  --fl: var(--font-engraved), "Helvetica Neue", Arial, sans-serif;
   --fb: var(--font-sans-loaded), "Helvetica Neue", system-ui, sans-serif;
 
   position: relative;

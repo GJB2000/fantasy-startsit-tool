@@ -166,7 +166,7 @@ body {
   font-family: var(--font-jost), "Futura", "Century Gothic", sans-serif;
 }
 .font-engraved {
-  font-family: var(--font-engraved), "Copperplate", "Optima", serif;
+  font-family: var(--font-engraved), "Helvetica Neue", Arial, sans-serif;
 }
 
 .matchup-page {
