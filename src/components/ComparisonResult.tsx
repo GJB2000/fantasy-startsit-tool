@@ -451,7 +451,7 @@ export function ComparisonResult({ result, contextNote, scoringFormat, propsByPl
       <div className={styles.body}>
         <div className={styles.mast}>
           <div className={styles.mastL}>The Matchup</div>
-          <div className={styles.mastR}>Legitfootball · Start / Sit</div>
+          <div className={styles.mastR}>LEGITFOOTBALL · Start / Sit</div>
         </div>
         <div className={styles.dateline}>
           {week ? <span>Week {week}</span> : null}
@@ -517,7 +517,7 @@ export function ComparisonResult({ result, contextNote, scoringFormat, propsByPl
         ))}
 
         <div className={styles.colophon}>
-          <span>Legitfootball Almanac</span>
+          <span>LEGITFOOTBALL Almanac</span>
           <span>{formatLabel} · 2025</span>
         </div>
 

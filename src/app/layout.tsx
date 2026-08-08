@@ -51,7 +51,7 @@ const cinzel = Archivo({
 });
 
 export const metadata: Metadata = {
-  title: "Legitfootball — Fantasy Football Tools",
+  title: "LEGITFOOTBALL — Fantasy Football Tools",
   description: "Start/sit calls, trade grades, and waiver targets — real data, a straight answer, and the reasoning behind it.",
 };
 

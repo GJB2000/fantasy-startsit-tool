@@ -54,7 +54,7 @@ export function NewsletterSignup() {
           </svg>
         </span>
         <div>
-          <p className="font-jost text-[18px] font-semibold leading-tight">The Legitfootball newsletter</p>
+          <p className="font-jost text-[18px] font-semibold leading-tight">The LEGITFOOTBALL newsletter</p>
           <p className="text-[12px] text-foreground/55">A better way to get your football news.</p>
         </div>
       </div>

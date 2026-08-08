@@ -330,7 +330,7 @@ export function TradeResult({ evaluation, contextNote, scoringFormat }: TradeRes
           </span>
         </div>
         <div className={styles.dateline}>
-          <span>Legitfootball Almanac</span>
+          <span>LEGITFOOTBALL Almanac</span>
           <span>{evaluation.give.length}-for-{evaluation.get.length} deal</span>
           {weeksLeft != null && <span>{weeksLeft} weeks remaining</span>}
         </div>
@@ -426,7 +426,7 @@ export function TradeResult({ evaluation, contextNote, scoringFormat }: TradeRes
 
         {/* colophon */}
         <div className={styles.colophon}>
-          <span>Legitfootball · Trade Desk</span>
+          <span>LEGITFOOTBALL · Trade Desk</span>
           <span>Projections, not guarantees</span>
         </div>
       </div>
