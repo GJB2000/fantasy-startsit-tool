@@ -7078,7 +7078,154 @@ single-season numbers for those specific constants.
       design-system undertaking, not a token tweak — see the new Open Item
       #28 for exactly what that would involve.
 
-### Open items (as of item 111 — pick up here)
+112. **Extended the editorial "almanac" look to the Trade Analyzer, and
+    front-loaded the two-theme shared foundation the rest of the rollout
+    reuses (presentation only — no engine/scoring/data changes).** Item 111
+    shipped the almanac on Start/Sit as a committed-LIGHT sheet; this pass
+    generalized it. Three decisions taken with the user up front
+    (AskUserQuestion): keep both light AND a new "night edition" (not drop
+    dark mode); recolor the sidebar to a pine/espresso rail; and bundle the
+    foundation into this pass rather than a separate step.
+    - **Two-theme almanac tokens** (`globals.css`): one shared `--alm-*`
+      palette (warm porcelain paper / pine-green / espresso ink by day;
+      warm espresso-charcoal + cream ink + brightened green/brass/red by
+      night, under `@media (prefers-color-scheme: dark)`). `.matchup-page`
+      now maps the app tokens FROM `--alm-*`, so the night edition falls
+      out with no per-page media query.
+    - **`ComparisonResult.module.css`** now sources its sheet palette from
+      `--alm-*`, giving the already-shipped Start/Sit the night edition too
+      (no longer committed-light).
+    - **Sidebar** (`AppShell`) recolored from emerald to a pine/brass
+      espresso rail (a constant dark spine in both themes).
+    - **Trade Analyzer**: `.matchup-page` wrapper + editorial header, new
+      `TradeResult.module.css` + rewritten `TradeResult.tsx` (porcelain
+      "trade desk" — pine verdict panel, give/get board, case columns,
+      engraved strip), all real evaluation data unchanged.
+    - **Shared-component `editorial` variant**: `ScoringFormatToggle`,
+      `PlayerMultiSelect`, and `RecentComparisonsPanel` gained an
+      `editorial` prop (default false → the still-dark tools untouched)
+      for squared/engraved styling, since these are shared across every
+      tool; each per-page landing wrapper passes `editorial` and supplies
+      its own editorial container/button. This is the reusable pattern
+      every later page in the rollout uses.
+    - Committed `5866836`; verified live in both themes.
+
+113. **Waiver Wire almanac.** `.matchup-page` wrapper + editorial header;
+    the buy-low hero + schematic gap bar editorialized; `WaiverResult`
+    board editorialized in place (all data logic preserved) — porcelain
+    squared spotlight with a brass "top target" tag, engraved gap-bar
+    labels, Jost names/figures, engraved-caps position tab index + section
+    headers, hairline row-lists, squared matchup/drop chips. Added reusable
+    `.font-jost` / `.font-engraved` utilities to `globals.css` for the
+    rollout. Shared `RosterSummaryButton` gained the `editorial` variant.
+    Committed `66c2086`.
+
+114. **Lineup Optimizer almanac.** Control deck (engraved Roster/Slots/
+    Scoring labels, Jost counts, editorial toggle, squared "Manage" +
+    engraved "Build my lineup"); `RosterSlotsEditor` squared; `LineupResult`
+    board (engraved "Optimal lineup" eyebrow + Jost heading and
+    projected-total, squared porcelain starter cards with engraved slot
+    chips, Jost projections/names, squared matchup/status pills, hairline
+    bench). Committed `8def0b8`.
+
+115. **Legit Rankings almanac.** Squared engraved segmented tab index
+    (Top 100 / QB / RB / WR / TE) + editorial scoring toggle;
+    `RankingsResult` squared porcelain list, Jost ranks/names/score badges.
+    **Real tier-color fix for the almanac palette**: the middle 45-69
+    legit-score band moved from `--caution` to `--info`, because
+    `--caution` and `--premium` are BOTH brass in the almanac and would
+    otherwise be indistinguishable from the 90+ gold elite tier — now
+    premium(gold)/good(pine)/info(blue)/bad(red) all read distinct, and
+    the gold elite tier carries over cleanly. Committed `266e6ee`.
+
+116. **Sidebar rail made editorial + a real mobile drawer** (`AppShell`),
+    two changes on request. (a) Almanac typography for the rail: a Jost
+    "Legitfootball" wordmark under an engraved "Fantasy Almanac" tagline,
+    an engraved "Tools" section label, engraved "My roster"/"Scoring"
+    footer labels, squared nav items and warm hairline borders — still a
+    constant dark espresso spine in both themes (unchanged intent). (b)
+    Mobile navigation reworked from the old horizontal scrolling strip into
+    a slim top bar (hamburger + wordmark + roster quick-button) that slides
+    the same rail in as a left drawer with a scrim; nav taps navigate and
+    close it (a route-change `useEffect`), and the close-X / scrim dismiss
+    it. Committed `faca7ca`.
+
+117. **Home almanac.** Page wrapper + editorial header; `NewsletterSignup`
+    (squared band, Jost title, engraved "Subscribe" button);
+    `HomeRankingsBoard` "Top of the board" (engraved header, squared list,
+    Jost ranks/names/scores, gold "Elite" chips carry over via `--premium`);
+    the three "This week" widgets + recent-comparisons card (engraved
+    hairline headers, squared cards, Jost names/figures). Every widget
+    still self-fetches its same real route. Committed `18578d0`.
+
+118. **Backtest almanac — completes the app-wide rollout** (all seven
+    pages + the shell are now editorial). Squared engraved mode/season
+    pills, position checkboxes, week selects, caveat/scope notes; engraved
+    result-section labels and table column headers; squared banners and
+    outcome pills; engraved "Run backtest" CTA; editorial `PlayerMultiSelect`
+    (single-pair + projection lookup); Jost headline figures (accuracy % /
+    MAE). **The dense tabular table figures were deliberately kept
+    `font-mono`** (JetBrains, unaffected) for alignment — only the
+    prominent figures went Jost. Verified live in both themes with a real
+    Broad backtest (58.7% overall + by-position + baselines); a full
+    `next build` passes. Committed `2605c6d`. **Resolves Open Item #28.**
+
+119. **Start/Sit fix: relabel the recent range "Recent low/high", not
+    "Floor/Ceiling".** A user flagged that a player (Mark Andrews) can be
+    projected ABOVE his stated "Ceiling" — which read as a contradiction.
+    It is NOT a scoring bug: `recentPprCeiling` is the max of a player's
+    recent box-score output (backward-looking), while `finalScore` is a
+    forward projection that can legitimately exceed it (favorable matchup,
+    expert consensus, volume — and `finalScore` is bounded relative to
+    `blendedScore`, not to the recent high, per item 105). Calling the
+    recent max a "Ceiling" implied a hard upper bound. Relabeled the
+    range-bar ends "Recent low"/"Recent high" and the Case-For sentence
+    "a recent high of" (`ComparisonResult.tsx`). Presentation only.
+    Committed `a49c5e3`.
+
+120. **Heading-font experiment: Fraunces — tried, then reverted.** On
+    request, tested replacing Jost (the `--font-jost` display role — page
+    titles, player/verdict names, big figures) with Fraunces (an editorial
+    serif) via a one-line `layout.tsx` swap into the same variable.
+    Verified live — it looked strongly editorial (the pine verdict panel
+    with the player name in Fraunces read like a broadsheet headline) and
+    the serif numbers stayed legible; the dense Backtest tables were
+    unaffected since they're `font-mono`. The user chose to revert for now.
+    Reverted (the change was never committed; `layout.tsx`/`globals.css`/
+    the two result modules restored to Jost). No repo artifact — this note
+    is the only record.
+
+121. **Start/Sit: hover tooltips explaining each player-card stat** (on
+    request — e.g. hovering QB "Success rate" pops a plain-English
+    description). Each `StatSlot` gained an optional `tip`; a `STAT_TIPS`
+    map covers every per-position stat surfaced (recent avg, pass att,
+    success rate, EPA/dropback, touches, targets, snap share, red-zone
+    touches/rushes, drop rate). `StatGrid` renders a scoped, almanac-styled
+    tooltip (a dark ink card on the porcelain sheet; inverts to a light
+    card in the night edition) above the cell, on `:hover` AND
+    `:focus-within`; cells with a tip are focusable (`tabIndex`) with a
+    subtle dotted-underline affordance, and right-column tooltips anchor
+    right so they never clip the sheet's `overflow:hidden`. No engine/data
+    change. `ComparisonResult.tsx` + `ComparisonResult.module.css`.
+    Committed `80715bb`.
+
+122. **Label-font swap: Archivo replaces Cinzel for the engraved labels**
+    (`--font-engraved`). On request, after comparing candidates live on a
+    throwaway `/font-lab` page — serif options first (Cormorant SC / IM
+    Fell English SC / EB Garamond), then modern options (Space Grotesk /
+    Archivo / Familjen Grotesk / Sora), each rendered at the real tiny
+    label sizes plus a large sample — the user picked **Archivo**, a modern
+    grotesk, for a cleaner/more contemporary take on the uppercase
+    letter-spaced labels (page eyebrows, section headers, stat/grid labels,
+    tags, sidebar). Loaded into the same `--font-engraved` variable (the
+    `const` is still named `cinzel` for historical reasons), weight 600;
+    the serif fallbacks in `globals.css`'s `.font-engraved` and both result
+    modules' `--fl` were swapped to a sans stack. Display headings (Jost)
+    and body/mono (Inter/JetBrains) are untouched — the type is now nearly
+    all-sans (Jost display + Archivo labels). The scratch `/font-lab` page
+    was deleted. Committed `779f9c7`.
+
+### Open items (as of item 122 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -7288,8 +7435,26 @@ this write-up; the wired-in code is `layout.tsx`'s Jost/Cinzel fonts, the new
 `ComparisonResult.module.css`, the rewritten `ComparisonResult.tsx`,
 `globals.css`'s `.matchup-page` token-override skin, and the re-skinned
 `start-sit/page.tsx`) plus this CLAUDE.md write-up are committed together.
-Everything above (items
-96-111, all code and write-ups) is committed and pushed to `main` — the
+**This session (items 112-122) — the app-wide editorial "almanac"
+rollout plus a few follow-ups — is all committed and pushed to `main`
+(HEAD `779f9c7`), working tree clean:** the almanac was extended to every
+remaining page and the shell (`5866836` Trade + shared two-theme
+foundation + pine/espresso sidebar + Start/Sit night edition, `66c2086`
+Waivers, `8def0b8` Lineup, `266e6ee` Rankings, `faca7ca` sidebar rail +
+mobile drawer, `18578d0` Home, `2605c6d` Backtest — this last one
+resolves Open Item #28); then `a49c5e3` (Start/Sit "recent low/high"
+relabel fix), a Fraunces heading-font experiment that was tried and
+reverted with no repo artifact (item 120), `80715bb` (Start/Sit stat
+hover tooltips), and `779f9c7` (Cinzel→Archivo engraved-label font).
+**IMPORTANT for the design system:** the whole app is now editorial
+(warm paper by day / espresso "night edition" by dark, via the shared
+`--alm-*` tokens + `.matchup-page` skin); fonts are Jost display
+(`--font-jost`), Archivo engraved labels (`--font-engraved`), Inter body,
+JetBrains mono. The Overview/Conventions paragraphs describing the older
+dark/emerald "data-grade" system (item 80) are now historical for
+everything except the shared `AppShell` sidebar, which stays a constant
+dark espresso rail by design. Everything above (items
+96-122, all code and write-ups) is committed and pushed to `main` — the
 working tree is clean. (Per this project's standing rule, commit/push only
 once the user explicitly asks.) Nothing below is started or fixed yet:
 
@@ -7675,8 +7840,15 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     mismatch, item 101), so there's no clean in-season equivalent unless a
     way is found to distinguish "recovered" from "still ramping" that the
     backtest can actually validate.
-28. **Extend the editorial "almanac" look (item 111) to the rest of the
-    app.** Right now only Start/Sit is editorial (warm paper / pine-green /
+28. **RESOLVED (items 112-118): the editorial "almanac" look now spans the
+    whole app.** Every page (Start/Sit, Trade, Waivers, Lineup, Legit
+    Rankings, Home, Backtest) is editorial in both a light and a "night
+    edition" theme, and the sidebar was recolored to a constant dark
+    pine/espresso rail — see items 112-118, plus item 116 (mobile drawer),
+    120 (Fraunces heading experiment, reverted), 121 (stat tooltips), and
+    122 (Cinzel→Archivo labels). The original map below is kept as the
+    historical record of how it was approached; it is done. Original text:
+    Right now only Start/Sit is editorial (warm paper / pine-green /
     espresso, Jost + Cinzel); the other five tools (Trade, Waivers, Lineup,
     Legit Rankings, Backtest) and the Home page are still the dark/emerald
     "data-grade" system, and the shared sidebar (`AppShell`) is deliberately
