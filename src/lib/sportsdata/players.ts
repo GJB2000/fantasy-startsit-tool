@@ -1,5 +1,7 @@
 import { REVALIDATE, sportsDataFetch } from "./client";
 import { getAllDstPlayers, getDstPlayerById } from "./defenseTeams";
+import { getPlayerSeasonStats } from "./seasonStats";
+import { getSeasonContext } from "./timeframes";
 import { isSkillPosition, type Player } from "./types";
 
 /** Unfiltered — includes historical/retired/inactive players. */
@@ -31,6 +33,28 @@ function isRosterable(p: Player): boolean {
   return p.Status === "Active" || (ROSTERABLE_INJURY_STATUSES.has(p.Status) && !!p.Team);
 }
 
+/**
+ * PlayerIDs who logged at least one game in the last completed season.
+ * These are real, relevant players even when their current /Players record
+ * shows Status "Inactive" with no Team — a common offseason free-agent
+ * state (e.g. Jonnu Smith, a 17-game contributor in 2025, after his
+ * contract ended). Since this tool analyzes last-completed-season data,
+ * such players belong in search. Degrades to an empty set (roster-only
+ * filtering) if the season-stats fetch fails, so search never breaks.
+ * Deliberately only used to widen the search-facing pool
+ * (getActiveExtendedPlayers), not getActivePlayers — see that function's
+ * note on why internal callers need the narrower current-roster set.
+ */
+async function getPlayedLastSeasonPlayerIds(): Promise<Set<number>> {
+  try {
+    const context = await getSeasonContext();
+    const rows = await getPlayerSeasonStats(context.lastCompletedSeason);
+    return new Set(rows.filter((r) => r.Played > 0).map((r) => r.PlayerID));
+  } catch {
+    return new Set();
+  }
+}
+
 export async function getActivePlayers(): Promise<Player[]> {
   const all = await getAllPlayers();
   return all.filter((p) => isRosterable(p) && isSkillPosition(p.Position));
@@ -49,6 +73,21 @@ export async function searchActivePlayers(query: string, limit = 20): Promise<Pl
 export async function getActivePlayerById(id: number): Promise<Player | null> {
   const players = await getActivePlayers();
   return players.find((p) => p.PlayerID === id) ?? null;
+}
+
+/**
+ * Resolve a player the scoring path should be able to build an input for:
+ * currently rosterable OR a real contributor last season (the same widened
+ * set search surfaces via getActiveExtendedPlayers). Without this an
+ * offseason free agent like Jonnu Smith is searchable but can't actually be
+ * scored — getActivePlayerById returns null and the comparison shows
+ * "insufficient data".
+ */
+export async function getScorablePlayerById(id: number): Promise<Player | null> {
+  const [all, playedLastSeason] = await Promise.all([getAllPlayers(), getPlayedLastSeasonPlayerIds()]);
+  const player = all.find((p) => p.PlayerID === id);
+  if (!player) return null;
+  return isRosterable(player) || playedLastSeason.has(player.PlayerID) ? player : null;
 }
 
 /**
@@ -74,8 +113,18 @@ export async function getAnyPlayerById(id: number): Promise<Player | null> {
  * defenseTeams.ts), so its synthetic entries are unioned in here.
  */
 export async function getActiveExtendedPlayers(): Promise<Player[]> {
-  const [all, dstPlayers] = await Promise.all([getAllPlayers(), getAllDstPlayers()]);
-  const skillAndK = all.filter((p) => isRosterable(p) && (isSkillPosition(p.Position) || p.Position === "K"));
+  const [all, dstPlayers, playedLastSeason] = await Promise.all([
+    getAllPlayers(),
+    getAllDstPlayers(),
+    getPlayedLastSeasonPlayerIds(),
+  ]);
+  // Search also includes players who actually played last season, so
+  // offseason free agents with an Inactive/no-team record (e.g. Jonnu
+  // Smith) still surface — see getPlayedLastSeasonPlayerIds.
+  const skillAndK = all.filter(
+    (p) =>
+      (isSkillPosition(p.Position) || p.Position === "K") && (isRosterable(p) || playedLastSeason.has(p.PlayerID))
+  );
   return [...skillAndK, ...dstPlayers];
 }
 

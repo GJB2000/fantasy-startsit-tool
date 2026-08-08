@@ -11,7 +11,7 @@ import {
 } from "@/lib/nflverse/aggregate";
 import type { ExpertConsensusEntry } from "@/lib/fantasypros/weeklyConsensus";
 import { getByeWeekForTeam } from "@/lib/sportsdata/byes";
-import { getActivePlayerById, getAllPlayers, getAnyPlayerById } from "@/lib/sportsdata/players";
+import { getScorablePlayerById, getAllPlayers, getAnyPlayerById } from "@/lib/sportsdata/players";
 import { getMatchupContext, type PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getPlayerSeasonStat } from "@/lib/sportsdata/seasonStats";
 import { isSkillPosition } from "@/lib/sportsdata/types";
@@ -36,7 +36,7 @@ export async function buildComparisonInput(
   priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map(),
   expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map()
 ): Promise<PlayerComparisonInput> {
-  const player = await getActivePlayerById(playerId).catch(() => null);
+  const player = await getScorablePlayerById(playerId).catch(() => null);
 
   if (!player) {
     const anyPlayer = await getAnyPlayerById(playerId).catch(() => null);
@@ -79,14 +79,16 @@ export async function buildComparisonInput(
     getAllPlayers().catch(() => []),
   ]);
 
-  const hasLimitedTeammate = allPlayers.some(
-    (p) =>
-      p.PlayerID !== playerId &&
-      p.Team === player.Team &&
-      p.Position === player.Position &&
-      p.InjuryStatus != null &&
-      LIMITED_INJURY_STATUSES.has(p.InjuryStatus)
-  );
+  const hasLimitedTeammate =
+    player.Team != null &&
+    allPlayers.some(
+      (p) =>
+        p.PlayerID !== playerId &&
+        p.Team === player.Team &&
+        p.Position === player.Position &&
+        p.InjuryStatus != null &&
+        LIMITED_INJURY_STATUSES.has(p.InjuryStatus)
+    );
 
   const isOnByeThisWeek = byeWeek !== null && byeWeek === context.lastCompletedWeek;
 
