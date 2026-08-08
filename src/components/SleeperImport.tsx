@@ -159,7 +159,7 @@ export function SleeperImport({ connection, onConnectionChange, onImportPlayers 
         My roster — connect Sleeper
       </h2>
       <p className="mt-1.5 text-xs leading-relaxed text-foreground/50">
-        Enter your Sleeper username and we&apos;ll pull your real roster — no need to add players one by one.
+        Enter your Sleeper username and we&apos;ll pull your real roster.
       </p>
       <div className="mt-3 flex gap-2">
         <input
@@ -168,7 +168,7 @@ export function SleeperImport({ connection, onConnectionChange, onImportPlayers 
           onChange={(e) => setUsername(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleFindLeagues()}
           placeholder="Sleeper username"
-          className="flex-1 rounded-2xl border border-foreground/10 bg-surface text-foreground px-4 py-2.5 text-sm shadow-sm outline-none transition-shadow placeholder:text-foreground/35 focus:border-accent focus:ring-4 focus:ring-accent/15"
+          className="min-w-0 flex-1 rounded-2xl border border-foreground/10 bg-surface text-foreground px-4 py-2.5 text-sm shadow-sm outline-none transition-shadow placeholder:text-foreground/35 focus:border-accent focus:ring-4 focus:ring-accent/15"
         />
         <button
           type="button"
