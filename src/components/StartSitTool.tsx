@@ -17,7 +17,7 @@ const MAX_PLAYERS = 4;
 interface CompareResponse {
   result: ComparisonResultData;
   propsByPlayerId?: Record<number, PlayerProps>;
-  context: { contextNote: string };
+  context: { contextNote: string; lastCompletedSeason: number };
 }
 
 export function StartSitTool() {
@@ -148,6 +148,7 @@ export function StartSitTool() {
             contextNote={response.context.contextNote}
             scoringFormat={scoringFormat}
             propsByPlayerId={response.propsByPlayerId}
+            dataSeason={response.context.lastCompletedSeason}
           />
         )}
       </div>

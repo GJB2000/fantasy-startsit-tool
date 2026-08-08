@@ -184,7 +184,7 @@
 .betPending { margin-top: 11px; font-size: 12px; line-height: 1.5; color: var(--muted); }
 .betf { margin-top: 10px; font-size: 10px; color: var(--faint); }
 
-.colophon { margin-top: 20px; display: flex; justify-content: space-between; border-top: 1.5px solid var(--ink); padding-top: 9px; }
+.colophon { margin-top: 20px; display: flex; justify-content: flex-end; border-top: 1.5px solid var(--ink); padding-top: 9px; }
 .colophon span { font-family: var(--fl); font-size: 8.5px; letter-spacing: 0.08em; color: var(--faint); }
 
 .unresolved { font-family: var(--fd); font-weight: 600; font-size: clamp(24px, 4vw, 34px); line-height: 1.1; letter-spacing: -0.01em; }

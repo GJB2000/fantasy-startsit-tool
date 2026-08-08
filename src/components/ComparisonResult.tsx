@@ -12,6 +12,8 @@ interface ComparisonResultProps {
   scoringFormat: ScoringFormat;
   /** Display-only betting lines per playerId (The Odds API) — empty in the offseason before books post props. */
   propsByPlayerId?: Record<number, PlayerProps>;
+  /** Season the underlying data is from (last completed season) — shown in the footer; auto-advances when the next season starts. */
+  dataSeason?: number;
 }
 
 const FORMAT_LABEL: Record<ScoringFormat, string> = {
@@ -455,7 +457,7 @@ function PlayerCard({
   );
 }
 
-export function ComparisonResult({ result, contextNote, scoringFormat, propsByPlayerId }: ComparisonResultProps) {
+export function ComparisonResult({ result, contextNote, scoringFormat, propsByPlayerId, dataSeason }: ComparisonResultProps) {
   const formatLabel = FORMAT_LABEL[scoringFormat];
   const winner = result.players.find((p) => p.playerId === result.recommendedPlayerId) ?? null;
   const confPct = getConfidencePct(result);
@@ -543,8 +545,7 @@ export function ComparisonResult({ result, contextNote, scoringFormat, propsByPl
         ))}
 
         <div className={styles.colophon}>
-          <span>LEGITFOOTBALL Almanac</span>
-          <span>{formatLabel} · 2025</span>
+          <span>{formatLabel}{dataSeason != null ? ` · ${dataSeason}` : ""}</span>
         </div>
 
         {contextNote && (
