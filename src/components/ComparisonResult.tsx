@@ -158,49 +158,90 @@ interface StatSlot {
   label: string;
   value: string | null;
   fill: number | null;
+  /** Plain-English "what this stat means", shown on hover of the cell. */
+  tip?: string;
 }
+
+// Brief, plain-English descriptions surfaced as hover tooltips over each
+// stat in the card's grid — newsletter voice: clear and concise.
+const STAT_TIPS = {
+  recent: "Average fantasy points over the player's last few games, in this scoring format — the base of the projection.",
+  passAtt: "Pass attempts per game recently. Volume is a steadier predictor of fantasy output than points, which swing on touchdowns.",
+  successRate: "The share of the QB's dropbacks that stayed 'on schedule' for the down and distance — a down-adjusted efficiency measure, less noisy than raw yards or TDs.",
+  epa: "Expected Points Added per dropback: how much the average pass play moved the team's scoring expectation. About 0 is league-average; positive is good.",
+  touches: "Carries plus catches per game recently — the running back's raw opportunity, and the single strongest stable signal for fantasy scoring.",
+  targets: "Passes thrown the player's way per game recently — receiving opportunity, which holds up week to week better than catches or yards.",
+  snap: "The share of the team's offensive snaps the player was on the field for — how central they are to the offense.",
+  rzTouch: "Touches inside the opponent's 20-yard line per game — high-value chances that turn into points far more often than ordinary touches.",
+  rzRush: "The QB's rushing attempts inside the opponent's 20 per game — goal-line carries that are disproportionately likely to score.",
+  drop: "The share of catchable targets the player has dropped recently — a reliability measure. Lower is better.",
+} as const;
 
 function buildRzDropSlot(player: PlayerScoreBreakdown): StatSlot {
   const pos = player.position;
-  if (pos === "RB" && player.redZoneTouchesAvg != null) {
-    return { label: "Red-zone / game", value: player.redZoneTouchesAvg.toFixed(1), fill: clamp01(player.redZoneTouchesAvg / RZ_TOUCH_BAR_MAX.RB) };
+  if (pos === "RB") {
+    const v = player.redZoneTouchesAvg;
+    return { label: "Red-zone / game", tip: STAT_TIPS.rzTouch, value: v != null ? v.toFixed(1) : null, fill: v != null ? clamp01(v / RZ_TOUCH_BAR_MAX.RB) : null };
   }
-  if (pos === "QB" && player.redZoneTouchesAvg != null) {
-    return { label: "Red-zone rushes", value: player.redZoneTouchesAvg.toFixed(1), fill: clamp01(player.redZoneTouchesAvg / RZ_TOUCH_BAR_MAX.QB) };
+  if (pos === "QB") {
+    const v = player.redZoneTouchesAvg;
+    return { label: "Red-zone rushes", tip: STAT_TIPS.rzRush, value: v != null ? v.toFixed(1) : null, fill: v != null ? clamp01(v / RZ_TOUCH_BAR_MAX.QB) : null };
   }
-  if ((pos === "WR" || pos === "TE") && player.dropRateAvg != null) {
-    return { label: "Drop rate", value: `${(player.dropRateAvg * 100).toFixed(0)}%`, fill: clamp01(player.dropRateAvg / DROP_RATE_BAR_MAX) };
+  if (pos === "WR" || pos === "TE") {
+    const v = player.dropRateAvg;
+    return { label: "Drop rate", tip: STAT_TIPS.drop, value: v != null ? `${(v * 100).toFixed(0)}%` : null, fill: v != null ? clamp01(v / DROP_RATE_BAR_MAX) : null };
   }
-  const label = pos === "WR" || pos === "TE" ? "Drop rate" : "Red-zone / game";
-  return { label, value: null, fill: null };
+  return { label: "Red-zone / game", value: null, fill: null };
 }
 function recentAvgSlot(player: PlayerScoreBreakdown, formatLabel: string): StatSlot {
-  return player.recentPprAvg != null
-    ? { label: `Recent avg · ${formatLabel}`, value: player.recentPprAvg.toFixed(1), fill: clamp01(player.recentPprAvg / RECENT_PPR_BAR_MAX) }
-    : { label: `Recent avg · ${formatLabel}`, value: null, fill: null };
+  return {
+    label: `Recent avg · ${formatLabel}`,
+    tip: STAT_TIPS.recent,
+    value: player.recentPprAvg != null ? player.recentPprAvg.toFixed(1) : null,
+    fill: player.recentPprAvg != null ? clamp01(player.recentPprAvg / RECENT_PPR_BAR_MAX) : null,
+  };
 }
 function buildQbStatSlots(player: PlayerScoreBreakdown, formatLabel: string): StatSlot[] {
-  const passAtt: StatSlot = player.recentVolumeAvg != null
-    ? { label: "Pass att / game", value: player.recentVolumeAvg.toFixed(1), fill: clamp01(player.recentVolumeAvg / PASS_ATT_BAR_MAX) }
-    : { label: "Pass att / game", value: null, fill: null };
-  const successRate: StatSlot = player.successRateAvg != null
-    ? { label: "Success rate", value: `${(player.successRateAvg * 100).toFixed(0)}%`, fill: clamp01(player.successRateAvg / QB_SUCCESS_RATE_BAR_MAX) }
-    : { label: "Success rate", value: null, fill: null };
-  const epa: StatSlot = player.epaPerPlayAvg != null
-    ? { label: "EPA / dropback", value: (player.epaPerPlayAvg >= 0 ? "+" : "") + player.epaPerPlayAvg.toFixed(2), fill: clamp01((player.epaPerPlayAvg - QB_EPA_BAR_MIN) / QB_EPA_BAR_RANGE) }
-    : { label: "EPA / dropback", value: null, fill: null };
+  const passAtt: StatSlot = {
+    label: "Pass att / game",
+    tip: STAT_TIPS.passAtt,
+    value: player.recentVolumeAvg != null ? player.recentVolumeAvg.toFixed(1) : null,
+    fill: player.recentVolumeAvg != null ? clamp01(player.recentVolumeAvg / PASS_ATT_BAR_MAX) : null,
+  };
+  const successRate: StatSlot = {
+    label: "Success rate",
+    tip: STAT_TIPS.successRate,
+    value: player.successRateAvg != null ? `${(player.successRateAvg * 100).toFixed(0)}%` : null,
+    fill: player.successRateAvg != null ? clamp01(player.successRateAvg / QB_SUCCESS_RATE_BAR_MAX) : null,
+  };
+  const epa: StatSlot = {
+    label: "EPA / dropback",
+    tip: STAT_TIPS.epa,
+    value: player.epaPerPlayAvg != null ? (player.epaPerPlayAvg >= 0 ? "+" : "") + player.epaPerPlayAvg.toFixed(2) : null,
+    fill: player.epaPerPlayAvg != null ? clamp01((player.epaPerPlayAvg - QB_EPA_BAR_MIN) / QB_EPA_BAR_RANGE) : null,
+  };
   return [recentAvgSlot(player, formatLabel), passAtt, successRate, epa];
 }
 function buildStatSlots(player: PlayerScoreBreakdown, formatLabel: string): StatSlot[] {
   const pos = player.position;
   if (pos === "QB") return buildQbStatSlots(player, formatLabel);
   const recentAvg = recentAvgSlot(player, formatLabel);
-  const opportunity: StatSlot = pos && VOLUME_UNIT_LABEL[pos] && player.recentVolumeAvg != null
-    ? { label: VOLUME_UNIT_LABEL[pos], value: player.recentVolumeAvg.toFixed(1), fill: clamp01(player.recentVolumeAvg / (VOLUME_BAR_MAX[pos] ?? 20)) }
-    : { label: (pos && VOLUME_UNIT_LABEL[pos]) || "Opportunity", value: null, fill: null };
-  const snapShare: StatSlot = player.snapShareAvg != null
-    ? { label: "Snap share", value: `${(player.snapShareAvg * 100).toFixed(0)}%`, fill: clamp01(player.snapShareAvg) }
-    : { label: "Snap share", value: null, fill: null };
+  const volumeLabel = (pos && VOLUME_UNIT_LABEL[pos]) || "Opportunity";
+  const opportunity: StatSlot = {
+    label: volumeLabel,
+    tip: pos === "RB" ? STAT_TIPS.touches : pos === "WR" || pos === "TE" ? STAT_TIPS.targets : undefined,
+    value: pos && VOLUME_UNIT_LABEL[pos] && player.recentVolumeAvg != null ? player.recentVolumeAvg.toFixed(1) : null,
+    fill:
+      pos && VOLUME_UNIT_LABEL[pos] && player.recentVolumeAvg != null
+        ? clamp01(player.recentVolumeAvg / (VOLUME_BAR_MAX[pos] ?? 20))
+        : null,
+  };
+  const snapShare: StatSlot = {
+    label: "Snap share",
+    tip: STAT_TIPS.snap,
+    value: player.snapShareAvg != null ? `${(player.snapShareAvg * 100).toFixed(0)}%` : null,
+    fill: player.snapShareAvg != null ? clamp01(player.snapShareAvg) : null,
+  };
   return [recentAvg, opportunity, snapShare, buildRzDropSlot(player)];
 }
 
@@ -236,13 +277,22 @@ function StatGrid({ player, formatLabel }: { player: PlayerScoreBreakdown; forma
   return (
     <div className={styles.stats}>
       {slots.map((s, i) => (
-        <div key={`${s.label}-${i}`} className={styles.st}>
+        <div
+          key={`${s.label}-${i}`}
+          className={`${styles.st}${s.tip ? ` ${styles.stTip}` : ""}`}
+          tabIndex={s.tip ? 0 : undefined}
+        >
           <div className={styles.stL}>{s.label}</div>
           <div className={`${styles.stV} ${styles.n}`}>{s.value ?? "—"}</div>
           {s.fill != null && (
             <div className={styles.stB}>
               <i style={{ width: `${s.fill * 100}%` }} />
             </div>
+          )}
+          {s.tip && (
+            <span className={styles.tip} role="tooltip">
+              {s.tip}
+            </span>
           )}
         </div>
       ))}
