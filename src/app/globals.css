@@ -10,6 +10,7 @@
  * colors) rather than a literal negative of the dark palette.
  */
 :root {
+  color-scheme: light;
   --background: #f5f7f5;
   --foreground: #0b0e0c;
   --surface: #ffffff;
@@ -55,8 +56,14 @@
   --font-mono: var(--font-mono-loaded), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
+/* Dark base tokens. Applied when the OS prefers dark AND the user hasn't
+   forced light, OR when the user has explicitly forced dark (data-theme).
+   The two selectors carry identical declarations because plain CSS can't
+   share a ruleset across a media-query boundary. See useTheme.ts / the
+   sidebar theme toggle. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --background: #0b0e0c;
     --foreground: #f2f5f3;
     --surface: #12151a;
@@ -78,6 +85,29 @@
     --pos-k: #9aa4b2;
     --pos-dst: #e8c468;
   }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0b0e0c;
+  --foreground: #f2f5f3;
+  --surface: #12151a;
+  --surface-glass: rgba(18, 21, 26, 0.7);
+  --surface-sunken: #08090a;
+  --accent: #00e07f;
+  --accent-secondary: #00b868;
+  --accent-ink: #06120c;
+  --good: #00e07f;
+  --bad: #ff4d4d;
+  --caution: #ffb020;
+  --info: #4fc3f7;
+  --premium: #e8c468;
+  --premium-ink: #221802;
+  --pos-qb: #a78bfa;
+  --pos-rb: #2dd4bf;
+  --pos-wr: #5aa9ff;
+  --pos-te: #f77fb0;
+  --pos-k: #9aa4b2;
+  --pos-dst: #e8c468;
 }
 
 body {
@@ -140,7 +170,7 @@ body {
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --alm-page-bg: #14120e;
     --alm-paper: #1c1913;
     --alm-card: #262219;
@@ -161,6 +191,27 @@ body {
     --alm-info: #86adbc;
     --alm-accent-ink: #14120e;
   }
+}
+:root[data-theme="dark"] {
+  --alm-page-bg: #14120e;
+  --alm-paper: #1c1913;
+  --alm-card: #262219;
+  --alm-surface: #211d16;
+  --alm-sunken: #15130e;
+  --alm-surface-sunken: #100e0a;
+  --alm-ink: #ece5d5;
+  --alm-muted: #a89f8c;
+  --alm-faint: #726b5b;
+  --alm-line: #39342a;
+  --alm-line2: #2b271f;
+  --alm-green: #4fd09a;
+  --alm-green-2: #2f9e73;
+  --alm-pine: #124030;
+  --alm-pine-ink: #f1ece1;
+  --alm-brass: #d0a45c;
+  --alm-red: #d8664f;
+  --alm-info: #86adbc;
+  --alm-accent-ink: #14120e;
 }
 
 /*

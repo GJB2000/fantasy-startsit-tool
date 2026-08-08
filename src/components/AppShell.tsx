@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useRosterModal } from "@/lib/useRosterModal";
 import { useScoringFormat } from "@/lib/useScoringFormat";
+import { useTheme } from "@/lib/useTheme";
 import { useSleeperConnection } from "@/lib/useSleeperConnection";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
 import { RosterManager } from "./RosterManager";
@@ -159,6 +160,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [rosterOpen, setRosterOpen] = useRosterModal();
   const [connection] = useSleeperConnection();
   const { rostered } = useRosteredPlayers();
+  const [theme, setTheme] = useTheme();
+  const [systemDark, setSystemDark] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Close the mobile drawer whenever the route changes (covers link taps,
@@ -167,6 +170,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberately syncing drawer state to route changes (an external navigation event), not deriving state from props.
     setMobileOpen(false);
   }, [pathname]);
+
+  // Track the OS preference so the toggle knows the effective theme while
+  // in "system" mode.
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing to the OS media-query state (an external source), not deriving from props.
+    setSystemDark(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  // Stamp (or clear) the data-theme override on <html> whenever it changes.
+  useEffect(() => {
+    const el = document.documentElement;
+    if (theme === "system") delete el.dataset.theme;
+    else el.dataset.theme = theme;
+  }, [theme]);
+
+  const effectiveDark = theme === "dark" || (theme === "system" && systemDark);
 
   return (
     <div className="flex min-h-full w-full flex-col md:flex-row">
@@ -296,6 +319,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     style={active ? { background: "rgba(79, 168, 120, 0.28)" } : undefined}
                   >
                     {FORMAT_SHORT[f]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5 rounded-[4px] bg-white/[0.04] px-2.5 py-2">
+            <span className="font-engraved text-[9.5px] uppercase tracking-[0.12em] text-[#9a8f7a]">Theme</span>
+            <div className="flex gap-1" role="group" aria-label="Theme">
+              {([
+                ["light", "Light"],
+                ["dark", "Dark"],
+              ] as const).map(([value, label]) => {
+                const active = value === "dark" ? effectiveDark : !effectiveDark;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setTheme(value)}
+                    aria-pressed={active}
+                    className={`font-mono flex-1 rounded-[3px] px-1 py-1 text-[10.5px] font-bold transition-colors ${
+                      active ? "text-[#f0e9db]" : "text-[#8a7f6c] hover:bg-white/[0.06] hover:text-[#ece5d5]"
+                    }`}
+                    style={active ? { background: "rgba(79, 168, 120, 0.28)" } : undefined}
+                  >
+                    {label}
                   </button>
                 );
               })}

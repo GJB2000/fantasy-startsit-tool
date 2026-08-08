@@ -64,6 +64,17 @@ export default function RootLayout({
       lang="en"
       className={`h-full antialiased ${barlowCondensed.variable} ${inter.variable} ${jetbrainsMono.variable} ${jost.variable} ${cinzel.variable}`}
     >
+      <head>
+        {/* Apply a saved theme override before first paint to avoid a flash
+            of the wrong theme. "system" (no key) falls through to the CSS
+            prefers-color-scheme media query. See useTheme.ts. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch(e){}",
+          }}
+        />
+      </head>
       <body className="min-h-full font-sans">
         <AppShell>{children}</AppShell>
       </body>
