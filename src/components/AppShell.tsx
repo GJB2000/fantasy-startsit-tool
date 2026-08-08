@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
@@ -182,11 +182,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  // Stamp (or clear) the data-theme override on <html> whenever it changes.
+  // Keep <html data-theme> and the `theme` cookie in sync with the store, so
+  // the server can render the right theme on the next load (no flash). The
+  // FIRST run is skipped: the server already rendered data-theme from the
+  // cookie, and `theme` is still the pre-hydration "system" default here —
+  // clearing data-theme now would clobber that SSR value and cause a flash.
+  // From the second run on (the hydrated value, or a user toggle) it applies.
+  const themeSyncedRef = useRef(false);
   useEffect(() => {
+    if (!themeSyncedRef.current) {
+      themeSyncedRef.current = true;
+      return;
+    }
     const el = document.documentElement;
-    if (theme === "system") delete el.dataset.theme;
-    else el.dataset.theme = theme;
+    if (theme === "system") {
+      delete el.dataset.theme;
+      document.cookie = "theme=; path=/; max-age=0; samesite=lax";
+    } else {
+      el.dataset.theme = theme;
+      document.cookie = `theme=${theme}; path=/; max-age=31536000; samesite=lax`;
+    }
   }, [theme]);
 
   const effectiveDark = theme === "dark" || (theme === "system" && systemDark);

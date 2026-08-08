@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Archivo, Barlow_Condensed, Inter, JetBrains_Mono, Jost } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
 import "./globals.css";
@@ -54,19 +55,25 @@ export const metadata: Metadata = {
   description: "Start/sit calls, trade grades, and waiver targets — real data, a straight answer, and the reasoning behind it.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Read the theme override from a cookie so the correct data-theme is
+  // rendered server-side — no flash of the wrong theme before hydration.
+  // Absent ("system") falls through to the CSS prefers-color-scheme media
+  // query. The client keeps this cookie in sync (see AppShell/useTheme).
+  const themeCookie = (await cookies()).get("theme")?.value;
+  const dataTheme = themeCookie === "light" || themeCookie === "dark" ? themeCookie : undefined;
+
   return (
-    // suppressHydrationWarning: AppShell stamps a `data-theme` override on
-    // <html> after hydration (see useTheme.ts) for users who've picked a
-    // theme other than their OS default; this keeps that expected client-only
-    // attribute from tripping a hydration warning. Also absorbs attributes
-    // some browser extensions inject on <html>.
+    // suppressHydrationWarning: defensive against attributes some browser
+    // extensions inject on <html>; the data-theme above is rendered on both
+    // server and client from the same cookie, so it doesn't itself mismatch.
     <html
       lang="en"
+      data-theme={dataTheme}
       suppressHydrationWarning
       className={`h-full antialiased ${barlowCondensed.variable} ${inter.variable} ${jetbrainsMono.variable} ${jost.variable} ${cinzel.variable}`}
     >
