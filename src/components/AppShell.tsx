@@ -324,30 +324,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               })}
             </div>
           </div>
-          <div className="flex flex-col gap-1.5 rounded-[4px] bg-white/[0.04] px-2.5 py-2">
+          <div className="flex items-center justify-between rounded-[4px] bg-white/[0.04] px-2.5 py-2">
             <span className="font-engraved text-[9.5px] uppercase tracking-[0.12em] text-[#9a8f7a]">Theme</span>
-            <div className="flex gap-1" role="group" aria-label="Theme">
-              {([
-                ["light", "Light"],
-                ["dark", "Dark"],
-              ] as const).map(([value, label]) => {
-                const active = value === "dark" ? effectiveDark : !effectiveDark;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setTheme(value)}
-                    aria-pressed={active}
-                    className={`font-mono flex-1 rounded-[3px] px-1 py-1 text-[10.5px] font-bold transition-colors ${
-                      active ? "text-[#f0e9db]" : "text-[#8a7f6c] hover:bg-white/[0.06] hover:text-[#ece5d5]"
-                    }`}
-                    style={active ? { background: "rgba(79, 168, 120, 0.28)" } : undefined}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
+            <button
+              type="button"
+              onClick={() => setTheme(effectiveDark ? "light" : "dark")}
+              aria-label={effectiveDark ? "Switch to light theme" : "Switch to dark theme"}
+              title={effectiveDark ? "Switch to light theme" : "Switch to dark theme"}
+              className="flex h-6 w-6 items-center justify-center rounded-[3px] text-[#d8cdb8] transition-colors hover:bg-white/[0.08]"
+            >
+              {effectiveDark ? (
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+                  <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+                </svg>
+              )}
+            </button>
           </div>
         </div>
       </aside>
