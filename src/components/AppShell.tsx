@@ -16,6 +16,13 @@ const FORMAT_LABEL: Record<ScoringFormat, string> = {
   standard: "Standard",
 };
 
+const SCORING_FORMATS: ScoringFormat[] = ["ppr", "half_ppr", "standard"];
+const FORMAT_SHORT: Record<ScoringFormat, string> = {
+  ppr: "PPR",
+  half_ppr: "Half",
+  standard: "Std",
+};
+
 const LINKS: { href: string; label: string; icon: React.ReactNode }[] = [
   {
     href: "/",
@@ -148,7 +155,7 @@ function LogoTile({ size = 30 }: { size?: number }) {
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [scoringFormat] = useScoringFormat();
+  const [scoringFormat, setScoringFormat] = useScoringFormat();
   const [rosterOpen, setRosterOpen] = useRosterModal();
   const [connection] = useSleeperConnection();
   const { rostered } = useRosteredPlayers();
@@ -271,14 +278,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {connection ? connection.leagueName : "Connect Sleeper →"}
             </span>
           </button>
-          <div className="flex items-center justify-between rounded-[4px] bg-white/[0.04] px-2.5 py-2">
+          <div className="flex flex-col gap-1.5 rounded-[4px] bg-white/[0.04] px-2.5 py-2">
             <span className="font-engraved text-[9.5px] uppercase tracking-[0.12em] text-[#9a8f7a]">Scoring</span>
-            <span
-              className="font-mono rounded-[3px] px-2 py-0.5 text-[11px] font-bold text-[#f0e9db]"
-              style={{ background: "rgba(79, 168, 120, 0.28)" }}
-            >
-              {FORMAT_LABEL[scoringFormat]}
-            </span>
+            <div className="flex gap-1" role="group" aria-label="Scoring format">
+              {SCORING_FORMATS.map((f) => {
+                const active = f === scoringFormat;
+                return (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setScoringFormat(f)}
+                    aria-pressed={active}
+                    title={FORMAT_LABEL[f]}
+                    className={`font-mono flex-1 rounded-[3px] px-1 py-1 text-[10.5px] font-bold transition-colors ${
+                      active ? "text-[#f0e9db]" : "text-[#8a7f6c] hover:bg-white/[0.06] hover:text-[#ece5d5]"
+                    }`}
+                    style={active ? { background: "rgba(79, 168, 120, 0.28)" } : undefined}
+                  >
+                    {FORMAT_SHORT[f]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </aside>
