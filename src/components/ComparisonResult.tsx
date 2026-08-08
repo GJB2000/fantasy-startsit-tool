@@ -53,6 +53,21 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
+function ordinal(n: number): string {
+  const rem100 = n % 100;
+  if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}
+
 // ---- confidence (unchanged logic; see prior history for the numbers) ----
 interface ConfidenceRates {
   confident: number;
@@ -112,8 +127,14 @@ function healthToneClass(player: PlayerScoreBreakdown): string | undefined {
   return styles.aiGood;
 }
 
-// ---- case for / against (unchanged copy logic) ----
-function buildCaseFor(player: PlayerScoreBreakdown): string {
+// ---- case for / against ----
+// Every branch resolves to a specific number from the player's own
+// breakdown. No vague qualifiers ("softer defense," "in form lately"),
+// no unresolved hedging, no process language — a newsletter-voice claim
+// backed by a figure, at the granularity our real data supports (team-
+// level defense vs. position, not per-defender coverage, which this data
+// source doesn't carry — see Data Source Notes).
+function buildCaseFor(player: PlayerScoreBreakdown, formatLabel: string): string {
   if (player.playerId != null && !player.team) {
     return `No game this week — a free agent isn't startable until they sign with a team.`;
   }
@@ -121,17 +142,17 @@ function buildCaseFor(player: PlayerScoreBreakdown): string {
   const m = player.matchupContext;
   const games = player.gamesUsedForRecent;
   if (m && matchupLabel(m.diffFromAverage).tone === "good") {
-    return `Draws a favorable matchup — ${m.opponentTeam} has been one of the softer defenses against ${pos}s lately.`;
+    return `${m.opponentTeam} allows the ${ordinal(m.rank)}-most points to ${pos}s — ${m.allowedPerGame.toFixed(1)} a game, ${(m.allowedPerGame - m.leagueAverage).toFixed(1)} above the ${m.leagueAverage.toFixed(1)} league average.`;
   }
   if (player.recentPprAvg != null && player.recentPprCeiling != null) {
-    return `In form lately — averaging ${player.recentPprAvg.toFixed(1)} PPR over the last ${games} game${
+    return `Averaging ${player.recentPprAvg.toFixed(1)} ${formatLabel} over ${games} recent game${
       games === 1 ? "" : "s"
-    }, with a recent high of ${player.recentPprCeiling.toFixed(1)}.`;
+    }, with a ${player.recentPprCeiling.toFixed(1)}-point ceiling.`;
   }
   if (player.finalScore != null) {
-    return `Projects for ${player.finalScore.toFixed(1)} PPR points this week.`;
+    return `Projects for ${player.finalScore.toFixed(1)} ${formatLabel} points this week.`;
   }
-  return `Limited recent data, but still worth a look here.`;
+  return `No recent games and no matchup data yet — nothing concrete to build a case on.`;
 }
 function buildCaseAgainst(player: PlayerScoreBreakdown): string {
   if (player.playerId != null && !player.team) {
@@ -139,16 +160,21 @@ function buildCaseAgainst(player: PlayerScoreBreakdown): string {
   }
   const pos = (player.position && POSITION_DISPLAY_LABEL[player.position]) || "this spot";
   const m = player.matchupContext;
-  if (player.injuryStatus) return `Injury risk — currently listed ${player.injuryStatus}.`;
+  const games = player.gamesUsedForRecent;
+  if (player.injuryStatus) return `Currently listed ${player.injuryStatus} — a real chance of not playing.`;
   if (player.isOnByeThisWeek) return `On a bye this week — won't score at all.`;
   if (m && matchupLabel(m.diffFromAverage).tone === "bad") {
-    return `Tough matchup — ${m.opponentTeam} has been one of the stingier defenses against ${pos}s.`;
+    return `${m.opponentTeam} allows the ${ordinal(m.teamCount - m.rank + 1)}-fewest points to ${pos}s — ${m.allowedPerGame.toFixed(1)} a game, ${(m.leagueAverage - m.allowedPerGame).toFixed(1)} below the ${m.leagueAverage.toFixed(1)} league average.`;
   }
-  if (player.dataQuality !== "full") return `Thin recent sample — limited data makes this projection less certain.`;
+  if (player.dataQuality !== "full") {
+    return games === 0
+      ? `No recent games to go on — this projection leans on season-long and matchup data alone.`
+      : `Only ${games} recent game${games === 1 ? "" : "s"} to go on — a thin sample that widens the range of outcomes.`;
+  }
   if (player.recentPprFloor != null && player.recentPprAvg != null && player.recentPprFloor < player.recentPprAvg * 0.6) {
-    return `Boom-or-bust — has dipped as low as ${player.recentPprFloor.toFixed(1)} in a recent game.`;
+    return `Boom-or-bust — as low as ${player.recentPprFloor.toFixed(1)} in a recent game against a ${player.recentPprAvg.toFixed(1)} average.`;
   }
-  return `Few red flags — the main risk is normal week-to-week variance.`;
+  return `No injury, bye, or matchup flags — the main risk is normal week-to-week variance.`;
 }
 
 // ---- per-position stat grid (same fields as before) ----
@@ -389,7 +415,7 @@ function PlayerCard({
       <div className={styles.case}>
         <div className={styles.caseCol}>
           <div className={`${styles.caseH} ${styles.caseFor}`}>Case for</div>
-          <p>{buildCaseFor(player)}</p>
+          <p>{buildCaseFor(player, formatLabel)}</p>
         </div>
         <div className={styles.caseCol}>
           <div className={`${styles.caseH} ${styles.caseAgainst}`}>Case against</div>

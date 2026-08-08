@@ -139,11 +139,11 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
 
   const matchupModifier = computeMatchupModifier(input.matchupContext);
   if (input.matchupContext) {
-    const { diffFromAverage, opponentTeam, rank, teamCount, position: matchupPosition } =
+    const { diffFromAverage, opponentTeam, rank, teamCount, allowedPerGame, leagueAverage, position: matchupPosition } =
       input.matchupContext;
     const direction = diffFromAverage >= 0 ? "friendlier" : "tougher";
     notes.push(
-      `In their last game (vs ${opponentTeam}), that defense ranked ${rank} of ${teamCount} in points allowed to ${matchupPosition}s — a ${direction}-than-average matchup.`
+      `Faces ${opponentTeam}, ranked ${rank} of ${teamCount} in points allowed to ${matchupPosition}s (${allowedPerGame.toFixed(1)}/game vs a ${leagueAverage.toFixed(1)} league average) — a ${direction}-than-average matchup.`
     );
   } else {
     notes.push("No matchup data available for this player's most recent opponent.");
@@ -616,8 +616,14 @@ export function compareBreakdowns(
       const separationPick = top.separation > second.separation ? top : second;
       if (targetSharePick.playerId === separationPick.playerId) {
         const composite = targetSharePick;
+        const winnerIsTop = composite.playerId === top.playerId;
+        const winTs = winnerIsTop ? top.targetShare : second.targetShare;
+        const loseTs = winnerIsTop ? second.targetShare : top.targetShare;
+        const winSep = winnerIsTop ? top.separation : second.separation;
+        const loseSep = winnerIsTop ? second.separation : top.separation;
+        const otherWr = winnerIsTop ? second : top;
         overrideNotes.push(
-          `${composite.displayName} leads both target share and average separation from the defender recently — a strong secondary signal on this close call.`
+          `${composite.displayName} leads ${otherWr.displayName} in both target share (${(winTs * 100).toFixed(0)}% to ${(loseTs * 100).toFixed(0)}%) and average separation (${winSep.toFixed(1)} to ${loseSep.toFixed(1)} yards) — the tiebreaker on this close call.`
         );
         winner = composite;
         isCloseCall = false;
@@ -653,20 +659,25 @@ export function compareBreakdowns(
     }
   }
 
+  const runnerUp = ranked.find((c) => c.playerId !== winner.playerId && c.finalScore != null) ?? null;
+  const winScore = winner.finalScore;
+  const upScore = runnerUp?.finalScore ?? null;
+  const fmt1 = (n: number) => n.toFixed(1);
+
   let headline: string;
-  if (wasOverridden) {
+  if (runnerUp == null || winScore == null || upScore == null) {
     headline =
-      ranked.length === 1
-        ? `Start ${winner.displayName} — nobody else in this comparison is currently available.`
+      wasOverridden && ranked.length === 1
+        ? `Start ${winner.displayName} — the only player in this comparison active this week.`
         : `Start ${winner.displayName}.`;
-  } else if (seasonGuardrailTriggered) {
-    headline = `Start ${winner.displayName} — the far stronger season-long play, despite a thin recent sample this week.`;
+  } else if (seasonGuardrailTriggered && winner.seasonPprAvg != null && runnerUp.seasonPprAvg != null) {
+    headline = `Start ${winner.displayName} over ${runnerUp.displayName} — ${fmt1(winner.seasonPprAvg)} vs ${fmt1(runnerUp.seasonPprAvg)} points per game on the season outweighs a thin recent sample.`;
   } else if (isCloseCall) {
-    headline = `Close call — lean ${winner.displayName}, but it's not a lock.`;
+    headline = `Close call — ${winner.displayName} over ${runnerUp.displayName} by just ${fmt1(Math.abs(winScore - upScore))} projected points (${fmt1(winScore)} to ${fmt1(upScore)}).`;
   } else if (hasLimitedData) {
-    headline = `Start ${winner.displayName} — though we have limited recent data on at least one of these players.`;
+    headline = `Start ${winner.displayName} over ${runnerUp.displayName} — ${fmt1(winScore)} to ${fmt1(upScore)} projected, though the recent sample on at least one player is thin.`;
   } else {
-    headline = `Start ${winner.displayName}.`;
+    headline = `Start ${winner.displayName} over ${runnerUp.displayName} — ${fmt1(Math.abs(winScore - upScore))} more projected points (${fmt1(winScore)} to ${fmt1(upScore)}).`;
   }
 
   const reasoning = buildReasoning(breakdowns, overrideNotes, isCloseCall, wasOverridden);
