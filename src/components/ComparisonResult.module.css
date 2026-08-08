@@ -110,9 +110,9 @@
 .pbig { font-family: var(--fd); font-weight: 600; font-size: 56px; line-height: 0.78; letter-spacing: -0.03em; }
 .pbig small { font-family: var(--fl); font-size: 11px; letter-spacing: 0.06em; color: var(--muted); margin-left: 8px; }
 .rng { padding-bottom: 8px; }
-.rtrack { position: relative; height: 2px; background: var(--sunken); margin-bottom: 9px; }
+.rtrack { position: relative; height: 4px; background: var(--sunken); margin-bottom: 9px; }
 .rfill { position: absolute; height: 100%; background: var(--green); }
-.rmark { position: absolute; top: -4px; width: 1.5px; height: 10px; background: var(--ink); }
+.rmark { position: absolute; top: -3px; width: 1.5px; height: 10px; background: var(--ink); }
 .rsingle { font-family: var(--fl); font-size: 9.5px; letter-spacing: 0.04em; color: var(--faint); padding-bottom: 12px; }
 .rends { display: flex; justify-content: space-between; }
 .rends span { font-family: var(--fl); font-size: 9px; letter-spacing: 0.05em; color: var(--faint); }
@@ -124,7 +124,7 @@
 .st:nth-child(even) { padding-left: 16px; }
 .stL { font-family: var(--fl); font-size: 8.5px; letter-spacing: 0.05em; color: var(--muted); }
 .stV { margin-top: 3px; font-family: var(--fd); font-weight: 600; font-size: 21px; letter-spacing: -0.01em; }
-.stB { margin-top: 7px; margin-bottom: 2px; height: 2px; background: var(--sunken); }
+.stB { margin-top: 7px; margin-bottom: 2px; height: 4px; background: var(--sunken); }
 .stB i { display: block; height: 100%; background: var(--green); }
 
 /* stat hover tooltips — a brief plain-English description of each stat */
