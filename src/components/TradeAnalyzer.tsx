@@ -61,7 +61,7 @@ export function TradeAnalyzer() {
   return (
     <div className="mx-auto mt-10 w-full max-w-3xl">
       <div className="rounded-[6px] border border-foreground/12 bg-surface p-5 shadow-sm sm:p-6">
-        <div className="mb-5 flex items-baseline justify-between gap-3 border-b border-foreground/15 pb-3">
+        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3 border-b border-foreground/15 pb-3">
           <span
             className="text-[12px] uppercase tracking-[0.1em] text-foreground/70"
             style={{ fontFamily: "var(--font-engraved)" }}

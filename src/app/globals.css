@@ -81,7 +81,12 @@
 }
 
 body {
-  background: var(--background);
+  /* Ground the whole app in the editorial page color (theme-aware) so any
+     area a page's .matchup-page <main> doesn't cover — e.g. short mobile
+     landing pages — matches seamlessly instead of showing the old default
+     background as white space. The app is fully editorial (see item 118);
+     the sidebar/top bar carry their own opaque dark background. */
+  background: var(--alm-page-bg);
   color: var(--foreground);
   font-family: var(--font-sans);
 }

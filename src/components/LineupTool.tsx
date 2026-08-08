@@ -131,7 +131,7 @@ export function LineupTool() {
         )}
 
         {/* Scoring */}
-        <div className="flex items-center justify-between gap-3 border-t border-foreground/[0.09] px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-foreground/[0.09] px-4 py-3">
           <span className="font-engraved text-[10px] uppercase tracking-[0.1em] text-foreground/50">Scoring</span>
           <ScoringFormatToggle
             editorial

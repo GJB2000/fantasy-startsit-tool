@@ -103,7 +103,7 @@ export function StartSitTool() {
     <div className="mx-auto grid w-full max-w-5xl grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_300px]">
       <div className="flex flex-col gap-4">
         <div className="rounded-[6px] border border-foreground/12 bg-surface p-5 shadow-sm sm:p-6">
-          <div className="mb-5 flex items-baseline justify-between gap-3 border-b border-foreground/15 pb-3">
+          <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3 border-b border-foreground/15 pb-3">
             <span
               className="text-[12px] uppercase tracking-[0.1em] text-foreground/70"
               style={{ fontFamily: "var(--font-engraved)" }}
