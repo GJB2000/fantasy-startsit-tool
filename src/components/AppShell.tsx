@@ -124,12 +124,12 @@ function LogoTile({ size = 30 }: { size?: number }) {
         <path d="M17 30 H28 V61 H39 V70 H17 Z" fill={fg} />
         {/* F */}
         <path d="M72 30 H91 V39 H83 V45.5 H88 V54.5 H83 V70 H72 Z" fill={fg} />
-        {/* Football */}
-        <ellipse cx="50" cy="50" rx="12.5" ry="22" fill={fg} />
-        <line x1="50" y1="33" x2="50" y2="67" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
-        <line x1="44.5" y1="43" x2="55.5" y2="43" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
-        <line x1="44.5" y1="50" x2="55.5" y2="50" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
-        <line x1="44.5" y1="57" x2="55.5" y2="57" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
+        {/* Football — centered in the gap between the L and the F */}
+        <ellipse cx="55.5" cy="50" rx="12.5" ry="22" fill={fg} />
+        <line x1="55.5" y1="33" x2="55.5" y2="67" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
+        <line x1="50" y1="43" x2="61" y2="43" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
+        <line x1="50" y1="50" x2="61" y2="50" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
+        <line x1="50" y1="57" x2="61" y2="57" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
       </svg>
     </span>
   );
