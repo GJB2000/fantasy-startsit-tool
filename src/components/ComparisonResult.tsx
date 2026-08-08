@@ -121,7 +121,7 @@ function buildCaseFor(player: PlayerScoreBreakdown): string {
   if (player.recentPprAvg != null && player.recentPprCeiling != null) {
     return `In form lately — averaging ${player.recentPprAvg.toFixed(1)} PPR over the last ${games} game${
       games === 1 ? "" : "s"
-    }, with a ceiling of ${player.recentPprCeiling.toFixed(1)}.`;
+    }, with a recent high of ${player.recentPprCeiling.toFixed(1)}.`;
   }
   if (player.finalScore != null) {
     return `Projects for ${player.finalScore.toFixed(1)} PPR points this week.`;
@@ -224,8 +224,8 @@ function RangeLine({ player }: { player: PlayerScoreBreakdown }) {
         {proj != null && <span className={styles.rmark} style={{ left: `calc(${toPct(proj)}% - 0.75px)` }} />}
       </div>
       <div className={styles.rends}>
-        <span>Floor {floor.toFixed(1)}</span>
-        <span>Ceiling {ceiling.toFixed(1)}</span>
+        <span>Recent low {floor.toFixed(1)}</span>
+        <span>Recent high {ceiling.toFixed(1)}</span>
       </div>
     </div>
   );
