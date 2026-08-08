@@ -73,8 +73,8 @@
 .vnote { margin-top: 13px; font-size: 12.5px; line-height: 1.55; color: rgba(241, 236, 225, 0.68); max-width: 54ch; }
 
 /* cards */
-.card { position: relative; background: var(--card); border: 1.5px solid var(--ink); border-top: 0; padding: 22px 28px; }
-.card:first-of-type { margin-top: 15px; }
+.card { position: relative; background: var(--card); border: 1.5px solid var(--ink); border-radius: 4px; margin-top: 12px; padding: 22px 28px; }
+.card:first-of-type { margin-top: 20px; }
 .bench { background: transparent; border-color: var(--line); }
 .chead { display: grid; grid-template-columns: auto 1fr auto; gap: 15px; align-items: center; }
 .rk { font-family: var(--fd); font-weight: 600; font-size: 40px; line-height: 0.8; color: var(--green); }
