@@ -7529,7 +7529,114 @@ single-season numbers for those specific constants.
       given stale-while-revalidate). Vercel Blob/KV is NO LONGER needed —
       that part of the original #29 is dropped.
 
-### Open items (as of item 126 — pick up here)
+127. **Rewrote every page's heading and subheading (presentation only, no
+    engine change).** The editorial pass had given each page a rhetorical-
+    question `<h1>` ("Who should you start?") that read as corny. Replaced
+    (via `AskUserQuestion`, plain-direct over editorial-declarative) with
+    all-caps tool names: START / SIT, TRADE ANALYZER, OPTIMIZE LINEUP,
+    PLAYER RANKINGS, WAIVER TARGETS, ENGINE BACKTEST; Home `<h1>` →
+    FANTASY TOOLKIT BY LEGITFOOTBALL.COM. Subheadings trimmed to one short
+    line each ("Who to start when two players compete for one spot.",
+    "Who wins the trade, by rest-of-season value.", etc.). Text-only edits
+    to each `src/app/*/page.tsx` header. Committed `7dcbb7e`.
+128. **Brand identity: real LF-football logo, matching favicon, uppercased
+    wordmark/brand everywhere.** (a) Replaced the placeholder green-cube
+    `LogoTile` in `AppShell.tsx` with an inline-SVG recreation of the
+    LF-football mark (block "L", vertical football with laces, block "F";
+    cream `#f4efe4` on a near-black tile) — crisp at any size, no asset
+    file; the football was then re-centered in the L→F gap on request.
+    (b) Matching favicon: deleted `src/app/favicon.ico`, added
+    `src/app/icon.svg` (same mark) which Next App Router auto-serves as the
+    tab icon. (c) Sidebar wordmark → all-caps LEGITFOOTBALL; tagline
+    "Fantasy Almanac" → "Fantasy Toolkit". (d) Uppercased EVERY user-facing
+    "Legitfootball" display instance → LEGITFOOTBALL (metadata title, the
+    six page eyebrows, the newsletter heading, result colophons/mastheads
+    in `ComparisonResult.tsx`/`TradeResult.tsx`); code comments left in
+    normal case. Commits `af6e769`/`eba8406` (logo + favicon + centering),
+    `3779f18` (wordmark/tagline), `1f357ab` (uppercase brand).
+129. **Sidebar scoring is now an interactive control, not a read-only
+    chip.** The sidebar footer's "Scoring" indicator became a compact
+    PPR/Half/Std segmented control (`AppShell.tsx`), writing through the
+    shared `useScoringFormat` store (item 88) so it syncs instantly with
+    every tool page's own toggle. Committed `0e27293`.
+130. **Light/dark theme toggle in the sidebar — SSR cookie-based, flash-
+    free.** The app was `prefers-color-scheme`-only; added a manual
+    override. New `useTheme` store (`src/lib/useTheme.ts` — "light" |
+    "dark" | "system", persisted, shared like `useScoringFormat`).
+    `globals.css` gained `data-theme` overrides that beat the media query:
+    the two dark token blocks (base `--*` and the editorial `--alm-*`) are
+    each guarded with `:root:not([data-theme="light"])` for the OS-follow
+    case PLUS a duplicated explicit `:root[data-theme="dark"]` block for a
+    forced-dark override (plain CSS can't share a ruleset across a media-
+    query boundary); `color-scheme` added per theme. UI: a single sun/moon
+    button in the sidebar footer under Scoring (an earlier two-segment
+    Light/Dark control was replaced). **Flash-free via a `theme` cookie**:
+    `layout.tsx` is now `async`, reads the cookie server-side
+    (`next/headers`) and renders `data-theme` in the SSR HTML; `AppShell`'s
+    effect mirrors the chosen theme into that cookie AND skips its first
+    (pre-hydration) run so it doesn't clobber the server-rendered
+    attribute. `suppressHydrationWarning` on `<html>`. An earlier
+    pre-paint inline-`<script>` approach (`next/script` beforeInteractive)
+    was tried and **reverted** — React 19 flags any inline script rendered
+    through the tree ("script tag" warning) and it caused a hydration
+    mismatch; the cookie/SSR approach is clean. One tradeoff: reading the
+    cookie opts pages into dynamic rendering (acceptable — the tools fetch
+    live data client-side anyway, and item-126's API-data caching is
+    unaffected). Commits `0f4cd24` (initial), `9e5890c` (sun/moon),
+    `b6301ae` (error fix), `cf44a66` (cookie/SSR).
+131. **Mobile polish batch.** (a) **Background white-space**: short mobile
+    pages showed the near-white root `--background` below `.matchup-page`'s
+    `<main>`; fixed with `body { background: var(--alm-page-bg) }` (theme-
+    aware editorial ground) so any uncovered area matches. (b) **Scoring
+    toggle clipped** ("STAN…") in the Trade/Start-Sit/Lineup card headers
+    at 375px — added `flex-wrap` so the segmented control drops to its own
+    line (Waivers/Rankings already wrapped). (c) **iOS auto-zoom** on input
+    focus: `@media (max-width:640px){ input:not([checkbox/radio]),textarea,
+    select { font-size:16px !important } }` — iOS Safari zooms when a
+    focused field is under 16px; user pinch-zoom left intact. (d) **Roster
+    modal**: `min-w-0` on the Sleeper username field so it stops overflowing
+    its flex row; dropped the "no need to add players one by one" copy.
+    (e) **Start/Sit player card**: Weather/Status stacked vertically on
+    mobile (`.aside` was overridden to `flex-direction:row`, which looked
+    misaligned); "Health" label renamed to "Status". Commits `879f951`
+    (bg + toggle wrap), `407aae7` (iOS zoom), `a040537` (roster modal),
+    `57bb3d1` (Start/Sit card).
+132. **Free agents: searchable, scorable, projected 0 — fixes real players
+    missing from search (reported: Jonnu Smith).** SportsDataIO lists an
+    offseason free agent as `Status:"Inactive"` / `Team:null`, so item
+    104's `isRosterable` dropped them from BOTH search and scoring — even
+    though they played last season (Jonnu Smith: 17 games for PIT in 2025,
+    85.2 PPR). Since this tool analyzes last-completed-season data, such
+    players belong in search. Fix (`players.ts`): a new
+    `getPlayedLastSeasonPlayerIds()` (PlayerIDs with `Played > 0` in the
+    last completed season's `PlayerSeasonStats`, cached, degrades to empty
+    on fetch failure) now widens the SEARCH pool (`getActiveExtendedPlayers`)
+    AND a new `getScorablePlayerById` (used by `buildComparisonInput`'s
+    player resolution — the scoring path had independently re-resolved via
+    the narrow set, so a searchable FA still came back "insufficient data")
+    to include anyone who logged a game last season. The internal current-
+    roster set (`getActivePlayers`, used by waivers/`hasLimitedTeammate`)
+    is deliberately UNCHANGED. Guarded the teammate check against a null
+    team. **Then, per follow-up, a free agent is projected 0**: a resolved
+    player with no NFL team has no upcoming game, so `withFreeAgentProjection`
+    (`scoreExtended.ts`) zeros `finalScore`/`recentPprFloor`/`recentPprCeiling`
+    and prepends an explanatory note (skill + K only — D/ST always has a
+    team). The Start/Sit card shows Status "Free agent" (red) and free-
+    agent-aware Case for/against (instead of the contradictory "recent high
+    of 0.0" the zeroing would otherwise produce). **Partially supersedes
+    item 104's "an Inactive player with no team is an unsigned free agent
+    and stays excluded"** — they're now included and searchable, just
+    projected 0. Commits `1e9c9b5` (search/scoring inclusion), `5a7fd08`
+    (0-projection), card copy in `57bb3d1`.
+
+### Open items (as of item 132 — pick up here)
+**This session (items 123-132) is all committed and pushed to `main`;
+HEAD is `1f357ab`, working tree clean.** Items 123-126 landed earlier
+(see their own entries for commit hashes: `8f7339c`, `6a9d859`, and the
+caching build `1f76c53`); items 127-132's commit hashes are listed inline
+in each entry above. Nothing below is started or fixed unless its own
+entry says so.
+
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
