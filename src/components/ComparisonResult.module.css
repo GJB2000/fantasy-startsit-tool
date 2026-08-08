@@ -196,7 +196,7 @@
   .sheet { padding: 20px; }
   .vgrid { grid-template-columns: 1fr; gap: 18px; }
   .mid { grid-template-columns: 1fr; gap: 18px; }
-  .aside { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 15px; flex-direction: row; gap: 32px; }
+  .aside { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 15px; flex-direction: column; gap: 12px; justify-content: flex-start; }
   .case { grid-template-columns: 1fr; gap: 15px; }
   .caseCol + .caseCol { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 15px; }
   .verdict, .card { padding: 20px; }

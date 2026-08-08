@@ -97,13 +97,15 @@ const CONFIDENCE_SCALE_MARKS = [
   { pct: 90, label: "Lock" },
 ];
 
-// ---- health ----
+// ---- status ----
 function healthStatusValue(player: PlayerScoreBreakdown): string {
+  if (player.playerId != null && !player.team) return "Free agent";
   if (player.injuryStatus) return player.injuryStatus;
   if (player.isOnByeThisWeek) return "On bye";
   return "Active";
 }
 function healthToneClass(player: PlayerScoreBreakdown): string | undefined {
+  if (player.playerId != null && !player.team) return styles.aiBad;
   if (player.injuryStatus === "Out" || player.injuryStatus === "Doubtful") return styles.aiBad;
   if (player.injuryStatus) return styles.aiBad;
   if (player.isOnByeThisWeek) return undefined;
@@ -112,6 +114,9 @@ function healthToneClass(player: PlayerScoreBreakdown): string | undefined {
 
 // ---- case for / against (unchanged copy logic) ----
 function buildCaseFor(player: PlayerScoreBreakdown): string {
+  if (player.playerId != null && !player.team) {
+    return `No game this week — a free agent isn't startable until they sign with a team.`;
+  }
   const pos = (player.position && POSITION_DISPLAY_LABEL[player.position]) || "this spot";
   const m = player.matchupContext;
   const games = player.gamesUsedForRecent;
@@ -129,6 +134,9 @@ function buildCaseFor(player: PlayerScoreBreakdown): string {
   return `Limited recent data, but still worth a look here.`;
 }
 function buildCaseAgainst(player: PlayerScoreBreakdown): string {
+  if (player.playerId != null && !player.team) {
+    return `Free agent — not on an NFL team, so projected 0 points until they sign.`;
+  }
   const pos = (player.position && POSITION_DISPLAY_LABEL[player.position]) || "this spot";
   const m = player.matchupContext;
   if (player.injuryStatus) return `Injury risk — currently listed ${player.injuryStatus}.`;
@@ -370,7 +378,7 @@ function PlayerCard({
             <div className={styles.aiV}>{player.nextOpponent ? formatWeather(player.nextGameWeather) : "—"}</div>
           </div>
           <div>
-            <div className={styles.aiL}>Health</div>
+            <div className={styles.aiL}>Status</div>
             <div className={`${styles.aiV} ${healthToneClass(player) ?? ""}`}>{healthStatusValue(player)}</div>
           </div>
         </div>
