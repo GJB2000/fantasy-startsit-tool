@@ -1,19 +1,19 @@
-import { getPositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat } from "@/lib/sportsdata/types";
 import { getLiveExpertConsensusByNormalizedName } from "@/lib/fantasypros/liveConsensus";
-import { getCurrentDepthChartRankByNormalizedName } from "@/lib/nflverse/depthCharts";
 import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
 import { compareBreakdowns } from "@/lib/recommendation/engine";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { getPropsForPlayers } from "@/lib/oddsapi/props";
 import { scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
 import {
-  getGameWeatherByTeamWeek,
-  getImpliedTeamTotalsByTeamWeek,
-  getRemainingOpponentsByTeam,
-  type RemainingGame,
-} from "@/lib/nflverse/schedules";
+  getDepthChartRankCached,
+  getGameWeatherCached,
+  getImpliedTotalsCached,
+  getPositionDefenseTableCached,
+  getRemainingOpponentsCached,
+} from "@/lib/cache/liveAggregates";
+import { type RemainingGame } from "@/lib/nflverse/schedules";
 
 // A cold nflverse cache means aggregating the full play-by-play release
 // for red-zone touches (~5-7s) on top of everything else this route
@@ -40,13 +40,13 @@ export async function GET(request: Request) {
     const context = await getSeasonContext();
     const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt, expertConsensusByNormalizedName, depthRankByName] =
       await Promise.all([
-        getPositionDefenseTable(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
+        getPositionDefenseTableCached(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
         getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
-        getRemainingOpponentsByTeam(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
+        getRemainingOpponentsCached(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
           () => new Map<string, RemainingGame[]>()
         ),
         getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
-        getCurrentDepthChartRankByNormalizedName(context.lastCompletedSeason).catch(() => new Map<string, number>()),
+        getDepthChartRankCached(context.lastCompletedSeason).catch(() => new Map<string, number>()),
       ]);
 
     // Same season-rollforward pattern as /api/trade — try continuing the
@@ -57,13 +57,13 @@ export async function GET(request: Request) {
     let remainingOpponentsByTeam = firstAttempt;
     if (remainingOpponentsByTeam.size === 0) {
       scheduleSeason = context.lastCompletedSeason + 1;
-      remainingOpponentsByTeam = await getRemainingOpponentsByTeam(scheduleSeason, 1).catch(
+      remainingOpponentsByTeam = await getRemainingOpponentsCached(scheduleSeason, 1).catch(
         () => new Map<string, RemainingGame[]>()
       );
     }
     const [teamWeatherByTeamWeek, impliedTotalsByTeamWeek] = await Promise.all([
-      getGameWeatherByTeamWeek(scheduleSeason).catch(() => new Map()),
-      getImpliedTeamTotalsByTeamWeek(scheduleSeason).catch(() => new Map()),
+      getGameWeatherCached(scheduleSeason).catch(() => new Map()),
+      getImpliedTotalsCached(scheduleSeason).catch(() => new Map()),
     ]);
 
     const breakdowns = await Promise.all(

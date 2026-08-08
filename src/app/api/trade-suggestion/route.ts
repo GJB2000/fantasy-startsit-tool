@@ -1,14 +1,14 @@
 import { getLiveExpertConsensusByNormalizedName } from "@/lib/fantasypros/liveConsensus";
 import { parseSlotsParam } from "@/lib/lineup/rosterSlots";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
+import { type RemainingGame } from "@/lib/nflverse/schedules";
 import {
-  getGameWeatherByTeamWeek,
-  getImpliedTeamTotalsByTeamWeek,
-  getRemainingOpponentsByTeam,
-  type RemainingGame,
-} from "@/lib/nflverse/schedules";
+  getGameWeatherCached,
+  getImpliedTotalsCached,
+  getPositionDefenseTableCached,
+  getRemainingOpponentsCached,
+} from "@/lib/cache/liveAggregates";
 import { resolveSleeperRoster } from "@/lib/sleeper/resolveRoster";
-import { getPositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat } from "@/lib/sportsdata/types";
 import { suggestLeagueTrade } from "@/lib/trade/suggestLeagueTrade";
@@ -34,9 +34,9 @@ export async function GET(request: Request) {
 
     const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt, expertConsensusByNormalizedName] =
       await Promise.all([
-        getPositionDefenseTable(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
+        getPositionDefenseTableCached(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
         getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
-        getRemainingOpponentsByTeam(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
+        getRemainingOpponentsCached(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
           () => new Map<string, RemainingGame[]>()
         ),
         getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
@@ -47,13 +47,13 @@ export async function GET(request: Request) {
     let remainingOpponentsByTeam = firstAttempt;
     if (remainingOpponentsByTeam.size === 0) {
       scheduleSeason = context.lastCompletedSeason + 1;
-      remainingOpponentsByTeam = await getRemainingOpponentsByTeam(scheduleSeason, 1).catch(
+      remainingOpponentsByTeam = await getRemainingOpponentsCached(scheduleSeason, 1).catch(
         () => new Map<string, RemainingGame[]>()
       );
     }
     const [teamWeatherByTeamWeek, impliedTotalsByTeamWeek] = await Promise.all([
-      getGameWeatherByTeamWeek(scheduleSeason).catch(() => new Map()),
-      getImpliedTeamTotalsByTeamWeek(scheduleSeason).catch(() => new Map()),
+      getGameWeatherCached(scheduleSeason).catch(() => new Map()),
+      getImpliedTotalsCached(scheduleSeason).catch(() => new Map()),
     ]);
 
     const yourPlayerIds = resolved.players.map((p) => p.playerId);

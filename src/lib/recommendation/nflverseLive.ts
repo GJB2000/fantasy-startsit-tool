@@ -1,9 +1,13 @@
-import { getInjuryReports } from "@/lib/nflverse/injuries";
-import { getNgsPassing, getNgsReceiving, getNgsRushing } from "@/lib/nflverse/nextGenStats";
-import { getRedZoneTouches } from "@/lib/nflverse/playByPlay";
+import {
+  getInjuryReports,
+  getNgsPassingCached,
+  getNgsReceivingCached,
+  getNgsRushingCached,
+  getPlayerWeekStatsCached,
+  getRedZoneTouchesCached,
+  getSnapCountsCached,
+} from "@/lib/cache/liveAggregates";
 import { buildSdioPlayerIdByNormalizedName } from "@/lib/nflverse/playerMatch";
-import { getPlayerWeekStats } from "@/lib/nflverse/playerStats";
-import { getSnapCounts } from "@/lib/nflverse/snapCounts";
 import { buildNflversePlayerWeekTable, type NflverseWeekStat } from "@/lib/nflverse/weekTable";
 import { getAllPlayers } from "@/lib/sportsdata/players";
 
@@ -30,13 +34,13 @@ export async function getLiveNflversePlayerWeekTable(season: number): Promise<Nf
   const [allPlayers, snapCounts, playerWeekStats, ngsPassing, ngsReceiving, ngsRushing, injuryReports, redZoneTouches] =
     await Promise.all([
       getAllPlayers(),
-      load("snap counts", () => getSnapCounts(season)),
-      load("player week stats", () => getPlayerWeekStats(season)),
-      load("NGS passing", () => getNgsPassing(season)),
-      load("NGS receiving", () => getNgsReceiving(season)),
-      load("NGS rushing", () => getNgsRushing(season)),
+      load("snap counts", () => getSnapCountsCached(season)),
+      load("player week stats", () => getPlayerWeekStatsCached(season)),
+      load("NGS passing", () => getNgsPassingCached(season)),
+      load("NGS receiving", () => getNgsReceivingCached(season)),
+      load("NGS rushing", () => getNgsRushingCached(season)),
       load("injury reports", () => getInjuryReports(season)),
-      load("red zone touches", () => getRedZoneTouches(season)),
+      load("red zone touches", () => getRedZoneTouchesCached(season)),
     ]);
 
   return buildNflversePlayerWeekTable(

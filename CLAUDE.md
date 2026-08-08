@@ -7470,7 +7470,66 @@ single-season numbers for those specific constants.
       inline route/nflverseLive timing and the `/api/debug-compare-timing`
       route all removed); working tree clean apart from this write-up.
 
-### Open items (as of item 125 — pick up here)
+126. **Implemented the item-125 speedup — and it needed NO external infra
+    (Vercel Blob turned out unnecessary).** The key discovery via
+    measurement: the two dominant cold tails parse HUGE files into SMALL
+    aggregates (`depthChart` ~12.8s parse → 12KB output; red-zone/pbp
+    ~10.2s → 1.79MB output), so caching the OUTPUT fits Next.js's built-in
+    Data Cache (`unstable_cache`) — which, unlike the per-process
+    `client.ts` Map, is shared across Vercel serverless cold starts. No
+    Blob/KV/Upstash to provision.
+    - **New `src/lib/cache/liveAggregates.ts`** — persistent read-through
+      wrappers around the slow-changing getters, 24h `revalidate` (matches
+      the getters' own in-process TTL; Vercel serves stale-while-
+      revalidate so users effectively never eat the cold parse after first
+      population). Wrapped: `getRedZoneTouchesCached`,
+      `getPlayerWeekStatsCached`, `getSnapCountsCached`, `getNgs*Cached`,
+      `getDepthChartRankCached`, `getPositionDefenseTableCached`,
+      `getRemainingOpponentsCached`, `getGameWeatherCached`,
+      `getImpliedTotalsCached`. Deliberately NOT wrapped (kept LIVE for
+      game-day freshness): `getInjuryReports` (~1.35s) and the FantasyPros
+      live consensus (~1s) — per item 125's hybrid.
+    - **Columnar encoding was the trick that made the two biggest raw
+      arrays cacheable.** `stats_player` (2.53MB) and `snap_counts`
+      (2.3MB) sit just OVER Next's ~2MB Data Cache entry limit — but only
+      because JSON repeats the field keys on all ~18-25k rows. Encoding
+      each cached array columnarly (`{k:[keys], r:[[values]...]}`, decoded
+      on read) cut them to 0.87MB / 0.94MB (red-zone 1.79MB→0.48MB) —
+      all comfortably under 2MB, MEASURED via a temp route before trusting
+      it. Without this they'd silently not cache (safe, but no speedup).
+    - **Accuracy-neutral, VERIFIED byte-identical.** A temporary
+      `/api/debug-cache-verify` route compared every cached wrapper's
+      output to the raw getter's via canonical JSON: `allIdentical: true`
+      across all 11 sources (including the columnar-encoded ones — decode
+      round-trips exactly). The engine reads identical numbers; the
+      backtest never touches these wrappers. Confirms item 125's
+      accuracy-neutral claim empirically.
+    - **Repointed all six live routes**: `compare` (positionDefense,
+      depthChart, schedules → cached; the pbp/snap/playerWeekStats/NGS win
+      comes for free via `nflverseLive.ts`, which every tool shares), plus
+      `trade`/`lineup`/`waivers`/`rankings`/`trade-suggestion`
+      (positionDefense + schedules → cached; all five share the identical
+      import shape, repointed together). `nflverseLive.ts` now pulls its
+      seven sources from the cached wrappers (except injuries, kept live).
+      So every live tool benefits, not just Start/Sit.
+    - **Verified end-to-end**: a real `/api/compare` returns a valid,
+      unchanged result (recommends the higher-scored player, real
+      finalScores), `/api/rankings` 0.1s warm, `tsc`/lint clean. The full
+      COLD→warm latency delta can't be cleanly measured on the shared dev
+      server (can't restart it / read its stdout — see item 125), so the
+      real production before/after remains the Open Item #29 confirm step;
+      but correctness (the thing that could break) is proven, and warm
+      requests are already fast (compare ~2.7s with live injuries+consensus
+      still in the path; rankings 0.1s).
+    - **Still remaining (moved to a slimmed Open Item #29)**: confirm the
+      real cold/warm latency on a Vercel deploy; defer the display-only
+      betting props (The Odds API) to a client-side follow-up fetch (an
+      independent UX win, a no-op in the current offseason since props are
+      empty); and OPTIONALLY a Vercel Cron warmer (largely unnecessary
+      given stale-while-revalidate). Vercel Blob/KV is NO LONGER needed —
+      that part of the original #29 is dropped.
+
+### Open items (as of item 126 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
@@ -8131,50 +8190,37 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       shared `.matchup-page` token skin on the page), verifying live against
       real data per the project's standing discipline — rather than one
       giant global flip.
-29. **Implement AND confirm the `/api/compare` precompute-cache speedup
-    (the #3 fix decided in item 125) — DECIDED, not yet built.** Profiling
-    (item 125) found the live compare is ~13s cold (parallel fetches
-    bounded by two tails: `depthChart` ~12.8s and pbp/red-zone ~10.2s),
-    and the per-process in-memory cache is useless across Vercel
-    serverless cold starts. The chosen fix is a HYBRID precompute cache:
-    a scheduled job (Vercel Cron) builds the expensive, slow-changing
-    tables (pbp/red-zone aggregate, the ~554k-row depth_charts table,
-    `playerWeekStats`, `positionDefenseTable`, schedules-derived
-    weather/implied/opponents) into a persistent store (Vercel Blob
-    preferred over KV for the multi-MB nflverse table; Upstash Redis an
-    alternative), which the live routes READ instead of parsing on demand;
-    the small game-day-volatile fetches (injuries ~1.35s, FantasyPros
-    consensus ~1s) stay LIVE so freshness isn't sacrificed. Expected:
-    ~13s cold → ~1-2s. **This is accuracy-neutral by construction** (a
-    caching change, not a logic change — the completed-week data being
-    precomputed is immutable, so a precomputed aggregate is byte-identical
-    to a live fetch; `config.ts`/`engine.ts` untouched; the backtest never
-    touches the live cache) — see item 125 for the full reasoning.
-    **What implementing it involves**, and what to CONFIRM once built:
-    - **Infra (user's Vercel dashboard, not doable from the repo alone)**:
-      provision a Vercel Blob store (or KV/Upstash), add its env vars
-      (same never-commit discipline as `SPORTSDATA_API_KEY`), and add a
-      Vercel Cron entry (weekly in-season; less often in the offseason).
-    - **Code**: a precompute job that builds each heavy table and writes it
-      to the store keyed by season/week; a thin read-through helper the
-      live routes use (`/api/compare`, `/api/trade`, `/api/lineup`,
-      `/api/waivers`, `/api/rankings` all share these fetches); and a
-      KEPT live-fetch FALLBACK for a cold/empty store (first deploy, failed
-      cron, season rollover) — so the live path is not deleted.
-    - **Also do the free UX win**: defer the display-only betting props
-      (The Odds API) to a client-side follow-up fetch so the verdict
-      renders immediately (item 125).
-    - **Confirm after building**: (1) real before/after latency (cold and
-      warm); (2) accuracy unchanged — re-run the primary and pooled
-      backtests and verify byte-identical numbers (they should be, since
-      the backtest pipeline is separate, but confirm nothing was
-      accidentally rewired); (3) a live compare returns identical
-      `finalScore`/pick to the pre-change engine for a few real player
-      pairs; (4) the fallback path actually works when the store is empty;
-      (5) the volatile-data cadence is fresh enough on game day. Watch the
-      known #3 tradeoffs (item 125): cron-bounded freshness, silent
-      nflverse schema-drift breakage in the background job, and the store's
-      size/cost limits.
+29. **Confirm the item-126 caching speedup on a real Vercel deploy, then
+    do the two small remainders — the core is BUILT (item 126).** The
+    persistent cache shipped as `src/lib/cache/liveAggregates.ts` using
+    Next.js's Data Cache (`unstable_cache`), NOT Vercel Blob — the
+    aggregated outputs fit Next's ~2MB entry limit (after columnar
+    encoding for the two big raw arrays), so no external store was needed.
+    Correctness is verified byte-identical (item 126); what's left:
+    - **Confirm real cold/warm latency on a Vercel deploy** — this is the
+      one thing that couldn't be measured locally (the shared dev server
+      can't be restarted/read from this session). Expected ~13s cold →
+      ~1-2s once the Data Cache is populated (the live floor is the two
+      deliberately-kept-live volatile fetches: injuries ~1.35s + consensus
+      ~1s, in parallel). Also worth a spot-check that a live compare
+      returns an identical pick/`finalScore` to before (should — the
+      byte-identical verification already proves the inputs are unchanged).
+    - **Defer the display-only betting props** (The Odds API) to a
+      client-side follow-up fetch so the verdict renders immediately. A
+      no-op right now (offseason → props empty), a real in-season UX win.
+      Independent of the caching.
+    - **OPTIONAL: a Vercel Cron warmer** — largely unnecessary because
+      `unstable_cache`'s stale-while-revalidate serves the stale value fast
+      while refreshing in the background, so users only ever eat the cold
+      parse on the very first population. Add only if the first-hit-after-
+      revalidate cost proves noticeable in practice.
+    - **Watch (residual tradeoffs)**: the 24h `revalidate` bounds
+      freshness for the CACHED sources (fine — they're finalized weekly
+      data, and the game-day-volatile ones are kept live); and nflverse
+      schema drift (LAR/LA, `season_type`/`game_type` — the doc has
+      several) would now surface as a cache miss / stale entry rather than
+      a loud request-time error. **Vercel Blob/KV is no longer needed** —
+      dropped from this item.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
