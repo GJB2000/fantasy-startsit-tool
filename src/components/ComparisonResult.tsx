@@ -475,7 +475,7 @@ export function ComparisonResult({ result, contextNote, scoringFormat, propsByPl
   const fillWidth = `${Math.max(0, Math.min(100, confPct))}%`;
 
   return (
-    <div className={`${styles.sheet} ${styles.grain} ${styles.rise}`}>
+    <div className={`${styles.sheet} ${styles.rise}`}>
       <div className={styles.body}>
         <div className={styles.mast}>
           <div className={styles.mastL}>The Matchup</div>
