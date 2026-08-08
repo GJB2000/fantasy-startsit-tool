@@ -7225,7 +7225,127 @@ single-season numbers for those specific constants.
     all-sans (Jost display + Archivo labels). The scratch `/font-lab` page
     was deleted. Committed `779f9c7`.
 
-### Open items (as of item 122 — pick up here)
+123. **Tested opponent-adjusted recent production — a genuinely new signal
+    (adjust a player's recent fantasy output for the strength of the
+    defenses they faced) — standalone then RB-only integration. Clean
+    negative finding, nothing shipped.** The first new *signal* idea
+    explored since item 97; not on the prior Open Items list. Motivation:
+    the engine's recent-form signals treat 12 targets against an elite
+    secondary the same as 12 against a bad one, even though it already has
+    a matchup modifier for the *upcoming* opponent — so opponent-adjusting
+    the *backward* production seemed like an obvious gap.
+    - **Standalone (pooled 2022-2025, nflverse-only, ~2,380 pairs)** via a
+      temporary diagnostic route, same discipline as every one-off in this
+      document. Adjusted each recent game's fantasy points by
+      `pts + strength * (leagueAvgAllowed[pos] - allowed[opp][pos])` (the
+      defense-strength reference is the target-week season-to-date
+      `positionDefenseTable` — all weeks before the target week, no
+      leakage), swept the additive strength (0.5/1.0/1.5) plus a
+      multiplicative `pts * leagueAvg/allowed` variant, against a **plain
+      recent-points control** (the honest baseline — there was no
+      "recent-N-game points average" baseline before this).
+      - Plain recent points: **51.0%** pooled (≈ item 2's coin-flip
+        finding — raw recent points alone are near chance).
+      - Opponent-adjusted (best, additive ×1.0): **51.7%** pooled — only
+        +0.7pp over plain, well inside noise, non-monotone in strength,
+        and mixed by season. By position it *helped RB* (51.6%→54.2% at
+        ×0.5) but *hurt QB* (53.3%→49.5%).
+      - Every variant was **dominated by `recentVolume` (54.7% pooled)** —
+        the shipped signal — at every position and every season. Even RB's
+        best opponent-adjusted number trailed RB volume (56.8%).
+      - **Why it fails is item 2's lesson restated**: the noise in
+        production is touchdown variance, and opponent-adjusting *points*
+        doesn't remove that — it reshuffles noisy points. Volume sidesteps
+        the noise entirely, which is why it's been the backbone since
+        items 6-13.
+    - **RB-only integration sweep** (the user asked specifically whether
+      applying it to RB would improve the engine, since RB was the one
+      position with a real standalone flicker). Blended an
+      opponent-adjusted recent-points estimate into RB `finalScore` as an
+      additive term via `compareBreakdowns` (mutating `finalScore` on the
+      real breakdowns so tiebreakers/guardrails run faithfully), pooled
+      2022-2025. **w=0 reproduced the real engine byte-for-byte** (RB
+      58.99%/n=812; by season 55.2/60.9/61.3/58.6 — exact match to the
+      shipped `/broad-nflverse-multiseason` route, verified before
+      trusting the sweep, per items 43/44/74's discipline).
+
+      | w | RB pooled | 2022 | 2023 | 2024 | 2025 |
+      |---|---|---|---|---|---|
+      | 0 (shipped) | 59.0 | 55.2 | 60.9 | **61.3** | 58.6 |
+      | 0.2 | 59.2 | 58.1 | 64.4 | 55.9 | 58.6 |
+      | 0.3 (peak) | 60.0 | 59.1 | 64.9 | **56.9** | 59.1 |
+      | 0.5 | 56.3 | 56.7 | 60.4 | 53.4 | 54.7 |
+
+      The pooled peak (+1.0pp RB, +0.3pp whole-model at w=0.3) **fails the
+      bar three ways**: (1) it's *inside the noise* (SE ≈ 1.7pp at n=812,
+      so 59.0→60.0 is under one SE); (2) it's a *season tradeoff, not a
+      plateau* — w=0.3 gains in 2022/2023/2025 but **2024 drops 4.4pp**
+      (61.3→56.9), the same seesaw shape as QB rushing (item 30), the
+      opposite of a clean every-season win; (3) the curve is *jagged, not
+      monotone* (w=0.1/0.15 sit *below* w=0, then spike, then fall — the
+      isolated-peak/pair-flipping noise pattern rejected in items 9/20/38).
+    - **Verdict: not shipped.** Lands like RB red-zone/EPA in item 44 —
+      real-looking on part of the sample, but not a durable, every-season
+      gain — and confirms the standalone prior exactly: a signal weaker
+      than both RB volume and the full engine's own RB accuracy adds no
+      robust information once blended, it just reshuffles noise for a
+      within-noise pooled bump at the cost of a real 2024 regression. No
+      `config.ts`/`engine.ts` change; both temporary diagnostic routes
+      (`/api/debug-opp-adj`, `/api/debug-opp-adj-int`) and their modules
+      deleted after recording these numbers. This write-up is the only
+      lasting artifact. The cleaner untested variant, run next as item
+      124: recency-weighting the *upcoming* defense's strength in the
+      matchup modifier — sharpening a signal the engine already uses,
+      rather than adding a redundant backward one.
+
+124. **Tested recency-weighting the upcoming-defense strength in the
+    matchup modifier (the #2 follow-up flagged in item 123) — clean,
+    monotone negative. Nothing shipped.** The shipped matchup modifier
+    ranks the upcoming opponent by season-to-date points allowed,
+    averaging every prior week EQUALLY. This built a recency-WEIGHTED
+    position-defense table (recent weeks weighted higher, geometric decay
+    `weight_i = decay^(mostRecentIndex - i)`) and injected it into the real
+    scoring path — `buildBacktestComparisonInput` reads
+    `weekSlice.positionDefenseTable`, so overriding that field per (week,
+    decay) changes only the matchup modifier, every other signal untouched
+    — swept the decay pooled 2022-2025 via a temporary diagnostic route.
+    `decay=1.0` is equal weighting = the shipped table, so it reproduced
+    the real engine byte-for-byte (overall 57.776%, exact match to
+    `/broad-nflverse-multiseason`), verified before trusting the sweep.
+
+    | decay | Overall | QB | RB | WR | TE |
+    |---|---|---|---|---|---|
+    | **1.0 (shipped)** | **57.8** | 60.5 | 59.0 | 55.7 | 56.8 |
+    | 0.9 | 57.3 | 59.8 | 58.5 | 55.7 | 55.8 |
+    | 0.8 | 57.5 | 60.0 | 58.3 | 56.0 | 56.5 |
+    | 0.7 | 57.2 | 59.8 | 58.0 | 55.9 | 55.8 |
+    | 0.6 | 57.1 | 59.8 | 57.9 | 55.7 | 55.6 |
+    | 0.5 | 56.8 | 59.6 | 57.8 | 55.8 | 54.3 |
+
+    - **The opposite of item 123's ambiguous seesaw — this is monotone and
+      unambiguous.** Every step toward recency emphasis makes it worse or
+      flat, at every position and in 3 of 4 seasons (2022 has a lone +0.5
+      blip at 0.8, isolated noise). No decay beats the shipped equal-
+      weighted table anywhere that matters. No tradeoff, no isolated peak,
+      no user decision.
+    - **Why**: a defense's points-allowed-per-position is a fairly stable
+      season-long property, and with only 1-17 prior games a full-season
+      average is a MORE reliable estimate than a recency-weighted one that
+      discards sample. Down-weighting older games shrinks the effective
+      sample and amplifies the large single-week defensive noise (a
+      defense's weekly output depends heavily on which offense it drew).
+      Same lesson as item 107 (EWMA on player form) and item 2 — thin
+      samples want stable averages, not recency emphasis.
+    - **Not shipped**, no `config.ts`/`engine.ts` change; temporary
+      diagnostic route (`/api/debug-recency-def`) and module deleted after
+      recording these numbers. Closes the item-123 #2 follow-up. Net for
+      the items 123-124 signal-hunting pass: both candidate ideas came back
+      negative (opponent-adjusted production marginal/noisy; recency-
+      weighted defense cleanly rejected), reinforcing that the engine's
+      recent-form and matchup signals are already well-tuned on both
+      fronts.
+
+### Open items (as of item 124 — pick up here)
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
 GitHub's own commit-status check, which shows Vercel's deployment for
