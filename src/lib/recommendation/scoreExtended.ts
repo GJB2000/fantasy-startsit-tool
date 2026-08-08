@@ -53,7 +53,9 @@ export async function scoreExtendedPlayer(
       teamWeatherByTeamWeek,
       impliedTotalsByTeamWeek
     );
-    return input ? scoreKicker(input, format) : notFoundBreakdown(`${player.FirstName} ${player.LastName}`.trim());
+    return input
+      ? withFreeAgentProjection(scoreKicker(input, format))
+      : notFoundBreakdown(`${player.FirstName} ${player.LastName}`.trim());
   }
 
   const input = await buildComparisonInput(
@@ -66,7 +68,27 @@ export async function scoreExtendedPlayer(
     undefined,
     expertConsensusByNormalizedName
   );
-  return scorePlayer(input, format);
+  return withFreeAgentProjection(scorePlayer(input, format));
+}
+
+/**
+ * A free agent (a real, resolved player with no NFL team — e.g. an
+ * offseason free agent who played last season, now searchable per the
+ * player-pool widening) has no upcoming game, so project 0: they can't be
+ * started until they sign. Kept scorable/searchable for analysis, just with
+ * an honest 0 and an explanatory note instead of a stale last-season-based
+ * projection. D/ST is never a free agent (synthetic per-team entries), so
+ * this only ever fires for skill players and kickers.
+ */
+function withFreeAgentProjection(breakdown: PlayerScoreBreakdown): PlayerScoreBreakdown {
+  if (breakdown.playerId == null || breakdown.team) return breakdown;
+  return {
+    ...breakdown,
+    finalScore: 0,
+    recentPprFloor: 0,
+    recentPprCeiling: 0,
+    notes: ["Free agent — not signed to an NFL team, so projected 0 points until they sign.", ...breakdown.notes],
+  };
 }
 
 /** Honest fallback label for a totally unrecognized ID (not a skill player, K, or D/ST). */
