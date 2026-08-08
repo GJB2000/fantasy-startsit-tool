@@ -95,6 +95,17 @@ body {
   background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
+/* iOS Safari auto-zooms the page when a focused form control's font-size is
+   under 16px. Force ≥16px on small screens (overriding smaller Tailwind
+   text utilities) so tapping a search box or field doesn't zoom in. */
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /*
  * Editorial "almanac" palette — one shared token set consumed both by the
  * .matchup-page token-override wrapper (below) AND by each tool's result CSS
