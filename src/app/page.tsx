@@ -95,11 +95,10 @@ export default function HomePage() {
           className="mt-2 text-[34px] leading-none tracking-[-0.01em] text-foreground"
           style={{ fontFamily: "var(--font-jost)", fontWeight: 600 }}
         >
-          Your fantasy toolkit
+          FANTASY TOOLKIT BY LEGITFOOTBALL.COM
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-foreground/60">
-          Six tools, one engine — start/sit calls, trade grades, waiver targets, full-lineup optimization, position
-          rankings, and the backtested accuracy behind all of it.
+          Six fantasy tools on one engine.
         </p>
       </header>
 

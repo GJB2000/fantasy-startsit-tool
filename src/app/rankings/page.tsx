@@ -14,12 +14,10 @@ export default function RankingsPage() {
           className="mt-2 text-[34px] leading-none tracking-[-0.01em] text-foreground"
           style={{ fontFamily: "var(--font-jost)", fontWeight: 600 }}
         >
-          Who&apos;s actually good right now?
+          PLAYER RANKINGS
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-foreground/60">
-          Every rankable player at a position, scored 1-100 by blending our own engine&apos;s current-form snapshot with
-          FantasyPros&apos; season-long consensus — so one noisy recent game doesn&apos;t tank a normally-great
-          player&apos;s rank.
+          Every player at a position, scored 1&ndash;100.
         </p>
       </header>
       <RankingsTool />

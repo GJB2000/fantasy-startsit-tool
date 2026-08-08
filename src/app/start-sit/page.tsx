@@ -14,11 +14,10 @@ export default function StartSitPage() {
           className="mt-2 text-[34px] leading-none tracking-[-0.01em] text-foreground"
           style={{ fontFamily: "var(--font-jost)", fontWeight: 600 }}
         >
-          Who should you start?
+          START / SIT
         </h1>
         <p className="mt-2 max-w-lg text-sm leading-relaxed text-foreground/60">
-          Pick two (or more) players fighting for the same roster spot. We&apos;ll pull their real recent stats and
-          matchup data and give you a straight answer — with the reasoning behind it.
+          Who to start when two players compete for one spot.
         </p>
       </header>
       <StartSitTool />

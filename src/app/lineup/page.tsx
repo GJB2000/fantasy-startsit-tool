@@ -14,11 +14,10 @@ export default function LineupPage() {
           className="mt-2 text-[34px] leading-none tracking-[-0.01em] text-foreground"
           style={{ fontFamily: "var(--font-jost)", fontWeight: 600 }}
         >
-          Who should start this week?
+          OPTIMIZE LINEUP
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-foreground/60">
-          Import your roster from Sleeper or add players by hand, tell us how many starters go at each spot, and
-          we&apos;ll fill out your best lineup — with the same reasoning behind every call as everywhere else in this app.
+          Your best possible starting lineup.
         </p>
       </header>
       <LineupTool />

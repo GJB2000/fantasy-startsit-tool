@@ -14,11 +14,10 @@ export default function WaiversPage() {
           className="mt-2 text-[34px] leading-none tracking-[-0.01em] text-foreground"
           style={{ fontFamily: "var(--font-jost)", fontWeight: 600 }}
         >
-          Who&apos;s worth a pickup?
+          WAIVER TARGETS
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-foreground/60">
-          We look for players getting real opportunity — volume, snaps, targets — who haven&apos;t been paid off in points
-          yet. Mark who&apos;s already on your roster and we&apos;ll suggest who to drop.
+          Who to add when volume is outpacing production.
         </p>
       </header>
       <WaiverTool />

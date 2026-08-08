@@ -14,11 +14,10 @@ export default function BacktestPage() {
           className="mt-2 text-[34px] leading-none tracking-[-0.01em] text-foreground"
           style={{ fontFamily: "var(--font-jost)", fontWeight: 600 }}
         >
-          Backtest the recommendation engine
+          ENGINE BACKTEST
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-foreground/60">
-          Replay the engine against a completed season, using only data that would have been known before each
-          week&apos;s games, and see how often it called it right.
+          How often the engine has been right.
         </p>
       </header>
       <BacktestTool />
