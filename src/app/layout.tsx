@@ -60,21 +60,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // suppressHydrationWarning: AppShell stamps a `data-theme` override on
+    // <html> after hydration (see useTheme.ts) for users who've picked a
+    // theme other than their OS default; this keeps that expected client-only
+    // attribute from tripping a hydration warning. Also absorbs attributes
+    // some browser extensions inject on <html>.
     <html
       lang="en"
+      suppressHydrationWarning
       className={`h-full antialiased ${barlowCondensed.variable} ${inter.variable} ${jetbrainsMono.variable} ${jost.variable} ${cinzel.variable}`}
     >
-      <head>
-        {/* Apply a saved theme override before first paint to avoid a flash
-            of the wrong theme. "system" (no key) falls through to the CSS
-            prefers-color-scheme media query. See useTheme.ts. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              "try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch(e){}",
-          }}
-        />
-      </head>
       <body className="min-h-full font-sans">
         <AppShell>{children}</AppShell>
       </body>
