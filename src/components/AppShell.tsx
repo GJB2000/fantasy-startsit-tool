@@ -104,20 +104,32 @@ const LINKS: { href: string; label: string; icon: React.ReactNode }[] = [
 const RAIL_BG = "linear-gradient(185deg, #241d13 0%, #1a150d 100%)";
 const RAIL_BORDER = "rgba(220, 195, 150, 0.13)";
 
+/** The Legitfootball mark: block "L", a vertical football with laces, block "F". */
 function LogoTile({ size = 30 }: { size?: number }) {
+  const bg = "#191817";
+  const fg = "#f4efe4";
   return (
     <span
       className="flex shrink-0 items-center justify-center rounded-[7px]"
       style={{
         width: size,
         height: size,
-        background: "linear-gradient(135deg, #4fb488, #1f6a4c)",
-        boxShadow: "0 4px 14px -4px rgba(79, 180, 136, 0.5)",
+        background: bg,
+        boxShadow: "0 4px 14px -5px rgba(0, 0, 0, 0.6)",
+        border: "1px solid rgba(244, 239, 228, 0.12)",
       }}
     >
-      <svg viewBox="0 0 24 24" style={{ width: size * 0.53, height: size * 0.53 }} fill="none">
-        <path d="M12 2L3 7v10l9 5 9-5V7l-9-5z" stroke="#0f3025" strokeWidth="1.6" strokeLinejoin="round" />
-        <path d="M12 12l9-5M12 12v10M12 12L3 7" stroke="#0f3025" strokeWidth="1.6" strokeLinejoin="round" />
+      <svg viewBox="0 0 100 100" style={{ width: size * 0.72, height: size * 0.72 }}>
+        {/* L */}
+        <path d="M17 30 H28 V61 H39 V70 H17 Z" fill={fg} />
+        {/* F */}
+        <path d="M72 30 H91 V39 H83 V45.5 H88 V54.5 H83 V70 H72 Z" fill={fg} />
+        {/* Football */}
+        <ellipse cx="50" cy="50" rx="12.5" ry="22" fill={fg} />
+        <line x1="50" y1="33" x2="50" y2="67" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
+        <line x1="44.5" y1="43" x2="55.5" y2="43" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
+        <line x1="44.5" y1="50" x2="55.5" y2="50" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
+        <line x1="44.5" y1="57" x2="55.5" y2="57" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
       </svg>
     </span>
   );
