@@ -213,7 +213,7 @@ export function BacktestTool() {
         <button
           type="button"
           onClick={() => setMode("pair")}
-          className={`rounded-full px-3.5 py-1.5 font-medium transition-colors ${
+          className={`rounded-[3px] px-3 py-1.5 font-engraved text-[11px] uppercase tracking-[0.06em] transition-colors ${
             mode === "pair"
               ? "bg-accent text-accent-ink"
               : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
@@ -224,7 +224,7 @@ export function BacktestTool() {
         <button
           type="button"
           onClick={() => setMode("broad")}
-          className={`rounded-full px-3.5 py-1.5 font-medium transition-colors ${
+          className={`rounded-[3px] px-3 py-1.5 font-engraved text-[11px] uppercase tracking-[0.06em] transition-colors ${
             mode === "broad"
               ? "bg-accent text-accent-ink"
               : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
@@ -235,7 +235,7 @@ export function BacktestTool() {
         <button
           type="button"
           onClick={() => setMode("trade")}
-          className={`rounded-full px-3.5 py-1.5 font-medium transition-colors ${
+          className={`rounded-[3px] px-3 py-1.5 font-engraved text-[11px] uppercase tracking-[0.06em] transition-colors ${
             mode === "trade"
               ? "bg-accent text-accent-ink"
               : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
@@ -249,7 +249,7 @@ export function BacktestTool() {
             setMode("projection");
             setSeason("2025");
           }}
-          className={`rounded-full px-3.5 py-1.5 font-medium transition-colors ${
+          className={`rounded-[3px] px-3 py-1.5 font-engraved text-[11px] uppercase tracking-[0.06em] transition-colors ${
             mode === "projection"
               ? "bg-accent text-accent-ink"
               : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
@@ -266,6 +266,7 @@ export function BacktestTool() {
             scored, not just whether it picked the right player.
           </p>
           <PlayerMultiSelect
+            editorial
             label="Look up specific players (optional)"
             selected={lookupPlayers}
             onAdd={addLookupPlayer}
@@ -286,7 +287,7 @@ export function BacktestTool() {
                 setBroadResult(null);
                 setTradeResult(null);
               }}
-              className={`rounded-full px-3.5 py-1.5 font-medium transition-colors ${
+              className={`rounded-[3px] px-3 py-1.5 font-engraved text-[11px] uppercase tracking-[0.06em] transition-colors ${
                 season === s ? "bg-accent text-accent-ink" : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
               }`}
             >
@@ -301,6 +302,7 @@ export function BacktestTool() {
 
       {mode === "pair" && (
         <PlayerMultiSelect
+          editorial
           selected={players}
           onAdd={addPlayer}
           onRemove={removePlayer}
@@ -310,7 +312,7 @@ export function BacktestTool() {
       )}
 
       {mode === "trade" && (
-        <div className="rounded-2xl border border-info/40 bg-info/10 p-3 text-xs text-info">
+        <div className="rounded-[3px] border border-info/40 bg-info/10 p-3 text-xs text-info">
           <strong>Scope:</strong> synthetic 1-for-1 trades only, generated the same way broad-mode
           start/sit pairs are (adjacent-rank pairs at each position, ranked as of the week below).
           Grades the trade analyzer&apos;s rest-of-season projection against what each player
@@ -324,7 +326,7 @@ export function BacktestTool() {
             {ALL_POSITIONS.map((position) => (
               <label
                 key={position}
-                className="flex items-center gap-1.5 rounded-full border border-foreground/15 px-2.5 py-1"
+                className="flex items-center gap-1.5 rounded-[3px] border border-foreground/15 px-2.5 py-1"
               >
                 <input
                   type="checkbox"
@@ -339,7 +341,7 @@ export function BacktestTool() {
               EXTENDED_ONLY_POSITIONS.map((position) => (
                 <label
                   key={position}
-                  className="flex items-center gap-1.5 rounded-full border border-foreground/15 px-2.5 py-1"
+                  className="flex items-center gap-1.5 rounded-[3px] border border-foreground/15 px-2.5 py-1"
                 >
                   <input
                     type="checkbox"
@@ -367,7 +369,7 @@ export function BacktestTool() {
             <select
               value={asOfWeek}
               onChange={(e) => setAsOfWeek(Number(e.target.value))}
-              className="rounded-xl border border-foreground/15 bg-surface px-1.5 py-1"
+              className="rounded-[3px] border border-foreground/15 bg-surface px-1.5 py-1"
             >
               {AS_OF_WEEK_OPTIONS.map((w) => (
                 <option key={w} value={w}>
@@ -387,7 +389,7 @@ export function BacktestTool() {
             <select
               value={weekFrom}
               onChange={(e) => setWeekFrom(Number(e.target.value))}
-              className="rounded-xl border border-foreground/15 bg-surface px-1.5 py-1"
+              className="rounded-[3px] border border-foreground/15 bg-surface px-1.5 py-1"
             >
               {WEEK_OPTIONS.map((w) => (
                 <option key={w} value={w}>
@@ -425,7 +427,8 @@ export function BacktestTool() {
         type="button"
         onClick={runBacktest}
         disabled={loading || (mode === "pair" && players.length !== 2)}
-        className="w-full rounded-full bg-accent px-4 py-3 text-sm font-semibold text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
+        style={{ fontFamily: "var(--font-engraved)" }}
+        className="w-full rounded-[4px] bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
       >
         {loading ? "Running…" : "Run backtest"}
       </button>
@@ -479,7 +482,7 @@ export function BacktestTool() {
 
           {projectionResult.playerDetail && projectionResult.playerDetail.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground/45">
+              <h3 className="font-engraved text-[11px] uppercase tracking-[0.1em] text-foreground/50">
                 Player lookup — projected vs. actual by week
               </h3>
               <ProjectionPlayerDetailView players={projectionResult.playerDetail} />
@@ -497,7 +500,7 @@ export function BacktestTool() {
                 expertConsensusByPosition={projectionResult.expertConsensusByPosition ?? undefined}
               />
               <div className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground/45">
+                <h3 className="font-engraved text-[11px] uppercase tracking-[0.1em] text-foreground/50">
                   By player (worst MAE first)
                 </h3>
                 <ProjectionPlayerTable players={projectionResult.byPlayer ?? []} />

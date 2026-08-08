@@ -18,7 +18,7 @@ export function ProjectionPlayerTable({ players }: ProjectionPlayerTableProps) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-foreground/10 text-left text-foreground/45">
+          <tr className="border-b border-foreground/15 text-left font-engraved text-[10.5px] uppercase tracking-[0.08em] text-foreground/50">
             <th className="py-2 pr-3">Player</th>
             <th className="py-2 pr-3">Pos</th>
             <th className="py-2 pr-3">Team</th>

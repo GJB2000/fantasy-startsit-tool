@@ -28,7 +28,7 @@ export function TradeBacktestTable({ results }: TradeBacktestTableProps) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-foreground/10 text-left text-foreground/45">
+          <tr className="border-b border-foreground/15 text-left font-engraved text-[10.5px] uppercase tracking-[0.08em] text-foreground/50">
             <th className="py-2 pr-3">Pos</th>
             <th className="py-2 pr-3">Give</th>
             <th className="py-2 pr-3">Get</th>
@@ -59,7 +59,7 @@ export function TradeBacktestTable({ results }: TradeBacktestTableProps) {
                   {fmt(r.give.actualTotal)} vs {fmt(r.get.actualTotal)}
                 </td>
                 <td className="py-2 pr-3">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${outcomeStyles[r.outcome]}`}>
+                  <span className={`rounded-[3px] px-2 py-0.5 text-xs font-medium ${outcomeStyles[r.outcome]}`}>
                     {outcomeLabels[r.outcome]}
                   </span>
                 </td>
