@@ -147,7 +147,7 @@ function LogoTile({ size = 30 }: { size?: number }) {
  * "espresso rail" in BOTH light and night mode (a deliberate constant
  * spine / masthead, unlike the editorial pages it frames, which switch
  * with the theme). Styled to the almanac: a Jost wordmark under an
- * engraved "Fantasy Almanac" line, engraved section/footer labels,
+ * engraved "Fantasy Toolkit" line, engraved section/footer labels,
  * pine-green active state on warm espresso. Below the `md` breakpoint it
  * collapses to a slim top bar with a hamburger that slides the same rail
  * in as a left drawer (with a scrim), rather than a horizontal scrolling
@@ -187,7 +187,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
         <Link href="/" className="flex items-center gap-2">
           <LogoTile size={26} />
-          <span className="font-jost text-[15px] font-semibold text-[#f0e9db]">Legitfootball</span>
+          <span className="font-jost text-[15px] font-semibold text-[#f0e9db]">LEGITFOOTBALL</span>
         </Link>
         <button
           type="button"
@@ -225,9 +225,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/" className="flex items-center gap-2.5 px-1">
             <LogoTile />
             <span className="flex flex-col leading-none">
-              <span className="font-jost text-[16px] font-semibold text-[#f0e9db]">Legitfootball</span>
+              <span className="font-jost text-[16px] font-semibold text-[#f0e9db]">LEGITFOOTBALL</span>
               <span className="mt-1 font-engraved text-[8.5px] uppercase tracking-[0.18em] text-[#b89768]">
-                Fantasy Almanac
+                Fantasy Toolkit
               </span>
             </span>
           </Link>
