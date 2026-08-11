@@ -216,7 +216,7 @@ export async function suggestLeagueTrade(
       if (!wouldHelpThem) continue;
     }
 
-    const evaluation = evaluateTrade([surplus], [candidate.result]);
+    const evaluation = evaluateTrade([surplus], [candidate.result], format);
     if (evaluation.verdict === "fair") {
       return { suggestion: { otherTeamName: candidate.team.teamName, evaluation }, reason: null };
     }

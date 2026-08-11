@@ -367,6 +367,13 @@ export function TradeResult({ evaluation, contextNote, scoringFormat }: TradeRes
               </div>
             </>
           )}
+
+          {evaluation.rosterNote && (
+            <>
+              <div className={styles.vrule} />
+              <p className={styles.vnote}>{evaluation.rosterNote}</p>
+            </>
+          )}
         </div>
 
         {/* trade board */}

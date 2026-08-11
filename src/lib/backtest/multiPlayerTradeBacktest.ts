@@ -1,7 +1,7 @@
 import { buildBacktestComparisonInput } from "@/lib/recommendation/buildBacktestInput";
-import { RECENT_WEEK_COUNT } from "@/lib/recommendation/config";
+import { RECENT_WEEK_COUNT, REPLACEMENT_PER_GAME } from "@/lib/recommendation/config";
 import { scorePlayer } from "@/lib/recommendation/engine";
-import type { Player, ScoringFormat, SkillPosition } from "@/lib/sportsdata/types";
+import { isSkillPosition, type Player, type ScoringFormat, type SkillPosition } from "@/lib/sportsdata/types";
 import { type BacktestOutcome, type BacktestSummary, summarizeOutcomes } from "./grading";
 import type { BacktestRunData } from "./loadRun";
 import { loadNflverseOnlyRunData } from "./loadRunNflverseOnly";
@@ -190,15 +190,48 @@ function gradeTrade(
 ): TradeOutcomes {
   const project = (id: number) =>
     projectPlayer(id, anyPlayerById, targetWeek, weekSlice, runData, opponentsByTeamWeek, format);
+  const actualOf = (id: number) => actualRestOfSeasonTotal(id, runData.allWeeklyRows, targetWeek, format);
 
-  const sumActualA = trade.sideA.reduce((s, id) => s + actualRestOfSeasonTotal(id, runData.allWeeklyRows, targetWeek, format), 0);
-  const sumActualB = trade.sideB.reduce((s, id) => s + actualRestOfSeasonTotal(id, runData.allWeeklyRows, targetWeek, format), 0);
-  const actualTie = sumActualA === sumActualB;
-  const actualAWins = sumActualA > sumActualB;
+  const sumActualA = trade.sideA.reduce((s, id) => s + actualOf(id), 0);
+  const sumActualB = trade.sideB.reduce((s, id) => s + actualOf(id), 0);
+
+  // Uneven-trade normalization (item 19): the shorter side frees the extra
+  // roster spot(s), credited at replacement level — applied to BOTH the
+  // ground-truth actual sums AND the engine's projected sums, so the count
+  // confound is removed from what's being graded (see evaluateTrade.ts). The
+  // extras are the (diff) lowest-actual-value players on the longer side; the
+  // filler uses their positions × the remaining weeks. Even-count (2-for-2)
+  // trades get zero filler, so their grading is byte-identical to before.
+  const remainingWeeks = runData.allWeeklyRows.length - targetWeek + 1;
+  const replacementOf = (id: number) => {
+    const pos = anyPlayerById.get(id)?.Position;
+    return pos && isSkillPosition(pos) ? REPLACEMENT_PER_GAME[format][pos] * remainingWeeks : 0;
+  };
+  let fillerA = 0;
+  let fillerB = 0;
+  if (trade.sideA.length > trade.sideB.length) {
+    const diff = trade.sideA.length - trade.sideB.length;
+    fillerB = [...trade.sideA]
+      .sort((a, b) => actualOf(a) - actualOf(b))
+      .slice(0, diff)
+      .reduce((s, id) => s + replacementOf(id), 0);
+  } else if (trade.sideB.length > trade.sideA.length) {
+    const diff = trade.sideB.length - trade.sideA.length;
+    fillerA = [...trade.sideB]
+      .sort((a, b) => actualOf(a) - actualOf(b))
+      .slice(0, diff)
+      .reduce((s, id) => s + replacementOf(id), 0);
+  }
+
+  const adjActualA = sumActualA + fillerA;
+  const adjActualB = sumActualB + fillerB;
+  const actualTie = adjActualA === adjActualB;
+  const actualAWins = adjActualA > adjActualB;
 
   // Naive baseline: pick whichever side has more players (a tie on even
-  // counts). Exposes how much of the 2-for-1 signal is just "more players
-  // accumulate more total points."
+  // counts). Graded against the SAME replacement-normalized ground truth, so
+  // it no longer wins by default on 2-for-1s just because more bodies
+  // accumulate more raw total — the whole point of the normalization.
   let naiveMorePlayers: BacktestOutcome;
   if (trade.sideA.length === trade.sideB.length) {
     naiveMorePlayers = "no_pick";
@@ -215,8 +248,8 @@ function gradeTrade(
   if (projA.some((p) => p == null) || projB.some((p) => p == null)) {
     engine = "no_pick";
   } else {
-    const sumProjA = projA.reduce((s: number, p) => s + p!, 0);
-    const sumProjB = projB.reduce((s: number, p) => s + p!, 0);
+    const sumProjA = projA.reduce((s: number, p) => s + p!, 0) + fillerA;
+    const sumProjB = projB.reduce((s: number, p) => s + p!, 0) + fillerB;
     if (sumProjA === sumProjB) engine = "no_pick";
     else if (actualTie) engine = "push";
     else engine = (sumProjA > sumProjB) === actualAWins ? "correct" : "incorrect";

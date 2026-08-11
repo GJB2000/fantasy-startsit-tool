@@ -7727,6 +7727,67 @@ single-season numbers for those specific constants.
     matched mockups.** Wiring any chosen direction into the real app would
     be a token/component restyle of the item-111-118 editorial system, not
     a data/engine change.
+138. **Fixed the uneven-trade over-valuation (Open Item #19) — a
+    replacement-level roster-spot normalization in `evaluateTrade.ts`
+    (live) and `multiPlayerTradeBacktest.ts` (backtest). Even-count trades
+    are byte-identical; only uneven ones change.** Item 90 surfaced that
+    both the live Trade Analyzer and the multi-player backtest summed
+    per-side rest-of-season points with no accounting for the roster spot a
+    consolidation frees, so the side with more players was structurally
+    over-valued (raw totals accumulate with headcount).
+    - **The mechanism (value-over-replacement, in effect)**: an uneven
+      trade frees (or consumes) roster spots equal to the count difference;
+      each is worth a freely-available waiver player. So the SHORTER side is
+      credited a replacement-level filler for the count difference before
+      the sides are compared. New `REPLACEMENT_PER_GAME` constant in
+      `config.ts` — the startable-pool-cutoff player's per-game value
+      (`BROAD_MODE_POOL_SIZE`: QB/TE #12, RB/WR #24), derived empirically
+      from the full 2025 season, per format (a throwaway diagnostic route,
+      deleted after recording, same discipline as every other one-off in
+      this doc). QB is high (~17.5, a shallow position → strong streamer)
+      and format-invariant; RB/WR/TE fall as reception weight drops
+      (e.g. WR 12.22 PPR → 8.13 Standard). The filler = that per-game value
+      × the extra player's remaining games; the "extras" are the (diff)
+      lowest-value players on the longer side, so their positions set the
+      filler. **Even counts → zero filler**, so 1-for-1 / 2-for-2 are
+      untouched (verified byte-identical).
+    - **Live (`evaluateTrade.ts`)**: gained a `format` param (threaded from
+      the trade route; the two other call sites — suggestDrop /
+      suggestLeagueTrade — are always 1-for-1, a no-op) and a new
+      `rosterNote` field explaining the credit, rendered as a caption in
+      `TradeResult.tsx`'s verdict panel so the adjustment is never silent
+      (item 95 stopped rendering `reasoning` in the trade view). Side
+      totals stay RAW (they match the player cards); only `netValue` — what
+      drives the verdict — is roster-adjusted. **Verified all directions
+      live**: even 1-for-1 (Pollard→Chase) net = raw diff exactly,
+      `rosterNote` null (unchanged); 2-for-1 (Pollard+Warren→Chase) raw
+      diff −66.3 (would read "bad") → freed spot credited ~206.6 → net
+      **+140.2, "good"** (matches real fantasy wisdom — an elite + a waiver
+      filler beats two mid players); 1-for-2 the exact mirror (net −140.2,
+      "bad"); Standard format a smaller filler (174.6 vs PPR's 206.6),
+      confirming format-awareness.
+    - **Backtest (`multiPlayerTradeBacktest.ts`)**: the same filler is
+      applied to BOTH the engine's projected sums AND the actual
+      ground-truth sums (extras chosen by actual value, always defined), so
+      the count confound is removed from what's graded, and the naive "more
+      players" baseline is graded against the corrected ground truth too.
+      **2-for-2 is byte-identical to item 90 (engine 55.5%, 479-384,
+      n=863)** — the clean even-count measure is untouched. **2-for-1
+      changed as intended**: the naive "more players" heuristic collapsed
+      from item 90's 61.2% to **17.7%** — correctly exposed as a *losing*
+      strategy once the freed spot is credited (a balanced consolidation
+      genuinely favors the FEWER-players side, real fantasy strategy), and
+      the engine tracks the corrected ground truth at 80.5%.
+    - **Honest read of the 2-for-1 number**: the ground-truth DIRECTION is
+      now correct (previously it wrongly favored more-players, a roster-
+      accounting omission), but the 80.5% is dominated by the large,
+      correct "consolidation is good" filler term rather than isolating
+      per-player projection skill — so **2-for-2 (55.5%) remains the clean
+      skill measure**, and the primary value of this change is the LIVE
+      tool's fairer uneven-trade verdicts, not turning 2-for-1 into a
+      pristine skill test. `tsc`/lint clean.
+    - **Still open (see #19/#5)**: 3+-player-per-side shapes beyond
+      2-for-2/2-for-1 aren't built (item 90 covered the two canonical ones).
 137. **Closed the two scoring-format gaps in the Backtest tooling (Open
     Item #6, and the Half-PPR/Standard part of #12) — plumbing plus a UI
     control, no engine/scoring-logic change.**
@@ -7832,13 +7893,13 @@ single-season numbers for those specific constants.
       no blendedScore fallback), and the weeks-2-4 partial-blend question
       is untouched.
 
-### Open items (as of item 137 — pick up here)
-**Item 137 (Backtest scoring-format gaps) is an UNCOMMITTED working-tree
-change — code complete and verified (`tsc`/lint clean, live no-regression
-check against the running dev server), not yet committed. Per this
-project's standing rule, commit/push only once the user asks.**
-**Item 136 (prior-season fallback → live tools) is committed and pushed to
-`main` as `940e354`.** The prior session (items 133-135) is committed and
+### Open items (as of item 138 — pick up here)
+**Item 138 (uneven-trade valuation fix) is an UNCOMMITTED working-tree
+change — code complete and verified (`tsc`/lint clean, live all-directions
+check + backtest re-run against the running dev server), not yet committed.
+Per this project's standing rule, commit/push only once the user asks.**
+**Item 137 (Backtest scoring-format gaps) is committed and pushed to `main`
+as `fa1cd37`; item 136 (prior-season fallback → live tools) as `940e354`.** The prior session (items 133-135) is committed and
 pushed to `main` (HEAD before item 136 was `0e7b2eb`). Items 133-134 are
 real shipped code (with commit hashes inline in each entry); item 135 is
 design exploration that shipped NO code — Artifacts only, the live app is
@@ -8329,24 +8390,22 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     signal directly, not as an input to a shrinkage-based volume-
     modifier fix — a genuinely different use of the same underlying
     stat, not yet tried.
-19. **Uneven trades (2-for-1, N-for-M with unequal counts) are
-    over-valued toward the larger side — a real bias in the live
-    `evaluateTrade.ts`, surfaced by item 90.** Both the live Trade Analyzer
-    and the trade backtest sum per-side rest-of-season points with NO
-    accounting for the roster/lineup spot a consolidation trade frees, so
-    the side with more players is structurally favored (more bodies
-    accumulate more total points). Item 90 confirmed it: on 2-for-1s the
-    engine's summed projection picks the larger side ~74% of the time and
-    barely beats a naive "more players" baseline. The fix (which would make
-    BOTH the live verdict fairer and the 2-for-1 backtest a meaningful skill
-    measure): credit the short side with a replacement/waiver-level filler
-    for each freed starting spot, so both sides field the same number of
-    startable players before summing. Needs a defensible "replacement
-    level" definition (e.g. the pooled ranking's startable-tier cutoff
-    value, position-aware) and touches `evaluateTrade.ts` (live) +
-    `multiPlayerTradeBacktest.ts` (backtest) together. Also still unbuilt:
-    3+-player-per-side shapes beyond 2-for-2/2-for-1 (item 90 covered the
-    two canonical ones).
+19. **RESOLVED (item 138): uneven-trade over-valuation is fixed.** A
+    replacement-level roster-spot normalization (`REPLACEMENT_PER_GAME` in
+    config.ts, position-aware/format-aware, derived from the 2025
+    startable-pool cutoff) now credits the shorter side a waiver-level
+    filler for the count difference, in both `evaluateTrade.ts` (live,
+    with a `rosterNote` surfaced in the UI) and `multiPlayerTradeBacktest.ts`
+    (backtest, applied to both projection and actual). Even-count trades
+    (1-for-1 / 2-for-2) are byte-identical; the live 2-for-1 verdict is now
+    fair (a stud + a freed waiver spot correctly beats two mid players), and
+    the backtest's naive "more players" heuristic correctly collapsed to
+    17.7% (was 61.2%). One honest residual, NOT a to-do: the 2-for-1
+    backtest's 80.5% is dominated by the (correct) consolidation-value
+    signal rather than isolating per-player projection skill, so 2-for-2
+    (55.5%) stays the clean skill measure — the primary win here is the
+    live tool. **Still unbuilt (see #5)**: 3+-player-per-side shapes beyond
+    2-for-2/2-for-1.
 20. **Trade Analyzer result load-in animation — deferred from item 95.**
     The mockup had a tasteful entrance (the value-balance and per-game bars
     grow from zero, cards/sections rise + fade on load), guarded by

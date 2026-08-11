@@ -719,3 +719,30 @@ export const ENSEMBLE_VOLUME_BLEND_RATIO: Record<ScoringFormat, Record<SkillPosi
  * backtest-mode validation.
  */
 export const EXPERT_CONSENSUS_BLEND_WEIGHT = 0.5;
+
+/**
+ * Replacement-level per-game fantasy value at each skill position — the
+ * per-game scoring of a freely-available waiver player, i.e. the player at
+ * the startable-pool cutoff (BROAD_MODE_POOL_SIZE: QB/TE #12, RB/WR #24).
+ * Used to normalize UNEVEN trades (2-for-1, N-for-M with unequal counts):
+ * consolidating players frees a roster spot worth a replacement-level
+ * filler, so the shorter side is credited for the freed spot(s) before
+ * summing (evaluateTrade.ts / multiPlayerTradeBacktest.ts) — otherwise the
+ * side with more players is structurally over-valued (a real bias the
+ * multi-player trade backtest surfaced; see CLAUDE.md items 90 and the
+ * uneven-trade-fix item). EVEN-count trades are a no-op (equal counts →
+ * zero fillers), so the common 1-for-1 / 2-for-2 case is unchanged.
+ *
+ * Derived empirically from the full 2025 season: each position's cutoff-
+ * ranked player's per-game average, in each format (min 8 games for a
+ * robust per-game). QB is format-invariant (QBs rarely catch passes) and
+ * high, since QB is a shallow position (only 12 starters), so its
+ * replacement level is a strong streamer. RB/WR/TE fall as reception
+ * weight drops, as expected. Same "2025-derived constant applied across
+ * all backtest seasons" precedent as POINTS_PER_VOLUME_UNIT et al.
+ */
+export const REPLACEMENT_PER_GAME: Record<ScoringFormat, Record<SkillPosition, number>> = {
+  ppr: { QB: 17.47, RB: 12.15, WR: 12.22, TE: 10.58 },
+  half_ppr: { QB: 17.47, RB: 11.1, WR: 10.34, TE: 8.75 },
+  standard: { QB: 17.47, RB: 10.27, WR: 8.13, TE: 6.89 },
+};
