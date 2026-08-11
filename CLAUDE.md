@@ -6642,7 +6642,12 @@ single-season numbers for those specific constants.
       (item 78's `ENGINE_WEIGHT`, calibrated assuming the offseason engine
       snapshot has no consensus); feeding offseason consensus into its
       engine snapshot too would double-weight redraft and distort that
-      tuning, so it keeps the weekly path.
+      tuning, so it keeps the weekly path. **(SUPERSEDED by item 139: this
+      exclusion turned out to be the cause of an elite-injured player,
+      Lamar Jackson, tanking in the rankings — the frozen weekly snapshot
+      gave his engine score no consensus support in the offseason. Legit
+      Rankings now uses the offseason-aware consensus too; the feared
+      double-count is self-correcting. See item 139.)**
     - **Backtest-neutral by construction**: the backtest uses the
       HISTORICAL per-week consensus path
       (`getExpertConsensusByNormalizedNameWeek`), never this live
@@ -7727,6 +7732,61 @@ single-season numbers for those specific constants.
     matched mockups.** Wiring any chosen direction into the real app would
     be a token/component restyle of the item-111-118 editorial system, not
     a data/engine change.
+139. **Fixed Legit Rankings under-ranking an elite player coming off an
+    injury-affected season (user report: "Lamar Jackson is far too low")
+    — a one-line data-source swap in the rankings route, no scoring-logic
+    change.** Diagnosed with a throwaway route (deleted after) rather than
+    guessed:
+    - **NOT a name-join or missing-data bug** (the obvious first guess):
+      Lamar is correctly matched to FantasyPros' redraft consensus at
+      **QB2** (ecr 2.51). The real cause: his engine snapshot scored only
+      **11.7** and was labeled `dataQuality: "full"` — the item-101/102
+      offseason backfill pulled in 7 played games, but several are his
+      injury-limited/rested late-2025 games, so the recent-form score is
+      genuinely depressed. At `"full"` quality the engine gets 65% of the
+      `computeLegitScores` blend weight (`ENGINE_WEIGHT`), so his tanked
+      snapshot drowned out his elite FP QB2 — while Jayden Daniels
+      (`"limited"`, engine only 15% weight) sailed past him on FP QB5.
+      Confirmed directly: Lamar final 11.7/dq full/FP 2 vs. Daniels
+      11.4/dq limited/FP 5, with Daniels ranking ABOVE Lamar.
+    - **Root cause was item 103's deliberate rankings exclusion.** Item
+      103 gave the LIVE tools an offseason-aware consensus
+      (`getLiveExpertConsensusByNormalizedName` — weekly in-season, the
+      current season-long REDRAFT consensus in the offseason), which lifts
+      Lamar's live engine score 11.7→16.5. It EXCLUDED Legit Rankings over
+      a double-counting worry (rankings already blends FP redraft
+      separately via `ENGINE_WEIGHT`). But that exclusion is exactly why
+      rankings used the FROZEN weekly snapshot — stuck at 2025 week 18,
+      where Lamar (hurt at season's end) is simply absent, so his engine
+      snapshot got NO consensus support and his injury-tanked games
+      dominated.
+    - **The fix**: the rankings route (`/api/rankings`) now uses
+      `getLiveExpertConsensusByNormalizedName(context)` like every other
+      tool, instead of `getCurrentExpertConsensusByNormalizedName()`. This
+      reverses item 103's rankings exclusion — justified because the
+      "double-count" it worried about is **self-correcting**: feeding
+      consensus into the engine snapshot pulls a consensus-elite player
+      with a bad recent sample UP (Lamar), and pulls an engine-over-rated
+      player DOWN toward consensus (e.g. Trevor Lawrence), both correct.
+      `ENGINE_WEIGHT` was never a rigorously tuned weight (item 78: "a
+      reasoned default"), so there's no precise tuning to distort.
+    - **Result**: Lamar went from **outside the top 10** to **QB #6, legit
+      90 (elite/gold tier)**; his engine score corrected 11.7→16.5 (the
+      same value item 103 got live). The whole QB board is now sensible
+      (Allen #1, Maye, Burrow, Hurts, Herbert, Lamar), and RB/WR/TE are
+      unaffected/sensible (Bijan/CMC/Gibbs; Chase/Nacua/St. Brown;
+      McBride/Bowers) — verified live across all four positions. `tsc`/lint
+      clean; throwaway diagnostic route deleted.
+    - **Deliberately NOT changed (user's call — see Open Items)**: Lamar
+      is a consensus QB2 but still sits at #6, behind a few QBs FP ranks
+      lower (Burrow QB4, Herbert QB8), because his corrected engine score
+      (16.5) is ~2 pts below theirs (18+, cleaner recent samples) and the
+      engine still carries 65% weight at `"full"` data. Pushing him toward
+      QB2-3 would mean lowering `ENGINE_WEIGHT.full` so rankings defer more
+      to consensus — a real shift in the rankings' philosophy (more
+      FantasyPros-mirroring, less of the app's own engine). Put to the
+      user, who chose to ship the current fix and revisit the harder lean
+      later — logged as an open item.
 138. **Fixed the uneven-trade over-valuation (Open Item #19) — a
     replacement-level roster-spot normalization in `evaluateTrade.ts`
     (live) and `multiPlayerTradeBacktest.ts` (backtest). Even-count trades
@@ -7893,13 +7953,15 @@ single-season numbers for those specific constants.
       no blendedScore fallback), and the weeks-2-4 partial-blend question
       is untouched.
 
-### Open items (as of item 138 — pick up here)
-**Item 138 (uneven-trade valuation fix) is an UNCOMMITTED working-tree
-change — code complete and verified (`tsc`/lint clean, live all-directions
-check + backtest re-run against the running dev server), not yet committed.
-Per this project's standing rule, commit/push only once the user asks.**
-**Item 137 (Backtest scoring-format gaps) is committed and pushed to `main`
-as `fa1cd37`; item 136 (prior-season fallback → live tools) as `940e354`.** The prior session (items 133-135) is committed and
+### Open items (as of item 139 — pick up here)
+**Item 139 (Legit Rankings offseason-consensus fix) is an UNCOMMITTED
+working-tree change — one-line route swap, verified live (Lamar outside
+top-10 → QB #6; QB/RB/WR/TE all sensible), `tsc`/lint clean, not yet
+committed. Per this project's standing rule, commit/push only once the user
+asks.**
+**Item 138 (uneven-trade valuation fix) is committed and pushed to `main`
+as `fadabd9`; item 137 (Backtest scoring-format gaps) as `fa1cd37`; item
+136 (prior-season fallback → live tools) as `940e354`.** The prior session (items 133-135) is committed and
 pushed to `main` (HEAD before item 136 was `0e7b2eb`). Items 133-134 are
 real shipped code (with commit hashes inline in each entry); item 135 is
 design exploration that shipped NO code — Artifacts only, the live app is
@@ -8594,6 +8656,32 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       several) would now surface as a cache miss / stale entry rather than
       a loud request-time error. **Vercel Blob/KV is no longer needed** —
       dropped from this item.
+30. **Legit Rankings could lean harder on FantasyPros consensus (deferred
+    from item 139, user's call).** Item 139 fixed the worst of it (an
+    elite player coming off an injury-affected season no longer tanks —
+    Lamar Jackson went from outside the QB top-10 to #6/elite tier by
+    giving rankings the offseason-aware consensus every other tool
+    already had). But a consensus QB2 like Lamar still sits at #6, behind
+    a few QBs FantasyPros ranks lower (Burrow QB4, Herbert QB8), because
+    his engine recent-form score (16.5, injury-dampened) is ~2 pts below
+    theirs and the engine still carries 65% of the blend at `"full"` data
+    quality (`ENGINE_WEIGHT.full` in `buildRankings.ts`). To push a
+    strong-consensus player toward their FP rank, lower `ENGINE_WEIGHT.full`
+    (currently 0.65) so the FantasyPros redraft rank carries more of the
+    blend. The tradeoff, put to the user in item 139: it makes the WHOLE
+    board track FantasyPros more closely and rely less on the app's own
+    engine — a real shift in the rankings' philosophy, not just a Lamar
+    tweak, so it wants a deliberate decision (and ideally a sweep of a few
+    values checked against several players, not just Lamar) rather than a
+    reflexive lower-the-number. `ENGINE_WEIGHT` was never rigorously tuned
+    (item 78: "a reasoned default"), so there's no validated number being
+    disturbed — but there's also no ground truth to tune it against, since
+    "was this ranking right" has no backtest the way pick accuracy does.
+    A related, subtler lever if revisited: the real defect is that
+    `dataQuality: "full"` over-trusts a full-but-unrepresentative sample
+    (Lamar's injury-limited games count as "full"); a disagreement-aware
+    weight (trust the engine less when its snapshot strongly diverges from
+    consensus) would target that directly, but adds a heuristic to tune.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that

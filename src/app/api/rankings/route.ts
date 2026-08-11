@@ -1,4 +1,4 @@
-import { getCurrentExpertConsensusByNormalizedName } from "@/lib/fantasypros/weeklyConsensus";
+import { getLiveExpertConsensusByNormalizedName } from "@/lib/fantasypros/liveConsensus";
 import { type RemainingGame } from "@/lib/nflverse/schedules";
 import {
   getGameWeatherCached,
@@ -39,7 +39,15 @@ export async function GET(request: Request) {
         getRemainingOpponentsCached(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
           () => new Map<string, RemainingGame[]>()
         ),
-        getCurrentExpertConsensusByNormalizedName().catch(() => new Map()),
+        // Offseason-aware consensus (item 103): weekly in-season, but the
+        // current season-long REDRAFT consensus in the offseason. Legit
+        // Rankings previously used the frozen weekly snapshot here, which
+        // in the offseason is stuck at last season's final week — where an
+        // elite player who was hurt at season's end (e.g. Lamar Jackson) is
+        // simply absent, so his engine snapshot got NO consensus support and
+        // his injury-tanked recent games dominated his (mislabeled "full")
+        // score, ranking him far below his real value. See buildRankings.ts.
+        getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
       ]);
 
     // Same season-rollforward pattern as every other live route.
