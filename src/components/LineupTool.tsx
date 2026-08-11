@@ -82,7 +82,7 @@ export function LineupTool() {
 
   const controls = (
     <div className="space-y-3">
-      <div className="overflow-hidden rounded-[6px] border border-foreground/12 bg-surface shadow-sm">
+      <div className="glass-card overflow-hidden rounded-2xl border border-foreground/12">
         <div className="flex flex-col divide-y divide-foreground/[0.09] sm:flex-row sm:divide-x sm:divide-y-0">
           {/* Roster */}
           <button
@@ -125,7 +125,7 @@ export function LineupTool() {
         </div>
 
         {slotsOpen && (
-          <div className="border-t border-foreground/[0.09] bg-surface-sunken p-4">
+          <div className="border-t border-foreground/[0.09] bg-foreground/[0.03] p-4">
             <RosterSlotsEditor slots={slotCounts} onChange={setSlotCounts} />
           </div>
         )}
@@ -149,7 +149,7 @@ export function LineupTool() {
         onClick={handleBuildLineup}
         disabled={loading || rostered.length === 0}
         style={{ fontFamily: "var(--font-engraved)" }}
-        className="w-full rounded-[4px] bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
+        className="w-full rounded-full bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
       >
         {loading ? "Building your lineup…" : "Build my lineup"}
       </button>

@@ -133,7 +133,7 @@ function StatusPills({ breakdown }: { breakdown: PlayerScoreBreakdown }) {
 
 function EmptySlotCard({ heading }: { heading: string }) {
   return (
-    <div className="rounded-[6px] border border-dashed border-foreground/20 bg-surface p-5">
+    <div className="glass-card rounded-2xl border border-dashed border-foreground/20 p-5">
       <SlotChip heading={heading} />
       <p className="mt-3 text-sm text-foreground/50">
         No eligible player on your roster for this slot — add one to fill it.
@@ -159,7 +159,7 @@ function StarterCard({
 
   return (
     <div
-      className="overflow-hidden rounded-[6px] border border-foreground/12 bg-surface shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+      className="glass-card overflow-hidden rounded-2xl border border-foreground/12 transition-all hover:-translate-y-0.5"
       style={{ borderLeft: `3px solid ${color}` }}
     >
       <div className="p-5">
@@ -257,7 +257,7 @@ export function LineupResult({ slots, bench, scoringFormat }: LineupResultProps)
   return (
     <div className="mt-6 space-y-8">
       {/* projected-total header */}
-      <div className="flex items-center justify-between gap-4 overflow-hidden rounded-[6px] border border-foreground/12 p-6 shadow-sm [background:radial-gradient(120%_140%_at_100%_0%,color-mix(in_srgb,var(--accent)_11%,transparent),transparent_55%),var(--surface)]">
+      <div className="glass-card-accent flex items-center justify-between gap-4 overflow-hidden rounded-2xl border border-accent/25 p-6">
         <div>
           <div className="font-engraved text-[11px] uppercase tracking-[0.16em] text-accent">
             Optimal lineup
@@ -297,7 +297,7 @@ export function LineupResult({ slots, bench, scoringFormat }: LineupResultProps)
           <h3 className="mb-3 font-engraved text-[12px] uppercase tracking-[0.1em] text-foreground/50">
             Bench <span className="font-mono text-foreground/35">{sortedBench.length}</span>
           </h3>
-          <div className="overflow-hidden rounded-[6px] border border-foreground/12 bg-surface">
+          <div className="glass-card overflow-hidden rounded-2xl border border-foreground/12">
             {sortedBench.map((breakdown) => (
               <BenchRow key={breakdown.playerId} breakdown={breakdown} />
             ))}
