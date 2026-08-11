@@ -29,21 +29,13 @@ const VERDICT_PHRASE: Record<TradeVerdict, string> = {
   unknown: "We can't call this one.",
 };
 
-// Two tone channels per verdict, set inline on the sheet:
-//   --tone      : a bright accent legible on the always-dark pine panel
-//   --tone-ink  : an on-paper accent (sourced from the sheet's own local vars)
-const TONE_PINE: Record<TradeVerdict, string> = {
-  good: "#4fd09a",
-  fair: "#dcb877",
-  bad: "#e6917d",
-  unknown: "#a9c2cc",
-};
-
-const TONE_INK: Record<TradeVerdict, string> = {
-  good: "var(--green)",
-  fair: "var(--brass)",
-  bad: "var(--red)",
-  unknown: "var(--muted)",
+// One tone per verdict, set inline as --tone — a theme-adaptive semantic token
+// so it stays readable on both the dark and light verdict card.
+const TONE: Record<TradeVerdict, string> = {
+  good: "var(--accent)",
+  fair: "var(--caution)",
+  bad: "var(--bad)",
+  unknown: "var(--info)",
 };
 
 /** Per-game rate reference for the small magnitude bars — a fixed visual scale (an elite skill player rest-of-season rate), not fabricated data; the displayed number is always real. */
@@ -317,25 +309,12 @@ export function TradeResult({ evaluation, contextNote, scoringFormat }: TradeRes
   const betterSide: "give" | "get" | null = verdict === "good" ? "get" : verdict === "bad" ? "give" : null;
   const balanceMax = giveTotal != null && getTotal != null ? Math.max(giveTotal, getTotal, 1) : null;
 
-  const toneStyle = { "--tone": TONE_PINE[verdict], "--tone-ink": TONE_INK[verdict] } as CSSProperties;
+  const toneStyle = { "--tone": TONE[verdict] } as CSSProperties;
 
   return (
-    <div className={`${styles.sheet} ${styles.grain} mt-8`} style={toneStyle}>
+    <div className={`${styles.sheet} mt-6`} style={toneStyle}>
       <div className={styles.body}>
-        {/* masthead */}
-        <div className={styles.mast}>
-          <span className={styles.mastL}>The Trade Desk</span>
-          <span className={styles.mastR}>
-            Rest-of-season value · {formatLabel}
-          </span>
-        </div>
-        <div className={styles.dateline}>
-          <span>LEGITFOOTBALL Almanac</span>
-          <span>{evaluation.give.length}-for-{evaluation.get.length} deal</span>
-          {weeksLeft != null && <span>{weeksLeft} weeks remaining</span>}
-        </div>
-
-        {/* verdict panel */}
+        {/* verdict hero */}
         <div className={styles.verdict}>
           <div className={styles.vhead}>
             <VerdictIcon verdict={verdict} />
@@ -411,30 +390,25 @@ export function TradeResult({ evaluation, contextNote, scoringFormat }: TradeRes
           />
         </div>
 
-        {/* reasons to accept / reject */}
-        <div className={styles.case}>
-          <div className={styles.caseCol}>
-            <div className={`${styles.caseH} ${styles.caseFor}`}>Reasons to accept</div>
-            <p>{buildReasonsToAccept(evaluation)}</p>
+        {/* breakdown: reasons + summary */}
+        <div className={styles.breakdown}>
+          <div className={styles.case}>
+            <div className={styles.caseCol}>
+              <div className={`${styles.caseH} ${styles.caseFor}`}>Reasons to accept</div>
+              <p>{buildReasonsToAccept(evaluation)}</p>
+            </div>
+            <div className={styles.caseCol}>
+              <div className={`${styles.caseH} ${styles.caseAgainst}`}>Reasons to reject</div>
+              <p>{buildReasonsToReject(evaluation)}</p>
+            </div>
           </div>
-          <div className={styles.caseCol}>
-            <div className={`${styles.caseH} ${styles.caseAgainst}`}>Reasons to reject</div>
-            <p>{buildReasonsToReject(evaluation)}</p>
+
+          <div className={styles.strip}>
+            <StripCell label="You give" value={giveTotal} />
+            <StripCell label="You get" value={getTotal} />
+            <StripCell label="Net value" value={netValue} isNet signed />
+            <StripCell label="Weeks left" value={weeksLeft} />
           </div>
-        </div>
-
-        {/* summary strip */}
-        <div className={styles.strip}>
-          <StripCell label="You give" value={giveTotal} />
-          <StripCell label="You get" value={getTotal} />
-          <StripCell label="Net value" value={netValue} isNet signed />
-          <StripCell label="Weeks left" value={weeksLeft} />
-        </div>
-
-        {/* colophon */}
-        <div className={styles.colophon}>
-          <span>LEGITFOOTBALL · Trade Desk</span>
-          <span>Projections, not guarantees</span>
         </div>
       </div>
     </div>

@@ -60,10 +60,10 @@ export function TradeAnalyzer() {
 
   return (
     <div className="mx-auto mt-10 w-full max-w-3xl">
-      <div className="rounded-[6px] border border-foreground/12 bg-surface p-5 shadow-sm sm:p-6">
-        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3 border-b border-foreground/15 pb-3">
+      <div className="rounded-2xl border border-foreground/12 bg-surface-glass p-5 shadow-[0_18px_46px_-24px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:p-6">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <span
-            className="text-[12px] uppercase tracking-[0.1em] text-foreground/70"
+            className="text-[10px] uppercase tracking-[0.14em] text-accent"
             style={{ fontFamily: "var(--font-engraved)" }}
           >
             Build the Trade
@@ -104,7 +104,7 @@ export function TradeAnalyzer() {
           onClick={handleAnalyze}
           disabled={givePlayers.length === 0 || getPlayers.length === 0 || loading}
           style={{ fontFamily: "var(--font-engraved)" }}
-          className="mt-5 w-full rounded-[4px] bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
+          className="mt-5 w-full rounded-full bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
         >
           {loading ? "Analyzing…" : "Analyze trade"}
         </button>
