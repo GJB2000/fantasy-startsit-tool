@@ -68,7 +68,8 @@ export async function suggestLeagueTrade(
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   teamWeatherByTeamWeek: Map<string, GameWeather>,
   impliedTotalsByTeamWeek: Map<string, number>,
-  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map()
+  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map(),
+  priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map()
 ): Promise<LeagueTradeResult> {
   if (yourPlayerIds.length === 0) return { suggestion: null, reason: "Your roster is empty." };
   if (otherTeams.length === 0) {
@@ -85,7 +86,8 @@ export async function suggestLeagueTrade(
       remainingOpponentsByTeam,
       teamWeatherByTeamWeek,
       impliedTotalsByTeamWeek,
-      expertConsensusByNormalizedName
+      expertConsensusByNormalizedName,
+      priorSeasonPprAvgByNormalizedName
     );
   }
 

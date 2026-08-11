@@ -7727,10 +7727,70 @@ single-season numbers for those specific constants.
     matched mockups.** Wiring any chosen direction into the real app would
     be a token/component restyle of the item-111-118 editorial system, not
     a data/engine change.
+136. **Wired the prior-season-average fallback into the live tools
+    (resolves Open Item #14, and the format half of #15) — a plumbing
+    change, no engine/scoring-logic change.** The fallback that lets a
+    player with zero current-season games still get a real projection
+    (item 67's `getPriorSeasonPprAveragesByNormalizedName` +
+    `scorePlayer`'s blendedScore fallback-of-last-resort branch,
+    previously fed only in the backtest's per-player lookup) now reaches
+    the live tools too.
+    - **Threaded exactly how expert consensus already was** (item 73): a
+      new trailing optional `priorSeasonPprAvgByNormalizedName` param on
+      `scoreExtendedPlayer`/`suggestDrops`/`suggestLeagueTrade` (default
+      empty map = no-op), and each of the five live scoring routes
+      (`/api/compare`, `/api/trade`, `/api/lineup`, `/api/waivers`,
+      `/api/trade-suggestion`) now fetches
+      `getPriorSeasonPprAveragesByNormalizedName(context.lastCompletedSeason
+      - 1, format)` once per request (fail-open `.catch(() => new Map())`)
+      and passes it down. `buildComparisonInput` already read the map and
+      populated `priorSeasonPprAvg` — the gap was purely that
+      `scoreExtendedPlayer` passed `undefined` for it and no route fetched
+      it. Now **format-aware** (the average is computed in the selected
+      scoring format), closing the "PPR-derived only" half of #15 for the
+      live tool.
+    - **Deliberately NOT wired into two no-op call sites**, per item 67's
+      own "don't add dead plumbing" discipline: Legit Rankings
+      (`buildRankings.ts`) and the waiver-candidate detail
+      (`buildWaiverReport.ts`) only ever score players that already
+      cleared a recent-games gate (item 102 / rankCandidates' opportunity
+      floor), so `recentGames.length === 0` can never hold there and the
+      fallback could never fire. It IS wired into `suggestDrops` (scores
+      the user's own roster, which can include a back-from-injury
+      zero-data player).
+    - **Confirmed the live path is genuinely reachable, not dead code**: a
+      currently-rostered player with zero current-season games is resolved
+      by `getScorablePlayerById` via its `isRosterable` branch (Active or
+      PUP/IR/NFI-with-a-team, item 104) even though they're absent from
+      `getPlayedLastSeasonPlayerIds`, so they reach `scorePlayer` with
+      `seasonStat == null` + an empty recent window → the fallback fires.
+      The only scorable-but-zero-current-data case is exactly a rostered
+      player who sat out the whole season (season-long IR/PUP) — the
+      narrow case this is for.
+    - **Verified**: `tsc`/lint clean; a live `/api/compare` regression
+      check against the running dev server shows full-data players
+      (Bijan/McCaffrey) unchanged with `priorSeasonPprAvg: null`, and a
+      ~35-player sweep of thin/injured players confirmed the fallback
+      stays dormant for anyone with any current-season data (they read
+      `dataQuality: "limited"`, not the fallback). The fallback LOGIC
+      itself was already validated in item 67 (Stafford week 1: "—" →
+      real 13.4). Could NOT exhibit a live zero-current-season player
+      firing it — such a player (rostered, sat out all of 2025, has 2024
+      data) is genuinely rare and none surfaced in the offseason sweep —
+      but the wiring, reachability, and no-regression are all confirmed,
+      and the change is a proven no-op for every player with any
+      current-season data.
+    - **Still open (folded into #15)**: the fallback is
+      skill-positions-only (D/ST and K use their own scorers, which have
+      no blendedScore fallback), and the weeks-2-4 partial-blend question
+      is untouched.
 
-### Open items (as of item 135 — pick up here)
-**This session (items 133-135) is committed and pushed to `main`; HEAD is
-`0e7b2eb`, working tree clean.** Items 133-134 are real shipped code (with
+### Open items (as of item 136 — pick up here)
+**Item 136 (prior-season fallback → live tools) is committed to `main` as
+`ef8166d` but NOT yet pushed — the user asked to commit, not push. Code
+complete and verified (`tsc`/lint clean, live no-regression check).**
+**The prior session (items 133-135) is committed and pushed to `main` (HEAD
+before this commit was `0e7b2eb`).** Items 133-134 are real shipped code (with
 commit hashes inline in each entry); item 135 is design exploration that
 shipped NO code — Artifacts only, the live app is unchanged. The numbered
 open items below were not touched this session — nothing below is started
@@ -8125,33 +8185,29 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     gain looked like it was worth, so it was reverted rather than shipped.
     Both are documented, open decisions if picked up again — see item 67
     for the full sweep numbers.
-14. **The prior-season fallback (item 67) is only wired into the
-    backtest's per-player lookup, not the live tool.**
-    `buildComparisonInput` (`buildInput.ts`) already accepts the new
-    `priorSeasonPprAvgByNormalizedName` parameter and defaults it safely
-    to a no-op empty map — the live-tool gap this would close is
-    narrower than the backtest one (per item 67's own analysis,
-    `SeasonContext` already carries last season's data forward until the
-    new season's week 1 actually completes), but a rookie call-up or a
-    player back from a long in-season absence would still benefit.
-    Wiring it in needs: fetching
-    `getPriorSeasonPprAveragesByNormalizedName(context.lastCompletedSeason
-    - 1, format)` once per request (mirroring how `remainingOpponentsByTeam`/
-    `teamWeatherByTeamWeek` are already fetched once and shared across
-    every player in a comparison) and threading it through
-    `scoreExtendedPlayer` (`scoreExtended.ts`) into all three live
-    routes (`/api/compare`, `/api/trade`, `/api/waivers`) — not attempted
-    this pass since it wasn't part of what was asked.
-15. **The prior-season fallback is skill-positions-only and PPR-derived
-    only where it's actually used** (matches the `buildRankedPoolForWeek`/
-    "Projection accuracy" scope it was built for — see item 12 above for
-    the broader D/ST/K and format gaps already on this list). Also
-    untested: whether the fallback should ever partially blend into
-    weeks 2-4 (thin-but-nonzero current-season samples) rather than only
-    firing on a strict zero — item 67 deliberately scoped this to the
-    narrowest fix that answers "why can't you project week 1," not a
-    reweighting of the `RECENT_WEIGHT` formula, which would need its own
-    real backtest sweep.
+14. **RESOLVED (item 136): the prior-season fallback is now wired into
+    the live tools.** All five live scoring routes (`/api/compare`,
+    `/api/trade`, `/api/lineup`, `/api/waivers`, `/api/trade-suggestion`)
+    fetch `getPriorSeasonPprAveragesByNormalizedName(context.lastCompletedSeason
+    - 1, format)` once per request and thread it through
+    `scoreExtendedPlayer` (and `suggestDrops`/`suggestLeagueTrade`), the
+    same trailing-optional-param pattern expert consensus already used.
+    Confirmed reachable (`getScorablePlayerById`'s `isRosterable` branch
+    resolves a rostered zero-current-season player) and a proven no-op for
+    every player with any current-season data. Deliberately skipped the
+    two no-op call sites (rankings, waiver-candidate detail — both gate on
+    recent games, so the fallback could never fire there). No longer open —
+    see item 136.
+15. **The prior-season fallback is skill-positions-only** (D/ST and K use
+    their own scorers, which have no blendedScore fallback branch). As of
+    item 136 the live wiring IS format-aware (the prior-season average is
+    computed in the selected scoring format), so the "PPR-derived only"
+    part of this item is closed for the live tool. Still untested: whether
+    the fallback should ever partially blend into weeks 2-4
+    (thin-but-nonzero current-season samples) rather than only firing on a
+    strict zero — item 67 deliberately scoped this to the narrowest fix
+    that answers "why can't you project week 1," not a reweighting of the
+    `RECENT_WEIGHT` formula, which would need its own real backtest sweep.
 16. **`pickByExpertConsensus`/`EXPERT_CONSENSUS_BLEND_WEIGHT` (items
     69-71): pick-accuracy integration and the projection-accuracy
     real-harness comparison are both done — one real follow-up remains:**

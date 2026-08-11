@@ -1,4 +1,5 @@
 import { getLiveExpertConsensusByNormalizedName } from "@/lib/fantasypros/liveConsensus";
+import { getPriorSeasonPprAveragesByNormalizedName } from "@/lib/nflverse/priorSeasonAverage";
 import { parseSlotsParam } from "@/lib/lineup/rosterSlots";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { type RemainingGame } from "@/lib/nflverse/schedules";
@@ -32,15 +33,25 @@ export async function GET(request: Request) {
   try {
     const [context, resolved] = await Promise.all([getSeasonContext(), resolveSleeperRoster(leagueId, userId)]);
 
-    const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt, expertConsensusByNormalizedName] =
-      await Promise.all([
-        getPositionDefenseTableCached(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
-        getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
-        getRemainingOpponentsCached(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
-          () => new Map<string, RemainingGame[]>()
-        ),
-        getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
-      ]);
+    const [
+      positionDefenseTable,
+      nflversePlayerWeekTable,
+      firstAttempt,
+      expertConsensusByNormalizedName,
+      priorSeasonPprAvgByNormalizedName,
+    ] = await Promise.all([
+      getPositionDefenseTableCached(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
+      getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
+      getRemainingOpponentsCached(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
+        () => new Map<string, RemainingGame[]>()
+      ),
+      getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
+      // Prior-season per-game average — fallback for a rostered player with
+      // zero games this season (see buildInput.ts / scorePlayer's fallback).
+      getPriorSeasonPprAveragesByNormalizedName(context.lastCompletedSeason - 1, format).catch(
+        () => new Map<string, number>()
+      ),
+    ]);
 
     // Same season-rollforward pattern as /api/compare, /api/trade, /api/lineup.
     let scheduleSeason = context.lastCompletedSeason;
@@ -69,7 +80,8 @@ export async function GET(request: Request) {
       remainingOpponentsByTeam,
       teamWeatherByTeamWeek,
       impliedTotalsByTeamWeek,
-      expertConsensusByNormalizedName
+      expertConsensusByNormalizedName,
+      priorSeasonPprAvgByNormalizedName
     );
 
     return Response.json({

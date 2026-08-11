@@ -1,4 +1,5 @@
 import { getLiveExpertConsensusByNormalizedName } from "@/lib/fantasypros/liveConsensus";
+import { getPriorSeasonPprAveragesByNormalizedName } from "@/lib/nflverse/priorSeasonAverage";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { type RemainingGame } from "@/lib/nflverse/schedules";
 import {
@@ -42,15 +43,26 @@ export async function GET(request: Request) {
   try {
     const context = await getSeasonContext();
 
-    const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt, expertConsensusByNormalizedName] =
-      await Promise.all([
-        getPositionDefenseTableCached(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
-        getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
-        getRemainingOpponentsCached(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
-          () => new Map<string, RemainingGame[]>()
-        ),
-        getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
-      ]);
+    const [
+      positionDefenseTable,
+      nflversePlayerWeekTable,
+      firstAttempt,
+      expertConsensusByNormalizedName,
+      priorSeasonPprAvgByNormalizedName,
+    ] = await Promise.all([
+      getPositionDefenseTableCached(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
+      getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
+      getRemainingOpponentsCached(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
+        () => new Map<string, RemainingGame[]>()
+      ),
+      getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
+      // Prior-season per-game average — fallback for a rostered player with
+      // zero games this season (e.g. back from a long absence), used when
+      // scoring drop candidates below (see buildInput.ts / scorePlayer).
+      getPriorSeasonPprAveragesByNormalizedName(context.lastCompletedSeason - 1, format).catch(
+        () => new Map<string, number>()
+      ),
+    ]);
 
     // Same season-rollforward fallback as /api/trade: try the current
     // season's remaining schedule first, roll forward to next season's
@@ -115,7 +127,8 @@ export async function GET(request: Request) {
       remainingOpponentsByTeam,
       teamWeatherByTeamWeek,
       impliedTotalsByTeamWeek,
-      expertConsensusByNormalizedName
+      expertConsensusByNormalizedName,
+      priorSeasonPprAvgByNormalizedName
     );
 
     const candidatesByPosition = Object.fromEntries(

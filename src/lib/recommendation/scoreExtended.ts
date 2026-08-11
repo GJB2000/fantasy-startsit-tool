@@ -31,7 +31,8 @@ export async function scoreExtendedPlayer(
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   teamWeatherByTeamWeek: Map<string, GameWeather>,
   impliedTotalsByTeamWeek: Map<string, number>,
-  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map()
+  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map(),
+  priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map()
 ): Promise<PlayerScoreBreakdown> {
   if (isDst(playerId)) {
     const input = await buildDstComparisonInput(
@@ -65,7 +66,7 @@ export async function scoreExtendedPlayer(
     nflversePlayerWeekTable,
     remainingOpponentsByTeam,
     teamWeatherByTeamWeek,
-    undefined,
+    priorSeasonPprAvgByNormalizedName,
     expertConsensusByNormalizedName
   );
   return withFreeAgentProjection(scorePlayer(input, format));

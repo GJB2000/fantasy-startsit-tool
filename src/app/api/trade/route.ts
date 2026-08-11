@@ -1,6 +1,7 @@
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat } from "@/lib/sportsdata/types";
 import { getLiveExpertConsensusByNormalizedName } from "@/lib/fantasypros/liveConsensus";
+import { getPriorSeasonPprAveragesByNormalizedName } from "@/lib/nflverse/priorSeasonAverage";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { projectExtendedRestOfSeason, scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
 import { type RemainingGame } from "@/lib/nflverse/schedules";
@@ -39,15 +40,25 @@ export async function GET(request: Request) {
   try {
     const context = await getSeasonContext();
 
-    const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt, expertConsensusByNormalizedName] =
-      await Promise.all([
-        getPositionDefenseTableCached(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
-        getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
-        getRemainingOpponentsCached(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
-          () => new Map<string, RemainingGame[]>()
-        ),
-        getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
-      ]);
+    const [
+      positionDefenseTable,
+      nflversePlayerWeekTable,
+      firstAttempt,
+      expertConsensusByNormalizedName,
+      priorSeasonPprAvgByNormalizedName,
+    ] = await Promise.all([
+      getPositionDefenseTableCached(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
+      getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
+      getRemainingOpponentsCached(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
+        () => new Map<string, RemainingGame[]>()
+      ),
+      getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
+      // Prior-season per-game average — fallback for a player with zero games
+      // this season (see buildInput.ts / scorePlayer's blendedScore fallback).
+      getPriorSeasonPprAveragesByNormalizedName(context.lastCompletedSeason - 1, format).catch(
+        () => new Map<string, number>()
+      ),
+    ]);
 
     // Try continuing the season lastCompletedWeek belongs to first; if it
     // has no games left, roll forward to the next season's full schedule.
@@ -80,7 +91,8 @@ export async function GET(request: Request) {
         remainingOpponentsByTeam,
         teamWeatherByTeamWeek,
         impliedTotalsByTeamWeek,
-        expertConsensusByNormalizedName
+        expertConsensusByNormalizedName,
+        priorSeasonPprAvgByNormalizedName
       );
       const projection = projectExtendedRestOfSeason(
         breakdown,

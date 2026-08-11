@@ -35,7 +35,8 @@ export async function suggestDrops(
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   teamWeatherByTeamWeek: Map<string, GameWeather>,
   impliedTotalsByTeamWeek: Map<string, number>,
-  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map()
+  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map(),
+  priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map()
 ): Promise<Map<number, DropSuggestion>> {
   const suggestions = new Map<number, DropSuggestion>();
   if (rosteredPlayerIds.length === 0 || candidates.length === 0) return suggestions;
@@ -51,7 +52,8 @@ export async function suggestDrops(
         remainingOpponentsByTeam,
         teamWeatherByTeamWeek,
         impliedTotalsByTeamWeek,
-        expertConsensusByNormalizedName
+        expertConsensusByNormalizedName,
+        priorSeasonPprAvgByNormalizedName
       );
       const projection = projectExtendedRestOfSeason(
         breakdown,
