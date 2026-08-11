@@ -68,15 +68,15 @@ export function RankingsTool() {
   return (
     <div className="mx-auto mt-6 w-full max-w-3xl">
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <div className="inline-flex overflow-hidden rounded-[3px] border border-foreground/25 shadow-sm">
+        <div className="inline-flex gap-0.5 rounded-full bg-surface-sunken p-[3px]">
           {TABS.map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               style={{ fontFamily: "var(--font-engraved)" }}
-              className={`whitespace-nowrap px-3.5 py-1.5 text-[11px] uppercase tracking-[0.08em] transition-colors [&:not(:first-child)]:border-l [&:not(:first-child)]:border-foreground/20 ${
-                tab === t ? "bg-accent text-accent-ink" : "text-foreground/55 hover:text-foreground"
+              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[11px] uppercase tracking-[0.08em] transition-colors ${
+                tab === t ? "bg-accent font-semibold text-accent-ink" : "text-foreground/55 hover:text-foreground"
               }`}
             >
               {TAB_LABEL[t]}

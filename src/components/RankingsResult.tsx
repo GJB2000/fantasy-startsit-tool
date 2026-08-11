@@ -113,7 +113,7 @@ export function RankingsResult({ rankings, positionLabel, scoringFormat }: Ranki
   }
 
   return (
-    <div className="mt-6 overflow-hidden rounded-[6px] border border-foreground/12 bg-surface shadow-sm">
+    <div className="glass-card mt-6 overflow-hidden rounded-2xl border border-foreground/12">
       {rankings.map((entry) => (
         <RankingRow key={entry.playerId ?? entry.displayName} entry={entry} formatLabel={formatLabel} />
       ))}
