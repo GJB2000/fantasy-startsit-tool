@@ -5,7 +5,6 @@ import { getPriorSeasonPprAveragesByNormalizedName } from "@/lib/nflverse/priorS
 import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
 import { compareBreakdowns } from "@/lib/recommendation/engine";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
-import { getPropsForPlayers } from "@/lib/oddsapi/props";
 import { scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
 import {
   getDepthChartRankCached,
@@ -108,18 +107,11 @@ export async function GET(request: Request) {
 
     const result = compareBreakdowns(breakdowns, depthRankByPlayerId);
 
-    // Display-only betting-line context for the cards (The Odds API,
-    // current/upcoming games). Fails open to {} — never blocks the
-    // comparison, and empty during the offseason before books post props.
-    const propsByPlayerId = await getPropsForPlayers(
-      breakdowns
-        .filter((b) => b.playerId != null)
-        .map((b) => ({ playerId: b.playerId!, name: b.displayName, team: b.team, position: b.position }))
-    ).catch(() => ({}));
-
+    // Betting lines (display-only) are fetched separately by the client via
+    // /api/props after this verdict renders, so the Odds API round-trip never
+    // delays the comparison.
     return Response.json({
       result,
-      propsByPlayerId,
       context: {
         lastCompletedSeason: context.lastCompletedSeason,
         lastCompletedApiSeason: context.lastCompletedApiSeason,

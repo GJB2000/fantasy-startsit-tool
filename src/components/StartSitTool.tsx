@@ -16,19 +16,22 @@ const MAX_PLAYERS = 4;
 
 interface CompareResponse {
   result: ComparisonResultData;
-  propsByPlayerId?: Record<number, PlayerProps>;
   context: { contextNote: string; lastCompletedSeason: number };
 }
 
 export function StartSitTool() {
   const [selectedPlayers, setSelectedPlayers] = useState<PlayerSummary[]>([]);
   const [response, setResponse] = useState<CompareResponse | null>(null);
+  const [propsByPlayerId, setPropsByPlayerId] = useState<Record<number, PlayerProps>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scoringFormat, setScoringFormat] = useScoringFormat();
   const { recent, addComparison } = useRecentComparisons();
   const [pendingRestore, setPendingRestore] = usePendingRestoreComparison();
   const restoredRef = useRef(false);
+  // Guards the async betting-lines fetch against a stale response landing after
+  // a newer comparison has started.
+  const propsTokenRef = useRef("");
 
   function addPlayer(player: PlayerSummary) {
     setSelectedPlayers((prev) =>
@@ -47,8 +50,10 @@ export function StartSitTool() {
     setLoading(true);
     setError(null);
     setResponse(null);
+    setPropsByPlayerId({});
+    const ids = players.map((p) => p.playerId).join(",");
+    propsTokenRef.current = ids;
     try {
-      const ids = players.map((p) => p.playerId).join(",");
       const res = await fetch(`/api/compare?ids=${ids}&scoringFormat=${format}`);
       const data = await res.json();
       if (!res.ok) {
@@ -56,6 +61,13 @@ export function StartSitTool() {
         return;
       }
       setResponse(data);
+      // Betting lines load separately so they never delay the verdict.
+      fetch(`/api/props?ids=${ids}`)
+        .then((r) => (r.ok ? r.json() : { propsByPlayerId: {} }))
+        .then((d) => {
+          if (propsTokenRef.current === ids) setPropsByPlayerId(d.propsByPlayerId ?? {});
+        })
+        .catch(() => {});
       const result: ComparisonResultData = data.result;
       const recommended = result.players.find((p) => p.playerId === result.recommendedPlayerId);
       addComparison({
@@ -147,7 +159,7 @@ export function StartSitTool() {
             result={response.result}
             contextNote={response.context.contextNote}
             scoringFormat={scoringFormat}
-            propsByPlayerId={response.propsByPlayerId}
+            propsByPlayerId={propsByPlayerId}
             dataSeason={response.context.lastCompletedSeason}
           />
         )}
