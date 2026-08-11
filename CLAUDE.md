@@ -7629,13 +7629,112 @@ single-season numbers for those specific constants.
     projected 0. Commits `1e9c9b5` (search/scoring inclusion), `5a7fd08`
     (0-projection), card copy in `57bb3d1`.
 
-### Open items (as of item 132 — pick up here)
-**This session (items 123-132) is all committed and pushed to `main`;
-HEAD is `1f357ab`, working tree clean.** Items 123-126 landed earlier
-(see their own entries for commit hashes: `8f7339c`, `6a9d859`, and the
-caching build `1f76c53`); items 127-132's commit hashes are listed inline
-in each entry above. Nothing below is started or fixed unless its own
-entry says so.
+133. **Tightened the Start/Sit reasoning copy against a set of writing
+    rules — prose/presentation only, zero engine/accuracy change — and
+    built then REMOVED two would-be features (injury-branch verdict,
+    format-flip note).** Prompted by a request to make the generated
+    reasoning specific and comparative, from a reference doc that was
+    explicitly NOT to override the backtest-validated calibration/weights.
+    - **Copy audit + fixes (shipped, `aa3c6c1`):** rewrote
+      `ComparisonResult.tsx`'s `buildCaseFor`/`buildCaseAgainst` and
+      `engine.ts`'s verdict `headline` so every claim carries a specific
+      number, both players are named comparatively in the verdict, and
+      hedging/process language is gone. Matchup claims now cite the real
+      defensive rank + points allowed vs. league average ("PIT allows the
+      6th-fewest points to RBs — 19.0 a game, 2.9 below the 21.9 league
+      average") instead of "tough matchup"; the verdict names both with
+      the gap ("Start Bijan Robinson over Jonathan Taylor — 1.7 more
+      projected points (21.4 to 19.6)") instead of a bare "Start X." or
+      the hedged "lean X, not a lock"; vague fallbacks ("still worth a
+      look") became honest empty-states; the recent-form line is now
+      format-correct (was hardcoded "PPR"). **Honest ceiling noted:** the
+      reference doc's per-defender/YPRR specificity isn't in this app's
+      data (see Data Source Notes), so Rule 1 was applied at the real
+      granularity — team-defense-vs-position, not per-CB coverage.
+    - **Real correctness fix found along the way:** the matchup NOTE
+      (`engine.ts`) still read "In their last game (vs X)" — stale since
+      item 93 pointed the live matchup at the NEXT opponent — now reads
+      "Faces X, ranked N of 32 …" (present-tense, correct for both live
+      and backtest). Visible on Waivers/Lineup/Trade, where notes render.
+    - **Two features built then REMOVED at the user's request** (net NOT
+      shipped — they do not exist in the codebase now): (a) an
+      injury-branch verdict ("if he plays start X; if not, start Y" when
+      the top pick is Questionable/Doubtful — via a new `injuryContingency`
+      field on `ComparisonResult`, set in `compareBreakdowns`), and (b) a
+      format-flip note (on a 50-64% confidence pick, re-score the SAME
+      engine under the other two formats in `/api/compare` and surface any
+      winner flip — a `formatFlips` response field). Both were fully wired
+      and verified live (a real Henry-vs-Kyler-Murray flip), then the user
+      said not to include them; everything was reverted before `aa3c6c1`.
+      Recorded here so a future session knows these were tried and
+      deliberately left out, not overlooked.
+    - **Accuracy-neutral, confirmed:** no `config.ts`/weights/calibration
+      touched; the pick, `finalScore`, and `confidence` are unchanged
+      (a live compare returned confidence 54 before/after), and the
+      backtest grader never reads headline/notes/case strings, so every
+      backtested number is byte-identical. `tsc`/lint clean.
+134. **Start/Sit result visual polish — five small presentation-only
+    changes, each committed and pushed separately.** All in
+    `ComparisonResult.tsx`/`ComparisonResult.module.css` (plus
+    `StartSitTool.tsx` for the last two), no engine/data change:
+    - Footer: dropped the "LEGITFOOTBALL Almanac" colophon label and made
+      the season dynamic — it now reads `lastCompletedSeason` from the API
+      (threaded via a new `dataSeason` prop on `ComparisonResult`) instead
+      of a hardcoded "2025", so it shows 2025 now and auto-advances when
+      the next season starts (`5b2acb8`).
+    - Thickened the card's green graphics — the stat-grid magnitude bars
+      and the projection range bar from 2px to 4px, projection marker
+      re-centered for the taller track (`b4da337`).
+    - Removed the paper-grain fractal-noise texture (`.grain::after` and
+      the `styles.grain` class usage) from the Start/Sit result sheet for
+      a flat, clean paper — scoped to `ComparisonResult` only; the Trade
+      Desk sheet keeps its own texture (`8b0f162`).
+    - Spaced the result cards apart — the verdict panel and each player
+      card are now separate bordered boxes (full border + 4px radius, 12px
+      between cards, 20px under the verdict) instead of the seamless
+      ruled-list "sheet" (`46dc25c`).
+    - Widened the Start/Sit column (`max-w-5xl` → `max-w-7xl`) and trimmed
+      vertical padding on the sheet/verdict/cards for a wider, more compact
+      layout (`0e7b2eb`).
+135. **Extensive Start/Sit visual-redesign exploration — Artifacts only,
+    NOTHING wired into the app.** After items 133-134, the user explored
+    many alternate visual directions for the Start/Sit page via published
+    Artifacts (claude.ai/code/artifact/…); none were adopted or committed
+    — **the live app is unchanged (still the editorial almanac design from
+    items 111-119).** Directions tried, and the read on each, so a new
+    session doesn't restart from zero: a "modernized" dark dashboard and a
+    flat "pro sheet" (both rejected as too generic / too Sleeper-like); the
+    current almanac recolored + retyped (palette + font explorers); a warm
+    "clubhouse" pine+gold middle-ground (off); a "prime time" broadcast
+    (navy+orange) with full-width stacked cards + a 6-accent switcher; a
+    bold poster / gameday-graphic (liked — "step in the right direction")
+    and a team-colors variant (Falcons red vs Colts blue, from a 32-team
+    color map); a "tale of the tape" head-to-head with a confidence dial
+    (rejected as too Sleeper-like); a boxing "fight card"; and a
+    "de-magazined" almanac (masthead/dateline/colophon/ruled-sheet removed,
+    dividers kept, real fonts inlined). Then reference-site matches on
+    request: **nash.ai** (deep navy + volt-lime, Host Grotesk, glassy
+    cards — full page with a 6-accent switcher + light/dark toggle),
+    **blink.new** (near-black + blue, light-weight Geist headings, grey
+    borders), and **wozcode.com** (green-black + lime, heavy condensed
+    Saira headings, warm-grey bordered cards). **Technique worth reusing:**
+    real design tokens were pulled from each reference site through the
+    in-app browser (`getComputedStyle`), and webfonts were matched by
+    inlining the app's own self-hosted woff2 (Jost/Archivo/Inter, found
+    under `.next/static/media` and `.next/dev/static/media`) as `@font-face`
+    data-URIs, since the Artifact CSP blocks font CDNs. **End state: no
+    direction chosen to ship; the user was still comparing reference-
+    matched mockups.** Wiring any chosen direction into the real app would
+    be a token/component restyle of the item-111-118 editorial system, not
+    a data/engine change.
+
+### Open items (as of item 135 — pick up here)
+**This session (items 133-135) is committed and pushed to `main`; HEAD is
+`0e7b2eb`, working tree clean.** Items 133-134 are real shipped code (with
+commit hashes inline in each entry); item 135 is design exploration that
+shipped NO code — Artifacts only, the live app is unchanged. The numbered
+open items below were not touched this session — nothing below is started
+or fixed unless its own entry says so.
 
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
