@@ -12,6 +12,7 @@ import type { PlayerProjectionDetail } from "@/lib/backtest/playerProjectionLook
 import type { PlayerProjectionSummary } from "@/lib/backtest/runProjectionBacktest";
 import type { PlayerSummary } from "@/lib/sportsdata/types";
 import type { TradeGradeResult } from "@/lib/backtest/tradeBacktest";
+import { useScoringFormat } from "@/lib/useScoringFormat";
 import { BacktestCaveatNote } from "./BacktestCaveatNote";
 import { BacktestSummaryView } from "./BacktestSummary";
 import { BacktestWeekTable } from "./BacktestWeekTable";
@@ -19,6 +20,7 @@ import { PlayerMultiSelect } from "./PlayerMultiSelect";
 import { ProjectionPlayerDetailView } from "./ProjectionPlayerDetail";
 import { ProjectionPlayerTable } from "./ProjectionPlayerTable";
 import { ProjectionSummaryView } from "./ProjectionSummary";
+import { ScoringFormatToggle } from "./ScoringFormatToggle";
 import { TradeBacktestTable } from "./TradeBacktestTable";
 
 type Mode = "pair" | "broad" | "trade" | "projection";
@@ -74,6 +76,10 @@ interface ProjectionResponse {
 
 export function BacktestTool() {
   const [mode, setMode] = useState<Mode>("pair");
+  // Reuses the app-wide scoring format (same global store the sidebar and
+  // every live tool share) — flipping it re-runs the backtest in that
+  // format. Every backtest route accepts a scoringFormat param.
+  const [scoringFormat, setScoringFormat] = useScoringFormat();
   const [season, setSeason] = useState<Season>("2025");
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
   const [weekFrom, setWeekFrom] = useState(1);
@@ -135,7 +141,7 @@ export function BacktestTool() {
           setError("Select at least one position, or search for a player.");
           return;
         }
-        const query = new URLSearchParams({ weeks, positions: positions.join(",") });
+        const query = new URLSearchParams({ weeks, positions: positions.join(","), scoringFormat });
         if (lookupPlayers.length > 0) {
           query.set("ids", lookupPlayers.map((p) => p.playerId).join(","));
         }
@@ -153,7 +159,7 @@ export function BacktestTool() {
         }
         const ids = players.map((p) => p.playerId).join(",");
         const path = season === "2025" ? "/api/backtest/pair" : "/api/backtest/pair-nflverse";
-        const query = new URLSearchParams({ ids, weeks });
+        const query = new URLSearchParams({ ids, weeks, scoringFormat });
         if (season !== "2025") query.set("season", season);
         const res = await fetch(`${path}?${query}`);
         const data = await res.json();
@@ -170,7 +176,7 @@ export function BacktestTool() {
         }
         const posParam = positions.join(",");
         const path = season === "2025" ? "/api/backtest/broad" : "/api/backtest/broad-nflverse";
-        const query = new URLSearchParams({ weeks, positions: posParam });
+        const query = new URLSearchParams({ weeks, positions: posParam, scoringFormat });
         if (season !== "2025") query.set("season", season);
         const res = await fetch(`${path}?${query}`);
         const data = await res.json();
@@ -187,7 +193,7 @@ export function BacktestTool() {
         }
         const posParam = positions.join(",");
         const path = season === "2025" ? "/api/backtest/trade" : "/api/backtest/trade-nflverse";
-        const query = new URLSearchParams({ asOfWeek: String(asOfWeek), positions: posParam });
+        const query = new URLSearchParams({ asOfWeek: String(asOfWeek), positions: posParam, scoringFormat });
         if (season !== "2025") query.set("season", season);
         const res = await fetch(`${path}?${query}`);
         const data = await res.json();
@@ -259,11 +265,18 @@ export function BacktestTool() {
         </button>
       </div>
 
+      <div className="flex items-center gap-3">
+        <span className="font-engraved text-[10px] uppercase tracking-[0.08em] text-foreground/55">
+          Scoring format
+        </span>
+        <ScoringFormatToggle value={scoringFormat} onChange={setScoringFormat} editorial />
+      </div>
+
       {mode === "projection" ? (
         <>
           <p className="text-xs text-foreground/45">
-            2025 season only, PPR only, for now — how close the engine&apos;s own score comes to real points
-            scored, not just whether it picked the right player.
+            2025 season only — how close the engine&apos;s own score comes to real points scored, not just
+            whether it picked the right player. Scored in the selected format above.
           </p>
           <PlayerMultiSelect
             editorial

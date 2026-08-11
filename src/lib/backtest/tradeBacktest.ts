@@ -4,7 +4,7 @@ import { scorePlayer } from "@/lib/recommendation/engine";
 import { sumProjectedPoints } from "@/lib/recommendation/restOfSeason";
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import type { PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
-import type { PlayerGameStat, SkillPosition } from "@/lib/sportsdata/types";
+import { getFantasyPoints, type PlayerGameStat, type ScoringFormat, type SkillPosition } from "@/lib/sportsdata/types";
 import { type BacktestOutcome, type BacktestSummary, summarizeOutcomes } from "./grading";
 import type { BacktestRunData } from "./loadRun";
 import { loadNflverseOnlyRunData } from "./loadRunNflverseOnly";
@@ -86,12 +86,13 @@ export function projectFromHistory(
 export function actualRestOfSeasonTotal(
   playerId: number,
   allWeeklyRows: PlayerGameStat[][],
-  fromWeek: number
+  fromWeek: number,
+  format: ScoringFormat = "ppr"
 ): number {
   let total = 0;
   for (let week = fromWeek; week <= allWeeklyRows.length; week++) {
     const row = (allWeeklyRows[week - 1] ?? []).find((r) => r.PlayerID === playerId && r.Played === 1);
-    if (row) total += row.FantasyPointsPPR;
+    if (row) total += getFantasyPoints(row, format);
   }
   return total;
 }
@@ -118,7 +119,8 @@ interface TradeSeasonCollection {
 function collectTradeResultsForSeason(
   runData: BacktestRunData,
   asOfWeeks: number[],
-  positions: SkillPosition[]
+  positions: SkillPosition[],
+  format: ScoringFormat = "ppr"
 ): TradeSeasonCollection {
   const anyPlayerById = new Map(runData.allPlayers.map((p) => [p.PlayerID, p]));
   const results: TradeGradeResult[] = [];
@@ -136,7 +138,7 @@ function collectTradeResultsForSeason(
       runData.depthChartByPlayerIdWeek
     );
     const opponentsByTeamWeek = buildOpponentsByTeamWeek(runData.allWeeklyRows, targetWeek);
-    const pairs = buildAllPairsForWeek(weekSlice, positions);
+    const pairs = buildAllPairsForWeek(weekSlice, positions, format);
 
     for (const pair of pairs) {
       const [giveId, getId] = pair.playerIds;
@@ -148,13 +150,13 @@ function collectTradeResultsForSeason(
           weekSlice,
           runData.byesByTeam
         );
-        return scorePlayer(input, "ppr");
+        return scorePlayer(input, format);
       });
 
       const projected = breakdowns.map((b) =>
         projectFromHistory(b, opponentsByTeamWeek, weekSlice.positionDefenseTable)
       );
-      const actual = pair.playerIds.map((id) => actualRestOfSeasonTotal(id, runData.allWeeklyRows, targetWeek));
+      const actual = pair.playerIds.map((id) => actualRestOfSeasonTotal(id, runData.allWeeklyRows, targetWeek, format));
 
       let predictedWinnerId: number | null = null;
       if (projected[0] != null && projected[1] != null && projected[0] !== projected[1]) {
@@ -204,9 +206,10 @@ function summarizeByPosition(byPositionOutcomes: Record<string, BacktestOutcome[
 export function runTradeBacktest(
   runData: BacktestRunData,
   asOfWeek: number,
-  positions: SkillPosition[]
+  positions: SkillPosition[],
+  format: ScoringFormat = "ppr"
 ): TradeBacktestResult {
-  const { results, byPositionOutcomes } = collectTradeResultsForSeason(runData, [asOfWeek], positions);
+  const { results, byPositionOutcomes } = collectTradeResultsForSeason(runData, [asOfWeek], positions, format);
   return {
     overall: summarizeOutcomes(results.map((r) => r.outcome)),
     byPosition: summarizeByPosition(byPositionOutcomes),
@@ -238,7 +241,8 @@ export interface TradeBacktestMultiSeasonResult {
 export async function runTradeBacktestMultiSeason(
   seasons: number[],
   asOfWeeks: number[],
-  positions: SkillPosition[]
+  positions: SkillPosition[],
+  format: ScoringFormat = "ppr"
 ): Promise<TradeBacktestMultiSeasonResult> {
   const pooledResults: TradeGradeResult[] = [];
   const pooledByPositionOutcomes: Record<string, BacktestOutcome[]> = {};
@@ -246,7 +250,7 @@ export async function runTradeBacktestMultiSeason(
 
   for (const season of seasons) {
     const runData = await loadNflverseOnlyRunData(season, 18);
-    const { results, byPositionOutcomes } = collectTradeResultsForSeason(runData, asOfWeeks, positions);
+    const { results, byPositionOutcomes } = collectTradeResultsForSeason(runData, asOfWeeks, positions, format);
 
     pooledResults.push(...results);
     for (const [position, outcomes] of Object.entries(byPositionOutcomes)) {

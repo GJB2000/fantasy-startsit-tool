@@ -1,6 +1,7 @@
 import { MAX_BACKTEST_WEEK } from "@/lib/backtest/config";
 import { parsePositionsParam, parseWeeksParam } from "@/lib/backtest/params";
 import { runTradeBacktestMultiSeason } from "@/lib/backtest/tradeBacktest";
+import { parseScoringFormat } from "@/lib/sportsdata/types";
 
 // Same heaviest-route shape as /api/backtest/broad-nflverse-multiseason:
 // loads N full seasons sequentially, each with its own play-by-play parse,
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
   const seasons = parseSeasonsParam(url.searchParams.get("seasons"));
   const asOfWeeks = parseWeeksParam(url.searchParams.get("asOfWeeks") ?? DEFAULT_AS_OF_WEEKS, MAX_BACKTEST_WEEK - 1);
   const positions = parsePositionsParam(url.searchParams.get("positions"));
+  const format = parseScoringFormat(url.searchParams.get("scoringFormat"));
 
   if (asOfWeeks.length === 0) {
     return Response.json({ error: "No valid weeks in the requested asOfWeeks range." }, { status: 400 });
@@ -51,7 +53,8 @@ export async function GET(request: Request) {
     const { bySeason, byPosition, overall, tradeCount } = await runTradeBacktestMultiSeason(
       seasons,
       asOfWeeks,
-      positions
+      positions,
+      format
     );
 
     return Response.json({
@@ -63,6 +66,7 @@ export async function GET(request: Request) {
         seasons,
         asOfWeeks,
         positions,
+        scoringFormat: format,
         source: "nflverse-only (pooled across seasons and as-of-week cutoffs)",
       },
     });

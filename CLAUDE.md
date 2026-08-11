@@ -7727,6 +7727,53 @@ single-season numbers for those specific constants.
     matched mockups.** Wiring any chosen direction into the real app would
     be a token/component restyle of the item-111-118 editorial system, not
     a data/engine change.
+137. **Closed the two scoring-format gaps in the Backtest tooling (Open
+    Item #6, and the Half-PPR/Standard part of #12) — plumbing plus a UI
+    control, no engine/scoring-logic change.**
+    - **Trade backtest is now format-aware** (#6): `tradeBacktest.ts`
+      (single-cutoff `runTradeBacktest` + pooled
+      `runTradeBacktestMultiSeason`) and `multiPlayerTradeBacktest.ts`
+      (the 2-for-1/2-for-2 backtest, item 90) both threaded a
+      `format: ScoringFormat = "ppr"` param through pairing
+      (`buildAllPairsForWeek`/`buildRankedPoolForWeek`), scoring
+      (`scorePlayer`), and — the previously-PPR-hardcoded ground truth —
+      `actualRestOfSeasonTotal`, which now sums `getFantasyPoints(row,
+      format)` instead of `row.FantasyPointsPPR`. All four trade-backtest
+      routes (`/trade`, `/trade-nflverse`, `/trade-nflverse-multiseason`,
+      `/trade-multi-nflverse-multiseason`) parse `scoringFormat` and echo
+      it in `context`. Defaults to `"ppr"` everywhere, matching the
+      existing convention (`buildAllPairsForWeek`/`gradeWeek`/
+      `runProjectionBacktest` all already default to ppr), so untouched
+      callers are byte-unchanged.
+    - **Projection-accuracy mode's backend was already format-aware** (its
+      route parsed `scoringFormat` and `runProjectionBacktest` took a
+      `format` param since item 65/71) — the only gap for #12's format
+      slice was the UI never exposing it.
+    - **The Backtest UI now has a scoring-format control** — the real
+      user-facing close, and a gap that turned out to span EVERY mode, not
+      just trade/projection: the Backtest page had no format control at
+      all, so every UI-driven run silently used PPR even though broad/pair
+      routes have accepted `scoringFormat` since item 51. `BacktestTool.tsx`
+      now reads the app-wide global `useScoringFormat` (the same store the
+      sidebar and every live tool share — item 88) and threads
+      `scoringFormat` into all four modes' query strings
+      (pair/broad/trade/projection). Rendered as the shared editorial
+      `ScoringFormatToggle` right under the mode buttons, so flipping the
+      format re-runs the current backtest in it. Deliberately reuses the
+      global format rather than a Backtest-local one, for consistency with
+      the rest of the app (one scoring-format concept).
+    - **Verified against the running dev server**: trade backtest (2025,
+      week 8, QB/RB/WR/TE) — PPR 25-11 (byte-identical to item 48's
+      documented 69.4%, so no regression), Half-PPR 19-17, Standard 22-14
+      (each now graded in its own format, previously silently PPR).
+      Projection mode (2025, RB, full season) — PPR MAE 6.45 / bias +0.35
+      (exactly item 71's documented RB number, no regression), Half-PPR
+      6.24 / +1.08, Standard 6.32 / +1.59 (bias grows more positive as PPR
+      weight drops — sensible, the blend is PPR-tuned). `/backtest` page
+      renders 200 with the new toggle. `tsc`/lint clean.
+    - **Still open (see #12)**: Projection mode's D/ST-and-K grading and
+      its 2022-2024 nflverse-only-season coverage are untouched here — this
+      pass was formats, not positions or seasons.
 136. **Wired the prior-season-average fallback into the live tools
     (resolves Open Item #14, and the format half of #15) — a plumbing
     change, no engine/scoring-logic change.** The fallback that lets a
@@ -7785,16 +7832,18 @@ single-season numbers for those specific constants.
       no blendedScore fallback), and the weeks-2-4 partial-blend question
       is untouched.
 
-### Open items (as of item 136 — pick up here)
-**Item 136 (prior-season fallback → live tools) is committed to `main` as
-`ef8166d` but NOT yet pushed — the user asked to commit, not push. Code
-complete and verified (`tsc`/lint clean, live no-regression check).**
-**The prior session (items 133-135) is committed and pushed to `main` (HEAD
-before this commit was `0e7b2eb`).** Items 133-134 are real shipped code (with
-commit hashes inline in each entry); item 135 is design exploration that
-shipped NO code — Artifacts only, the live app is unchanged. The numbered
-open items below were not touched this session — nothing below is started
-or fixed unless its own entry says so.
+### Open items (as of item 137 — pick up here)
+**Item 137 (Backtest scoring-format gaps) is an UNCOMMITTED working-tree
+change — code complete and verified (`tsc`/lint clean, live no-regression
+check against the running dev server), not yet committed. Per this
+project's standing rule, commit/push only once the user asks.**
+**Item 136 (prior-season fallback → live tools) is committed and pushed to
+`main` as `940e354`.** The prior session (items 133-135) is committed and
+pushed to `main` (HEAD before item 136 was `0e7b2eb`). Items 133-134 are
+real shipped code (with commit hashes inline in each entry); item 135 is
+design exploration that shipped NO code — Artifacts only, the live app is
+unchanged. The numbered open items below were not touched this session —
+nothing below is started or fixed unless its own entry says so.
 
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
@@ -8066,22 +8115,23 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
    more players" (61.2%), so that number isn't a clean skill measure. Only
    3+-for-N shapes (beyond 2-for-2/2-for-1) remain unbuilt, and the
    uneven-trade fix is item #19.
-6. **Scoring-format toggle still isn't fully universal — narrowed
-   further by item 52, one gap left.** Item 51 made the nflverse-only
-   backtest and every naive baseline picker format-aware; item 52
-   re-swept the active blend weights per format and found only
-   `VOLUME_BLEND_WEIGHT`/`SNAP_SHARE_BLEND_WEIGHT_TE` had a real,
-   every-season-validated Standard-specific optimum, now shipped. What's
-   left: `tradeBacktest.ts` (the Trade Analyzer's own backtest) is still
-   PPR-only — out of scope for both items 51 and 52, neither of which
-   touched the trade backtest. Half-PPR/Standard whole-model accuracy
-   still trails PPR's somewhat (primary pipeline: 55.2%/56.5% vs. 57.5%;
-   pooled nflverse-only: 55.3%/54.8% vs. 56.5%) — item 52 confirmed this
-   isn't fixable by further per-format weight tuning (RB signals, drop
-   rate, and QB rushing terms all showed no real format-specific case),
-   so the remaining gap is more likely structural (e.g. `blendedScore`
-   itself, or `POINTS_PER_*` conversion factors interacting with
-   position pools differently per format) than a tuning oversight.
+6. **RESOLVED (item 137): the scoring-format toggle is now universal
+   across the backtest tooling.** Item 51 made the nflverse-only backtest
+   and every naive baseline format-aware; item 52 re-swept the active
+   blend weights per format; item 137 closed the last actionable gap —
+   `tradeBacktest.ts`/`multiPlayerTradeBacktest.ts` (the Trade Analyzer's
+   own backtests) are now format-aware, and the Backtest UI gained a
+   scoring-format control that threads the format into all four modes
+   (which surfaced that the UI had never exposed format for ANY mode, not
+   just trade). One non-actionable observation remains, NOT a to-do:
+   Half-PPR/Standard whole-model pick accuracy still trails PPR's somewhat
+   (primary pipeline: 55.2%/56.5% vs. 57.5%; pooled nflverse-only:
+   55.3%/54.8% vs. 56.5%) — item 52 confirmed this isn't fixable by
+   further per-format weight tuning (RB signals, drop rate, and QB rushing
+   terms all showed no real format-specific case), so the residual gap is
+   structural (e.g. `blendedScore` itself, or `POINTS_PER_*` conversion
+   factors interacting with position pools differently per format), an
+   inherent property of a PPR-tuned engine rather than an unfinished task.
 7. **`QB_RUSH_BLEND_WEIGHT` (0.3) re-sweep — RESOLVED, see item 89: no
    change, 0.3 re-confirmed optimal.** Item 52's side-finding (pooled
    accuracy "climbing well past 0.3") did NOT reproduce on the current
@@ -8144,9 +8194,11 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       actual-score lookup (mirroring `toDstActualRows` in
       `runBacktest.ts`) since D/ST has no row in `allWeeklyRows`, but
       the rest of the plumbing already exists.
-    - **Half-PPR/Standard aren't tested** — `runProjectionBacktest`
-      takes a `format` parameter and would work unchanged, this just
-      hasn't been run/reported yet.
+    - **Half-PPR/Standard — RESOLVED (item 137).** The projection route
+      already accepted `scoringFormat`; item 137 added the Backtest UI's
+      scoring-format control that threads it, so Half-PPR/Standard
+      projection accuracy is now user-accessible and verified (2025 RB:
+      Half MAE 6.24/bias +1.08, Standard 6.32/+1.59, vs. PPR 6.45/+0.35).
     - **The 2022-2024 nflverse-only seasons aren't covered** — would
       need a second orchestration function pointed at
       `loadRunNflverseOnly.ts`, the same pattern every other
@@ -8983,8 +9035,10 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   `gradeBaselinesForPair` itself gained a `format` parameter in item 51
   after both call sites were found to be silently dropping the
   already-in-scope `format` variable; `runBacktestNflverseOnly.ts` is
-  fully format-aware too as of item 51 — only `tradeBacktest.ts` still
-  calls everything with `"ppr"` hardcoded, per Open Item 6. As of item
+  fully format-aware too as of item 51 — `tradeBacktest.ts`/
+  `multiPlayerTradeBacktest.ts` became format-aware in item 137, so every
+  backtest is format-aware now (`format` defaults to `"ppr"` throughout,
+  so untouched callers are unchanged). As of item
   63, both `runPairBacktest`/`runBroadBacktest` score every player
   through `scoreExtendedPlayerBacktest`/`compareBreakdowns` instead of
   `buildBacktestComparisonInput`/`comparePlayers` directly, so a request

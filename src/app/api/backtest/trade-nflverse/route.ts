@@ -2,6 +2,7 @@ import { MAX_BACKTEST_WEEK } from "@/lib/backtest/config";
 import { loadNflverseOnlyRunData } from "@/lib/backtest/loadRunNflverseOnly";
 import { parsePositionsParam } from "@/lib/backtest/params";
 import { runTradeBacktest } from "@/lib/backtest/tradeBacktest";
+import { parseScoringFormat } from "@/lib/sportsdata/types";
 
 // Same heavier cold path as /api/backtest/broad-nflverse — box scores and
 // the play-by-play red-zone aggregation are both fetched fresh here.
@@ -19,6 +20,7 @@ export async function GET(request: Request) {
   const season = Number(url.searchParams.get("season") ?? "2024");
   const asOfWeek = Number(url.searchParams.get("asOfWeek") ?? 8);
   const positions = parsePositionsParam(url.searchParams.get("positions"));
+  const format = parseScoringFormat(url.searchParams.get("scoringFormat"));
 
   if (!Number.isFinite(asOfWeek) || asOfWeek < 1 || asOfWeek >= MAX_BACKTEST_WEEK) {
     return Response.json(
@@ -31,7 +33,7 @@ export async function GET(request: Request) {
 
   try {
     const runData = await loadNflverseOnlyRunData(season, MAX_BACKTEST_WEEK);
-    const { overall, byPosition, results } = runTradeBacktest(runData, asOfWeek, positions);
+    const { overall, byPosition, results } = runTradeBacktest(runData, asOfWeek, positions, format);
 
     return Response.json({
       overall,
@@ -41,6 +43,7 @@ export async function GET(request: Request) {
         season,
         asOfWeek,
         positions,
+        scoringFormat: format,
         source: "nflverse-only",
         caveat:
           "Synthetic 1-for-1 trades only (adjacent-rank pairs, same methodology as broad-mode start/sit backtesting) — grades the trade analyzer's rest-of-season projection against what each player actually scored, summed, over the real remaining weeks of the season.",

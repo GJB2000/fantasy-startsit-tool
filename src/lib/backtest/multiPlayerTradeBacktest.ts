@@ -1,7 +1,7 @@
 import { buildBacktestComparisonInput } from "@/lib/recommendation/buildBacktestInput";
 import { RECENT_WEEK_COUNT } from "@/lib/recommendation/config";
 import { scorePlayer } from "@/lib/recommendation/engine";
-import type { Player, SkillPosition } from "@/lib/sportsdata/types";
+import type { Player, ScoringFormat, SkillPosition } from "@/lib/sportsdata/types";
 import { type BacktestOutcome, type BacktestSummary, summarizeOutcomes } from "./grading";
 import type { BacktestRunData } from "./loadRun";
 import { loadNflverseOnlyRunData } from "./loadRunNflverseOnly";
@@ -77,10 +77,10 @@ interface SyntheticTrade {
  * since this is a PREDICTION backtest (which side scores more), not a
  * trade-fairness one.
  */
-function buildPooledRanking(weekSlice: BacktestWeekSlice): PooledEntry[] {
+function buildPooledRanking(weekSlice: BacktestWeekSlice, format: ScoringFormat): PooledEntry[] {
   const entries: PooledEntry[] = [];
   for (const position of SKILL_POSITIONS) {
-    for (const entry of buildRankedPoolForWeek(weekSlice, position, "ppr")) {
+    for (const entry of buildRankedPoolForWeek(weekSlice, position, format)) {
       entries.push({ playerId: entry.playerId, position, avg: entry.avgPoints });
     }
   }
@@ -159,7 +159,8 @@ function projectPlayer(
   targetWeek: number,
   weekSlice: BacktestWeekSlice,
   runData: BacktestRunData,
-  opponentsByTeamWeek: Map<string, string[]>
+  opponentsByTeamWeek: Map<string, string[]>,
+  format: ScoringFormat
 ): number | null {
   const input = buildBacktestComparisonInput(
     playerId,
@@ -168,7 +169,7 @@ function projectPlayer(
     weekSlice,
     runData.byesByTeam
   );
-  const breakdown = scorePlayer(input, "ppr");
+  const breakdown = scorePlayer(input, format);
   return projectFromHistory(breakdown, opponentsByTeamWeek, weekSlice.positionDefenseTable);
 }
 
@@ -184,12 +185,14 @@ function gradeTrade(
   targetWeek: number,
   weekSlice: BacktestWeekSlice,
   runData: BacktestRunData,
-  opponentsByTeamWeek: Map<string, string[]>
+  opponentsByTeamWeek: Map<string, string[]>,
+  format: ScoringFormat
 ): TradeOutcomes {
-  const project = (id: number) => projectPlayer(id, anyPlayerById, targetWeek, weekSlice, runData, opponentsByTeamWeek);
+  const project = (id: number) =>
+    projectPlayer(id, anyPlayerById, targetWeek, weekSlice, runData, opponentsByTeamWeek, format);
 
-  const sumActualA = trade.sideA.reduce((s, id) => s + actualRestOfSeasonTotal(id, runData.allWeeklyRows, targetWeek), 0);
-  const sumActualB = trade.sideB.reduce((s, id) => s + actualRestOfSeasonTotal(id, runData.allWeeklyRows, targetWeek), 0);
+  const sumActualA = trade.sideA.reduce((s, id) => s + actualRestOfSeasonTotal(id, runData.allWeeklyRows, targetWeek, format), 0);
+  const sumActualB = trade.sideB.reduce((s, id) => s + actualRestOfSeasonTotal(id, runData.allWeeklyRows, targetWeek, format), 0);
   const actualTie = sumActualA === sumActualB;
   const actualAWins = sumActualA > sumActualB;
 
@@ -236,7 +239,8 @@ function emptyShapeOutcomes(): Record<TradeShape, ShapeOutcomes> {
 
 function collectMultiTradeResultsForSeason(
   runData: BacktestRunData,
-  asOfWeeks: number[]
+  asOfWeeks: number[],
+  format: ScoringFormat
 ): Record<TradeShape, ShapeOutcomes> {
   const anyPlayerById = new Map(runData.allPlayers.map((p) => [p.PlayerID, p]));
   const byShape = emptyShapeOutcomes();
@@ -253,11 +257,11 @@ function collectMultiTradeResultsForSeason(
       runData.depthChartByPlayerIdWeek
     );
     const opponentsByTeamWeek = buildOpponentsByTeamWeek(runData.allWeeklyRows, targetWeek);
-    const ranked = buildPooledRanking(weekSlice);
+    const ranked = buildPooledRanking(weekSlice, format);
 
     const trades = [...build2for1Trades(ranked), ...build2for2Trades(ranked)];
     for (const trade of trades) {
-      const outcomes = gradeTrade(trade, anyPlayerById, targetWeek, weekSlice, runData, opponentsByTeamWeek);
+      const outcomes = gradeTrade(trade, anyPlayerById, targetWeek, weekSlice, runData, opponentsByTeamWeek, format);
       byShape[trade.shape].engine.push(outcomes.engine);
       byShape[trade.shape].naiveMorePlayers.push(outcomes.naiveMorePlayers);
     }
@@ -303,14 +307,15 @@ export interface MultiTradeBacktestResult {
  */
 export async function runMultiPlayerTradeBacktestMultiSeason(
   seasons: number[],
-  asOfWeeks: number[]
+  asOfWeeks: number[],
+  format: ScoringFormat = "ppr"
 ): Promise<MultiTradeBacktestResult> {
   const pooled = emptyShapeOutcomes();
   const bySeason: MultiTradeBacktestResult["bySeason"] = {};
 
   for (const season of seasons) {
     const runData = await loadNflverseOnlyRunData(season, 18);
-    const byShape = collectMultiTradeResultsForSeason(runData, asOfWeeks);
+    const byShape = collectMultiTradeResultsForSeason(runData, asOfWeeks, format);
 
     for (const shape of ["2for1", "2for2"] as TradeShape[]) {
       pooled[shape].engine.push(...byShape[shape].engine);
