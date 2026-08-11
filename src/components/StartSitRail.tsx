@@ -14,9 +14,7 @@ export function RecentComparisonsPanel({
   return (
     <div
       className={`rounded-2xl border p-4 ${
-        editorial
-          ? "border-foreground/12 bg-surface-glass shadow-[0_18px_46px_-24px_rgba(0,0,0,0.55)] backdrop-blur-xl"
-          : "border-foreground/10 bg-surface shadow-sm"
+        editorial ? "glass-card border-foreground/12" : "border-foreground/10 bg-surface shadow-sm"
       }`}
     >
       <div

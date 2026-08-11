@@ -121,7 +121,7 @@ export default function HomePage() {
           <Link
             key={tool.href}
             href={tool.href}
-            className="group rounded-[6px] border border-foreground/12 bg-surface p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+            className="group glass-card rounded-2xl border border-foreground/12 p-5 transition-all hover:-translate-y-0.5"
           >
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] bg-accent/12 text-accent">

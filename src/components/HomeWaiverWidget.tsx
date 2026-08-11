@@ -14,7 +14,7 @@ interface WaiverResponse {
 
 function WidgetShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-[6px] border border-foreground/12 bg-surface p-4 shadow-sm">
+    <div className="glass-card rounded-2xl border border-foreground/12 p-4">
       <div className="mb-3 flex items-center justify-between gap-2 border-b border-foreground/[0.09] pb-2.5">
         <div className="flex items-center gap-2 font-engraved text-[11px] uppercase tracking-[0.08em] text-foreground/70">
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-accent" fill="none">

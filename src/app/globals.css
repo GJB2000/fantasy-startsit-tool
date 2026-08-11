@@ -226,6 +226,32 @@ body {
   font-family: var(--font-engraved), "Helvetica Neue", Arial, sans-serif;
 }
 
+/* Frosted-glass card surfaces — strong translucency + heavy backdrop-blur so
+   the page's ambient volt/navy glow refracts through, plus a soft depth shadow
+   and an inner top highlight for the "glass edge." Unlayered so the translucent
+   background wins over any Tailwind bg utility. Pair with a rounded-* + border
+   utility on the element. --accent variant carries a corner volt/navy wash for
+   CTAs. */
+.glass-card {
+  background: color-mix(in srgb, var(--surface) 44%, transparent);
+  backdrop-filter: blur(26px) saturate(160%);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  box-shadow:
+    0 22px 54px -26px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 13%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--foreground) 4%, transparent);
+}
+.glass-card-accent {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 15%, transparent), transparent 62%),
+    color-mix(in srgb, var(--surface) 44%, transparent);
+  backdrop-filter: blur(26px) saturate(160%);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  box-shadow:
+    0 22px 54px -26px color-mix(in srgb, var(--accent) 24%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 14%, transparent);
+}
+
 /*
  * Per-page skin. The whole app is token-driven, so mapping the app's color
  * tokens from the --alm-* palette on this one wrapper recolors every
@@ -251,10 +277,11 @@ body {
   --premium: var(--alm-brass);
   --premium-ink: var(--alm-accent-ink);
   background:
-    radial-gradient(52% 34% at 4% 0%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 60%),
-    radial-gradient(46% 30% at 100% 5%, color-mix(in srgb, var(--info) 9%, transparent), transparent 58%),
-    radial-gradient(44% 32% at 98% 50%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 60%),
-    radial-gradient(50% 36% at 0% 90%, color-mix(in srgb, var(--info) 6%, transparent), transparent 62%),
+    radial-gradient(50% 32% at 3% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+    radial-gradient(46% 30% at 100% 4%, color-mix(in srgb, var(--info) 10%, transparent), transparent 58%),
+    radial-gradient(40% 26% at 66% 30%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
+    radial-gradient(42% 30% at 16% 58%, color-mix(in srgb, var(--info) 8%, transparent), transparent 60%),
+    radial-gradient(46% 32% at 94% 82%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 62%),
     var(--background);
   color: var(--foreground);
   min-height: 100%;

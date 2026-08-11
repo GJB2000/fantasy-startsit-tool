@@ -45,7 +45,7 @@ export function NewsletterSignup() {
   }
 
   return (
-    <div className="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-[6px] border border-accent/25 bg-accent/[0.07] p-4 shadow-sm sm:p-5">
+    <div className="glass-card-accent mb-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-accent/30 p-4 sm:p-5">
       <div className="flex items-center gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] bg-accent text-accent-ink">
           <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none">

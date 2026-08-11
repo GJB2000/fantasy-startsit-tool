@@ -37,7 +37,7 @@ function BoardShell({ children }: { children: React.ReactNode }) {
           Full Top 100 →
         </Link>
       </div>
-      <div className="overflow-hidden rounded-[6px] border border-foreground/12 bg-surface shadow-sm">{children}</div>
+      <div className="glass-card overflow-hidden rounded-2xl border border-foreground/12">{children}</div>
     </section>
   );
 }
@@ -116,7 +116,7 @@ export function HomeRankingsBoard() {
           <Link
             key={entry.playerId ?? entry.displayName}
             href="/rankings"
-            className="flex items-center gap-3 border-t border-foreground/[0.09] px-4 py-3 transition-colors first:border-none hover:bg-surface-sunken"
+            className="flex items-center gap-3 border-t border-foreground/[0.09] px-4 py-3 transition-colors first:border-none hover:bg-foreground/[0.05]"
           >
             <span className="w-5 shrink-0 text-right font-jost text-[15px] font-semibold tabular-nums text-foreground/40">
               {i + 1}
