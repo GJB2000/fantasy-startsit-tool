@@ -33,8 +33,34 @@
 .n { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; letter-spacing: -0.02em; }
 .lab { font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
 
-/* verdict hero — unboxed, on the page */
-.verdict { padding: 30px 4px 18px; }
+/* verdict hero — a bold, high-contrast card that anchors the result.
+   Deliberately more solid and volt-forward than the frosted player panels
+   below it, so it reads as the headline. */
+.verdict {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--acc-line);
+  border-radius: 18px;
+  padding: 28px 30px 24px;
+  margin-bottom: 4px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent 46%),
+    var(--card);
+  box-shadow:
+    0 24px 64px -28px color-mix(in srgb, var(--accent) 28%, transparent),
+    0 12px 32px -18px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 9%, transparent);
+}
+/* a bright volt spine down the left edge as a verdict marker */
+.verdict::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--acc);
+}
 .kick { font-size: 10px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--acc); }
 .vname {
   font-family: var(--fd); font-weight: 500; font-size: clamp(32px, 5vw, 50px);
