@@ -289,7 +289,7 @@ function SpotlightCard({
   const matchup = matchupPill(candidate);
 
   return (
-    <div className="relative mt-6 overflow-hidden rounded-[6px] border border-premium/50 bg-surface p-6 shadow-[0_20px_44px_-26px_rgba(0,0,0,0.55)] [background:radial-gradient(120%_140%_at_100%_0%,color-mix(in_srgb,var(--premium)_12%,transparent),transparent_55%),var(--surface)]">
+    <div className="relative mt-6 overflow-hidden rounded-2xl border border-premium/50 p-6 shadow-[0_22px_54px_-26px_color-mix(in_srgb,var(--premium)_24%,transparent)] backdrop-blur-2xl [background:radial-gradient(120%_140%_at_100%_0%,color-mix(in_srgb,var(--premium)_14%,transparent),transparent_55%),color-mix(in_srgb,var(--surface)_46%,transparent)]">
       <span className="absolute right-6 top-0 rounded-b-[3px] bg-premium px-3 py-1 font-engraved text-[10.5px] uppercase tracking-[0.16em] text-premium-ink">
         Top target this week
       </span>
@@ -492,7 +492,7 @@ function Section({
           Defenses swing week to week, so these rank by <b className="font-semibold text-foreground/60">this week&apos;s matchup</b> against their season baseline — a spot start, not a season hold.
         </p>
       )}
-      <div className="overflow-hidden rounded-[6px] border border-foreground/12 bg-surface">
+      <div className="glass-card overflow-hidden rounded-2xl border border-foreground/12">
         {candidates.map((candidate, i) => (
           <WaiverCandidateRow
             key={candidate.playerId}

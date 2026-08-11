@@ -87,7 +87,7 @@ const HERO_FEATURES: { title: string; body: string }[] = [
 
 function MethodHero() {
   return (
-    <section className="overflow-hidden rounded-[6px] border border-foreground/12 p-6 shadow-sm sm:p-7 [background:radial-gradient(120%_140%_at_0%_0%,color-mix(in_srgb,var(--accent)_11%,transparent),transparent_55%),var(--surface)]">
+    <section className="glass-card-accent overflow-hidden rounded-2xl border border-accent/25 p-6 sm:p-7">
       <span
         className="text-[11px] uppercase tracking-[0.16em] text-accent"
         style={{ fontFamily: "var(--font-engraved)" }}
@@ -175,7 +175,7 @@ export function WaiverTool() {
     : null;
 
   const controls = (
-    <div className="rounded-[6px] border border-foreground/12 bg-surface p-5 shadow-sm sm:p-6">
+    <div className="glass-card rounded-2xl border border-foreground/12 p-5 sm:p-6">
       <div className="border-b border-foreground/15 pb-3">
         <div
           className="text-[12px] uppercase tracking-[0.1em] text-foreground/70"
@@ -219,7 +219,7 @@ export function WaiverTool() {
         onClick={handleFind}
         disabled={loading}
         style={{ fontFamily: "var(--font-engraved)" }}
-        className="mt-5 w-full rounded-[4px] bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
+        className="mt-5 w-full rounded-full bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
       >
         {loading ? "Scanning the player pool…" : "Find waiver targets"}
       </button>
