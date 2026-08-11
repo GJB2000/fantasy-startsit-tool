@@ -448,19 +448,24 @@ export async function getLegitRankingsOverall(
     )
   );
 
-  const top = perPosition
-    .flat()
-    .map((entry) => ({ entry, vor: valueOverReplacement(entry, format) }))
+  const withVor = perPosition.flat().map((entry) => ({ entry, vor: valueOverReplacement(entry, format) }));
+
+  // Normalize against the FULL rankable pool's VOR range, NOT the top-100
+  // slice's own range: a top-100 player is well above replacement, so
+  // scaling only across the top-100 would force the 100th-best player in the
+  // NFL to a score of 1 (absurd — they're a solid starter). Anchoring to the
+  // whole pool keeps every top-100 player in a high band and only deep
+  // waiver-tier players (never shown here) approach 1.
+  const allVor = withVor.map((t) => t.vor);
+  const minVor = Math.min(...allVor);
+  const maxVor = Math.max(...allVor);
+
+  return withVor
     .sort((a, b) => b.vor - a.vor)
-    .slice(0, TOP_100_LIMIT);
-
-  const vorValues = top.map((t) => t.vor);
-  const minVor = Math.min(...vorValues);
-  const maxVor = Math.max(...vorValues);
-
-  return top.map((t, i) => ({
-    ...t.entry,
-    positionRank: i + 1,
-    legitScore: Math.round(normalize(t.vor, minVor, maxVor)),
-  }));
+    .slice(0, TOP_100_LIMIT)
+    .map((t, i) => ({
+      ...t.entry,
+      positionRank: i + 1,
+      legitScore: Math.round(normalize(t.vor, minVor, maxVor)),
+    }));
 }

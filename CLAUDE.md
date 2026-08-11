@@ -7774,6 +7774,16 @@ single-season numbers for those specific constants.
       drops elite QBs down the overall board (correct for a 1-QB value
       ranking; the app has no superflex/2-QB league setting). `tsc`/lint
       clean.
+    - **Follow-up fix (same day): the re-normalization was scaling across
+      the top-100 SLICE's own VOR range, which forced the 100th-best player
+      to a score of 1** (user: "why would a player in the top 100 have a
+      score of 1"). Fixed to normalize against the FULL rankable pool's VOR
+      range instead — a top-100 player is well above replacement, so they
+      now land in a high band (verified: score range 56-100, the 100th
+      player shows 56, the gold 90+ tier is a tight 8 players, McBride 88),
+      and only deep waiver-tier players (never shown) approach 1. Monotonic
+      with rank; per-position tabs still show their own position-relative
+      legitScore (McBride 100 on the TE tab), unaffected.
 139. **Fixed Legit Rankings under-ranking an elite player coming off an
     injury-affected season (user report: "Lamar Jackson is far too low")
     — a one-line data-source swap in the rankings route, no scoring-logic
@@ -7996,11 +8006,13 @@ single-season numbers for those specific constants.
       is untouched.
 
 ### Open items (as of item 140 — pick up here)
-**Item 140 (Top 100 VOR sort) is an UNCOMMITTED working-tree change —
-`buildRankings.ts` `getLegitRankingsOverall` now sorts by value-over-
-replacement, verified live (McBride #2 → #10; TE tab unchanged), `tsc`/lint
-clean, not yet committed. Per this project's standing rule, commit/push only
-once the user asks.**
+**Item 140's follow-up score-normalization fix (Top-100 legitScore now
+normalized against the full pool's VOR range, so no top-100 player shows a
+score of 1) is an UNCOMMITTED working-tree change — `buildRankings.ts`,
+verified live (range 56-100), `tsc`/lint clean, not yet committed. Per this
+project's standing rule, commit/push only once the user asks. NOTE: item
+140's original VOR-sort change is already committed/pushed as `fbec298`;
+this is a follow-up on top of it.**
 **Item 139 (Legit Rankings offseason-consensus fix) is committed and pushed
 to `main` as `05f41e2`; item 138 (uneven-trade valuation fix) as `fadabd9`;
 item 137 (Backtest scoring-format gaps) as `fa1cd37`; item 136 (prior-season
