@@ -5494,6 +5494,10 @@ single-season numbers for those specific constants.
       to a new `TOP_100_LIMIT = 100` — the caching behavior itself is
       unaffected (still one cache entry per position, 30-minute TTL;
       only what gets sliced out of that cached list differs by caller).
+      **(SUPERSEDED by item 140: sorting the Top 100 by `legitScore` was
+      wrong — legitScore is position-relative, so best-TE=100 sat next to
+      best-WR=100 and McBride ranked #2 overall. The Top 100 now sorts by
+      value-over-replacement instead. See item 140.)**
     - The `"OVERALL"` internal tab/query-param value was kept as-is
       (only the user-facing label changed to "Top 100") — no API
       contract change, just `RankingsTool.tsx`'s `TAB_LABEL` map.
@@ -7732,6 +7736,44 @@ single-season numbers for those specific constants.
     matched mockups.** Wiring any chosen direction into the real app would
     be a token/component restyle of the item-111-118 editorial system, not
     a data/engine change.
+140. **Fixed the Top 100 (cross-position) view over-ranking elite TEs and
+    QBs — now sorted by value-over-replacement (user report: "why is Trey
+    McBride so high").** Presentation/ordering change, no new scoring.
+    - **Diagnosis**: the Top 100 / Overall view sorted by `legitScore`,
+      which is normalized WITHIN each position (item 84) — best TE = 100,
+      exactly like best WR = 100. So the combined sort put McBride (TE,
+      projection 16.6, legit 100) at **#2 overall**, above Bijan (RB, 21.4)
+      and every WR/RB he outscores by ~4-5 pts. The same flaw put six QBs
+      in the top 15. McBride's TE-tab #1 was correct (FantasyPros TE1); the
+      cross-position placement was the bug.
+    - **Root cause was item 84's own sort choice.** Item 84 deliberately
+      sorted the Overall view by `legitScore` rather than raw `finalScore`,
+      reasoning that finalScore isn't comparable across positions (QBs/RBs
+      naturally outscore TEs). That's true — but the correct cross-position
+      comparison isn't legitScore either, it's **value over replacement**
+      (finalScore minus the position's replacement level), which item 84
+      didn't consider.
+    - **The fix**: `getLegitRankingsOverall` (`buildRankings.ts`) now sorts
+      by `valueOverReplacement` = `finalScore - REPLACEMENT_PER_GAME[format]
+      [position]` (reusing the exact constants item 138 built for the
+      uneven-trade fix). The displayed `legitScore` in the Top 100 is
+      RE-NORMALIZED to the Top-100's own VOR spread (1..100) so the number
+      moves monotonically with the order and the gold "elite" tier
+      highlights the genuinely-top-overall players — rather than a TE's 100
+      sitting at rank 9. A player can legitimately show a different score in
+      the two views: the position tab answers "how good at your position"
+      (McBride 100, best TE), the Top 100 answers "how valuable overall"
+      (McBride ~73, mid-pack).
+    - **Result**: McBride **#2 → #10** overall; the top is now RBs/WRs by
+      projection (Bijan, Chase, Nacua, McCaffrey, St. Brown…), and the
+      first QB lands at **rank 32** — matching FantasyPros' OWN redraft-
+      overall board (which had Lamar, their QB2, at ecr ~32 overall).
+      Top-100 position mix RB 33 / WR 33 / TE 15 / QB 19. **Per-position
+      tabs are unchanged** (McBride still TE #1, legit 100) — verified live.
+    - **User chose VOR** over a "keep QBs prominent" variant, knowing it
+      drops elite QBs down the overall board (correct for a 1-QB value
+      ranking; the app has no superflex/2-QB league setting). `tsc`/lint
+      clean.
 139. **Fixed Legit Rankings under-ranking an elite player coming off an
     injury-affected season (user report: "Lamar Jackson is far too low")
     — a one-line data-source swap in the rankings route, no scoring-logic
@@ -7953,15 +7995,16 @@ single-season numbers for those specific constants.
       no blendedScore fallback), and the weeks-2-4 partial-blend question
       is untouched.
 
-### Open items (as of item 139 — pick up here)
-**Item 139 (Legit Rankings offseason-consensus fix) is an UNCOMMITTED
-working-tree change — one-line route swap, verified live (Lamar outside
-top-10 → QB #6; QB/RB/WR/TE all sensible), `tsc`/lint clean, not yet
-committed. Per this project's standing rule, commit/push only once the user
-asks.**
-**Item 138 (uneven-trade valuation fix) is committed and pushed to `main`
-as `fadabd9`; item 137 (Backtest scoring-format gaps) as `fa1cd37`; item
-136 (prior-season fallback → live tools) as `940e354`.** The prior session (items 133-135) is committed and
+### Open items (as of item 140 — pick up here)
+**Item 140 (Top 100 VOR sort) is an UNCOMMITTED working-tree change —
+`buildRankings.ts` `getLegitRankingsOverall` now sorts by value-over-
+replacement, verified live (McBride #2 → #10; TE tab unchanged), `tsc`/lint
+clean, not yet committed. Per this project's standing rule, commit/push only
+once the user asks.**
+**Item 139 (Legit Rankings offseason-consensus fix) is committed and pushed
+to `main` as `05f41e2`; item 138 (uneven-trade valuation fix) as `fadabd9`;
+item 137 (Backtest scoring-format gaps) as `fa1cd37`; item 136 (prior-season
+fallback → live tools) as `940e354`.** The prior session (items 133-135) is committed and
 pushed to `main` (HEAD before item 136 was `0e7b2eb`). Items 133-134 are
 real shipped code (with commit hashes inline in each entry); item 135 is
 design exploration that shipped NO code — Artifacts only, the live app is

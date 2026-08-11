@@ -2,6 +2,7 @@ import type { ExpertConsensusEntry } from "@/lib/fantasypros/weeklyConsensus";
 import { getSeasonRedraftRankByKey, type SeasonRedraftEntry } from "@/lib/fantasypros/seasonProjections";
 import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
 import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
+import { REPLACEMENT_PER_GAME } from "@/lib/recommendation/config";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { toSdioTeam } from "@/lib/recommendation/restOfSeason";
 import { getRecentWindow } from "@/lib/recommendation/recentWindow";
@@ -13,7 +14,7 @@ import { getActiveExtendedPlayers, getActivePlayers } from "@/lib/sportsdata/pla
 import type { PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getPlayerSeasonStats } from "@/lib/sportsdata/seasonStats";
 import type { SeasonContext } from "@/lib/sportsdata/timeframes";
-import type { ExtendedPosition, Player, ScoringFormat } from "@/lib/sportsdata/types";
+import { isSkillPosition, type ExtendedPosition, type Player, type ScoringFormat } from "@/lib/sportsdata/types";
 import { getPlayerGameStatsByWeek } from "@/lib/sportsdata/weeklyStats";
 
 export interface LegitRankingEntry extends PlayerScoreBreakdown {
@@ -378,26 +379,48 @@ export async function getLegitRankingsForPosition(
 const TOP_100_LIMIT = 100;
 
 /**
+ * Cross-position VALUE for the Top 100 sort: the engine's projection minus
+ * that player's position replacement level (REPLACEMENT_PER_GAME) — i.e.
+ * value over replacement (VORP), the standard way to compare players across
+ * positions. `legitScore` alone CANNOT rank across positions: it's
+ * normalized WITHIN each position (best TE = 100, exactly like best WR =
+ * 100), so sorting the combined list by it puts an elite TE (Trey McBride)
+ * right next to an elite WR despite a far lower absolute projection — the
+ * thing that read as "why is McBride so high." VOR fixes that, and also
+ * correctly drops QBs down the board (elite QB replacement is high in a
+ * 1-QB league, so even a top QB nets little value over a streamer — which
+ * matches FantasyPros' own overall/redraft board). Skill positions only,
+ * which is all RANKABLE_POSITIONS ever contains.
+ */
+function valueOverReplacement(entry: LegitRankingEntry, format: ScoringFormat): number {
+  const projection = entry.finalScore ?? 0;
+  const pos = entry.position;
+  if (pos != null && isSkillPosition(pos)) return projection - REPLACEMENT_PER_GAME[format][pos];
+  return projection;
+}
+
+/**
  * The "Top 100" view: every position's FULL (uncapped) ranked list,
- * merged and re-sorted by legitScore, then trimmed to the 100 best
- * players regardless of position — no new scoring pass, just a
- * re-combination of getFullLegitRankingsForPosition's own cached output
- * for each of the four rankable positions. Deliberately reads the
- * uncapped list, not getLegitRankingsForPosition's own tab-display-
- * capped one (QB10/RB20/WR25/TE10, ~65 total) — those caps exist so a
- * single position's tab doesn't run all the way to replacement-level
- * noise, not because there are only 65 players worth ever showing across
- * all positions combined. Sorting across positions by legitScore (not
- * raw finalScore) is what makes this a fair combination at all:
- * legitScore is already normalized 1-100 within each position's own
- * pool, so a QB's 90 and a WR's 90 both mean "about as good as it gets
- * at that position this week" — raw finalScore wouldn't be comparable
- * across positions the same way (QBs/RBs naturally score higher point
- * totals than TEs regardless of relative quality). `positionRank` is
- * reassigned to this combined list's own 1..100 order (overwriting each
- * entry's original per-position rank) — the number shown in the UI's
- * leading column, so it should mean "rank in the list you're looking
- * at" for both views, not silently switch meaning between them.
+ * merged and re-sorted by VALUE OVER REPLACEMENT (see valueOverReplacement)
+ * — NOT by legitScore, which is position-relative and can't be compared
+ * across positions — then trimmed to the 100 most valuable players. No new
+ * scoring pass, just a re-combination of getFullLegitRankingsForPosition's
+ * own cached output for each of the four rankable positions. Deliberately
+ * reads the uncapped list, not getLegitRankingsForPosition's own tab-
+ * display-capped one (QB10/RB20/WR25/TE10, ~65 total) — those caps exist so
+ * a single position's tab doesn't run to replacement-level noise, not
+ * because there are only 65 players worth showing across all positions.
+ *
+ * The displayed `legitScore` is RE-NORMALIZED here to the Top 100's own VOR
+ * spread (1..100 across the shown players), so the number the UI shows moves
+ * monotonically with this value ordering and the gold "elite" tier
+ * highlights the genuinely-top-overall players — rather than showing each
+ * position's own 1-100 legitScore, which would look scrambled (a TE's 100
+ * sitting at rank 9). A player can therefore legitimately show a different
+ * score here than on their position tab: the tab answers "how good at your
+ * position" (McBride = 100, best TE), the Top 100 answers "how valuable
+ * overall" (McBride ~mid-pack). `positionRank` is reassigned to this
+ * combined list's own 1..100 order.
  */
 export async function getLegitRankingsOverall(
   context: SeasonContext,
@@ -425,9 +448,19 @@ export async function getLegitRankingsOverall(
     )
   );
 
-  const merged = perPosition
+  const top = perPosition
     .flat()
-    .sort((a, b) => b.legitScore - a.legitScore)
+    .map((entry) => ({ entry, vor: valueOverReplacement(entry, format) }))
+    .sort((a, b) => b.vor - a.vor)
     .slice(0, TOP_100_LIMIT);
-  return merged.map((entry, i) => ({ ...entry, positionRank: i + 1 }));
+
+  const vorValues = top.map((t) => t.vor);
+  const minVor = Math.min(...vorValues);
+  const maxVor = Math.max(...vorValues);
+
+  return top.map((t, i) => ({
+    ...t.entry,
+    positionRank: i + 1,
+    legitScore: Math.round(normalize(t.vor, minVor, maxVor)),
+  }));
 }
