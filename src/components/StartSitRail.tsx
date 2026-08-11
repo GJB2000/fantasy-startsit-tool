@@ -12,7 +12,13 @@ export function RecentComparisonsPanel({
   editorial?: boolean;
 }) {
   return (
-    <div className={`border border-foreground/10 bg-surface p-4 shadow-sm ${editorial ? "rounded-[6px]" : "rounded-2xl"}`}>
+    <div
+      className={`rounded-2xl border p-4 ${
+        editorial
+          ? "border-foreground/12 bg-surface-glass shadow-[0_18px_46px_-24px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+          : "border-foreground/10 bg-surface shadow-sm"
+      }`}
+    >
       <div
         className={`mb-3 flex items-center gap-2 ${editorial ? "border-b border-foreground/15 pb-2.5 text-[11px] uppercase tracking-[0.1em] text-foreground/70" : "text-[12.5px] font-semibold"}`}
         style={editorial ? { fontFamily: "var(--font-engraved)" } : undefined}

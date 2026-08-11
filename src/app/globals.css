@@ -251,8 +251,10 @@ body {
   --premium: var(--alm-brass);
   --premium-ink: var(--alm-accent-ink);
   background:
-    radial-gradient(60% 42% at 12% 0%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
-    radial-gradient(55% 40% at 100% 0%, color-mix(in srgb, var(--accent) 4%, transparent), transparent 55%),
+    radial-gradient(52% 34% at 4% 0%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 60%),
+    radial-gradient(46% 30% at 100% 5%, color-mix(in srgb, var(--info) 9%, transparent), transparent 58%),
+    radial-gradient(44% 32% at 98% 50%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 60%),
+    radial-gradient(50% 36% at 0% 90%, color-mix(in srgb, var(--info) 6%, transparent), transparent 62%),
     var(--background);
   color: var(--foreground);
   min-height: 100%;
