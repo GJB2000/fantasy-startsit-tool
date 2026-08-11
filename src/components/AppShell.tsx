@@ -109,12 +109,12 @@ const LINKS: { href: string; label: string; icon: React.ReactNode }[] = [
   },
 ];
 
-const RAIL_BG = "linear-gradient(185deg, #241d13 0%, #1a150d 100%)";
-const RAIL_BORDER = "rgba(220, 195, 150, 0.13)";
+const RAIL_BG = "linear-gradient(185deg, #0c1130 0%, #060a22 100%)";
+const RAIL_BORDER = "rgba(255, 255, 255, 0.09)";
 
 /** The Legitfootball mark: block "L", a vertical football with laces, block "F". */
 function LogoTile({ size = 30 }: { size?: number }) {
-  const bg = "#191817";
+  const bg = "#0e1330";
   const fg = "#f4efe4";
   return (
     <span
@@ -144,12 +144,11 @@ function LogoTile({ size = 30 }: { size?: number }) {
 }
 
 /**
- * Site-wide navigation shell — a persistent sidebar kept a fixed dark
- * "espresso rail" in BOTH light and night mode (a deliberate constant
- * spine / masthead, unlike the editorial pages it frames, which switch
- * with the theme). Styled to the almanac: a Jost wordmark under an
- * engraved "Fantasy Toolkit" line, engraved section/footer labels,
- * pine-green active state on warm espresso. Below the `md` breakpoint it
+ * Site-wide navigation shell — a persistent sidebar kept a fixed deep-navy
+ * rail in BOTH light and dark mode (a deliberate constant spine / masthead,
+ * unlike the pages it frames, which switch with the theme). Styled to the
+ * Nash/volt system: a Jost wordmark, engraved section/footer labels, and a
+ * bright volt active state on navy. Below the `md` breakpoint it
  * collapses to a slim top bar with a hamburger that slides the same rail
  * in as a left drawer (with a scrim), rather than a horizontal scrolling
  * strip.
@@ -217,7 +216,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           type="button"
           onClick={() => setMobileOpen(true)}
           aria-label="Open menu"
-          className="flex h-9 w-9 items-center justify-center rounded-[4px] text-[#d8cdb8] transition-colors hover:bg-white/[0.06]"
+          className="flex h-9 w-9 items-center justify-center rounded-[4px] text-[rgba(255,255,255,0.72)] transition-colors hover:bg-white/[0.06]"
         >
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
             <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
@@ -225,20 +224,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
         <Link href="/" className="flex items-center gap-2">
           <LogoTile size={26} />
-          <span className="font-jost text-[15px] font-semibold text-[#f0e9db]">LEGITFOOTBALL</span>
+          <span className="font-jost text-[15px] font-semibold text-[#eef1fa]">LEGITFOOTBALL</span>
         </Link>
         <button
           type="button"
           onClick={() => setRosterOpen(true)}
           aria-label="Manage your roster"
-          className="flex items-center gap-1.5 rounded-[4px] bg-white/[0.06] px-2.5 py-1.5 text-[12px] font-medium text-[#d8cdb8] transition-colors hover:bg-white/[0.1]"
+          className="flex items-center gap-1.5 rounded-[4px] bg-white/[0.06] px-2.5 py-1.5 text-[12px] font-medium text-[rgba(255,255,255,0.72)] transition-colors hover:bg-white/[0.1]"
         >
           <svg viewBox="0 0 24 24" className="h-[15px] w-[15px]" fill="none">
             <circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.6" />
             <path d="M5 20a7 7 0 0114 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
-          {connection && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#6fcfa0" }} />}
-          <span className="font-mono text-[11px] font-bold text-[#f0e9db]">{rostered.length}</span>
+          {connection && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#c8ff00" }} />}
+          <span className="font-mono text-[11px] font-bold text-[#eef1fa]">{rostered.length}</span>
         </button>
       </div>
 
@@ -263,8 +262,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/" className="flex items-center gap-2.5 px-1">
             <LogoTile />
             <span className="flex flex-col leading-none">
-              <span className="font-jost text-[16px] font-semibold text-[#f0e9db]">LEGITFOOTBALL</span>
-              <span className="mt-1 font-engraved text-[8.5px] uppercase tracking-[0.18em] text-[#b89768]">
+              <span className="font-jost text-[16px] font-semibold text-[#eef1fa]">LEGITFOOTBALL</span>
+              <span className="mt-1 font-engraved text-[8.5px] uppercase tracking-[0.18em] text-[#7f88ad]">
                 Fantasy Toolkit
               </span>
             </span>
@@ -273,7 +272,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             type="button"
             onClick={() => setMobileOpen(false)}
             aria-label="Close menu"
-            className="flex h-8 w-8 items-center justify-center rounded-[4px] text-[#9a8f7a] transition-colors hover:bg-white/[0.06] md:hidden"
+            className="flex h-8 w-8 items-center justify-center rounded-[4px] text-[rgba(255,255,255,0.6)] transition-colors hover:bg-white/[0.06] md:hidden"
           >
             <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
               <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
@@ -282,7 +281,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex flex-col gap-0.5">
-          <span className="mb-1.5 px-2.5 font-engraved text-[9px] uppercase tracking-[0.18em] text-[#8a7f6c]">Tools</span>
+          <span className="mb-1.5 px-2.5 font-engraved text-[9px] uppercase tracking-[0.18em] text-[rgba(255,255,255,0.5)]">Tools</span>
           {LINKS.map((link) => {
             const active = pathname === link.href;
             return (
@@ -291,9 +290,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-2.5 whitespace-nowrap rounded-[4px] px-2.5 py-2 text-[13.5px] font-medium transition-colors ${
-                  active ? "" : "text-[#9a8f7a] hover:bg-white/5 hover:text-[#ece5d5]"
+                  active ? "" : "text-[rgba(255,255,255,0.6)] hover:bg-white/5 hover:text-[#ffffff]"
                 }`}
-                style={active ? { background: "rgba(79, 168, 120, 0.16)", color: "#6fcfa0" } : undefined}
+                style={active ? { background: "rgba(200, 255, 0, 0.13)", color: "#c8ff00" } : undefined}
               >
                 {link.icon}
                 {link.label}
@@ -309,15 +308,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="flex flex-col gap-0.5 rounded-[4px] bg-white/[0.04] px-2.5 py-2 text-left transition-colors hover:bg-white/[0.08]"
           >
             <span className="flex items-center justify-between">
-              <span className="font-engraved text-[9.5px] uppercase tracking-[0.12em] text-[#9a8f7a]">My roster</span>
-              <span className="font-mono text-[11px] font-bold text-[#f0e9db]">{rostered.length}</span>
+              <span className="font-engraved text-[9.5px] uppercase tracking-[0.12em] text-[rgba(255,255,255,0.6)]">My roster</span>
+              <span className="font-mono text-[11px] font-bold text-[#eef1fa]">{rostered.length}</span>
             </span>
-            <span className="truncate text-[11px] text-[#8a7f6c]">
+            <span className="truncate text-[11px] text-[rgba(255,255,255,0.5)]">
               {connection ? connection.leagueName : "Connect Sleeper →"}
             </span>
           </button>
           <div className="flex flex-col gap-1.5 rounded-[4px] bg-white/[0.04] px-2.5 py-2">
-            <span className="font-engraved text-[9.5px] uppercase tracking-[0.12em] text-[#9a8f7a]">Scoring</span>
+            <span className="font-engraved text-[9.5px] uppercase tracking-[0.12em] text-[rgba(255,255,255,0.6)]">Scoring</span>
             <div className="flex gap-1" role="group" aria-label="Scoring format">
               {SCORING_FORMATS.map((f) => {
                 const active = f === scoringFormat;
@@ -328,10 +327,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     onClick={() => setScoringFormat(f)}
                     aria-pressed={active}
                     title={FORMAT_LABEL[f]}
-                    className={`font-mono flex-1 rounded-[3px] px-1 py-1 text-[10.5px] font-bold transition-colors ${
-                      active ? "text-[#f0e9db]" : "text-[#8a7f6c] hover:bg-white/[0.06] hover:text-[#ece5d5]"
+                    className={`font-mono flex-1 rounded-full px-1 py-1 text-[10.5px] font-bold transition-colors ${
+                      active ? "" : "text-[rgba(255,255,255,0.5)] hover:bg-white/[0.06] hover:text-[#ffffff]"
                     }`}
-                    style={active ? { background: "rgba(79, 168, 120, 0.28)" } : undefined}
+                    style={active ? { background: "#c8ff00", color: "#01051e" } : undefined}
                   >
                     {FORMAT_SHORT[f]}
                   </button>
@@ -340,13 +339,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center justify-between rounded-[4px] bg-white/[0.04] px-2.5 py-2">
-            <span className="font-engraved text-[9.5px] uppercase tracking-[0.12em] text-[#9a8f7a]">Theme</span>
+            <span className="font-engraved text-[9.5px] uppercase tracking-[0.12em] text-[rgba(255,255,255,0.6)]">Theme</span>
             <button
               type="button"
               onClick={() => setTheme(effectiveDark ? "light" : "dark")}
               aria-label={effectiveDark ? "Switch to light theme" : "Switch to dark theme"}
               title={effectiveDark ? "Switch to light theme" : "Switch to dark theme"}
-              className="flex h-6 w-6 items-center justify-center rounded-[3px] text-[#d8cdb8] transition-colors hover:bg-white/[0.08]"
+              className="flex h-6 w-6 items-center justify-center rounded-[3px] text-[rgba(255,255,255,0.72)] transition-colors hover:bg-white/[0.08]"
             >
               {effectiveDark ? (
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">

@@ -55,6 +55,14 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
+/** Two-letter monogram for the player avatar tile (first + last initial). */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 function ordinal(n: number): string {
   const rem100 = n % 100;
   if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
@@ -356,51 +364,59 @@ function PlayerCard({
   const week = player.nextOpponent?.week;
   const skill = isSkillCardPosition(player.position);
   const betLines = props?.lines ?? [];
+  const meta = [posLine, opp ? `vs ${opp}${week ? `, Week ${week}` : ""}` : null].filter(Boolean).join(" · ");
 
   return (
-    <section className={`${styles.card} ${isRecommended ? "" : styles.bench} ${styles.rise}`} style={{ animationDelay: `${0.1 + rank * 0.06}s` }}>
-      <div className={styles.chead}>
-        <div className={`${styles.rk} ${styles.n}`}>{rank}</div>
-        <div>
-          <div className={styles.cname}>{player.displayName}</div>
-          {posLine && <div className={styles.cmeta}>{posLine}</div>}
-        </div>
-        <div className={`${styles.tag} ${isRecommended ? styles.tagStart : styles.tagBench}`}>{isRecommended ? "Start" : "Bench"}</div>
-      </div>
-
-      <div className={`${styles.rule} ${styles.ruleHair}`} />
-
-      <div className={styles.opp}>
-        <div className={styles.oppWho}>
-          {player.team ? <b>{player.team}</b> : "—"}
-          {opp ? ` vs ${opp}` : ""}
-          {week ? ` · Week ${week}` : ""}
-        </div>
-        {matchup && m && (
-          <div className={`${styles.dtag} ${DTAG_TONE[matchup.tone]}`}>
-            {matchup.text} · #{m.rank} of {m.teamCount}
+    <article
+      className={`${styles.panel} ${isRecommended ? styles.pick : ""} ${styles.rise}`}
+      style={{ animationDelay: `${0.1 + rank * 0.06}s` }}
+    >
+      <div className={styles.pLeft}>
+        <div className={styles.pId}>
+          <span className={styles.pAva}>{initials(player.displayName)}</span>
+          <div>
+            <div className={styles.pName}>{player.displayName}</div>
+            {meta && <div className={styles.pMeta}>{meta}</div>}
           </div>
-        )}
-      </div>
+        </div>
 
-      <div className={styles.rule} />
-
-      <div className={styles.prow}>
-        <div>
+        <div className={styles.pProj}>
           <div className={styles.lab}>Projection</div>
-          <div className={styles.pbig}>
+          <div className={styles.pNum}>
             <span className={styles.n}>{player.finalScore != null ? player.finalScore.toFixed(1) : "—"}</span>
             <small>{formatLabel}</small>
           </div>
+          <RangeLine player={player} />
         </div>
-        <RangeLine player={player} />
+
+        {matchup && m && (
+          <div className={styles.pMtag}>
+            <span className={`${styles.dtag} ${DTAG_TONE[matchup.tone]}`}>
+              {matchup.text} · #{m.rank} of {m.teamCount}
+            </span>
+          </div>
+        )}
+
+        <div>
+          <span className={`${styles.pill} ${isRecommended ? styles.pillStart : styles.pillBench}`}>
+            {isRecommended ? "Start" : "Bench"}
+          </span>
+        </div>
       </div>
 
-      <div className={styles.rule} />
-
-      <div className={styles.mid}>
+      <div className={styles.pRight}>
         <StatGrid player={player} formatLabel={formatLabel} />
-        <div className={styles.aside}>
+        <div className={styles.case}>
+          <div className={styles.caseCol}>
+            <div className={`${styles.caseH} ${styles.caseFor}`}>Case for</div>
+            <p>{buildCaseFor(player, formatLabel)}</p>
+          </div>
+          <div className={styles.caseCol}>
+            <div className={`${styles.caseH} ${styles.caseAgainst}`}>Case against</div>
+            <p>{buildCaseAgainst(player)}</p>
+          </div>
+        </div>
+        <div className={styles.extra}>
           <div>
             <div className={styles.aiL}>Weather</div>
             <div className={styles.aiV}>{player.nextOpponent ? formatWeather(player.nextGameWeather) : "—"}</div>
@@ -412,48 +428,32 @@ function PlayerCard({
         </div>
       </div>
 
-      <div className={styles.rule} />
-
-      <div className={styles.case}>
-        <div className={styles.caseCol}>
-          <div className={`${styles.caseH} ${styles.caseFor}`}>Case for</div>
-          <p>{buildCaseFor(player, formatLabel)}</p>
-        </div>
-        <div className={styles.caseCol}>
-          <div className={`${styles.caseH} ${styles.caseAgainst}`}>Case against</div>
-          <p>{buildCaseAgainst(player)}</p>
-        </div>
-      </div>
-
       {skill && (
-        <>
-          <div className={styles.rule} />
-          <div>
-            <div className={styles.betH}>
-              <div className={styles.lab}>Betting Lines</div>
-              {betLines.length > 0 && <div className={styles.bk}>{props?.bookmaker}</div>}
-            </div>
-            {betLines.length > 0 ? (
-              <>
-                <div className={styles.betL}>
-                  {betLines.map((line, i) => (
-                    <div key={`${line.label}-${i}`} className={styles.bc}>
-                      <div className={styles.bcL}>{line.label}</div>
-                      <div className={`${styles.bcV} ${styles.n}`}>{line.value}</div>
-                    </div>
-                  ))}
-                </div>
-                <p className={styles.betf}>Market lines — shown for context, not part of our projection.</p>
-              </>
-            ) : (
-              <p className={styles.betPending}>
-                Sportsbook lines post closer to kickoff — pass, rush and receiving props will show here once this week&rsquo;s game is on the board.
-              </p>
-            )}
+        <div className={styles.betRow}>
+          <div className={styles.betH}>
+            <div className={styles.lab}>Betting Lines</div>
+            {betLines.length > 0 && <div className={styles.bk}>{props?.bookmaker}</div>}
           </div>
-        </>
+          {betLines.length > 0 ? (
+            <>
+              <div className={styles.betL}>
+                {betLines.map((line, i) => (
+                  <div key={`${line.label}-${i}`} className={styles.bc}>
+                    <div className={styles.bcL}>{line.label}</div>
+                    <div className={`${styles.bcV} ${styles.n}`}>{line.value}</div>
+                  </div>
+                ))}
+              </div>
+              <p className={styles.betf}>Market lines — shown for context, not part of our projection.</p>
+            </>
+          ) : (
+            <p className={styles.betPending}>
+              Sportsbook lines post closer to kickoff — pass, rush and receiving props will show here once this week&rsquo;s game is on the board.
+            </p>
+          )}
+        </div>
       )}
-    </section>
+    </article>
   );
 }
 
@@ -477,40 +477,27 @@ export function ComparisonResult({ result, contextNote, scoringFormat, propsByPl
   return (
     <div className={`${styles.sheet} ${styles.rise}`}>
       <div className={styles.body}>
-        <div className={styles.mast}>
-          <div className={styles.mastL}>The Matchup</div>
-          <div className={styles.mastR}>LEGITFOOTBALL · Start / Sit</div>
-        </div>
-        <div className={styles.dateline}>
-          {week ? <span>Week {week}</span> : null}
-          <span>{formatLabel} Scoring</span>
-          <span>{rankedPlayers.length}-Player Comparison</span>
-        </div>
-
         {winner ? (
-          <section className={styles.verdict}>
-            <div className={styles.kick}>The Verdict</div>
-            <h2 className={styles.vname}>{winner.displayName}</h2>
-            {overText && (
-              <p className={styles.vsub}>
-                to start over <b>{overText}</b>
-              </p>
-            )}
-            <div className={styles.vrule} />
+          <header className={styles.verdict}>
+            <div className={styles.kick}>
+              The verdict{week ? ` · Week ${week}` : ""} · {formatLabel}
+            </div>
+            <h1 className={styles.vname}>
+              Start {winner.displayName}
+              {overText && <span style={{ color: "var(--alm-faint)" }}> over {overText}.</span>}
+            </h1>
+            <p className={styles.vsub}>{result.headline}</p>
             <div className={styles.vgrid}>
               <div>
-                <div className={`${styles.cnum} ${styles.n}`}>
-                  {confPct}
+                <div className={styles.cnum}>
+                  <span className={styles.n}>{confPct}</span>
                   <small>%</small>
                 </div>
-                <div className={styles.cdesc}>{confTier(confPct)} · Confidence</div>
+                <div className={styles.cdesc}>Confidence · {confTier(confPct)}</div>
               </div>
-              <div>
+              <div className={styles.meterWrap}>
                 <div className={styles.meter}>
                   <span className={styles.meterFill} style={{ width: fillWidth }} />
-                  {CONFIDENCE_SCALE_MARKS.map((mk) => (
-                    <span key={mk.label} className={styles.tk} style={{ left: `${mk.pct}%` }} />
-                  ))}
                 </div>
                 <div className={styles.mscale}>
                   {CONFIDENCE_SCALE_MARKS.map((mk) => (
@@ -522,35 +509,33 @@ export function ComparisonResult({ result, contextNote, scoringFormat, propsByPl
                 </p>
               </div>
             </div>
-            <p className={styles.vnote} style={{ marginTop: "16px" }}>
-              {result.headline}
-            </p>
-          </section>
+          </header>
         ) : (
-          <section className={styles.verdict}>
-            <div className={styles.kick}>The Verdict</div>
+          <header className={styles.verdict}>
+            <div className={styles.kick}>The verdict</div>
             <p className={styles.unresolved}>{result.headline}</p>
-          </section>
+          </header>
         )}
 
-        {rankedPlayers.map((player, i) => (
-          <PlayerCard
-            key={player.playerId ?? `unresolved-${i}`}
-            player={player}
-            rank={i + 1}
-            isRecommended={player.playerId === result.recommendedPlayerId}
-            formatLabel={formatLabel}
-            props={player.playerId != null ? propsByPlayerId?.[player.playerId] : undefined}
-          />
-        ))}
-
-        <div className={styles.colophon}>
-          <span>{formatLabel}{dataSeason != null ? ` · ${dataSeason}` : ""}</span>
+        <div className={styles.panels}>
+          {rankedPlayers.map((player, i) => (
+            <PlayerCard
+              key={player.playerId ?? `unresolved-${i}`}
+              player={player}
+              rank={i + 1}
+              isRecommended={player.playerId === result.recommendedPlayerId}
+              formatLabel={formatLabel}
+              props={player.playerId != null ? propsByPlayerId?.[player.playerId] : undefined}
+            />
+          ))}
         </div>
 
-        {contextNote && (
-          <p style={{ marginTop: "10px", fontSize: "11px", color: "var(--faint)", fontFamily: "var(--fb)" }}>{contextNote}</p>
-        )}
+        <div className={styles.foot}>
+          Recent form · Volume · Matchup · Market consensus &nbsp;·&nbsp; {formatLabel}
+          {dataSeason != null ? ` · ${dataSeason}` : ""}
+        </div>
+
+        {contextNote && <p className={styles.note}>{contextNote}</p>}
       </div>
     </div>
   );

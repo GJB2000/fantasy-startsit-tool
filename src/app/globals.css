@@ -1,29 +1,31 @@
 @import "tailwindcss";
 
 /*
- * Dark/emerald "data-grade" design system — replaces the earlier
- * Apple-inspired system (system-font typography, ui-rounded numerals,
- * navy/blue accent). Light and dark are both first-class themes here,
- * not just a system-preference afterthought: the reference this was
- * built from is dark-first, so light mode was designed as its own
- * inversion (darker emerald for contrast on white, darker semantic
- * colors) rather than a literal negative of the dark palette.
+ * "Prime-time" Nash/volt design system — deep navy grounds + a bright volt
+ * (chartreuse) accent, replacing the earlier editorial "almanac" (warm paper,
+ * pine/brass). Dark is the hero theme (near-black navy #01051e, bright volt
+ * #c8ff00). Light is a first-class inversion: cool off-white grounds with a
+ * DEEP olive-volt accent, because bright volt is unreadable as text on white —
+ * so on light the one --accent token holds the readable deep shade (and its
+ * fills carry white ink), while on dark it holds the bright volt (with dark
+ * navy ink on fills). One --accent token stays correct for both `bg-accent`
+ * and `text-accent` in each theme.
  */
 :root {
   color-scheme: light;
-  --background: #f5f7f5;
-  --foreground: #0b0e0c;
+  --background: #f4f6fa;
+  --foreground: #0e1116;
   --surface: #ffffff;
-  --surface-glass: rgba(255, 255, 255, 0.78);
-  --surface-sunken: #edf1ee;
-  --accent: #00b868;
-  --accent-secondary: #00a85d;
+  --surface-glass: rgba(255, 255, 255, 0.8);
+  --surface-sunken: #eaedf3;
+  --accent: #557a00;
+  --accent-secondary: #46620a;
   --accent-ink: #ffffff;
-  --good: #00b868;
-  --bad: #d93636;
-  --caution: #c97a0a;
-  --info: #1e7fbf;
-  --premium: #b8863a;
+  --good: #557a00;
+  --bad: #cf3a52;
+  --caution: #b06f00;
+  --info: #1e6fb8;
+  --premium: #9a6a10;
   --premium-ink: #ffffff;
   /* Position accents — for player-search scanning only. Deliberately
      outside the semantic set (accent/good/bad/caution) so they never
@@ -56,28 +58,29 @@
   --font-mono: var(--font-mono-loaded), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
-/* Dark base tokens. Applied when the OS prefers dark AND the user hasn't
-   forced light, OR when the user has explicitly forced dark (data-theme).
-   The two selectors carry identical declarations because plain CSS can't
-   share a ruleset across a media-query boundary. See useTheme.ts / the
-   sidebar theme toggle. */
+/* Dark base tokens (the hero theme). Applied when the OS prefers dark AND the
+   user hasn't forced light, OR when the user has explicitly forced dark
+   (data-theme). The two selectors carry identical declarations because plain
+   CSS can't share a ruleset across a media-query boundary. See useTheme.ts /
+   the sidebar theme toggle. On dark, --accent is the BRIGHT volt (readable as
+   text on the near-black navy, and dark navy ink sits on its fills). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --background: #0b0e0c;
-    --foreground: #f2f5f3;
-    --surface: #12151a;
-    --surface-glass: rgba(18, 21, 26, 0.7);
-    --surface-sunken: #08090a;
-    --accent: #00e07f;
-    --accent-secondary: #00b868;
-    --accent-ink: #06120c;
-    --good: #00e07f;
-    --bad: #ff4d4d;
+    --background: #01051e;
+    --foreground: #ffffff;
+    --surface: #0a0e26;
+    --surface-glass: rgba(10, 15, 43, 0.72);
+    --surface-sunken: #0d1129;
+    --accent: #c8ff00;
+    --accent-secondary: #9fe000;
+    --accent-ink: #01051e;
+    --good: #c8ff00;
+    --bad: #ff7a8a;
     --caution: #ffb020;
-    --info: #4fc3f7;
+    --info: #78b4ff;
     --premium: #e8c468;
-    --premium-ink: #221802;
+    --premium-ink: #01051e;
     --pos-qb: #a78bfa;
     --pos-rb: #2dd4bf;
     --pos-wr: #5aa9ff;
@@ -88,20 +91,20 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --background: #0b0e0c;
-  --foreground: #f2f5f3;
-  --surface: #12151a;
-  --surface-glass: rgba(18, 21, 26, 0.7);
-  --surface-sunken: #08090a;
-  --accent: #00e07f;
-  --accent-secondary: #00b868;
-  --accent-ink: #06120c;
-  --good: #00e07f;
-  --bad: #ff4d4d;
+  --background: #01051e;
+  --foreground: #ffffff;
+  --surface: #0a0e26;
+  --surface-glass: rgba(10, 15, 43, 0.72);
+  --surface-sunken: #0d1129;
+  --accent: #c8ff00;
+  --accent-secondary: #9fe000;
+  --accent-ink: #01051e;
+  --good: #c8ff00;
+  --bad: #ff7a8a;
   --caution: #ffb020;
-  --info: #4fc3f7;
+  --info: #78b4ff;
   --premium: #e8c468;
-  --premium-ink: #221802;
+  --premium-ink: #01051e;
   --pos-qb: #a78bfa;
   --pos-rb: #2dd4bf;
   --pos-wr: #5aa9ff;
@@ -111,11 +114,9 @@
 }
 
 body {
-  /* Ground the whole app in the editorial page color (theme-aware) so any
-     area a page's .matchup-page <main> doesn't cover — e.g. short mobile
-     landing pages — matches seamlessly instead of showing the old default
-     background as white space. The app is fully editorial (see item 118);
-     the sidebar/top bar carry their own opaque dark background. */
+  /* Ground the whole app in the page color (theme-aware) so any area a page's
+     .matchup-page <main> doesn't cover matches seamlessly. The sidebar/top bar
+     carry their own opaque dark background. */
   background: var(--alm-page-bg);
   color: var(--foreground);
   font-family: var(--font-sans);
@@ -137,98 +138,87 @@ body {
 }
 
 /*
- * Editorial "almanac" palette — one shared token set consumed both by the
- * .matchup-page token-override wrapper (below) AND by each tool's result CSS
- * Module (ComparisonResult.module.css, TradeResult.module.css, …), which read
- * these --alm-* tokens through ordinary custom-property inheritance (module
- * class scoping doesn't affect custom-property resolution). Defining the
- * palette once here — with a light default and a "night edition" variant under
- * prefers-color-scheme: dark — means the whole editorial world themes from a
- * single place: warm porcelain paper / pine-green / espresso ink by day, warm
- * espresso-charcoal by night, with brightened green/brass/red accents.
+ * Nash/volt palette — one shared token set consumed both by the .matchup-page
+ * token-override wrapper (below) AND by each tool's result CSS Module
+ * (ComparisonResult.module.css, TradeResult.module.css), which read these
+ * --alm-* tokens through ordinary custom-property inheritance (module class
+ * scoping doesn't affect custom-property resolution). The variable NAMES are
+ * retained from the prior editorial system (paper/pine/brass/…) so the modules
+ * didn't need renaming — only the VALUES changed to the navy/volt world. Defined
+ * once here with a light default and a dark ("night") variant, so the whole app
+ * themes from a single place.
  */
 :root {
-  --alm-page-bg: #e7e1d2;
-  --alm-paper: #ede8dd;
-  --alm-card: #f6f2e8;
-  --alm-surface: #f5f1e7;
-  --alm-sunken: #e7e1d3;
-  --alm-surface-sunken: #e4decd;
-  --alm-ink: #211f19;
-  --alm-muted: #6c685c;
-  --alm-faint: #9a9384;
-  --alm-line: #d8d1c1;
-  --alm-line2: #e2dccd;
-  --alm-green: #0b6a47;
-  --alm-green-2: #0a5a3d;
-  --alm-pine: #0f3025;
-  --alm-pine-ink: #f1ece1;
-  --alm-brass: #b58a46;
-  --alm-red: #b44230;
-  --alm-info: #4a6d7a;
-  --alm-accent-ink: #f5f1e7;
+  --alm-page-bg: #f4f6fa;
+  --alm-paper: #ffffff;
+  --alm-card: #f7f9fc;
+  --alm-surface: #ffffff;
+  --alm-sunken: #eaedf3;
+  --alm-surface-sunken: #eef1f6;
+  --alm-ink: #0e1116;
+  --alm-muted: rgba(14, 17, 22, 0.62);
+  --alm-faint: rgba(14, 17, 22, 0.44);
+  --alm-line: rgba(14, 17, 22, 0.12);
+  --alm-line2: rgba(14, 17, 22, 0.07);
+  --alm-green: #557a00;
+  --alm-green-2: #46620a;
+  --alm-pine: #0f1836;
+  --alm-pine-ink: #f1f4ff;
+  --alm-brass: #9a6a10;
+  --alm-red: #cf3a52;
+  --alm-info: #1e6fb8;
+  --alm-accent-ink: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --alm-page-bg: #14120e;
-    --alm-paper: #1c1913;
-    --alm-card: #262219;
-    --alm-surface: #211d16;
-    --alm-sunken: #15130e;
-    --alm-surface-sunken: #100e0a;
-    --alm-ink: #ece5d5;
-    --alm-muted: #a89f8c;
-    --alm-faint: #726b5b;
-    --alm-line: #39342a;
-    --alm-line2: #2b271f;
-    --alm-green: #4fd09a;
-    --alm-green-2: #2f9e73;
-    --alm-pine: #124030;
-    --alm-pine-ink: #f1ece1;
-    --alm-brass: #d0a45c;
-    --alm-red: #d8664f;
-    --alm-info: #86adbc;
-    --alm-accent-ink: #14120e;
+    --alm-page-bg: #01051e;
+    --alm-paper: #0a0e26;
+    --alm-card: #0d1129;
+    --alm-surface: #0a0e26;
+    --alm-sunken: #11152e;
+    --alm-surface-sunken: #0d1129;
+    --alm-ink: #ffffff;
+    --alm-muted: rgba(255, 255, 255, 0.62);
+    --alm-faint: rgba(255, 255, 255, 0.4);
+    --alm-line: rgba(255, 255, 255, 0.1);
+    --alm-line2: rgba(255, 255, 255, 0.06);
+    --alm-green: #c8ff00;
+    --alm-green-2: #9fe000;
+    --alm-pine: #0a0f2b;
+    --alm-pine-ink: #ffffff;
+    --alm-brass: #e8c468;
+    --alm-red: #ff7a8a;
+    --alm-info: #78b4ff;
+    --alm-accent-ink: #01051e;
   }
 }
 :root[data-theme="dark"] {
-  --alm-page-bg: #14120e;
-  --alm-paper: #1c1913;
-  --alm-card: #262219;
-  --alm-surface: #211d16;
-  --alm-sunken: #15130e;
-  --alm-surface-sunken: #100e0a;
-  --alm-ink: #ece5d5;
-  --alm-muted: #a89f8c;
-  --alm-faint: #726b5b;
-  --alm-line: #39342a;
-  --alm-line2: #2b271f;
-  --alm-green: #4fd09a;
-  --alm-green-2: #2f9e73;
-  --alm-pine: #124030;
-  --alm-pine-ink: #f1ece1;
-  --alm-brass: #d0a45c;
-  --alm-red: #d8664f;
-  --alm-info: #86adbc;
-  --alm-accent-ink: #14120e;
+  --alm-page-bg: #01051e;
+  --alm-paper: #0a0e26;
+  --alm-card: #0d1129;
+  --alm-surface: #0a0e26;
+  --alm-sunken: #11152e;
+  --alm-surface-sunken: #0d1129;
+  --alm-ink: #ffffff;
+  --alm-muted: rgba(255, 255, 255, 0.62);
+  --alm-faint: rgba(255, 255, 255, 0.4);
+  --alm-line: rgba(255, 255, 255, 0.1);
+  --alm-line2: rgba(255, 255, 255, 0.06);
+  --alm-green: #c8ff00;
+  --alm-green-2: #9fe000;
+  --alm-pine: #0a0f2b;
+  --alm-pine-ink: #ffffff;
+  --alm-brass: #e8c468;
+  --alm-red: #ff7a8a;
+  --alm-info: #78b4ff;
+  --alm-accent-ink: #01051e;
 }
 
-/*
- * Editorial "almanac" skin, applied per page (Start/Sit, Trade, …). The whole
- * app is token-driven, so mapping the app's color tokens from the --alm-*
- * palette on this one wrapper recolors every token-consuming component inside
- * it (search panel, scoring toggle, player chips, rails) — without changing
- * any of those shared components. Wins over the light and dark :root token
- * definitions because a descendant's nearest ancestor sets the custom
- * property; and because it sources from --alm-* (which themselves switch under
- * prefers-color-scheme), the wrapper needs no media query of its own — the
- * night edition falls out for free. Each result sheet carries its own full
- * editorial typography via its scoped CSS Module.
- */
-/* Almanac typography utilities — Jost for display figures/headings, Cinzel
-   for engraved small-caps labels. Unlayered, so they win over any Tailwind
-   font utility. Used across the editorial tool pages. */
+/* Display + label type utilities. Jost carries the Nash display role (headings,
+   player names, big figures); the "engraved" utility is the uppercase
+   letter-spaced label face. Unlayered, so they win over any Tailwind font
+   utility. */
 .font-jost {
   font-family: var(--font-jost), "Futura", "Century Gothic", sans-serif;
 }
@@ -236,6 +226,16 @@ body {
   font-family: var(--font-engraved), "Helvetica Neue", Arial, sans-serif;
 }
 
+/*
+ * Per-page skin. The whole app is token-driven, so mapping the app's color
+ * tokens from the --alm-* palette on this one wrapper recolors every
+ * token-consuming component inside it — without changing those shared
+ * components. It sources from --alm-* (which switch under prefers-color-scheme),
+ * so no media query of its own is needed. --premium stays the gold brass tone
+ * (Rankings' elite tier); --caution is left to inherit the base amber so it
+ * reads distinct from premium. A faint volt glow at the top edge echoes the
+ * mockup's radial highlight.
+ */
 .matchup-page {
   --background: var(--alm-page-bg);
   --foreground: var(--alm-ink);
@@ -247,11 +247,13 @@ body {
   --accent-ink: var(--alm-accent-ink);
   --good: var(--alm-green);
   --bad: var(--alm-red);
-  --caution: var(--alm-brass);
   --info: var(--alm-info);
   --premium: var(--alm-brass);
   --premium-ink: var(--alm-accent-ink);
-  background: var(--background);
+  background:
+    radial-gradient(60% 42% at 12% 0%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
+    radial-gradient(55% 40% at 100% 0%, color-mix(in srgb, var(--accent) 4%, transparent), transparent 55%),
+    var(--background);
   color: var(--foreground);
   min-height: 100%;
 }
