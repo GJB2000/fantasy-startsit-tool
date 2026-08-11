@@ -8026,23 +8026,33 @@ single-season numbers for those specific constants.
       is untouched.
 
 ### Open items (as of item 140 — pick up here)
-**Item 140's two follow-up fixes (Top-100 scoring + consensus-blended VOR
-sort — no top-100 player scores 1; injured elites like Lamar no longer fall
-below rookies like Shough) are an UNCOMMITTED working-tree change —
-`buildRankings.ts` `crossPositionVor`, verified live (Lamar #37 > Shough
-#87; QBs present; McBride #9; scores 57-100), `tsc`/lint clean, not yet
-committed. Per this project's standing rule, commit/push only once the user
-asks. NOTE: item 140's original VOR-sort change is already committed/pushed
-as `fbec298`; these are follow-ups on top of it.**
-**Item 139 (Legit Rankings offseason-consensus fix) is committed and pushed
-to `main` as `05f41e2`; item 138 (uneven-trade valuation fix) as `fadabd9`;
-item 137 (Backtest scoring-format gaps) as `fa1cd37`; item 136 (prior-season
-fallback → live tools) as `940e354`.** The prior session (items 133-135) is committed and
-pushed to `main` (HEAD before item 136 was `0e7b2eb`). Items 133-134 are
-real shipped code (with commit hashes inline in each entry); item 135 is
-design exploration that shipped NO code — Artifacts only, the live app is
-unchanged. The numbered open items below were not touched this session —
-nothing below is started or fixed unless its own entry says so.
+**Everything through item 140 is committed and pushed to `main`; working
+tree is CLEAN and up to date with origin (HEAD `cd97b87`).** This session
+shipped items 136-140 (each with its own numbered write-up above):
+- item 136 (prior-season fallback → live tools) — `940e354`
+- item 137 (Backtest tooling fully scoring-format-aware) — `fa1cd37`
+- item 138 (uneven-trade valuation fix, `REPLACEMENT_PER_GAME`) — `fadabd9`
+- item 139 (Legit Rankings offseason-consensus fix; Lamar back to QB #6) — `05f41e2`
+- item 140 (Top 100 ranked by value-over-replacement) — `fbec298`, plus two
+  same-day follow-ups documented inside item 140's entry: the Top-100 score
+  re-normalization fix (`3403b2c`) and the consensus-blended cross-position
+  VOR that fixed "Shough above Lamar" (`cd97b87`).
+This session also did some Start/Sit "glassmorphism" DESIGN exploration up
+front (published Artifacts only — the de-magazined/glass almanac full-page
+mockup), which shipped NO code and was set aside ("take a break from
+design"); the live app is unchanged by it, so it has no numbered item — same
+precedent as item 135.
+**The prior session (items 133-135) is committed and pushed to `main` (HEAD
+before item 136 was `0e7b2eb`).** Items 133-134 are real shipped code (with
+commit hashes inline in each entry); item 135 is design exploration that
+shipped NO code — Artifacts only, the live app is unchanged. The numbered
+open items below were NOT touched this session except as noted here —
+nothing below is started or fixed unless its own entry says so. This
+session's open-item changes: items **6, 14, 19 fully RESOLVED**; items **12,
+15 PARTIALLY resolved** (12: Half-PPR/Standard done, D/ST-K + 2022-24 seasons
+still open; 15: format-awareness done, skill-only + weeks-2-4 still open);
+item **30 ADDED** (lean Legit Rankings harder on consensus — deferred by the
+user). Item 5 (3+-player-per-side trade shapes) remains open/unbuilt.
 
 Everything through 80f6c70 ("Add Waiver Wire tool with real Sleeper
 league import") is committed and pushed (`git log`; confirmed live via
