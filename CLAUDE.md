@@ -7779,11 +7779,31 @@ single-season numbers for those specific constants.
       to a score of 1** (user: "why would a player in the top 100 have a
       score of 1"). Fixed to normalize against the FULL rankable pool's VOR
       range instead — a top-100 player is well above replacement, so they
-      now land in a high band (verified: score range 56-100, the 100th
-      player shows 56, the gold 90+ tier is a tight 8 players, McBride 88),
+      now land in a high band (score range ~57-100, gold 90+ tier tight),
       and only deep waiver-tier players (never shown) approach 1. Monotonic
       with rank; per-position tabs still show their own position-relative
       legitScore (McBride 100 on the TE tab), unaffected.
+    - **Second follow-up fix (same day): raw-finalScore VOR discarded
+      consensus, so an injured elite fell below a rookie** (user: "why is
+      Tyler Shough above Lamar Jackson"). Shough's engine finalScore (16.6)
+      coincidentally matched Lamar's (16.5, injury-depressed), and a plain
+      `finalScore - replacement` sort has no consensus input — so the rookie
+      edged the consensus QB2. The QB TAB got it right (Lamar #6) because
+      legitScore blends consensus; the Overall VOR didn't. Fixed by computing
+      the cross-position VOR from a CONSENSUS-BLENDED projection:
+      `0.5*finalScore + 0.5*expertConsensusR2pPts` (the redraft-derived
+      consensus points estimate already on the breakdown, item 70/103), then
+      minus replacement (`crossPositionVor` in `buildRankings.ts`). Keeps the
+      value points-based (accurate spacing/scarcity) AND consensus-aware.
+      A rejected intermediate — scaling legitScore by a per-position VOR
+      ceiling — fixed the ordering but distorted spacing so badly it pushed
+      EVERY QB out of the top 100 (position mix RB 42 / WR 46 / TE 12 / QB
+      0), so it was discarded. Verified: Lamar **#37** (r2p 21.3) now well
+      above Shough **#87** (r2p 15); Josh Allen **#25** (top QB, matching
+      FantasyPros' overall board); McBride **#9** (elite TE, consensus-
+      backed, no longer the absurd #2); scores 57-100; QB/RB/WR/TE all
+      present (mix WR 35 / RB 32 / TE 15 / QB 18); position tabs still
+      unaffected. `tsc`/lint clean.
 139. **Fixed Legit Rankings under-ranking an elite player coming off an
     injury-affected season (user report: "Lamar Jackson is far too low")
     — a one-line data-source swap in the rankings route, no scoring-logic
@@ -8006,13 +8026,14 @@ single-season numbers for those specific constants.
       is untouched.
 
 ### Open items (as of item 140 — pick up here)
-**Item 140's follow-up score-normalization fix (Top-100 legitScore now
-normalized against the full pool's VOR range, so no top-100 player shows a
-score of 1) is an UNCOMMITTED working-tree change — `buildRankings.ts`,
-verified live (range 56-100), `tsc`/lint clean, not yet committed. Per this
-project's standing rule, commit/push only once the user asks. NOTE: item
-140's original VOR-sort change is already committed/pushed as `fbec298`;
-this is a follow-up on top of it.**
+**Item 140's two follow-up fixes (Top-100 scoring + consensus-blended VOR
+sort — no top-100 player scores 1; injured elites like Lamar no longer fall
+below rookies like Shough) are an UNCOMMITTED working-tree change —
+`buildRankings.ts` `crossPositionVor`, verified live (Lamar #37 > Shough
+#87; QBs present; McBride #9; scores 57-100), `tsc`/lint clean, not yet
+committed. Per this project's standing rule, commit/push only once the user
+asks. NOTE: item 140's original VOR-sort change is already committed/pushed
+as `fbec298`; these are follow-ups on top of it.**
 **Item 139 (Legit Rankings offseason-consensus fix) is committed and pushed
 to `main` as `05f41e2`; item 138 (uneven-trade valuation fix) as `fadabd9`;
 item 137 (Backtest scoring-format gaps) as `fa1cd37`; item 136 (prior-season

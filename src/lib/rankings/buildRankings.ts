@@ -379,47 +379,51 @@ export async function getLegitRankingsForPosition(
 const TOP_100_LIMIT = 100;
 
 /**
- * Cross-position VALUE for the Top 100 sort: the engine's projection minus
- * that player's position replacement level (REPLACEMENT_PER_GAME) — i.e.
- * value over replacement (VORP), the standard way to compare players across
- * positions. `legitScore` alone CANNOT rank across positions: it's
- * normalized WITHIN each position (best TE = 100, exactly like best WR =
- * 100), so sorting the combined list by it puts an elite TE (Trey McBride)
- * right next to an elite WR despite a far lower absolute projection — the
- * thing that read as "why is McBride so high." VOR fixes that, and also
- * correctly drops QBs down the board (elite QB replacement is high in a
- * 1-QB league, so even a top QB nets little value over a streamer — which
- * matches FantasyPros' own overall/redraft board). Skill positions only,
- * which is all RANKABLE_POSITIONS ever contains.
+ * Cross-position VALUE for the Top 100 sort: value over replacement (VORP)
+ * computed from a CONSENSUS-BLENDED projection, not the raw engine
+ * finalScore. Two failure modes this navigates, both found live:
+ *   - Sorting by position-relative legitScore over-ranks shallow-but-elite
+ *     positions (best TE = 100 = best WR) → an elite TE (McBride) landed #2
+ *     overall despite a far lower projection.
+ *   - Sorting by raw-finalScore VOR discards consensus → an injured elite
+ *     (Lamar, engine snapshot injury-depressed to ~16.5) fell below a rookie
+ *     (Shough, ~16.6) whose engine score coincidentally matched, even though
+ *     consensus has Lamar as QB2 and the rookie deep.
+ *   - Scaling legitScore by a per-position VOR ceiling fixed both orderings
+ *     but distorted spacing so badly it pushed EVERY QB out of the top 100.
+ * Blending the engine projection with FantasyPros' consensus points estimate
+ * (`expertConsensusR2pPts`, redraft-derived in the offseason — the same
+ * signal the per-position legitScore leans on) before subtracting replacement
+ * keeps the value points-based (accurate spacing/scarcity — TEs and QBs land
+ * where they should) AND consensus-aware (Lamar over Shough). Falls back to
+ * the engine projection alone for a player with no consensus estimate.
  */
-function valueOverReplacement(entry: LegitRankingEntry, format: ScoringFormat): number {
-  const projection = entry.finalScore ?? 0;
+const OVERALL_CONSENSUS_WEIGHT = 0.5;
+function crossPositionVor(entry: LegitRankingEntry, format: ScoringFormat): number {
+  const engineProjection = entry.finalScore ?? 0;
+  const projection =
+    entry.expertConsensusR2pPts != null
+      ? (1 - OVERALL_CONSENSUS_WEIGHT) * engineProjection + OVERALL_CONSENSUS_WEIGHT * entry.expertConsensusR2pPts
+      : engineProjection;
   const pos = entry.position;
   if (pos != null && isSkillPosition(pos)) return projection - REPLACEMENT_PER_GAME[format][pos];
   return projection;
 }
 
 /**
- * The "Top 100" view: every position's FULL (uncapped) ranked list,
- * merged and re-sorted by VALUE OVER REPLACEMENT (see valueOverReplacement)
- * — NOT by legitScore, which is position-relative and can't be compared
- * across positions — then trimmed to the 100 most valuable players. No new
- * scoring pass, just a re-combination of getFullLegitRankingsForPosition's
- * own cached output for each of the four rankable positions. Deliberately
- * reads the uncapped list, not getLegitRankingsForPosition's own tab-
- * display-capped one (QB10/RB20/WR25/TE10, ~65 total) — those caps exist so
- * a single position's tab doesn't run to replacement-level noise, not
- * because there are only 65 players worth showing across all positions.
+ * The "Top 100" view: every position's FULL (uncapped) ranked list, merged
+ * and re-sorted by cross-position VALUE (see crossPositionVor — a
+ * consensus-blended value over replacement), then trimmed to the 100 best.
+ * No new scoring pass, just a re-combination of getFullLegitRankingsForPosition's
+ * cached per-position output.
  *
- * The displayed `legitScore` is RE-NORMALIZED here to the Top 100's own VOR
- * spread (1..100 across the shown players), so the number the UI shows moves
- * monotonically with this value ordering and the gold "elite" tier
- * highlights the genuinely-top-overall players — rather than showing each
- * position's own 1-100 legitScore, which would look scrambled (a TE's 100
- * sitting at rank 9). A player can therefore legitimately show a different
- * score here than on their position tab: the tab answers "how good at your
- * position" (McBride = 100, best TE), the Top 100 answers "how valuable
- * overall" (McBride ~mid-pack). `positionRank` is reassigned to this
+ * The displayed `legitScore` is RE-NORMALIZED to the FULL pool's value range
+ * (NOT the top-100 slice's own range, which would force the 100th-best
+ * player to a score of 1) so the number moves monotonically with the order
+ * and stays in a high band for everyone shown. A player can therefore show a
+ * different score here than on their position tab: the tab answers "how good
+ * at your position" (McBride 100, best TE), the Top 100 answers "how
+ * valuable overall" (McBride mid-pack). `positionRank` is reassigned to this
  * combined list's own 1..100 order.
  */
 export async function getLegitRankingsOverall(
@@ -448,24 +452,18 @@ export async function getLegitRankingsOverall(
     )
   );
 
-  const withVor = perPosition.flat().map((entry) => ({ entry, vor: valueOverReplacement(entry, format) }));
+  const withValue = perPosition.flat().map((entry) => ({ entry, value: crossPositionVor(entry, format) }));
 
-  // Normalize against the FULL rankable pool's VOR range, NOT the top-100
-  // slice's own range: a top-100 player is well above replacement, so
-  // scaling only across the top-100 would force the 100th-best player in the
-  // NFL to a score of 1 (absurd — they're a solid starter). Anchoring to the
-  // whole pool keeps every top-100 player in a high band and only deep
-  // waiver-tier players (never shown here) approach 1.
-  const allVor = withVor.map((t) => t.vor);
-  const minVor = Math.min(...allVor);
-  const maxVor = Math.max(...allVor);
+  const allValues = withValue.map((t) => t.value);
+  const minValue = Math.min(...allValues);
+  const maxValue = Math.max(...allValues);
 
-  return withVor
-    .sort((a, b) => b.vor - a.vor)
+  return withValue
+    .sort((a, b) => b.value - a.value)
     .slice(0, TOP_100_LIMIT)
     .map((t, i) => ({
       ...t.entry,
       positionRank: i + 1,
-      legitScore: Math.round(normalize(t.vor, minVor, maxVor)),
+      legitScore: Math.round(normalize(t.value, minValue, maxValue)),
     }));
 }
