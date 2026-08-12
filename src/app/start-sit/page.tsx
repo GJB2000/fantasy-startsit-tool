@@ -8,7 +8,7 @@ export default function StartSitPage() {
           className="text-[11px] uppercase tracking-[0.14em] text-accent"
           style={{ fontFamily: "var(--font-engraved)" }}
         >
-          LEGITFOOTBALL · Start / Sit
+          LEGITFOOTBALL
         </span>
         <h1
           className="mt-2 text-[34px] leading-none tracking-[-0.01em] text-foreground"
@@ -16,9 +16,6 @@ export default function StartSitPage() {
         >
           START / SIT
         </h1>
-        <p className="mt-2 max-w-lg text-sm leading-relaxed text-foreground/60">
-          Who to start when two players compete for one spot.
-        </p>
       </header>
       <StartSitTool />
     </main>

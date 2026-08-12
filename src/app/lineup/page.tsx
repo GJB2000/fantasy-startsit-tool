@@ -8,7 +8,7 @@ export default function LineupPage() {
           className="text-[11px] uppercase tracking-[0.14em] text-accent"
           style={{ fontFamily: "var(--font-engraved)" }}
         >
-          LEGITFOOTBALL · Lineup Optimizer
+          LEGITFOOTBALL
         </span>
         <h1
           className="mt-2 text-[34px] leading-none tracking-[-0.01em] text-foreground"
@@ -16,9 +16,6 @@ export default function LineupPage() {
         >
           OPTIMIZE LINEUP
         </h1>
-        <p className="mt-2 max-w-xl text-sm leading-relaxed text-foreground/60">
-          Your best possible starting lineup.
-        </p>
       </header>
       <LineupTool />
     </main>

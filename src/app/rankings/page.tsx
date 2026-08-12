@@ -8,7 +8,7 @@ export default function RankingsPage() {
           className="text-[11px] uppercase tracking-[0.14em] text-accent"
           style={{ fontFamily: "var(--font-engraved)" }}
         >
-          LEGITFOOTBALL · Legit Rankings
+          LEGITFOOTBALL
         </span>
         <h1
           className="mt-2 text-[34px] leading-none tracking-[-0.01em] text-foreground"
@@ -16,9 +16,6 @@ export default function RankingsPage() {
         >
           PLAYER RANKINGS
         </h1>
-        <p className="mt-2 max-w-xl text-sm leading-relaxed text-foreground/60">
-          Every player at a position, scored 1&ndash;100.
-        </p>
       </header>
       <RankingsTool />
     </main>
