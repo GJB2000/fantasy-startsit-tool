@@ -1,5 +1,6 @@
 import type { ExpertConsensusEntry } from "@/lib/fantasypros/weeklyConsensus";
 import { buildComparisonInput } from "@/lib/recommendation/buildInput";
+import { POINTS_PER_VOLUME_UNIT, REPLACEMENT_PER_GAME } from "@/lib/recommendation/config";
 import { scorePlayer } from "@/lib/recommendation/engine";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
@@ -25,6 +26,14 @@ export interface WaiverCandidate {
   residualScore?: number;
   /** Production is lagging the volume (residualScore > 0) — the "buy-low" tag. Absent/false for D/ST and K. */
   isBuyLow?: boolean;
+  /**
+   * Cross-position "best pickup" score: projected points from recent volume
+   * minus the position's replacement level (value over replacement). Unlike
+   * raw volume/residual it's comparable ACROSS positions, so the single
+   * "top target" isn't QB-biased (a deep, streamable QB has a high
+   * replacement level and thus low value). Absent for D/ST and K.
+   */
+  waiverValue?: number;
   /** e.g. "WR14" — rank by recent volume. */
   positionLabel: string;
   /** e.g. "WR34" — rank by recent points, at the same position. */
@@ -121,6 +130,9 @@ export async function buildWaiverCandidateDetails(
         gapScore: rank.gapScore,
         residualScore: rank.residualScore,
         isBuyLow,
+        waiverValue:
+          rank.recentVolumeAvg * POINTS_PER_VOLUME_UNIT[format][rank.position] -
+          REPLACEMENT_PER_GAME[format][rank.position],
         positionLabel: `${rank.position}${rank.volumeRank}`,
         productionLabel: `${rank.position}${rank.pointsRank}`,
         reasoning,

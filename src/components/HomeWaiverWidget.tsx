@@ -6,7 +6,7 @@ import type { ExtendedPosition } from "@/lib/sportsdata/types";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { useSleeperConnection } from "@/lib/useSleeperConnection";
-import { isStreamingPosition, moveHeadline, POSITION_ORDER, type WaiverCandidateResponse } from "./WaiverResult";
+import { computeRosterNeedPenalty, isStreamingPosition, moveHeadline, pickTopTarget, type WaiverCandidateResponse } from "./WaiverResult";
 
 interface WaiverResponse {
   candidatesByPosition: Record<ExtendedPosition, WaiverCandidateResponse[]>;
@@ -35,9 +35,9 @@ function WidgetShell({ children }: { children: React.ReactNode }) {
 /**
  * Compact Home-page summary of the Waiver Wire tool — reuses the exact
  * same /api/waivers route as WaiverTool.tsx, auto-fetched on mount, and
- * surfaces just the single best candidate (the first non-empty position
- * in POSITION_ORDER, whose own list is already sorted best-gap-first by
- * the API — see rankCandidates.ts) rather than the full by-position grid.
+ * surfaces the single best pickup via the SAME pickTopTarget helper the
+ * Waiver page's spotlight uses (value over replacement, position-fair), so
+ * the widget and the page always agree on the top target.
  */
 export function HomeWaiverWidget() {
   const { rostered } = useRosteredPlayers();
@@ -104,7 +104,10 @@ export function HomeWaiverWidget() {
 
   if (!response) return <WidgetShell>{null}</WidgetShell>;
 
-  const top = POSITION_ORDER.map((position) => response.candidatesByPosition[position]?.[0]).find((c) => c != null);
+  const top = pickTopTarget(
+    response.candidatesByPosition,
+    computeRosterNeedPenalty(rostered, sleeperConnection?.rosterPositions ?? [])
+  );
 
   if (!top) {
     return (

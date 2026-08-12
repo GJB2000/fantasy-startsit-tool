@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ExtendedPosition } from "@/lib/sportsdata/types";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useRosterModal } from "@/lib/useRosterModal";
@@ -8,7 +8,7 @@ import { useScoringFormat } from "@/lib/useScoringFormat";
 import { useSleeperConnection } from "@/lib/useSleeperConnection";
 import { RosterSummaryButton } from "./RosterSummaryButton";
 import { ScoringFormatToggle } from "./ScoringFormatToggle";
-import { WaiverResult, type WaiverCandidateResponse } from "./WaiverResult";
+import { computeRosterNeedPenalty, WaiverResult, type WaiverCandidateResponse } from "./WaiverResult";
 
 interface WaiverResponse {
   candidatesByPosition: Record<ExtendedPosition, WaiverCandidateResponse[]>;
@@ -135,6 +135,10 @@ export function WaiverTool() {
   const [response, setResponse] = useState<WaiverResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const rosterNeedPenalty = useMemo(
+    () => computeRosterNeedPenalty(rostered, sleeperConnection?.rosterPositions ?? []),
+    [rostered, sleeperConnection]
+  );
   const [dismissedIds, setDismissedIds] = useState<Set<number>>(new Set());
 
   async function handleFind() {
@@ -247,6 +251,7 @@ export function WaiverTool() {
           showRosteredButton={!sleeperConnection}
           onMarkRostered={handleMarkRostered}
           contextNote={response.context.contextNote}
+          rosterNeedPenalty={rosterNeedPenalty}
         />
       )}
     </div>

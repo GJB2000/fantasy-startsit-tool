@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import type { TradeEvaluation, TradeVerdict } from "@/lib/trade/evaluateTrade";
+import { DEFAULT_SLOTS, parseSleeperRosterPositions, type SlotType } from "@/lib/lineup/rosterSlots";
 import type { MatchupContext } from "@/lib/sportsdata/positionDefense";
-import type { ExtendedPosition, ScoringFormat } from "@/lib/sportsdata/types";
+import { SKILL_POSITIONS, type ExtendedPosition, type ScoringFormat, type SkillPosition } from "@/lib/sportsdata/types";
 import { ChevronIcon } from "./CollapsibleSection";
 
 export interface WaiverCandidateResponse {
@@ -22,8 +23,10 @@ export interface WaiverCandidateResponse {
   productionLabel: string;
   /** Production is lagging the volume — show the buy-low tag + gap bar. Absent for D/ST and K. */
   isBuyLow?: boolean;
-  /** Expected points from volume minus points scored; orders the buy-low spotlight. Absent for D/ST and K. */
+  /** Expected points from volume minus points scored; the buy-low measure. Absent for D/ST and K. */
   residualScore?: number;
+  /** Value over replacement — the cross-position "best pickup" score that picks the single top target. Absent for D/ST and K. */
+  waiverValue?: number;
   reasoning: string[];
   injuryStatus: string | null;
   dropSuggestion: TradeEvaluation | null;
@@ -42,6 +45,8 @@ interface WaiverResultProps {
   showRosteredButton: boolean;
   /** The API's dynamic context note (e.g. "also excluding N players rostered by other teams"). */
   contextNote?: string;
+  /** Per-position value penalty for the top-target spotlight (roster need) — see computeRosterNeedPenalty. */
+  rosterNeedPenalty?: Partial<Record<SkillPosition, number>>;
 }
 
 // D/ST and K last — they're a different kind of signal (this week's
@@ -366,7 +371,7 @@ function SpotlightCard({
         </div>
 
         <div>
-          <GapBar candidate={candidate} size="lg" />
+          {candidate.isBuyLow && <GapBar candidate={candidate} size="lg" />}
           {matchup && (
             <div className="mt-4">
               <span className={`rounded-[3px] border px-2.5 py-1 text-[11.5px] font-semibold ${MATCHUP_PILL[matchup.tone]}`}>
@@ -533,12 +538,83 @@ function Section({
   );
 }
 
+// Points of value docked per rostered player beyond a position's starter
+// need — see computeRosterNeedPenalty. A "one bench player's worth"
+// demotion: enough to reorder a marginal pickup at a set position without
+// hiding a genuinely elite one.
+const SURPLUS_PENALTY_PER_PLAYER = 3;
+
+function starterNeedByPosition(slots: Record<SlotType, number>): Record<SkillPosition, number> {
+  const flex = slots.FLEX + slots.WRRB_FLEX;
+  return {
+    QB: slots.QB + slots.SUPER_FLEX,
+    RB: slots.RB + flex,
+    WR: slots.WR + flex + slots.REC_FLEX,
+    TE: slots.TE + slots.REC_FLEX,
+  };
+}
+
+/**
+ * Per-skill-position value penalty for the top-target pick, reflecting
+ * roster need: a position where the user already rosters more players than
+ * they can start is worth less to them (they'd bench the pickup), so it's
+ * docked SURPLUS_PENALTY_PER_PLAYER points per surplus player. Uses the
+ * connected league's real starter slots, or a standard lineup for a manual
+ * user with no league settings. Only affects the single cross-position
+ * "top target," never the per-position lists.
+ */
+export function computeRosterNeedPenalty(
+  rostered: { position?: string | null }[],
+  rosterPositions: string[]
+): Record<SkillPosition, number> {
+  const slots = rosterPositions.length > 0 ? parseSleeperRosterPositions(rosterPositions) : DEFAULT_SLOTS;
+  const need = starterNeedByPosition(slots);
+  const counts: Record<SkillPosition, number> = { QB: 0, RB: 0, WR: 0, TE: 0 };
+  for (const p of rostered) {
+    if (p.position && p.position in counts) counts[p.position as SkillPosition] += 1;
+  }
+  const penalty = {} as Record<SkillPosition, number>;
+  for (const pos of SKILL_POSITIONS) {
+    penalty[pos] = Math.max(0, counts[pos] - need[pos]) * SURPLUS_PENALTY_PER_PLAYER;
+  }
+  return penalty;
+}
+
+/**
+ * The single best cross-position waiver pickup: the skill candidate with
+ * the highest value over replacement (`waiverValue`), minus a roster-need
+ * penalty for positions the user is already set at (see
+ * computeRosterNeedPenalty). Used by BOTH the page spotlight and the Home
+ * waiver widget so they always agree. Streaming positions (D/ST, K) are a
+ * different kind of signal and excluded from the cross-position "top target."
+ */
+export function pickTopTarget(
+  candidatesByPosition: Record<ExtendedPosition, WaiverCandidateResponse[]>,
+  needPenalty?: Partial<Record<SkillPosition, number>>
+): WaiverCandidateResponse | null {
+  let best: WaiverCandidateResponse | null = null;
+  let bestValue = -Infinity;
+  for (const p of POSITION_ORDER) {
+    if (isStreamingPosition(p)) continue;
+    const penalty = needPenalty?.[p as SkillPosition] ?? 0;
+    for (const c of candidatesByPosition[p] ?? []) {
+      const value = (c.waiverValue ?? -Infinity) - penalty;
+      if (value > bestValue) {
+        bestValue = value;
+        best = c;
+      }
+    }
+  }
+  return best;
+}
+
 export function WaiverResult({
   candidatesByPosition,
   scoringFormat,
   showRosteredButton,
   onMarkRostered,
   contextNote,
+  rosterNeedPenalty,
 }: WaiverResultProps) {
   const formatLabel = FORMAT_LABEL[scoringFormat];
   const [tab, setTab] = useState<"ALL" | ExtendedPosition>("ALL");
@@ -548,26 +624,14 @@ export function WaiverResult({
     [candidatesByPosition]
   );
 
-  // Spotlight: the standout BUY-LOW — the skill candidate whose production
-  // most lags their volume (biggest residual). The list is ranked by volume;
-  // the spotlight calls out the best value within it. Null when nothing is a
-  // buy-low (streaming positions use a different signal and are excluded).
-  const spotlight = useMemo(() => {
-    let best: WaiverCandidateResponse | null = null;
-    let bestResidual = 0;
-    for (const p of POSITION_ORDER) {
-      if (isStreamingPosition(p)) continue;
-      for (const c of candidatesByPosition[p] ?? []) {
-        if (!c.isBuyLow) continue;
-        const residual = c.residualScore ?? 0;
-        if (residual > bestResidual) {
-          bestResidual = residual;
-          best = c;
-        }
-      }
-    }
-    return best;
-  }, [candidatesByPosition]);
+  // Spotlight: the single best cross-position pickup (highest value over
+  // replacement — see pickTopTarget). Position-fair, so it isn't QB-biased
+  // the way raw volume/residual is. Shared with the Home waiver widget so
+  // both show the identical "top target."
+  const spotlight = useMemo(
+    () => pickTopTarget(candidatesByPosition, rosterNeedPenalty),
+    [candidatesByPosition, rosterNeedPenalty]
+  );
 
   if (total === 0) {
     return (
