@@ -263,7 +263,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <LogoTile />
             <span className="flex flex-col leading-none">
               <span className="font-jost text-[16px] font-semibold text-[#eef1fa]">LEGITFOOTBALL</span>
-              <span className="mt-1 font-engraved text-[8.5px] uppercase tracking-[0.18em] text-[#7f88ad]">
+              <span className="mt-1 font-engraved text-[8.5px] uppercase tracking-[0.18em] text-[var(--premium)]">
                 Fantasy Toolkit
               </span>
             </span>
