@@ -53,13 +53,19 @@ of a trade and get a graded verdict (good/fair/bad) with reasoning,
 built on a rest-of-season value projection rather than a single game
 (see "Backtesting & Tuning History" items 47-49 and the Trade Analyzer
 paragraph below). A third live tool, the Waiver Wire recommender
-(`/waivers`), shipped after that — surfaces players whose recent
-opportunity (volume) is running ahead of their recent production, by
-position, with a plain-English reason and a suggested same-position
-drop candidate; deliberately built on the engine's already-validated
-absolute-opportunity signal rather than a trend/delta framing, after a
-dedicated backtest of the trend hypothesis came back negative (see
-"Backtesting & Tuning History" item 58). Its roster input started as
+(`/waivers`), shipped after that — originally surfaced players whose
+recent opportunity (volume) was running ahead of their recent production
+(the "gap" framing), by position, with a plain-English reason and a
+suggested same-position drop candidate; deliberately built on the
+engine's already-validated absolute-opportunity signal rather than a
+trend/delta framing, after a dedicated backtest of the trend hypothesis
+came back negative (see "Backtesting & Tuning History" item 58). **As of
+item 142 this tool was reframed**: a dedicated backtest of the RANKING
+itself found the gap heuristic was no better than random on real forward
+production, so the primary sort is now recent volume among
+waiver-eligible players (the startable/rostered tier excluded), and
+"buy-low" (production lagging volume) became a per-candidate tag rather
+than the sort key — see item 142. Its roster input started as
 manual one-by-one marking, then gained real Sleeper league import as
 the primary path after that turned out to be the actual pain point —
 connect once, one-click sync from then on — with manual marking kept
@@ -8143,6 +8149,97 @@ single-season numbers for those specific constants.
       glass system above. Kept as the record of how the design evolved;
       not current styling.
 
+142. **Built the waiver-ranking backtest (the long-standing Open Item #9),
+    found the shipped "gap" ranking was no better than random, and
+    reframed the Waiver Wire tool around recent volume as a result.** Every
+    prior waiver work (items 58-61, 83) validated only the UNDERLYING
+    primitive (recent volume beats recent points as a forward signal); the
+    RANKING heuristic itself — "biggest volume-vs-points gap" — had never
+    been graded as a ranking. This graded it directly, then acted on the
+    result. Prompted by a user question ("does the waiver logic make
+    sense?") that surfaced the ordinal gap metric's real weaknesses
+    (magnitude-blind, pool-composition-dependent, structurally selects
+    low-scorers).
+    - **Refactored `rankCandidates.ts` into a pure, data-injected core**
+      (`scoreWaiverPool` builds the eligible pool with all metrics;
+      `selectWaiverCandidates` applies a strategy's gate/sort/slice;
+      `computeEfficiencyBaseline`/`unitsAndYardsForPosition` exported) so
+      the live tool and the backtest run the IDENTICAL ranking logic — the
+      backtest grades the actual shipped code, not a reimplementation.
+      Verified the live tool is byte-identical after the refactor before
+      building on it. The nflverse `gameLog.ts` rows already carry every
+      field the ranking reads (volume, yards, points), so the backtest
+      runs on the pooled 2022-2025 nflverse-only pipeline like every other
+      multi-season backtest here.
+    - **Method** (`lib/backtest/waiverBacktest.ts`, route
+      `/api/backtest/waiver-nflverse-multiseason`, validation-only/no-UI
+      like the other `*-nflverse-multiseason` routes): for each
+      (season, cutoff week W), rank candidates using only data through W,
+      then measure each surfaced candidate's ACTUAL forward production
+      (mean PPG over the next 4 played weeks). A strategy's score is the
+      mean forward PPG of the players it surfaces. Runs TWO pool variants:
+      `full` (studs included) and `waiverTier` (the startable/rostered tier
+      — top BROAD_MODE_POOL_SIZE by season-to-date points — removed, so the
+      baselines can't win just by surfacing studs no one can add). Honest
+      caveats baked in: forward PPG over played games (0-forward-game
+      candidates dropped equally across strategies); efficiency baseline
+      computed strictly from weeks <= W (leak-free, unlike the live tool's
+      full-season one); absolute forward PPG is the target, NOT
+      breakout-vs-own-baseline (the decision-relevant metric — you start
+      who'll score more, not who improved most from a low base).
+    - **Result (waiver-tier pool, the fair comparison, pooled 2022-2025,
+      mean forward PPG):**
+
+      | strategy | PPG | vs. random |
+      |---|---|---|
+      | blindPool (random eligible) | 8.88 | — |
+      | **gap (shipped)** | **9.00** | **+0.12 — no edge, any season** |
+      | residual | 10.18 | +1.30 (beats gap all 4 seasons) |
+      | volumeOnly | 11.99 | +3.11 |
+      | pointsOnly | 11.98 | +3.10 |
+
+      - **The shipped `gap` ranking is essentially random** (9.00 vs.
+        8.88), consistent across all four seasons — it structurally
+        selects low-scorers (its gate), and low recent points predict low
+        forward points (points aren't pure noise). On the `full` pool it's
+        even worse-than-random (10.96 vs. 11.64).
+      - **`residual` (the A/B prototype, item's own follow-up) beats
+        `gap` every season** — the ordinal→real-points fix is a genuine
+        improvement — but still only ~= random on the fair pool, and
+        trails volume.
+      - **Volume-rank alone wins by ~2-3 PPG** — the decisive answer to
+        Open Item #9: the gap does NOT beat picking by volume, it's far
+        worse. Among waiver-tier players `volumeOnly` ≈ `pointsOnly` (the
+        "volume >> points" law holds for the full pool/engine, not the
+        shallow end).
+    - **Acted on it — reframed the tool (user chose the "bigger" option
+      over just flipping the default to residual):** primary sort is now
+      **recent volume among waiver-eligible players**
+      (`DEFAULT_WAIVER_STRATEGY = "volume"`; `gap`/`residual` kept
+      selectable via `?rankBy=`), and the live ranking now excludes the
+      **startable/rostered tier itself** (`STARTABLE_TIER_DEPTH`, top-12
+      QB·TE / top-24 RB·WR by season points) on top of the user's own
+      rostered/league exclusions — this is the piece that makes volume-sort
+      good advice for everyone (without it, volume-sort surfaced studs like
+      Bijan/CMC; with it, real waiver targets). "Buy-low" (production
+      lagging volume, `residualScore > 0`) is now a per-candidate TAG, not
+      the sort key.
+    - **UI reframe** (`WaiverResult.tsx`/`WaiverTool.tsx`): the list is
+      volume-ranked; a `BuyLowTag` + the gap bar are shown only for actual
+      buy-lows (non-buy-lows read "producing in line with the workload — a
+      volume play"); the spotlight is now the standout BUY-LOW (biggest
+      residual), not the biggest ordinal gap; reasoning leads with
+      opportunity and appends the buy-low line conditionally; hero/footer
+      copy reframed from "ranked by the gap" to "ranked by opportunity,
+      buy-lows flagged."
+    - **Verified**: live tool byte-identical after the pure-core refactor;
+      the reframed board returns sensible waiver-tier players with correct
+      buy-low tags (raw API + live browser — hero, volume-ranked sections,
+      tags, spotlight, non-buy-low note, drop suggestions all render);
+      `tsc`/lint clean. **Resolves Open Item #9.** Backtest infrastructure
+      committed as `c991f7e`; the reframe + this write-up in a follow-up
+      commit.
+
 ### Open items (as of item 141 — pick up here)
 **Item 141 (the Nash/volt + glass redesign, above) is the latest work —
 committed and pushed to `main`, current HEAD `014615b`, working tree
@@ -8484,16 +8581,17 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
    — and found it monotonically HURTS pick accuracy on both pipelines (no
    decay/season/format preferred it). The flat recent-form average is
    confirmed better; code was reverted, no engine change. Closed.
-9. **The Waiver Wire tool's gap ranking (item 58) has never itself been
-   directly backtested as a ranking heuristic** — only its underlying
-   primitive (recent volume beats recent points as a forward signal) has
-   validated numbers behind it. Whether "biggest volume-rank-minus-
-   points-rank gap" specifically predicts a genuine breakout better than,
-   say, volume rank alone, hasn't been checked. Also: `suggestDrop.ts`'s
-   drop-candidate suggestion is same-position only — no flex-spot
-   cross-position logic (mirrors the same scoping decision the Trade
-   Analyzer itself never needed to make, since it's user-driven there).
-   Both are candidates for a dedicated pass if this tool gets real usage.
+9. **The Waiver Wire ranking backtest — RESOLVED, see item 142.** The gap
+   ranking WAS finally graded as a ranking heuristic: it was no better than
+   random on real forward production, `residual` beat it every season but
+   still trailed, and plain volume-rank won by ~2-3 PPG. The tool was
+   reframed around recent volume as a result (studs excluded via
+   `STARTABLE_TIER_DEPTH`, buy-low demoted to a tag). One related thread
+   stays open: `suggestDrop.ts`'s drop-candidate suggestion is
+   same-position only — no flex-spot cross-position logic (mirrors the same
+   scoping decision the Trade Analyzer never needed to make, since it's
+   user-driven there) — a candidate for a dedicated pass if this tool gets
+   real usage.
 10. **Sleeper roster import skipping D/ST and K — resolved, see item
     76.** `resolveSleeperRoster` now reads from `getActiveExtendedPlayers()`
     and resolves D/ST via a team-code → synthetic-PlayerID map (K joins
@@ -9078,15 +9176,27 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
 - `src/lib/waivers/` — the Waiver Wire tool's evaluation layer (item 58).
   `rankCandidates.ts` does a cheap, bulk pass across the whole active
   player pool (NOT the full `buildComparisonInput`/`scorePlayer`
-  pipeline — that's reserved for the few candidates actually surfaced),
-  ranking each position by the gap between a player's recent-volume rank
-  and recent-points rank; a real backtest found trend/delta framing adds
-  nothing over this absolute-level gap (see item 58), so this is
-  deliberately NOT a trend signal. As of item 83, a candidate also has to
+  pipeline — that's reserved for the few candidates actually surfaced).
+  **As of item 142 it ranks by recent VOLUME among waiver-eligible
+  players** (`DEFAULT_WAIVER_STRATEGY = "volume"`) — the
+  startable/rostered tier (`STARTABLE_TIER_DEPTH`) is excluded on top of
+  the caller's own rostered/league exclusions, and "buy-low" (production
+  lagging volume, `residualScore > 0`) is a per-candidate tag, not the
+  sort key — after a backtest of the ranking itself found the old "gap"
+  sort no better than random on real forward production (item 142). The
+  ranking is now split into a pure, data-injected core — `scoreWaiverPool`
+  (builds the eligible pool per position, applying the volume + efficiency
+  floors, with all metrics computed) plus `selectWaiverCandidates`
+  (a strategy's gate/sort/slice) — so the live tool AND the waiver backtest
+  run the identical logic (`gap`/`residual` stay selectable via
+  `?rankBy=`). A real backtest earlier found trend/delta framing adds
+  nothing over absolute level (see item 58), so this was never a trend
+  signal. As of item 83, a candidate also has to
   clear a real yards-per-unit efficiency floor (`getEfficiencyStat`,
   `EFFICIENCY_FLOOR_RATIO=0.75`) against the position's real full-season
-  baseline (`computeSeasonEfficiencyBaseline`, fetched via
-  `getPlayerSeasonStats` — a ratio-of-sums over hundreds of real
+  baseline (`computeEfficiencyBaseline`, fed full-season
+  `getPlayerSeasonStats` live or every game row through the cutoff in the
+  backtest — a ratio-of-sums over hundreds of real
   attempts/touches/targets, not the thin recent-candidate pool a first,
   rejected version used) — closes a real false positive where a badly-
   performing backup QB forced into volume still ranked as a top target on
@@ -9472,6 +9582,16 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   summary numbers between this and `runProjectionBacktest`'s `byPlayer`
   as a result (see item 65's Stafford example) — a real methodology
   difference, not a bug.
+  `waiverBacktest.ts` (item 142) is a fourth parallel feature (route
+  `/api/backtest/waiver-nflverse-multiseason`) — grades the Waiver Wire
+  RANKING itself, not the engine: for each (season, cutoff) it ranks
+  candidates through the real shipped core (`scoreWaiverPool`/
+  `selectWaiverCandidates` from `lib/waivers/rankCandidates.ts`) and
+  measures each surfaced candidate's actual forward production (mean PPG
+  over the next 4 weeks), A/Bing volume vs. gap vs. residual vs. naive
+  baselines across two pool variants (full vs. startable-tier-removed).
+  Pooled 2022-2025 nflverse-only; validation-only/no-UI. Found the shipped
+  gap sort was no better than random and drove the item-142 reframe.
 - `src/app/api/players` (item 62: now calls `searchActiveExtendedPlayers`
   instead of the skill-only `searchActivePlayers`, so D/ST and K appear
   in the shared `PlayerMultiSelect.tsx` search box everywhere it's used —
@@ -9528,7 +9648,10 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   `src/app/api/backtest/trade`, `src/app/api/backtest/trade-nflverse`,
   `src/app/api/backtest/trade-nflverse-multiseason` (the trade-backtest
   trio is items 48-49; the other nflverse-suffixed routes are items
-  24/36/39 — all out-of-sample validation only), `src/app/api/backtest/
+  24/36/39 — all out-of-sample validation only),
+  `src/app/api/backtest/waiver-nflverse-multiseason` (item 142 — grades
+  the waiver ranking by real forward production, pooled 2022-2025),
+  `src/app/api/backtest/
   projection` (item 65 — MAE/RMSE/bias grading, 2025/PPR/skill-only for
   now; `positions` and an optional `ids` param are independent — the
   route reads `positions` off the raw query value directly rather than

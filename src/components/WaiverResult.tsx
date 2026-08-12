@@ -20,6 +20,10 @@ export interface WaiverCandidateResponse {
   pointsRank: number;
   positionLabel: string;
   productionLabel: string;
+  /** Production is lagging the volume — show the buy-low tag + gap bar. Absent for D/ST and K. */
+  isBuyLow?: boolean;
+  /** Expected points from volume minus points scored; orders the buy-low spotlight. Absent for D/ST and K. */
+  residualScore?: number;
   reasoning: string[];
   injuryStatus: string | null;
   dropSuggestion: TradeEvaluation | null;
@@ -186,7 +190,20 @@ function PosChip({ position }: { position: ExtendedPosition }) {
   );
 }
 
-/** The signature device: a position-rank axis with the "opportunity" node (volume/this-week, green) sitting ahead of the "production" node (points/season, hollow), the green span between them = the buy-low gap. */
+/** Tag for a candidate whose recent production is lagging their recent volume — a value pickup. */
+function BuyLowTag({ size = "sm" }: { size?: "sm" | "lg" }) {
+  return (
+    <span
+      className={`shrink-0 rounded-[3px] border border-accent/45 bg-accent/12 font-engraved uppercase tracking-[0.1em] text-accent ${
+        size === "lg" ? "px-2 py-0.5 text-[10.5px]" : "px-1.5 py-0.5 text-[9.5px]"
+      }`}
+    >
+      Buy-low
+    </span>
+  );
+}
+
+/** The buy-low illustration: a position-rank axis with the "opportunity" node (volume/this-week, green) sitting ahead of the "production" node (points/season, hollow), the green span between them = the gap. Shown for streaming (this-week vs. season) and for skill buy-lows. */
 function GapBar({ candidate, size }: { candidate: WaiverCandidateResponse; size: "sm" | "lg" }) {
   const scale = GAP_SCALE[candidate.position] ?? 60;
   const streaming = isStreamingPosition(candidate.position);
@@ -301,6 +318,7 @@ function SpotlightCard({
               <h3 className="font-jost text-[28px] font-semibold leading-none tracking-[-0.01em]">{candidate.displayName}</h3>
               <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[13px] text-foreground/55">
                 <PosChip position={candidate.position} />
+                {candidate.isBuyLow && <BuyLowTag size="lg" />}
                 <span>
                   {candidate.team ?? "FA"}
                   {candidate.breakdown?.matchupContext ? ` · vs ${candidate.breakdown.matchupContext.opponentTeam}` : ""}
@@ -409,6 +427,7 @@ function WaiverCandidateRow({
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <h3 className="truncate font-jost text-[15px] font-semibold tracking-tight">{candidate.displayName}</h3>
+              {candidate.isBuyLow && <BuyLowTag />}
               {candidate.injuryStatus && (
                 <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${injuryBadgeClasses(candidate.injuryStatus)}`}>
                   {candidate.injuryStatus}
@@ -423,7 +442,13 @@ function WaiverCandidateRow({
         </div>
 
         <div className="col-span-3 min-w-0 sm:col-span-1 sm:col-start-3">
-          <GapBar candidate={candidate} size="sm" />
+          {streaming || candidate.isBuyLow ? (
+            <GapBar candidate={candidate} size="sm" />
+          ) : (
+            <p className="text-[12px] leading-relaxed text-foreground/40">
+              Producing in line with the workload — a volume play, not a buy-low.
+            </p>
+          )}
         </div>
 
         <div className="col-start-3 row-start-1 flex items-center justify-end gap-3 sm:col-start-4 sm:row-start-auto">
@@ -523,18 +548,20 @@ export function WaiverResult({
     [candidatesByPosition]
   );
 
-  // Spotlight: the skill-position candidate with the biggest opportunity→
-  // production gap (streaming positions use a different kind of gap, so
-  // they're excluded from the cross-position "top target").
+  // Spotlight: the standout BUY-LOW — the skill candidate whose production
+  // most lags their volume (biggest residual). The list is ranked by volume;
+  // the spotlight calls out the best value within it. Null when nothing is a
+  // buy-low (streaming positions use a different signal and are excluded).
   const spotlight = useMemo(() => {
     let best: WaiverCandidateResponse | null = null;
-    let bestGap = -Infinity;
+    let bestResidual = 0;
     for (const p of POSITION_ORDER) {
       if (isStreamingPosition(p)) continue;
       for (const c of candidatesByPosition[p] ?? []) {
-        const gap = c.pointsRank - c.volumeRank;
-        if (gap > bestGap) {
-          bestGap = gap;
+        if (!c.isBuyLow) continue;
+        const residual = c.residualScore ?? 0;
+        if (residual > bestResidual) {
+          bestResidual = residual;
           best = c;
         }
       }
@@ -545,8 +572,8 @@ export function WaiverResult({
   if (total === 0) {
     return (
       <p className="mt-10 text-center text-sm text-foreground/50">
-        No standout opportunity-vs-production gaps right now — check back after a few more weeks of games, or once more
-        of your roster is marked so we can look deeper into the pool.
+        No waiver targets to surface right now — check back after a few more weeks of games, or mark more of your roster
+        so we can look deeper into the pool.
       </p>
     );
   }
@@ -622,11 +649,11 @@ export function WaiverResult({
       </div>
 
       <p className="mt-10 max-w-[68ch] border-t border-foreground/10 pt-5 text-[12px] leading-relaxed text-foreground/40">
-        <b className="text-foreground/55">How to read the board.</b> The green node is where a player&apos;s recent{" "}
-        <b className="text-foreground/55">usage</b> ranks at his position; the hollow node is where his{" "}
-        <b className="text-foreground/55">points</b> rank. A wide green span means the touches or targets are already there
-        and the production hasn&apos;t followed. Everyone already rostered in your league is filtered out, and every pickup
-        can be paired with a same-position drop graded on rest-of-season value.
+        <b className="text-foreground/55">How to read the board.</b> Players are ranked by recent{" "}
+        <b className="text-foreground/55">usage</b> — the touches or targets already coming their way, the strongest
+        signal for what&apos;s ahead. A <b className="text-foreground/55">Buy-low</b> tag (and the green→hollow bar) flags
+        players whose points haven&apos;t yet caught up to that workload. Everyone already rostered in your league is
+        filtered out, and every pickup can be paired with a same-position drop graded on rest-of-season value.
       </p>
     </div>
   );

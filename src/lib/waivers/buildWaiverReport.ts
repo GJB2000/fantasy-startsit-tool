@@ -23,6 +23,8 @@ export interface WaiverCandidate {
   gapScore?: number;
   /** Points-residual buy-low signal (expected points from volume minus points scored). Absent for D/ST and K. See rankCandidates.ts's WaiverRankStrategy. */
   residualScore?: number;
+  /** Production is lagging the volume (residualScore > 0) — the "buy-low" tag. Absent/false for D/ST and K. */
+  isBuyLow?: boolean;
   /** e.g. "WR14" — rank by recent volume. */
   positionLabel: string;
   /** e.g. "WR34" — rank by recent points, at the same position. */
@@ -75,9 +77,19 @@ export async function buildWaiverCandidateDetails(
       const breakdown = scorePlayer(input, format);
       if (breakdown.playerId == null || !breakdown.position) return null;
 
+      // Lead with opportunity (recent volume — the ranking's basis, and the
+      // strongest forward signal this app has). The "buy-low" observation is
+      // appended only when production is actually lagging that volume, since
+      // the ranking no longer requires it (see WaiverRankStrategy).
+      const isBuyLow = rank.residualScore > 0;
       const reasoning: string[] = [
-        `${rank.position}${rank.volumeRank} by recent volume (${rank.recentVolumeAvg.toFixed(1)} ${UNIT_LABEL[rank.position]}/game) but just your ${rank.position}${rank.pointsRank} by recent points — opportunity is running ahead of production.`,
+        `${rank.position}${rank.volumeRank} by recent volume (${rank.recentVolumeAvg.toFixed(1)} ${UNIT_LABEL[rank.position]}/game) — one of the highest-usage players still available.`,
       ];
+      if (isBuyLow) {
+        reasoning.push(
+          `Only your ${rank.position}${rank.pointsRank} by recent points, so the production hasn't caught up to the workload yet — a buy-low.`
+        );
+      }
       // Written fresh rather than reusing scorePlayer's own handcuff note
       // (WR-only, and always reads "worth roughly 0.0 extra points" since
       // TEAMMATE_OUT_BUMP_WEIGHT_WR is currently zeroed — see CLAUDE.md
@@ -108,6 +120,7 @@ export async function buildWaiverCandidateDetails(
         pointsRank: rank.pointsRank,
         gapScore: rank.gapScore,
         residualScore: rank.residualScore,
+        isBuyLow,
         positionLabel: `${rank.position}${rank.volumeRank}`,
         productionLabel: `${rank.position}${rank.pointsRank}`,
         reasoning,

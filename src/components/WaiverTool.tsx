@@ -80,9 +80,9 @@ function SchematicGapBar() {
 }
 
 const HERO_FEATURES: { title: string; body: string }[] = [
-  { title: "Opportunity over output", body: "Ranked by the touches and targets the points haven't caught up to yet." },
+  { title: "Ranked by opportunity", body: "The touches and targets already there — the strongest forward signal, and the best in our backtests." },
+  { title: "Buy-lows flagged", body: "When the usage is there but the points haven't followed, the pickup gets a Buy-low tag." },
   { title: "A drop to pair with it", body: "Every pickup comes with a same-position drop, graded on rest-of-season value." },
-  { title: "Your league, filtered out", body: "Connect Sleeper and everyone already rostered — yours and opponents' — is excluded." },
 ];
 
 function MethodHero() {
@@ -92,17 +92,18 @@ function MethodHero() {
         className="text-[11px] uppercase tracking-[0.16em] text-accent"
         style={{ fontFamily: "var(--font-engraved)" }}
       >
-        The buy-low signal
+        The opportunity board
       </span>
       <h2
         className="mt-2 text-[27px] leading-[1.05] tracking-[-0.01em] sm:text-[31px]"
         style={{ fontFamily: "var(--font-jost)", fontWeight: 600 }}
       >
-        Catch the breakout before your league does
+        Grab the opportunity before your league does
       </h2>
       <p className="mt-2.5 max-w-[52ch] text-[13.5px] leading-relaxed text-foreground/60">
-        We rank every available player two ways — recent opportunity and recent points. When the
-        usage is already there but the scoring hasn&apos;t followed, that&apos;s a player worth grabbing early.
+        We rank every available player by recent opportunity — the touches and targets already coming
+        their way, the strongest signal for what&apos;s ahead. When the points haven&apos;t caught up yet, that&apos;s a{" "}
+        <span className="font-semibold text-foreground/75">buy-low</span>.
       </p>
 
       <div className="mt-5">

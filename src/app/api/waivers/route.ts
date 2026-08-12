@@ -39,11 +39,13 @@ export async function GET(request: Request) {
   // user's own team. Kept separate from `rosteredIds` because only the
   // user's OWN roster is a valid drop-candidate pool.
   const leagueRosteredIds = parseIds(url.searchParams.get("leagueRostered"));
-  // A/B: `gap` (default, shipped) ranks by the ordinal volume-vs-points
-  // rank gap; `residual` ranks by expected-points-from-volume minus points
-  // scored (real points, pool-independent). Only affects skill positions —
-  // D/ST and K stream on their own matchup logic. See rankCandidates.ts.
-  const rankBy: WaiverRankStrategy = url.searchParams.get("rankBy") === "residual" ? "residual" : "gap";
+  // Default `volume` — rank available players by recent opportunity, the
+  // backtest-winning strategy (lib/backtest/waiverBacktest.ts); "buy-low"
+  // is now a tag, not the sort. `gap`/`residual` stay selectable for
+  // comparison. Only affects skill positions — D/ST and K stream on their
+  // own matchup logic. See rankCandidates.ts.
+  const rankByParam = url.searchParams.get("rankBy");
+  const rankBy: WaiverRankStrategy = rankByParam === "gap" || rankByParam === "residual" ? rankByParam : "volume";
 
   try {
     const context = await getSeasonContext();

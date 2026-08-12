@@ -30,18 +30,33 @@ const CANDIDATES_PER_POSITION = 6;
 // single bad week.
 const EFFICIENCY_FLOOR_RATIO = 0.75;
 
+// The "already rostered / startable" tier to exclude so the board shows
+// genuinely-available waiver players, not studs. Ranked by season-to-date
+// points; depths mirror the backtest's BROAD_MODE_POOL_SIZE (top-12 QB/TE,
+// top-24 RB/WR) — the waiver backtest validated volume-sort specifically on
+// this startable-tier-removed pool. Applied on TOP of the user's own
+// rostered/league exclusions (for a Sleeper user these studs are usually
+// already excluded; for a manual user this is what keeps the board honest).
+const STARTABLE_TIER_DEPTH: Record<SkillPosition, number> = { QB: 12, RB: 24, WR: 24, TE: 12 };
+
 /**
- * Which "opportunity outpacing production" metric drives the ranking.
- * - "gap" (default, current shipped behavior): the ordinal
- *   pointsRank - volumeRank difference.
- * - "residual": expected points from recent volume minus points actually
- *   scored, in real points rather than ranks — an A/B alternative to gap,
- *   prototyped because gap is magnitude-blind and pool-composition-
- *   dependent (see CLAUDE.md's waiver open item). Not yet backtested as a
- *   ranking heuristic, so gap stays the default until it earns the swap.
+ * Which metric drives the ranking.
+ * - "volume" (default): rank the eligible pool by recent volume alone —
+ *   the highest-opportunity players still available. The waiver backtest
+ *   (lib/backtest/waiverBacktest.ts) showed this beats both "gap" and
+ *   "residual" on real forward production by ~2 PPG, while the old "gap"
+ *   sort was no better than picking a random eligible player. "Buy-low"
+ *   (production lagging volume) is now surfaced as a per-candidate tag,
+ *   not the sort key.
+ * - "residual": expected points from recent volume minus points scored —
+ *   the biggest buy-lows first. Beats "gap" every season in the backtest
+ *   but still trails plain volume. Kept selectable (rankBy=residual).
+ * - "gap": the original ordinal pointsRank - volumeRank difference —
+ *   magnitude-blind and pool-composition-dependent; retired as the default
+ *   after the backtest. Kept selectable (rankBy=gap) for comparison.
  */
-export type WaiverRankStrategy = "gap" | "residual";
-export const DEFAULT_WAIVER_STRATEGY: WaiverRankStrategy = "gap";
+export type WaiverRankStrategy = "volume" | "gap" | "residual";
+export const DEFAULT_WAIVER_STRATEGY: WaiverRankStrategy = "volume";
 
 export interface WaiverCandidateRank {
   playerId: number;
@@ -268,6 +283,13 @@ export function selectWaiverCandidates(
   strategy: WaiverRankStrategy,
   limit: number
 ): WaiverCandidateRank[] {
+  // Volume: the highest-opportunity available players, no underproduction
+  // gate (the backtest-winning strategy — see WaiverRankStrategy).
+  if (strategy === "volume") {
+    return [...pool].sort((a, b) => b.recentVolumeAvg - a.recentVolumeAvg).slice(0, limit);
+  }
+  // gap/residual: gate on "is this an underproducer" with the same metric
+  // the sort uses, so the surfaced set is internally coherent.
   return pool
     .filter((p) => (strategy === "residual" ? p.residualScore > 0 : p.gapScore > 0))
     .sort((a, b) => (strategy === "residual" ? b.residualScore - a.residualScore : b.gapScore - a.gapScore))
@@ -333,7 +355,18 @@ export async function rankWaiverCandidates(
     recentGamesByPlayer.set(playerId, takeRecentPlayed(list, recentWindow.limit));
   }
 
-  const pool = scoreWaiverPool(activePlayers, recentGamesByPlayer, efficiencyBaseline, excludePlayerIds, format);
+  // Exclude the startable/rostered tier (top by season points per position)
+  // on top of the caller's own exclusions — see STARTABLE_TIER_DEPTH.
+  const excludeWithStartable = new Set(excludePlayerIds);
+  for (const position of SKILL_POSITIONS) {
+    const startable = seasonStats
+      .filter((s) => s.Position === position)
+      .sort((a, b) => getFantasyPoints(b, format) - getFantasyPoints(a, format))
+      .slice(0, STARTABLE_TIER_DEPTH[position]);
+    for (const s of startable) excludeWithStartable.add(s.PlayerID);
+  }
+
+  const pool = scoreWaiverPool(activePlayers, recentGamesByPlayer, efficiencyBaseline, excludeWithStartable, format);
 
   const byPosition = {} as Record<SkillPosition, WaiverCandidateRank[]>;
   for (const position of SKILL_POSITIONS) {
