@@ -8025,9 +8025,135 @@ single-season numbers for those specific constants.
       no blendedScore fallback), and the weeks-2-4 partial-blend question
       is untouched.
 
-### Open items (as of item 140 — pick up here)
-**Everything through item 140 is committed and pushed to `main`; working
-tree is CLEAN and up to date with origin (HEAD `cd97b87`).** This session
+141. **Whole-app "Nash/volt" + glass redesign, plus a Start/Sit perf
+    fix (this session). Presentation-only throughout — ZERO scoring/
+    engine/data changes; every pick, confidence number, and projection is
+    unchanged.** Replaced the editorial "almanac" design system (warm
+    paper / pine / brass / Cinzel, items 80/111-122) ENTIRELY with a
+    nash.ai-inspired dark-navy + volt (chartreuse) system, plus a
+    frosted-glass treatment. Started from a published Start/Sit Artifact
+    mockup (dark navy `#01051e`, bright volt `#c8ff00`, Jost display),
+    then rolled it across the whole app tool-by-tool.
+    - **Design tokens (`globals.css`):** base `:root`+dark AND the
+      `--alm-*` palette (still read by the two result CSS modules — the
+      variable NAMES were kept, only the VALUES changed to navy/volt)
+      redefined. **Dark is the hero theme** (near-black navy `#01051e`
+      bg, `--accent` = bright volt `#c8ff00`, `--accent-ink` = navy
+      `#01051e`, `--bad` = rose `#ff7a8a`). **Light uses a NAVY accent**
+      (`--accent` = deep navy `#16265f`, white ink) — bright volt is
+      unreadable as text on white, so light mode uses navy, the app's
+      other brand color. The system reads as "volt on dark, navy on
+      light," with the constant-dark sidebar keeping volt highlights in
+      both (the light-mode-accent decision was made after showing the
+      user olive/volt/navy options — user chose navy). `--good` is merged
+      into `--accent`; `--premium` stays gold (Rankings' 90+ elite tier).
+      Fonts: Jost (`--font-jost`) display, Archivo (`--font-engraved`)
+      uppercase labels, Inter body, JetBrains mono numbers (all
+      unchanged from the editorial pass — only colors/layout changed).
+      `.matchup-page` gained a spread ambient volt/navy radial glow so
+      frosted glass has color to refract.
+    - **Glass utilities (`globals.css`): `.glass-card` / `.glass-card-accent`**
+      — strong translucency (`color-mix(var(--surface) 44-52%,
+      transparent)`) + heavy `backdrop-filter: blur(24-26px) saturate()`
+      + a bright inner top-edge highlight + soft depth shadow; the
+      `-accent` variant adds a corner volt/navy wash for CTAs (newsletter
+      band, waiver/lineup heroes). Reusable — applied to every tool's
+      card surfaces. (Note: on some pages `backdrop-filter` computes to
+      `none` where an ancestor breaks it, but the translucent fill +
+      shadow still read as glass; not a perf problem.)
+    - **Per-tool status — ALL committed and pushed to `main`:** Start/Sit
+      (verdict hero card + glass player panels — see below), Trade
+      Analyzer (tone-adaptive verdict hero by good/fair/bad/unknown via a
+      single `--tone` semantic token, glass give↔get board + breakdown
+      card, editorial masthead/colophon dropped), Home (newsletter band +
+      rankings board + all "This week" widgets + tool cards all
+      `.glass-card`), Waivers (glass buy-low hero/controls, GOLD-tinted
+      glass spotlight, glass row-list, pill Find button), Rankings (pill
+      tab bar + glass ranked list, gold elite tier kept), Lineup (glass
+      control deck + accent-glass optimal-lineup header + glass starter
+      cards keeping position-colored left borders + glass empty-slot/
+      bench). **Backtest was DELIBERATELY left on the plainer styling**
+      (internal validation tool — still Nash-colored via the token layer,
+      but no glass panels / pill controls). This continues the historical
+      precedent of excluding Backtest from visual passes.
+    - **Start/Sit result specifics (`ComparisonResult.tsx`/`.module.css`):**
+      the verdict is now a high-contrast **hero card** (a `--tone`/volt
+      left spine + corner gradient wash + soft glow, more solid than the
+      frosted player panels). Player cards were then **rearranged to the
+      almanac single-column layout** on user request: a big rank number +
+      player name + "pos · team" + Start/Bench tag in the header, then
+      hairline-ruled sections — opponent row (team vs opp · week + matchup
+      tag), projection + range, stat grid with a weather/status aside
+      (border-separated), case for/against (2-col), betting lines — all
+      keeping the Nash glass/volt skin. The avatar-initials were dropped
+      (rank number replaces them; `initials()` helper removed). Player
+      name enlarged to 34px (`.pName`) on request.
+    - **Shared components:** the `editorial` prop on `ScoringFormatToggle`/
+      `PlayerMultiSelect`/`RecentComparisonsPanel`/`RosterSummaryButton`
+      is now a MISNOMER — it renders rounded pills / glass (the Nash
+      tool-page variant), not the old squared/engraved editorial look.
+      Don't rename it (14 call sites); just know "editorial" = "themed
+      tool-page variant." `AppShell` sidebar recolored espresso → constant
+      deep-navy with volt (dark) / — active states.
+    - **Perf fix #1 — deferred betting lines (DONE, committed):**
+      `/api/compare` used to fetch The Odds API player props INLINE before
+      returning, delaying the verdict on a network round-trip. Moved to a
+      new **`/api/props?ids=`** route the client (`StartSitTool`) fetches
+      AFTER the verdict renders (guarded by a `propsTokenRef` against a
+      stale response landing after a newer comparison). Compare returns
+      immediately; lines fill in async (empty/pending in the offseason,
+      same as before). Display-only — no scoring impact. `getScorablePlayerById`
+      resolves ids → name/team/position for `getPropsForPlayers`.
+    - **Perf — the ACTUAL "slow" issue (#2, NOT done — pick up here):**
+      User reported the DEPLOYED Start/Sit "slow again" (result takes long
+      to appear). Diagnosed: NOT a regression from the redesign. Every
+      Vercel deploy wipes the persistent Data Cache (item 126's
+      `unstable_cache`), so the FIRST compare after each deploy re-parses
+      the heavy nflverse **depth-charts release (~554k rows, ~13s, item
+      100's confidence floor)** + play-by-play (WR drop rate), then it's
+      fast for 24h; this session's ~10 deploys made the cold path
+      recurrent. Measured locally: the API is genuinely FAST (0.36s cold
+      offseason — the heavy in-season parses don't fire because
+      current-season files are near-empty; warm 0.05s), and the frontend
+      scrolls at 60fps — so it's specifically the post-deploy cold cache
+      on production. **RECOMMENDED FIX #2 (agreed with user, not yet
+      built): wrap the two heaviest, least-essential cold fetches
+      (`getDepthChartRankCached` → confidence floor; the pbp/drop-rate
+      fetch) in a short `Promise.race` timeout (~2.5s) so a cold compare
+      returns fast and those two minor signals fill in once the cache
+      warms in the background (the slow promise keeps running and
+      populates `unstable_cache` for next time — self-healing). Tradeoff:
+      on the first cold request the confidence number may lack its
+      depth-chart starter bump (item 100) and a WR drop-rate tiebreaker
+      may be skipped — NEITHER changes the actual pick.** Alternative
+      full-fidelity fix: a Vercel Cron warmer (Open Item #29) to keep the
+      cache warm across deploys.
+    - **Commits this session (all pushed to `main`, current HEAD
+      `014615b`):** `eb0b0e9` whole-app tokens + Start/Sit + sidebar,
+      `85f9951` Start/Sit glass, `40fbb9f` verdict contrast card,
+      `5e7cb16` light-mode navy accent, `2e3da3d` Trade, `20bb950` Home
+      glass + `.glass-card` utility, `bdcba42` Waivers, `6e6d839`
+      Rankings, `ca73407` Lineup, `2ddaaa0` props deferral (#1),
+      `014615b` almanac card layout + bigger name.
+    - **Doc-currency note:** every paragraph elsewhere in this file
+      describing the editorial "almanac" system (items 80/111-122 — warm
+      paper, pine/brass, Cinzel labels, the "night edition," the constant-
+      DARK-espresso sidebar) or the earlier dark/emerald "data-grade"
+      system (item 80) is now HISTORICAL, superseded by the Nash/volt +
+      glass system above. Kept as the record of how the design evolved;
+      not current styling.
+
+### Open items (as of item 141 — pick up here)
+**Item 141 (the Nash/volt + glass redesign, above) is the latest work —
+committed and pushed to `main`, current HEAD `014615b`, working tree
+CLEAN. The one open thread carried out of that session is perf fix #2
+(cap the heavy cold fetches on `/api/compare` — see the end of item
+141).** The paragraph below is the PRIOR session's record (items
+136-140), kept for context — its "as of item 140" framing and HEAD
+`cd97b87` are historical:
+
+**Everything through item 140 was committed and pushed to `main` (HEAD
+`cd97b87` at that time).** That session
 shipped items 136-140 (each with its own numbered write-up above):
 - item 136 (prior-season fallback → live tools) — `940e354`
 - item 137 (Backtest tooling fully scoring-format-aware) — `fa1cd37`
