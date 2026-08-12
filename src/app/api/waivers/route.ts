@@ -11,7 +11,7 @@ import {
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat, SKILL_POSITIONS } from "@/lib/sportsdata/types";
 import { buildWaiverCandidateDetails, type WaiverCandidate } from "@/lib/waivers/buildWaiverReport";
-import { rankWaiverCandidates } from "@/lib/waivers/rankCandidates";
+import { rankWaiverCandidates, type WaiverRankStrategy } from "@/lib/waivers/rankCandidates";
 import { rankExtendedWaiverCandidates } from "@/lib/waivers/rankExtendedCandidates";
 import { suggestDrops } from "@/lib/waivers/suggestDrop";
 
@@ -39,6 +39,11 @@ export async function GET(request: Request) {
   // user's own team. Kept separate from `rosteredIds` because only the
   // user's OWN roster is a valid drop-candidate pool.
   const leagueRosteredIds = parseIds(url.searchParams.get("leagueRostered"));
+  // A/B: `gap` (default, shipped) ranks by the ordinal volume-vs-points
+  // rank gap; `residual` ranks by expected-points-from-volume minus points
+  // scored (real points, pool-independent). Only affects skill positions —
+  // D/ST and K stream on their own matchup logic. See rankCandidates.ts.
+  const rankBy: WaiverRankStrategy = url.searchParams.get("rankBy") === "residual" ? "residual" : "gap";
 
   try {
     const context = await getSeasonContext();
@@ -84,7 +89,7 @@ export async function GET(request: Request) {
     ]);
 
     const [ranksByPosition, extendedCandidates] = await Promise.all([
-      rankWaiverCandidates(context, format, excludeIds),
+      rankWaiverCandidates(context, format, excludeIds, rankBy),
       rankExtendedWaiverCandidates(
         context,
         format,
@@ -146,6 +151,7 @@ export async function GET(request: Request) {
       context: {
         lastCompletedSeason: context.lastCompletedSeason,
         lastCompletedWeek: context.lastCompletedWeek,
+        rankBy,
         contextNote:
           scheduleSeason === context.lastCompletedSeason
             ? `Ranked on current form through Week ${context.lastCompletedWeek} of the ${context.lastCompletedSeason} season — recent volume relative to recent points, at the same position.`

@@ -1,3 +1,4 @@
+import { POINTS_PER_VOLUME_UNIT } from "@/lib/recommendation/config";
 import { getRecentWindow, takeRecentPlayed } from "@/lib/recommendation/recentWindow";
 import { getVolumeStat } from "@/lib/recommendation/volume";
 import { getPlayerSeasonStats } from "@/lib/sportsdata/seasonStats";
@@ -6,8 +7,8 @@ import type { SeasonContext } from "@/lib/sportsdata/timeframes";
 import {
   getFantasyPoints,
   SKILL_POSITIONS,
+  type Player,
   type PlayerGameStat,
-  type PlayerSeasonStat,
   type ScoringFormat,
   type SkillPosition,
 } from "@/lib/sportsdata/types";
@@ -29,6 +30,19 @@ const CANDIDATES_PER_POSITION = 6;
 // single bad week.
 const EFFICIENCY_FLOOR_RATIO = 0.75;
 
+/**
+ * Which "opportunity outpacing production" metric drives the ranking.
+ * - "gap" (default, current shipped behavior): the ordinal
+ *   pointsRank - volumeRank difference.
+ * - "residual": expected points from recent volume minus points actually
+ *   scored, in real points rather than ranks — an A/B alternative to gap,
+ *   prototyped because gap is magnitude-blind and pool-composition-
+ *   dependent (see CLAUDE.md's waiver open item). Not yet backtested as a
+ *   ranking heuristic, so gap stays the default until it earns the swap.
+ */
+export type WaiverRankStrategy = "gap" | "residual";
+export const DEFAULT_WAIVER_STRATEGY: WaiverRankStrategy = "gap";
+
 export interface WaiverCandidateRank {
   playerId: number;
   position: SkillPosition;
@@ -42,6 +56,15 @@ export interface WaiverCandidateRank {
   pointsRank: number;
   /** pointsRank - volumeRank; positive means opportunity is ahead of production. */
   gapScore: number;
+  /**
+   * Expected points from recent volume (recentVolumeAvg × the position's
+   * POINTS_PER_VOLUME_UNIT conversion factor) minus recent points actually
+   * scored. Positive = scoring fewer points than this volume typically
+   * yields — the same "buy-low" case as gapScore, but in real points and
+   * independent of pool composition. The "residual" ranking key; see
+   * WaiverRankStrategy.
+   */
+  residualScore: number;
 }
 
 function average(values: number[]): number {
@@ -75,35 +98,56 @@ function getEfficiencyStat(row: PlayerGameStat, position: SkillPosition): number
   }
 }
 
-/** Same volume/yards pairing as getEfficiencyStat, over a player's season totals rather than one game. */
-function getSeasonUnitsAndYards(stat: PlayerSeasonStat, position: SkillPosition): { units: number; yards: number } {
+/**
+ * Volume/yards pairing for the efficiency baseline, over any object that
+ * carries the raw box-score fields (a PlayerGameStat or a PlayerSeasonStat
+ * — both share these field names). Same pairing as getEfficiencyStat.
+ */
+interface UnitsAndYardsSource {
+  PassingAttempts: number;
+  PassingYards: number;
+  RushingAttempts: number;
+  RushingYards: number;
+  Receptions: number;
+  ReceivingYards: number;
+  ReceivingTargets: number;
+}
+
+export function unitsAndYardsForPosition(
+  s: UnitsAndYardsSource,
+  position: SkillPosition
+): { units: number; yards: number } {
   switch (position) {
     case "QB":
-      return { units: stat.PassingAttempts, yards: stat.PassingYards };
+      return { units: s.PassingAttempts, yards: s.PassingYards };
     case "RB":
-      return { units: stat.RushingAttempts + stat.Receptions, yards: stat.RushingYards + stat.ReceivingYards };
+      return { units: s.RushingAttempts + s.Receptions, yards: s.RushingYards + s.ReceivingYards };
     case "WR":
     case "TE":
-      return { units: stat.ReceivingTargets, yards: stat.ReceivingYards };
+      return { units: s.ReceivingTargets, yards: s.ReceivingYards };
   }
 }
 
 /**
- * Position-wide "typical efficiency this season" baseline for
- * EFFICIENCY_FLOOR_RATIO — a real ratio-of-sums across every skill
- * player's full-season totals (the same "ratio of sums" method this
- * app's other empirically-derived conversion factors use, e.g.
- * POINTS_PER_VOLUME_UNIT), not this ranking's own thin recent-week
- * candidate pool.
+ * Position-wide "typical efficiency" baseline for EFFICIENCY_FLOOR_RATIO —
+ * a real ratio-of-sums across every skill player's totals (the same "ratio
+ * of sums" method this app's other empirically-derived conversion factors
+ * use, e.g. POINTS_PER_VOLUME_UNIT), not this ranking's own thin
+ * recent-week candidate pool. Works on any UnitsAndYardsSource rows, so
+ * the live path can feed it full-season PlayerSeasonStats while the
+ * backtest feeds it every game row strictly before the cutoff week (a
+ * leak-free, point-in-time baseline).
  */
-function computeSeasonEfficiencyBaseline(seasonStats: PlayerSeasonStat[]): Record<SkillPosition, number | null> {
+export function computeEfficiencyBaseline(
+  rows: (UnitsAndYardsSource & { Position: string })[]
+): Record<SkillPosition, number | null> {
   const result = {} as Record<SkillPosition, number | null>;
   for (const position of SKILL_POSITIONS) {
     let totalUnits = 0;
     let totalYards = 0;
-    for (const stat of seasonStats) {
-      if (stat.Position !== position) continue;
-      const { units, yards } = getSeasonUnitsAndYards(stat, position);
+    for (const row of rows) {
+      if (row.Position !== position) continue;
+      const { units, yards } = unitsAndYardsForPosition(row, position);
       totalUnits += units;
       totalYards += yards;
     }
@@ -113,72 +157,36 @@ function computeSeasonEfficiencyBaseline(seasonStats: PlayerSeasonStat[]): Recor
 }
 
 /**
- * Bulk ranking pass across the whole active skill-player pool —
- * deliberately NOT running the full buildComparisonInput/scorePlayer
- * pipeline here (that's reserved for the handful of top candidates
- * actually surfaced, see buildWaiverReport.ts), since this needs to scan
- * every active player cheaply rather than the few players a normal
- * comparison touches.
+ * Pure, data-injected core of the waiver ranking — everything except the
+ * data fetch. Given each candidate's recent-games window, a position-wide
+ * efficiency baseline, and the exclude set, it scores the full ELIGIBLE
+ * pool per position (players clearing MIN_RECENT_GAMES, the top-half
+ * recent-volume floor, and the efficiency floor) with every ranking
+ * metric computed (volumeRank/pointsRank/gapScore/residualScore) — but
+ * does NOT apply the strategy-specific underproduction gate or the final
+ * slice. Callers pass this pool to selectWaiverCandidates.
  *
- * Ranks by the GAP between a player's recent-volume rank and their
- * recent-points rank at the same position: a player getting
- * starter-level opportunity while still producing replacement-level
- * points is exactly the "opportunity outpacing production" profile a
- * waiver add is looking for. This is a ranking composition of one
- * already-validated primitive (recent volume level beats recent points
- * as a forward signal — the strongest standalone predictor found across
- * this whole app's backtesting history), not an independent predictive
- * claim of its own.
- *
- * Explicitly NOT a trend/delta signal: a real backtest of "opportunity
- * TREND vs. points TREND" (recent-N-games vs. a prior baseline window,
- * swept across window sizes and baseline definitions) came back
- * statistically indistinguishable from chance-level noise and clearly
- * weaker than just using absolute recent volume level — see CLAUDE.md's
- * waiver-wire investigation for the full sweep. This ranking uses
- * absolute LEVEL only, per that finding.
+ * Split out from the live fetch so both rankWaiverCandidates (live,
+ * SportsDataIO data) and the waiver backtest (nflverse historical data)
+ * run the identical ranking logic rather than a reimplementation — the
+ * backtest is grading the actual shipped ranking, not a copy of it.
  */
-export async function rankWaiverCandidates(
-  context: SeasonContext,
-  format: ScoringFormat,
-  excludePlayerIds: Set<number>
-): Promise<Record<SkillPosition, WaiverCandidateRank[]>> {
-  // Same recent-form window the scoring path uses (getRecentWindow): in
-  // the offseason a wider lookback, from which each player keeps only
-  // their last N games actually PLAYED — so a candidate whose recent
-  // volume/production would otherwise be judged off injury-thinned
-  // half-games is ranked on real pre-injury games instead.
-  const recentWindow = getRecentWindow(context);
-  const [activePlayers, weeklyRows, seasonStats] = await Promise.all([
-    getActivePlayers(),
-    Promise.all(recentWindow.weeks.map((week) => getPlayerGameStatsByWeek(context.lastCompletedApiSeason, week))),
-    getPlayerSeasonStats(context.lastCompletedSeason),
-  ]);
-  const seasonEfficiencyBaseline = computeSeasonEfficiencyBaseline(seasonStats);
-
-  const recentGamesByPlayer = new Map<number, PlayerGameStat[]>();
-  for (const rows of weeklyRows) {
-    for (const row of rows) {
-      if (row.Played !== 1) continue;
-      const list = recentGamesByPlayer.get(row.PlayerID);
-      if (list) list.push(row);
-      else recentGamesByPlayer.set(row.PlayerID, [row]);
-    }
-  }
-  for (const [playerId, list] of recentGamesByPlayer) {
-    list.sort((a, b) => a.Week - b.Week);
-    recentGamesByPlayer.set(playerId, takeRecentPlayed(list, recentWindow.limit));
-  }
-
+export function scoreWaiverPool(
+  players: Pick<Player, "PlayerID" | "Position" | "Team">[],
+  recentGamesByPlayer: Map<number, PlayerGameStat[]>,
+  efficiencyBaseline: Record<SkillPosition, number | null>,
+  excludePlayerIds: Set<number>,
+  format: ScoringFormat
+): Record<SkillPosition, WaiverCandidateRank[]> {
   const byPosition = {} as Record<SkillPosition, WaiverCandidateRank[]>;
 
   for (const position of SKILL_POSITIONS) {
-    type RawCandidate = Omit<WaiverCandidateRank, "volumeRank" | "pointsRank" | "gapScore">;
+    type RawCandidate = Omit<WaiverCandidateRank, "volumeRank" | "pointsRank" | "gapScore" | "residualScore">;
     const raw: RawCandidate[] = [];
 
     const efficiencyByPlayerId = new Map<number, number>();
 
-    for (const player of activePlayers) {
+    for (const player of players) {
       if (player.Position !== position || excludePlayerIds.has(player.PlayerID)) continue;
       const games = recentGamesByPlayer.get(player.PlayerID) ?? [];
       if (games.length < MIN_RECENT_GAMES) continue;
@@ -214,30 +222,122 @@ export async function rankWaiverCandidates(
     const volumeFloorRank = Math.max(1, Math.ceil(raw.length / 2));
 
     // A candidate must convert volume to yards at least reasonably well
-    // relative to this season's real position-wide baseline — see
-    // EFFICIENCY_FLOOR_RATIO. A missing efficiency reading (no valid
-    // game) never excludes a player on its own — this only filters
-    // players proven bad, not players we lack data on.
-    const seasonBaseline = seasonEfficiencyBaseline[position];
-    const efficiencyMinimum = seasonBaseline != null ? seasonBaseline * EFFICIENCY_FLOOR_RATIO : null;
+    // relative to the position-wide baseline — see EFFICIENCY_FLOOR_RATIO.
+    // A missing efficiency reading (no valid game) never excludes a player
+    // on its own — this only filters players proven bad, not players we
+    // lack data on.
+    const baseline = efficiencyBaseline[position];
+    const efficiencyMinimum = baseline != null ? baseline * EFFICIENCY_FLOOR_RATIO : null;
+
+    const pointsPerVolumeUnit = POINTS_PER_VOLUME_UNIT[format][position];
 
     byPosition[position] = raw
       .map((p) => {
         const volumeRank = volumeRankById.get(p.playerId)!;
         const pointsRank = pointsRankById.get(p.playerId)!;
-        return { ...p, volumeRank, pointsRank, gapScore: pointsRank - volumeRank };
+        const expectedPointsFromVolume = p.recentVolumeAvg * pointsPerVolumeUnit;
+        return {
+          ...p,
+          volumeRank,
+          pointsRank,
+          gapScore: pointsRank - volumeRank,
+          residualScore: expectedPointsFromVolume - p.recentPprAvg,
+        };
       })
       .filter((p) => {
         const efficiency = efficiencyByPlayerId.get(p.playerId);
         return (
           p.volumeRank <= volumeFloorRank &&
-          p.gapScore > 0 &&
           (efficiency == null || efficiencyMinimum == null || efficiency >= efficiencyMinimum)
         );
-      })
-      .sort((a, b) => b.gapScore - a.gapScore)
-      .slice(0, CANDIDATES_PER_POSITION);
+      });
   }
 
+  return byPosition;
+}
+
+/**
+ * Applies a strategy's underproduction gate, sort, and top-N slice to a
+ * scored eligible pool from scoreWaiverPool. Each strategy gates "is this
+ * an underproducer" with the same metric it ranks by, so the surfaced set
+ * is internally coherent (gate and sort agree) rather than one strategy's
+ * picks being pre-filtered by the other's definition.
+ */
+export function selectWaiverCandidates(
+  pool: WaiverCandidateRank[],
+  strategy: WaiverRankStrategy,
+  limit: number
+): WaiverCandidateRank[] {
+  return pool
+    .filter((p) => (strategy === "residual" ? p.residualScore > 0 : p.gapScore > 0))
+    .sort((a, b) => (strategy === "residual" ? b.residualScore - a.residualScore : b.gapScore - a.gapScore))
+    .slice(0, limit);
+}
+
+/**
+ * Bulk ranking pass across the whole active skill-player pool —
+ * deliberately NOT running the full buildComparisonInput/scorePlayer
+ * pipeline here (that's reserved for the handful of top candidates
+ * actually surfaced, see buildWaiverReport.ts), since this needs to scan
+ * every active player cheaply rather than the few players a normal
+ * comparison touches.
+ *
+ * Ranks by the GAP between a player's recent-volume rank and their
+ * recent-points rank at the same position: a player getting
+ * starter-level opportunity while still producing replacement-level
+ * points is exactly the "opportunity outpacing production" profile a
+ * waiver add is looking for. This is a ranking composition of one
+ * already-validated primitive (recent volume level beats recent points
+ * as a forward signal — the strongest standalone predictor found across
+ * this whole app's backtesting history), not an independent predictive
+ * claim of its own.
+ *
+ * Explicitly NOT a trend/delta signal: a real backtest of "opportunity
+ * TREND vs. points TREND" (recent-N-games vs. a prior baseline window,
+ * swept across window sizes and baseline definitions) came back
+ * statistically indistinguishable from chance-level noise and clearly
+ * weaker than just using absolute recent volume level — see CLAUDE.md's
+ * waiver-wire investigation for the full sweep. This ranking uses
+ * absolute LEVEL only, per that finding.
+ */
+export async function rankWaiverCandidates(
+  context: SeasonContext,
+  format: ScoringFormat,
+  excludePlayerIds: Set<number>,
+  strategy: WaiverRankStrategy = DEFAULT_WAIVER_STRATEGY
+): Promise<Record<SkillPosition, WaiverCandidateRank[]>> {
+  // Same recent-form window the scoring path uses (getRecentWindow): in
+  // the offseason a wider lookback, from which each player keeps only
+  // their last N games actually PLAYED — so a candidate whose recent
+  // volume/production would otherwise be judged off injury-thinned
+  // half-games is ranked on real pre-injury games instead.
+  const recentWindow = getRecentWindow(context);
+  const [activePlayers, weeklyRows, seasonStats] = await Promise.all([
+    getActivePlayers(),
+    Promise.all(recentWindow.weeks.map((week) => getPlayerGameStatsByWeek(context.lastCompletedApiSeason, week))),
+    getPlayerSeasonStats(context.lastCompletedSeason),
+  ]);
+  const efficiencyBaseline = computeEfficiencyBaseline(seasonStats);
+
+  const recentGamesByPlayer = new Map<number, PlayerGameStat[]>();
+  for (const rows of weeklyRows) {
+    for (const row of rows) {
+      if (row.Played !== 1) continue;
+      const list = recentGamesByPlayer.get(row.PlayerID);
+      if (list) list.push(row);
+      else recentGamesByPlayer.set(row.PlayerID, [row]);
+    }
+  }
+  for (const [playerId, list] of recentGamesByPlayer) {
+    list.sort((a, b) => a.Week - b.Week);
+    recentGamesByPlayer.set(playerId, takeRecentPlayed(list, recentWindow.limit));
+  }
+
+  const pool = scoreWaiverPool(activePlayers, recentGamesByPlayer, efficiencyBaseline, excludePlayerIds, format);
+
+  const byPosition = {} as Record<SkillPosition, WaiverCandidateRank[]>;
+  for (const position of SKILL_POSITIONS) {
+    byPosition[position] = selectWaiverCandidates(pool[position], strategy, CANDIDATES_PER_POSITION);
+  }
   return byPosition;
 }

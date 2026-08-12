@@ -19,6 +19,10 @@ export interface WaiverCandidate {
   gamesUsedForRecent: number;
   volumeRank: number;
   pointsRank: number;
+  /** Ordinal buy-low signal (pointsRank - volumeRank). Absent for D/ST and K (streaming, no volume/points gap). */
+  gapScore?: number;
+  /** Points-residual buy-low signal (expected points from volume minus points scored). Absent for D/ST and K. See rankCandidates.ts's WaiverRankStrategy. */
+  residualScore?: number;
   /** e.g. "WR14" — rank by recent volume. */
   positionLabel: string;
   /** e.g. "WR34" — rank by recent points, at the same position. */
@@ -102,6 +106,8 @@ export async function buildWaiverCandidateDetails(
         gamesUsedForRecent: rank.gamesUsedForRecent,
         volumeRank: rank.volumeRank,
         pointsRank: rank.pointsRank,
+        gapScore: rank.gapScore,
+        residualScore: rank.residualScore,
         positionLabel: `${rank.position}${rank.volumeRank}`,
         productionLabel: `${rank.position}${rank.pointsRank}`,
         reasoning,
