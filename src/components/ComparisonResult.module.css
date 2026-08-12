@@ -81,7 +81,7 @@
 .unresolved { font-family: var(--fd); font-weight: 500; font-size: clamp(24px, 4vw, 34px); line-height: 1.1; letter-spacing: -0.02em; }
 
 /* panels — single-column, hairline-ruled sections (almanac layout, Nash skin) */
-.panels { display: flex; flex-direction: column; gap: 14px; margin-top: 6px; }
+.panels { display: flex; flex-direction: column; gap: 14px; margin-top: 22px; }
 .panel {
   background: color-mix(in srgb, var(--card) 58%, transparent);
   backdrop-filter: blur(20px) saturate(150%);
