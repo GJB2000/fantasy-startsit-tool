@@ -55,14 +55,6 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
-/** Two-letter monogram for the player avatar tile (first + last initial). */
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
 function ordinal(n: number): string {
   const rem100 = n % 100;
   if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
@@ -364,59 +356,59 @@ function PlayerCard({
   const week = player.nextOpponent?.week;
   const skill = isSkillCardPosition(player.position);
   const betLines = props?.lines ?? [];
-  const meta = [posLine, opp ? `vs ${opp}${week ? `, Week ${week}` : ""}` : null].filter(Boolean).join(" · ");
 
   return (
     <article
       className={`${styles.panel} ${isRecommended ? styles.pick : ""} ${styles.rise}`}
       style={{ animationDelay: `${0.1 + rank * 0.06}s` }}
     >
-      <div className={styles.pLeft}>
-        <div className={styles.pId}>
-          <span className={styles.pAva}>{initials(player.displayName)}</span>
-          <div>
-            <div className={styles.pName}>{player.displayName}</div>
-            {meta && <div className={styles.pMeta}>{meta}</div>}
-          </div>
+      <header className={styles.chead}>
+        <div className={`${styles.rk} ${styles.n}`}>{rank}</div>
+        <div>
+          <div className={styles.pName}>{player.displayName}</div>
+          {posLine && <div className={styles.pMeta}>{posLine}</div>}
         </div>
+        <div className={`${styles.tag} ${isRecommended ? styles.tagStart : styles.tagBench}`}>
+          {isRecommended ? "Start" : "Bench"}
+        </div>
+      </header>
 
-        <div className={styles.pProj}>
+      {(player.team || opp) && (
+        <>
+          <div className={styles.rule} />
+          <div className={styles.opp}>
+            <div className={styles.oppWho}>
+              {player.team ? <b>{player.team}</b> : "—"}
+              {opp ? ` vs ${opp}` : ""}
+              {week ? ` · Week ${week}` : ""}
+            </div>
+            {matchup && m && (
+              <span className={`${styles.dtag} ${DTAG_TONE[matchup.tone]}`}>
+                {matchup.text} · #{m.rank} of {m.teamCount}
+              </span>
+            )}
+          </div>
+        </>
+      )}
+
+      <div className={styles.rule} />
+
+      <div className={styles.prow}>
+        <div>
           <div className={styles.lab}>Projection</div>
           <div className={styles.pNum}>
             <span className={styles.n}>{player.finalScore != null ? player.finalScore.toFixed(1) : "—"}</span>
             <small>{formatLabel}</small>
           </div>
-          <RangeLine player={player} />
         </div>
-
-        {matchup && m && (
-          <div className={styles.pMtag}>
-            <span className={`${styles.dtag} ${DTAG_TONE[matchup.tone]}`}>
-              {matchup.text} · #{m.rank} of {m.teamCount}
-            </span>
-          </div>
-        )}
-
-        <div>
-          <span className={`${styles.pill} ${isRecommended ? styles.pillStart : styles.pillBench}`}>
-            {isRecommended ? "Start" : "Bench"}
-          </span>
-        </div>
+        <RangeLine player={player} />
       </div>
 
-      <div className={styles.pRight}>
+      <div className={styles.rule} />
+
+      <div className={styles.mid}>
         <StatGrid player={player} formatLabel={formatLabel} />
-        <div className={styles.case}>
-          <div className={styles.caseCol}>
-            <div className={`${styles.caseH} ${styles.caseFor}`}>Case for</div>
-            <p>{buildCaseFor(player, formatLabel)}</p>
-          </div>
-          <div className={styles.caseCol}>
-            <div className={`${styles.caseH} ${styles.caseAgainst}`}>Case against</div>
-            <p>{buildCaseAgainst(player)}</p>
-          </div>
-        </div>
-        <div className={styles.extra}>
+        <div className={styles.aside}>
           <div>
             <div className={styles.aiL}>Weather</div>
             <div className={styles.aiV}>{player.nextOpponent ? formatWeather(player.nextGameWeather) : "—"}</div>
@@ -428,30 +420,46 @@ function PlayerCard({
         </div>
       </div>
 
-      {skill && (
-        <div className={styles.betRow}>
-          <div className={styles.betH}>
-            <div className={styles.lab}>Betting Lines</div>
-            {betLines.length > 0 && <div className={styles.bk}>{props?.bookmaker}</div>}
-          </div>
-          {betLines.length > 0 ? (
-            <>
-              <div className={styles.betL}>
-                {betLines.map((line, i) => (
-                  <div key={`${line.label}-${i}`} className={styles.bc}>
-                    <div className={styles.bcL}>{line.label}</div>
-                    <div className={`${styles.bcV} ${styles.n}`}>{line.value}</div>
-                  </div>
-                ))}
-              </div>
-              <p className={styles.betf}>Market lines — shown for context, not part of our projection.</p>
-            </>
-          ) : (
-            <p className={styles.betPending}>
-              Sportsbook lines post closer to kickoff — pass, rush and receiving props will show here once this week&rsquo;s game is on the board.
-            </p>
-          )}
+      <div className={styles.rule} />
+
+      <div className={styles.case}>
+        <div className={styles.caseCol}>
+          <div className={`${styles.caseH} ${styles.caseFor}`}>Case for</div>
+          <p>{buildCaseFor(player, formatLabel)}</p>
         </div>
+        <div className={styles.caseCol}>
+          <div className={`${styles.caseH} ${styles.caseAgainst}`}>Case against</div>
+          <p>{buildCaseAgainst(player)}</p>
+        </div>
+      </div>
+
+      {skill && (
+        <>
+          <div className={styles.rule} />
+          <div className={styles.betRow}>
+            <div className={styles.betH}>
+              <div className={styles.lab}>Betting Lines</div>
+              {betLines.length > 0 && <div className={styles.bk}>{props?.bookmaker}</div>}
+            </div>
+            {betLines.length > 0 ? (
+              <>
+                <div className={styles.betL}>
+                  {betLines.map((line, i) => (
+                    <div key={`${line.label}-${i}`} className={styles.bc}>
+                      <div className={styles.bcL}>{line.label}</div>
+                      <div className={`${styles.bcV} ${styles.n}`}>{line.value}</div>
+                    </div>
+                  ))}
+                </div>
+                <p className={styles.betf}>Market lines — shown for context, not part of our projection.</p>
+              </>
+            ) : (
+              <p className={styles.betPending}>
+                Sportsbook lines post closer to kickoff — pass, rush and receiving props will show here once this week&rsquo;s game is on the board.
+              </p>
+            )}
+          </div>
+        </>
       )}
     </article>
   );

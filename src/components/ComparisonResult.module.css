@@ -80,7 +80,7 @@
 .vnote { margin-top: 16px; font-size: 12px; line-height: 1.55; color: var(--muted); max-width: 60ch; }
 .unresolved { font-family: var(--fd); font-weight: 500; font-size: clamp(24px, 4vw, 34px); line-height: 1.1; letter-spacing: -0.02em; }
 
-/* panels */
+/* panels — single-column, hairline-ruled sections (almanac layout, Nash skin) */
 .panels { display: flex; flex-direction: column; gap: 14px; margin-top: 6px; }
 .panel {
   background: color-mix(in srgb, var(--card) 58%, transparent);
@@ -91,32 +91,45 @@
   box-shadow:
     0 18px 46px -24px rgba(0, 0, 0, 0.6),
     inset 0 1px 0 color-mix(in srgb, var(--foreground) 7%, transparent);
-  padding: 26px 28px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
-  gap: 30px 34px;
+  padding: 24px 30px;
 }
 .pick {
   border-color: var(--acc-line);
   background:
-    linear-gradient(180deg, var(--acc-soft), transparent 140px),
+    linear-gradient(180deg, var(--acc-soft), transparent 150px),
     color-mix(in srgb, var(--card) 58%, transparent);
   box-shadow:
     0 18px 54px -22px color-mix(in srgb, var(--accent) 34%, transparent),
     inset 0 1px 0 color-mix(in srgb, var(--foreground) 10%, transparent);
 }
 
-.pLeft { min-width: 0; }
-.pId { display: flex; align-items: center; gap: 14px; }
-.pAva { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; font-size: 14px; font-weight: 600; background: var(--sunken); border: 1px solid var(--line); color: var(--muted); flex: none; }
-.pick .pAva { background: var(--acc-soft); border-color: var(--acc-line); color: var(--acc); }
-.pName { font-family: var(--fd); font-weight: 500; font-size: 23px; letter-spacing: -0.02em; line-height: 1; }
-.pMeta { font-size: 12.5px; color: var(--muted); margin-top: 5px; }
+/* header: rank · name/meta · Start/Bench tag */
+.chead { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 18px; align-items: center; }
+.rk { font-family: var(--fd); font-weight: 500; font-size: 42px; line-height: 0.8; color: var(--faint); font-variant-numeric: tabular-nums; }
+.pick .rk { color: var(--acc); }
+.pName { font-family: var(--fd); font-weight: 500; font-size: 34px; letter-spacing: -0.02em; line-height: 1; }
+.pMeta { font-size: 12px; color: var(--muted); margin-top: 6px; letter-spacing: 0.02em; }
+.tag { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 16px; border-radius: 100px; white-space: nowrap; }
+.tagStart { background: var(--acc); color: var(--acc-ink); }
+.tagBench { border: 1px solid var(--line); color: var(--muted); }
 
-.pProj { margin-top: 22px; }
-.pNum { font-family: var(--fd); font-weight: 500; font-size: 50px; line-height: 0.9; margin-top: 6px; }
+.rule { height: 1px; background: var(--line); margin: 20px 0; }
+
+/* opponent row */
+.opp { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.oppWho { font-size: 13.5px; color: var(--muted); }
+.oppWho b { color: var(--ink); font-weight: 500; }
+.dtag { display: inline-flex; font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 6px 12px; border-radius: 100px; white-space: nowrap; }
+.dtagGood { background: var(--acc-soft); color: var(--acc); }
+.dtagBad { background: var(--rose-soft); color: var(--rose); }
+.dtagNeutral { background: var(--sunken); color: var(--muted); border: 1px solid var(--line); }
+
+/* projection + range row */
+.prow { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 34px; align-items: end; }
+.pNum { font-family: var(--fd); font-weight: 500; font-size: 54px; line-height: 0.82; margin-top: 6px; }
 .pick .pNum { color: var(--acc); }
 .pNum small { font-size: 13px; color: var(--muted); font-weight: 500; margin-left: 6px; letter-spacing: 0; }
-
-.rng { margin-top: 16px; }
+.rng { padding-bottom: 6px; }
 .rtrack { position: relative; height: 6px; border-radius: 100px; background: var(--sunken); }
 .rfill { position: absolute; top: 0; bottom: 0; border-radius: 100px; background: var(--neutral-bar); }
 .pick .rfill { background: var(--acc); }
@@ -125,18 +138,8 @@
 .rends { display: flex; justify-content: space-between; margin-top: 9px; }
 .rends span { font-size: 11px; color: var(--faint); }
 
-.pMtag { margin-top: 18px; }
-.dtag { display: inline-flex; font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 6px 12px; border-radius: 100px; }
-.dtagGood { background: var(--acc-soft); color: var(--acc); }
-.dtagBad { background: var(--rose-soft); color: var(--rose); }
-.dtagNeutral { background: var(--sunken); color: var(--muted); border: 1px solid var(--line); }
-
-.pill { display: inline-flex; margin-top: 20px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; padding: 7px 14px; border-radius: 100px; }
-.pillStart { background: var(--acc); color: var(--acc-ink); }
-.pillBench { background: var(--sunken); color: var(--muted); border: 1px solid var(--line); }
-
-/* right column */
-.pRight { min-width: 0; display: flex; flex-direction: column; gap: 22px; }
+/* stats grid + weather/status aside */
+.mid { display: grid; grid-template-columns: minmax(0, 1fr) 172px; gap: 28px; }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 22px; }
 .st { min-width: 0; }
 .stL { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
@@ -178,21 +181,23 @@
 .stTip:hover .tip,
 .stTip:focus-within .tip { opacity: 1; transform: none; }
 
-.case { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-.caseCol { min-width: 0; }
-.caseH { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
-.caseFor { color: var(--acc); }
-.caseAgainst { color: var(--rose); }
-.caseCol p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
-
-.extra { display: flex; gap: 24px; padding-top: 18px; border-top: 1px solid var(--line2); }
+/* weather/status aside — sits beside the stat grid in .mid */
+.aside { display: flex; flex-direction: column; gap: 16px; justify-content: center; border-left: 1px solid var(--line); padding-left: 26px; }
 .aiL { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
 .aiV { font-size: 14px; font-weight: 500; margin-top: 4px; }
 .aiGood { color: var(--acc); }
 .aiBad { color: var(--rose); }
 
-/* betting lines — spans both columns */
-.betRow { grid-column: 1 / -1; padding-top: 20px; border-top: 1px solid var(--line2); }
+.case { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.caseCol { min-width: 0; }
+.caseCol + .caseCol { border-left: 1px solid var(--line); padding-left: 24px; }
+.caseH { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.caseFor { color: var(--acc); }
+.caseAgainst { color: var(--rose); }
+.caseCol p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+
+/* betting lines */
+.betRow { }
 .betH { display: flex; justify-content: space-between; align-items: baseline; }
 .bk { font-size: 9px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
 .betL { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
@@ -208,9 +213,15 @@
 .rise { opacity: 0; transform: translateY(12px); animation: nashRise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
 @keyframes nashRise { to { opacity: 1; transform: none; } }
 
-@media (max-width: 760px) {
-  .panel { grid-template-columns: 1fr; gap: 22px; }
+@media (max-width: 620px) {
+  .prow { grid-template-columns: 1fr; gap: 16px; }
+  .mid { grid-template-columns: 1fr; gap: 18px; }
+  .aside { border-left: 0; border-top: 1px solid var(--line); padding-left: 0; padding-top: 16px; justify-content: flex-start; }
   .case { grid-template-columns: 1fr; gap: 16px; }
+  .caseCol + .caseCol { border-left: 0; border-top: 1px solid var(--line); padding-left: 0; padding-top: 16px; }
+  .rk { font-size: 34px; }
+  .pName { font-size: 28px; }
+  .pNum { font-size: 46px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rise { opacity: 1; transform: none; animation: none; }
