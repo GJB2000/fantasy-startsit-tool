@@ -739,8 +739,27 @@ export const ENSEMBLE_VOLUME_BLEND_RATIO: Record<ScoringFormat, Record<SkillPosi
  * CLAUDE.md's live-tool-wiring item) — this weight has a real effect on
  * the deployed Start/Sit, Trade Analyzer, and Waivers tools, not just
  * backtest-mode validation.
+ *
+ * Now PER-POSITION (item 145): a per-position sweep found the item-70
+ * universal-0.5 compromise was leaving a clean, no-tradeoff win on the
+ * table. QB wants FAR more consensus (peaks at 0.8 on BOTH pipelines —
+ * primary QB 61.8 -> 66.7, pooled 60.5 -> 61.5; 0.9/1.0 both decline, so
+ * it's a real peak) and TE wants a bit more (0.7: pooled 56.8 -> 57.8,
+ * primary flat). WR must stay at 0.5 (primary WR declines above it — the
+ * exact reason item 70 couldn't just raise the universal weight), and RB
+ * is flat. Per-position weights serve all four at once. Net: primary
+ * overall 59.02 -> 59.84 (+0.82pp), pooled 57.98 -> 58.31, no position
+ * regressing on either pipeline. QB now leans 80% on FantasyPros consensus
+ * — a deliberate, user-confirmed shift toward the market signal for the
+ * position where it's most predictive. See CLAUDE.md's per-position
+ * consensus-weight sweep.
  */
-export const EXPERT_CONSENSUS_BLEND_WEIGHT = 0.5;
+export const EXPERT_CONSENSUS_BLEND_WEIGHT: Record<SkillPosition, number> = {
+  QB: 0.8,
+  RB: 0.5,
+  WR: 0.5,
+  TE: 0.7,
+};
 
 /**
  * Replacement-level per-game fantasy value at each skill position — the

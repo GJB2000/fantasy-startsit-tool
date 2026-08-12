@@ -311,9 +311,11 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
   // the standalone pickByExpertConsensus baseline validated strong at
   // every position (57-60% pooled pick accuracy, 2022-2025) rather than
   // needing the usual per-position scoping — see CLAUDE.md item 69/70.
-  // Backtest-only for now: input.expertConsensusR2pPts is always null in
-  // live mode (no current-snapshot fetch path built yet), so this is
-  // structurally a no-op for the live tool regardless of the weight below.
+  // Blends the whole running score toward FantasyPros' consensus estimate
+  // at a per-position weight (EXPERT_CONSENSUS_BLEND_WEIGHT). Populated in
+  // both backtest AND live mode (the live current-snapshot path was wired
+  // in later — see CLAUDE.md's live-consensus item), so this has a real
+  // effect on the deployed tools, heaviest for QB (weight 0.8).
   let expertConsensusModifier = 0;
   if (blendedScore != null && input.expertConsensusR2pPts != null) {
     const runningScore =
@@ -329,8 +331,11 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
       rbEpaModifier +
       dropRateModifier +
       teammateOutBumpModifier;
+    const expertConsensusWeight =
+      (position != null ? EXPERT_CONSENSUS_BLEND_WEIGHT[position as keyof typeof EXPERT_CONSENSUS_BLEND_WEIGHT] : null) ??
+      0.5;
     const blendedWithExpertConsensus =
-      (1 - EXPERT_CONSENSUS_BLEND_WEIGHT) * runningScore + EXPERT_CONSENSUS_BLEND_WEIGHT * input.expertConsensusR2pPts;
+      (1 - expertConsensusWeight) * runningScore + expertConsensusWeight * input.expertConsensusR2pPts;
     expertConsensusModifier = blendedWithExpertConsensus - runningScore;
     notes.push(
       `FantasyPros' weekly consensus projects roughly ${input.expertConsensusR2pPts.toFixed(1)} points this week — blended in at this position's typical rate.`

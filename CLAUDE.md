@@ -519,17 +519,18 @@ This is the most important section — the "brain" of the tool.
     different KIND of factor from everything else in this list:
     human/market-informed (dynastyprocess/data, reconstructed from git
     history — see Data Source Notes), not derived from box scores or
-    play-by-play. Blended in last, universal across all four skill
-    positions rather than position-scoped (unlike almost every other
-    signal here). Backtest-only for now — no live "current snapshot"
-    fetch exists yet, so this factor doesn't affect the live tool at
-    all regardless of its weight, only backtest-mode validation. A real
-    tradeoff, not a clean win: a higher weight (~0.7-0.9) pools better
-    across 2022-2025 nflverse-only data, but costs real WR accuracy on
-    the primary 2025 pipeline specifically — shipped at the more
-    conservative 0.5, which captures nearly all the gain (QB especially:
-    +8.8 to +10.8pp on the primary pipeline) with zero measured WR cost.
-    See items 69-70 for the full validation story.
+    play-by-play. Blended in last (after every other modifier), and now
+    PER-POSITION (item 145): `Record<SkillPosition, number>` = {QB:0.8,
+    RB:0.5, WR:0.5, TE:0.7}. It affects the live tool too — the live
+    current-snapshot fetch was wired in later (item 73), so this is NOT
+    backtest-only despite what older items in this file say. Shipped
+    universal at 0.5 first (item 70) as a compromise — a higher universal
+    weight pooled better but cost primary-pipeline WR accuracy — then split
+    per position (item 145) once it was clear that broke the tradeoff: QB
+    peaks at 0.8 on both pipelines (primary QB 61.8→66.7) and TE wants 0.7,
+    while WR must stay ≤0.5, a clean no-tradeoff win. QB now leans 80% on
+    consensus — the strongest single dependence on an external signal
+    anywhere in the engine. See items 69-70 and 145 for the full story.
   - [Add more factors here as they're decided]
 - When it's a close call statistically, say so. Don't force false
   confidence.
@@ -8346,6 +8347,52 @@ single-season numbers for those specific constants.
       diagnostic route (format-aware this time), deleted after; the earlier
       batch "failures" were just cold-cache timeouts from running both
       pipelines per request, fine once warm.
+
+145. **Made `EXPERT_CONSENSUS_BLEND_WEIGHT` per-position and shipped QB=0.8
+    / TE=0.7 — the cleanest no-tradeoff win in the tuning history, and a
+    direct sequel to RB=0's "consensus reshapes the signal landscape"
+    theme.** Consensus (item 70) is the single biggest lever in the engine
+    (+8-10pp QB), but it was one universal weight of 0.5. Item 70's own
+    write-up already had the clue: at higher weights the pooled pipeline and
+    QB keep improving, but the primary WR *declines* (58.3 → 53.4 by w=0.9)
+    — so a universal weight couldn't be raised without hurting WR, and 0.5
+    was the compromise. Per-position weights break exactly that tradeoff.
+    - **Method**: same as item 144 — made it `Record<SkillPosition, number>`
+      (verified no-op at all-0.5), swept per position via an in-memory-
+      mutation diagnostic route (positions independent in broad mode) on
+      BOTH pipelines + by-season, deleted after.
+    - **Result — a clean win, no position regressing on either pipeline.**
+      QB strongly wants high consensus and PEAKS at 0.8 on BOTH pipelines
+      (primary QB 61.8 → 66.7, pooled 60.5 → 61.5; 0.9 and 1.0 both decline,
+      confirming a real peak, not a boundary). TE wants a bit more (0.7:
+      pooled 56.8 → 57.8, primary flat). WR stays 0.5 (primary declines
+      above it) and RB stays 0.5 (flat). Combined QB0.8/TE0.7/RB0.5/WR0.5:
+      primary overall 59.02 → 59.84 (+0.82pp), pooled 57.98 → 58.31
+      (+0.33pp), QB's weak 2024 improves (55.9 → 56.9). Bigger than RB=0
+      (+0.25pp) and with no tradeoff.
+    - **The one real implication, put to the user**: QB now leans **80%** on
+      FantasyPros consensus (engine's own signals 20%) — a meaningful shift
+      toward the market signal for the position where it's most predictive,
+      echoing the deferred Open Item #30 ("lean rankings harder on
+      consensus") but for the start/sit engine. Presented as such (same as
+      RB=0); user confirmed ship.
+    - **Shipped** `EXPERT_CONSENSUS_BLEND_WEIGHT = {QB:0.8, RB:0.5, WR:0.5,
+      TE:0.7}` (`engine.ts` indexes by position; also fixed a stale comment
+      there that wrongly called consensus "backtest-only / always null in
+      live mode" — item 73 wired it live). Verified on both real routes
+      (primary QB 66.7 / RB 59.6 / WR 58.3 / TE 56.4; pooled 58.31 / QB
+      61.5, matching the diagnostic exactly) and live (a real Allen-vs-Burrow
+      QB compare shows a large consensus modifier +6.34 pulling Allen's score
+      toward the 22.1 consensus, sensible output). `tsc`/lint clean.
+    - **One environmental gotcha worth recording**: after a dev-server
+      restart clears the in-process FantasyPros cache, the FIRST backtest
+      request's consensus fetch can miss (cold cache / GitHub's 60-req/hour
+      unauth limit, exhausted by a long sweep) and silently degrade to an
+      empty map (`.catch(() => new Map())`) — which makes that one run look
+      like the no-consensus result (QB 52.9) and briefly looks alarming. It
+      is transient: a second run once the cache is warm gives the real
+      numbers. Not a code issue — the fetch's fail-open-to-empty is by
+      design; just re-run.
 
 ### Open items (as of item 141 — pick up here)
 **Item 141 (the Nash/volt + glass redesign, above) is the latest work —
