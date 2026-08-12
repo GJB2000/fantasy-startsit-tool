@@ -8240,6 +8240,46 @@ single-season numbers for those specific constants.
       committed as `c991f7e`; the reframe + this write-up in a follow-up
       commit.
 
+143. **Unified the Waiver Wire "top target" between the Home widget and the
+    Waiver page, made it position-fair (value over replacement), and added
+    roster-need weighting** — from a user report that "the home screen
+    waiver widget has a different target than our waiver page" and that the
+    tool should "take into account the players already on the team."
+    - **Diagnosed first, not guessed.** Confirmed with the user's real
+      connected roster that the exclusion already works — zero rostered or
+      league-rostered players leak into the candidates (all 241 owned
+      players excluded). The mismatch was two different SELECTION
+      heuristics: the Home widget picked the first non-empty position in
+      `POSITION_ORDER` (→ the top QB by volume), while the page spotlight
+      picked the biggest buy-low (item 142). Both were also QB-biased —
+      QB volume/residual numbers are largest in absolute terms, so the
+      "top target" kept surfacing a QB regardless of roster.
+    - **Fix 1 — one shared, position-fair selection.** New
+      `pickTopTarget` (`WaiverResult.tsx`), used by BOTH the page spotlight
+      and the Home widget, ranks by **value over replacement**
+      (`waiverValue = recentVolumeAvg × POINTS_PER_VOLUME_UNIT −
+      REPLACEMENT_PER_GAME`, computed server-side in `buildWaiverReport.ts`
+      and carried on each candidate). VOR is comparable across positions,
+      so a deep/streamable QB (replacement ~17.5) no longer outranks a
+      high-opportunity RB/WR. **Supersedes item 142's "spotlight = biggest
+      residual buy-low"** — the spotlight is now the best VOR pickup (still
+      shows the buy-low gap bar only when the pick is itself a buy-low).
+    - **Fix 2 — roster-need weighting** (the "take the team into account"
+      ask, beyond just excluding rostered players). `computeRosterNeedPenalty`
+      docks `SURPLUS_PENALTY_PER_PLAYER` (3 pts) per rostered player beyond
+      a position's starter need, using the connected league's real starter
+      slots (`sleeperConnection.rosterPositions` via
+      `parseSleeperRosterPositions`, or `DEFAULT_SLOTS` for a manual user);
+      flex slots count toward RB/WR need. Applied ONLY to the single
+      cross-position top target, never the per-position lists (a QB-needy
+      user still browses the QB tab normally).
+    - **Verified live end-to-end.** With the user's real roster (2 QB / 5 RB
+      / 7 WR / 2 TE in a league needing 1 QB / 5 RB / 6 WR / 1 TE), the top
+      target moved from **QB Aaron Rodgers** (before) to **RB Devin Neal**
+      (after) — QB and TE penalized for surplus, RB at exactly its need. The
+      Home widget now shows the identical target as the page. `tsc`/lint
+      clean; committed as `5fbb3ae`.
+
 ### Open items (as of item 141 — pick up here)
 **Item 141 (the Nash/volt + glass redesign, above) is the latest work —
 committed and pushed to `main`, current HEAD `014615b`, working tree
@@ -9201,7 +9241,11 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   rejected version used) — closes a real false positive where a badly-
   performing backup QB forced into volume still ranked as a top target on
   the opportunity-vs-production gap alone. `buildWaiverReport.ts` runs the real
-  engine for just the surfaced top-N candidates, reusing
+  engine for just the surfaced top-N candidates. It also computes each
+  candidate's `waiverValue` (value over replacement: `recentVolumeAvg ×
+  POINTS_PER_VOLUME_UNIT − REPLACEMENT_PER_GAME`, item 143) — the
+  cross-position "best pickup" score that drives the single top-target
+  spotlight/widget (position-fair, unlike raw volume/residual). It reuses
   `PlayerScoreBreakdown.notes` verbatim rather than inventing new copy
   (same discipline as `ComparisonResult.tsx`/`TradeResult.tsx`), with one
   filtered exception — `scorePlayer`'s WR-only handcuff note is dropped
@@ -9762,8 +9806,11 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   nothing actionable when no Sleeper league is connected, rather than a
   fake placeholder, per this app's standing "no dummy data" rule).
   `HomeWaiverWidget.tsx` picks its single top candidate using
-  `WaiverResult.tsx`'s exported `POSITION_ORDER`/`isStreamingPosition`/
-  `moveHeadline`, reused rather than re-derived. `RankingsTool.tsx`/
+  `WaiverResult.tsx`'s exported `pickTopTarget`/`computeRosterNeedPenalty`
+  (item 143) — the SAME helpers the Waiver page's spotlight uses, so the
+  widget and page always agree on the top target (value over replacement,
+  minus a roster-need penalty), rather than the old first-position-in-order
+  pick. `RankingsTool.tsx`/
   `RankingsResult.tsx` (item 78 — the Legit Rankings tool, at
   `/rankings`) render `RankingsTab = "OVERALL" | "QB" | "RB" | "WR" |
   "TE"` (default `"OVERALL"`, internal value unchanged since item 78 —
