@@ -8322,16 +8322,30 @@ single-season numbers for those specific constants.
       dip, 0.9 baseline between), so there's some noise, but 0 is clearly
       best on both pipelines by a real margin.
     - **Shipped `VOLUME_BLEND_WEIGHT.ppr.RB = 0`** (QB/WR/TE unchanged at
-      0.9; Half-PPR/Standard RB left at their prior values, unswept — this
-      was a PPR-only sweep). Put to the user as a genuine judgment call
-      (it reverses a foundational signal for a modest +0.25pp overall gain,
-      per items 30/33/41/44 precedent); user chose to ship. Verified on the
-      real primary route (RB 59.6 / overall 58.94, QB/WR/TE byte-unchanged)
-      and live (a real RB comparison renders sensibly, the pick correctly
-      shifts since the RB volume term is gone), `tsc`/lint clean. The RB
-      volume machinery (`POINTS_PER_VOLUME_UNIT.RB`) is kept, just
-      zero-weighted for PPR — same "disabled but not deleted" precedent as
-      every other zeroed signal in `config.ts`.
+      0.9). Put to the user as a genuine judgment call (it reverses a
+      foundational signal for a modest +0.25pp overall gain, per items
+      30/33/41/44 precedent); user chose to ship. Verified on the real
+      primary route (RB 59.6 / overall 58.94, QB/WR/TE byte-unchanged) and
+      live (a real RB comparison renders sensibly, the pick correctly shifts
+      since the RB volume term is gone), `tsc`/lint clean. The RB volume
+      machinery (`POINTS_PER_VOLUME_UNIT.RB`) is kept, just zero-weighted
+      for PPR — same "disabled but not deleted" precedent as every other
+      zeroed signal in `config.ts`.
+    - **Follow-up: swept Half-PPR and Standard too — RB=0 is PPR-ONLY, does
+      NOT transfer.** Half-PPR: RB=0 makes the primary pipeline worse
+      (primary RB 52.7 → 51.2, overall 56.23 → 55.74) even though pooled
+      mildly likes it (+0.7) — the same non-transfer pattern, so not
+      shipped. Standard: RB=0 is clearly wrong on BOTH pipelines (primary RB
+      **56.9 → 49.0**, −7.9pp; pooled RB 54.6 → 52.0), and Standard wants its
+      full weight. Coherent mechanism: PPR RB scoring includes receptions
+      (which form + consensus already capture, making raw touch-volume
+      redundant), but Standard RB points are yardage/TD-only and noisier, so
+      touch-volume genuinely de-noises there. **Half-PPR RB stays 0.9 and
+      Standard RB stays 1.0** — no config change, the PPR-only decision is
+      now validated rather than merely scoped. Same in-memory-mutation
+      diagnostic route (format-aware this time), deleted after; the earlier
+      batch "failures" were just cold-cache timeouts from running both
+      pipelines per request, fine once warm.
 
 ### Open items (as of item 141 — pick up here)
 **Item 141 (the Nash/volt + glass redesign, above) is the latest work —
@@ -9163,9 +9177,13 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   RB: `ppr.RB` is now 0 (form + consensus already capture RB value; item 44
   had already zeroed RB's red-zone/EPA terms for the same "over-signaled"
   reason), validated on both pipelines. QB/WR/TE stay at their format values
-  (PPR/Half-PPR 0.9, Standard 1.0); Half-PPR/Standard RB left unswept. Every
-  other weight (WR drop rate, both QB rushing terms) showed no format- or
-  position-specific case and stayed a plain shared scalar.
+  (PPR/Half-PPR 0.9, Standard 1.0). A follow-up sweep confirmed RB=0 is
+  PPR-only and does NOT transfer — Half-PPR RB stays 0.9, Standard RB stays
+  1.0 (Standard's primary RB craters 56.9→49.0 at w=0; Standard RB points
+  are yardage/TD-only, so touch-volume de-noises there where PPR receptions
+  make it redundant). Every other weight (WR drop rate, both QB rushing
+  terms) showed no format- or position-specific case and stayed a plain
+  shared scalar.
   `ENSEMBLE_VOLUME_BLEND_RATIO` (item 53) is a different kind of thing
   entirely — a final stage in `scorePlayer`, applied AFTER every modifier
   above, that shrinks the whole `finalScore` toward a simple

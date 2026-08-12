@@ -179,9 +179,17 @@ export const POINTS_PER_VOLUME_UNIT: Record<ScoringFormat, Record<"QB" | "RB" | 
  * RB 58.6 -> 59.6, pooled RB 59.0 -> 59.6) and tightens cross-season
  * variance (2022 RB 55.2 -> 58.1) — consistent with item 44 already
  * finding RB "over-signaled" (its red-zone/EPA terms are also zeroed):
- * recent form + consensus already capture RB value. RB=0 shipped for PPR
- * only (the swept format); Half-PPR/Standard RB left unswept at their
- * prior values. See CLAUDE.md's per-position volume-weight sweep.
+ * recent form + consensus already capture RB value.
+ *
+ * RB=0 is PPR-only, confirmed by a follow-up sweep of Half-PPR and
+ * Standard: it does NOT transfer to either — Half-PPR primary RB 52.7 ->
+ * 51.2 at w=0 (worse), Standard primary RB 56.9 -> 49.0 (much worse), and
+ * Standard wants its full weight on both pipelines. Coherent reason: PPR
+ * RB scoring includes receptions (which form + consensus already capture,
+ * making raw touch-volume redundant), but in Standard, RB points are
+ * yardage/TD-only and noisier, so touch-volume genuinely de-noises and
+ * should stay weighted. So Half-PPR RB stays 0.9 and Standard RB stays 1.0.
+ * See CLAUDE.md's per-position volume-weight sweep.
  */
 export const VOLUME_BLEND_WEIGHT: Record<ScoringFormat, Record<SkillPosition, number>> = {
   ppr: { QB: 0.9, RB: 0, WR: 0.9, TE: 0.9 },
