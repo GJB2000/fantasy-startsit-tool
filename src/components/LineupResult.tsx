@@ -96,14 +96,6 @@ function Avatar({ breakdown, size }: { breakdown: PlayerScoreBreakdown; size: nu
   );
 }
 
-function SlotChip({ heading }: { heading: string }) {
-  return (
-    <span className="rounded-[3px] bg-foreground/[0.06] px-2 py-0.5 font-engraved text-[10.5px] uppercase tracking-[0.08em] text-foreground/60">
-      {heading}
-    </span>
-  );
-}
-
 function opponentLabel(breakdown: PlayerScoreBreakdown): string | null {
   const opp = breakdown.nextOpponent?.team ?? breakdown.matchupContext?.opponentTeam;
   return opp ? `vs ${opp}` : null;
@@ -131,18 +123,21 @@ function StatusPills({ breakdown }: { breakdown: PlayerScoreBreakdown }) {
   );
 }
 
-function EmptySlotCard({ heading }: { heading: string }) {
+function EmptySlotRow({ heading }: { heading: string }) {
   return (
-    <div className="glass-card rounded-2xl border border-dashed border-foreground/20 p-5">
-      <SlotChip heading={heading} />
-      <p className="mt-3 text-sm text-foreground/50">
-        No eligible player on your roster for this slot — add one to fill it.
-      </p>
+    <div className="flex items-center gap-3 border-t border-foreground/[0.07] px-4 py-3.5 first:border-none">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-dashed border-foreground/25 text-[18px] leading-none text-foreground/30">
+        +
+      </span>
+      <div className="min-w-0">
+        <div className="font-engraved text-[9.5px] uppercase tracking-[0.11em] text-foreground/40">{heading}</div>
+        <p className="mt-0.5 text-[12.5px] text-foreground/45">No eligible player on your roster — add one to fill it.</p>
+      </div>
     </div>
   );
 }
 
-function StarterCard({
+function StarterRow({
   heading,
   breakdown,
   formatLabel,
@@ -154,62 +149,48 @@ function StarterCard({
   const [open, setOpen] = useState(false);
   const matchup = matchupPill(breakdown);
   const opp = opponentLabel(breakdown);
-  const color = posVar(breakdown.position);
   const hasNotes = breakdown.notes.length > 0;
 
   return (
-    <div
-      className="glass-card overflow-hidden rounded-2xl border border-foreground/12 transition-all hover:-translate-y-0.5"
-      style={{ borderLeft: `3px solid ${color}` }}
-    >
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <SlotChip heading={heading} />
-          <div className="text-right">
-            <div className="font-jost text-[28px] font-semibold leading-none tabular-nums">
-              {breakdown.finalScore != null ? breakdown.finalScore.toFixed(1) : "—"}
-            </div>
-            <div className="mt-1 font-engraved text-[10.5px] uppercase tracking-[0.08em] text-foreground/40">proj · {formatLabel}</div>
+    <div className="border-t border-foreground/[0.07] first:border-none">
+      <button
+        type="button"
+        onClick={() => hasNotes && setOpen((v) => !v)}
+        aria-expanded={hasNotes ? open : undefined}
+        className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors ${hasNotes ? "hover:bg-foreground/[0.02]" : "cursor-default"}`}
+      >
+        <Avatar breakdown={breakdown} size={40} />
+        <div className="min-w-0 flex-1">
+          <div className="font-engraved text-[9.5px] uppercase tracking-[0.11em] text-foreground/40">{heading}</div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h3 className="truncate font-jost text-[15px] font-semibold tracking-tight">{breakdown.displayName}</h3>
+            <StatusPills breakdown={breakdown} />
           </div>
+          <p className="truncate text-[11.5px] text-foreground/45">
+            {breakdown.position ?? ""}
+            {breakdown.team ? ` · ${breakdown.team}` : ""}
+            {opp ? ` · ${opp}` : ""}
+          </p>
         </div>
-
-        <div className="mt-3 flex items-center gap-3">
-          <Avatar breakdown={breakdown} size={44} />
-          <div className="min-w-0 flex-1">
-            <h3 className="truncate font-jost text-[16px] font-semibold tracking-tight">{breakdown.displayName}</h3>
-            <p className="mt-0.5 truncate text-[12.5px] text-foreground/45">
-              {breakdown.position ?? ""}
-              {breakdown.team ? ` · ${breakdown.team}` : ""}
-              {opp ? ` · ${opp}` : ""}
-            </p>
-          </div>
+        <div className="flex shrink-0 items-center gap-3">
           {matchup && (
-            <span className={`shrink-0 rounded-[3px] border px-2.5 py-1 text-[11px] font-semibold ${MATCHUP_PILL[matchup.tone]}`}>
+            <span className={`hidden shrink-0 rounded-[3px] border px-2.5 py-1 text-[11px] font-semibold sm:inline ${MATCHUP_PILL[matchup.tone]}`}>
               {matchup.text}
             </span>
           )}
+          <div className="text-right">
+            <div className="font-jost text-[19px] font-semibold leading-none tabular-nums">
+              {breakdown.finalScore != null ? breakdown.finalScore.toFixed(1) : "—"}
+            </div>
+            <div className="mt-1 font-engraved text-[9.5px] uppercase tracking-[0.08em] text-foreground/40">proj · {formatLabel}</div>
+          </div>
+          {hasNotes ? <ChevronIcon open={open} /> : <span className="w-4 shrink-0" />}
         </div>
-
-        <div className="mt-3">
-          <StatusPills breakdown={breakdown} />
-        </div>
-
-        {hasNotes && (
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="mt-3 flex items-center gap-1.5 text-[12px] font-semibold text-foreground/50 transition-colors hover:text-foreground"
-            aria-expanded={open}
-          >
-            Why this pick
-            <ChevronIcon open={open} />
-          </button>
-        )}
-      </div>
+      </button>
 
       {hasNotes && open && (
-        <div className="border-t border-foreground/[0.07] px-5 pb-5 pt-4">
-          <ul className="flex flex-col gap-2.5">
+        <div className="px-4 pb-4 pl-[68px]">
+          <ul className="flex flex-col gap-2.5 border-t border-foreground/[0.07] pt-3.5">
             {breakdown.notes.map((note, i) => (
               <li key={i} className="relative pl-4 text-sm leading-relaxed text-foreground/70">
                 <span className="absolute left-0 top-[0.55em] h-1.5 w-1.5 rounded-full bg-accent" />
@@ -279,13 +260,13 @@ export function LineupResult({ slots, bench, scoringFormat }: LineupResultProps)
       {/* starters */}
       <div>
         <h3 className="mb-3 font-engraved text-[12px] uppercase tracking-[0.1em] text-foreground/50">Starters</h3>
-        <div className="flex flex-col gap-4">
+        <div className="glass-card overflow-hidden rounded-2xl border border-foreground/12">
           {slots.map((slot, i) => {
             const heading = slotHeading(slot, countBySlotType[slot.slotType] ?? 1);
             return slot.breakdown ? (
-              <StarterCard key={`${slot.slotType}-${i}`} heading={heading} breakdown={slot.breakdown} formatLabel={formatLabel} />
+              <StarterRow key={`${slot.slotType}-${i}`} heading={heading} breakdown={slot.breakdown} formatLabel={formatLabel} />
             ) : (
-              <EmptySlotCard key={`${slot.slotType}-${i}`} heading={heading} />
+              <EmptySlotRow key={`${slot.slotType}-${i}`} heading={heading} />
             );
           })}
         </div>
