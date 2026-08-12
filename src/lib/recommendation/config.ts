@@ -168,11 +168,25 @@ export const POINTS_PER_VOLUME_UNIT: Record<ScoringFormat, Record<"QB" | "RB" | 
  * SNAP_SHARE_BLEND_WEIGHT_TE confirmed w=1.0 as part of a real,
  * every-season-improving optimum for Standard specifically — see
  * CLAUDE.md's per-format weight re-sweep for the full story.
+ *
+ * Now PER-POSITION (not just per-format), after a dedicated per-position
+ * PPR sweep on both pipelines. The broad "volume is redundant now that
+ * expert consensus carries the score" hypothesis did NOT transfer: the
+ * pooled nflverse pipeline liked low QB/TE weights, but the primary 2025
+ * SportsDataIO pipeline (which the live tool uses) CRATERS QB without it
+ * (61.8 -> 54.9 at w=0), so QB/WR/TE stay at their format values. Only RB
+ * transferred: RB=0 (no volume term) beats 0.9 on BOTH pipelines (primary
+ * RB 58.6 -> 59.6, pooled RB 59.0 -> 59.6) and tightens cross-season
+ * variance (2022 RB 55.2 -> 58.1) — consistent with item 44 already
+ * finding RB "over-signaled" (its red-zone/EPA terms are also zeroed):
+ * recent form + consensus already capture RB value. RB=0 shipped for PPR
+ * only (the swept format); Half-PPR/Standard RB left unswept at their
+ * prior values. See CLAUDE.md's per-position volume-weight sweep.
  */
-export const VOLUME_BLEND_WEIGHT: Record<ScoringFormat, number> = {
-  ppr: 0.9,
-  half_ppr: 0.9,
-  standard: 1.0,
+export const VOLUME_BLEND_WEIGHT: Record<ScoringFormat, Record<SkillPosition, number>> = {
+  ppr: { QB: 0.9, RB: 0, WR: 0.9, TE: 0.9 },
+  half_ppr: { QB: 0.9, RB: 0.9, WR: 0.9, TE: 0.9 },
+  standard: { QB: 1.0, RB: 1.0, WR: 1.0, TE: 1.0 },
 };
 
 /**

@@ -157,7 +157,8 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
       recentVolumeAvg = average(volumeValues);
       const pointsPerUnit = POINTS_PER_VOLUME_UNIT[format][position as keyof (typeof POINTS_PER_VOLUME_UNIT)[ScoringFormat]];
       const expectedPointsFromVolume = recentVolumeAvg * pointsPerUnit;
-      const volumeBlendWeight = VOLUME_BLEND_WEIGHT[format];
+      const volumeBlendWeight =
+        VOLUME_BLEND_WEIGHT[format][position as keyof (typeof VOLUME_BLEND_WEIGHT)[ScoringFormat]];
       const blendedWithVolume =
         (1 - volumeBlendWeight) * blendedScore + volumeBlendWeight * expectedPointsFromVolume;
       volumeModifier = blendedWithVolume - blendedScore;

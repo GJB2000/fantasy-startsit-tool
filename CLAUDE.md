@@ -8280,6 +8280,59 @@ single-season numbers for those specific constants.
       Home widget now shows the identical target as the page. `tsc`/lint
       clean; committed as `5fbb3ae`.
 
+144. **Made `VOLUME_BLEND_WEIGHT` per-position and shipped RB=0 (PPR) — the
+    broad "volume is now redundant" hypothesis was a pooled-nflverse
+    artifact that the primary-pipeline check killed; only RB transferred.**
+    Prompted by the observation that volume drives ~90% of the score but
+    the blend weight was a single per-format scalar shared across all four
+    positions, never tuned per position — while QB's pass-attempt volume is
+    a structurally weaker signal than RB touches/WR targets, and expert
+    consensus (item 70) now carries a lot of the score.
+    - **Method**: made `VOLUME_BLEND_WEIGHT` `Record<ScoringFormat,
+      Record<SkillPosition, number>>` (verified no-op at all-0.9 first),
+      then swept it per position via a temporary in-memory-mutation
+      diagnostic route (`/api/debug-volume-sweep`, deleted after) rather
+      than config-edit-and-curl — the latter hit a Next-dev module-recompile
+      race that produced stale/off-by-one results (a first attempt's numbers
+      were discarded once byte-identical rows across different weights
+      exposed the staleness). Positions are independent in broad mode (pairs
+      are within-position), so setting all four to the same test weight per
+      run yields the full per-position curve. **Also caught and fixed a real
+      self-inflicted bug**: the first sweep's regex matched BOTH `ppr: { QB:
+      … }` lines and `count=1` corrupted `POINTS_PER_VOLUME_UNIT.ppr` (the
+      conversion factor) instead of the weight — restored immediately, and
+      every later run asserts the conversion factor is intact.
+    - **Pooled 2022-2025 said "lower QB/TE weight"** (QB best at w≈0: 61.3
+      vs 60.5, fixing 2024 55.9→62.7), suggesting volume had become
+      redundant given the consensus blend. **But the primary 2025
+      SportsDataIO pipeline — the one the live tool runs on — flatly
+      contradicted it**: at w=0, primary QB CRATERS 61.8 → 54.9 (−6.9pp) and
+      overall drops 58.69 → 56.72. Classic cross-pipeline non-transfer (the
+      exact failure mode item 53 established the primary-pipeline check for,
+      and item 70 saw for consensus). So QB/WR/TE stay at their format
+      values — the pooled "improvement" is an artifact.
+    - **RB was the one position that transferred.** RB=0 (no volume term)
+      beats 0.9 on BOTH pipelines — primary RB 58.6 → 59.6 (overall 58.69 →
+      58.94), pooled RB 59.0 → 59.6 — AND tightens cross-season variance
+      (pooled 2022 RB 55.2 → 58.1, the weakest season). Coherent mechanism,
+      not a fluke: item 44 already found RB "over-signaled" and zeroed its
+      red-zone and EPA terms; recent form + consensus already capture RB
+      value, so the base volume term is likewise net-noise. One caution
+      noted honestly: the primary RB curve is non-monotonic (0 best, 0.3/0.5
+      dip, 0.9 baseline between), so there's some noise, but 0 is clearly
+      best on both pipelines by a real margin.
+    - **Shipped `VOLUME_BLEND_WEIGHT.ppr.RB = 0`** (QB/WR/TE unchanged at
+      0.9; Half-PPR/Standard RB left at their prior values, unswept — this
+      was a PPR-only sweep). Put to the user as a genuine judgment call
+      (it reverses a foundational signal for a modest +0.25pp overall gain,
+      per items 30/33/41/44 precedent); user chose to ship. Verified on the
+      real primary route (RB 59.6 / overall 58.94, QB/WR/TE byte-unchanged)
+      and live (a real RB comparison renders sensibly, the pick correctly
+      shifts since the RB volume term is gone), `tsc`/lint clean. The RB
+      volume machinery (`POINTS_PER_VOLUME_UNIT.RB`) is kept, just
+      zero-weighted for PPR — same "disabled but not deleted" precedent as
+      every other zeroed signal in `config.ts`.
+
 ### Open items (as of item 141 — pick up here)
 **Item 141 (the Nash/volt + glass redesign, above) is the latest work —
 committed and pushed to `main`, current HEAD `014615b`, working tree
@@ -9100,13 +9153,19 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   factors (weight `0`: red-zone, goal-line, QB success rate, RB EPA,
   teammate-bump) were deliberately left as plain PPR-only numbers, since
   a dormant constant doesn't need per-format recalibration.
-  `VOLUME_BLEND_WEIGHT`/`SNAP_SHARE_BLEND_WEIGHT_TE` are *also*
-  `Record<ScoringFormat, number>` as of item 52, the only two per-position
-  blend *weights* (as opposed to conversion factors) found to have a real,
-  every-season-validated per-format optimum — Standard runs higher on
-  both (1.0/0.5 vs. PPR/Half-PPR's shared 0.9/0.4); every other weight
-  (RB red-zone/EPA, WR drop rate, both QB rushing terms) showed no
-  format-specific case and stayed a plain shared scalar.
+  `SNAP_SHARE_BLEND_WEIGHT_TE` is *also* `Record<ScoringFormat, number>`
+  as of item 52 (Standard 0.5 vs. PPR/Half-PPR's 0.4). `VOLUME_BLEND_WEIGHT`
+  went further and is now `Record<ScoringFormat, Record<SkillPosition,
+  number>>` (item 144) — after a per-position PPR sweep found the broad
+  "volume is redundant now that expert consensus carries the score"
+  hypothesis was a pooled-nflverse artifact that didn't transfer to the
+  primary pipeline (QB craters without its volume weight there), EXCEPT for
+  RB: `ppr.RB` is now 0 (form + consensus already capture RB value; item 44
+  had already zeroed RB's red-zone/EPA terms for the same "over-signaled"
+  reason), validated on both pipelines. QB/WR/TE stay at their format values
+  (PPR/Half-PPR 0.9, Standard 1.0); Half-PPR/Standard RB left unswept. Every
+  other weight (WR drop rate, both QB rushing terms) showed no format- or
+  position-specific case and stayed a plain shared scalar.
   `ENSEMBLE_VOLUME_BLEND_RATIO` (item 53) is a different kind of thing
   entirely — a final stage in `scorePlayer`, applied AFTER every modifier
   above, that shrinks the whole `finalScore` toward a simple
