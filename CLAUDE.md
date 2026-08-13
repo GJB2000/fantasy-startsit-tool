@@ -8394,6 +8394,47 @@ single-season numbers for those specific constants.
       numbers. Not a code issue — the fetch's fail-open-to-empty is by
       design; just re-run.
 
+146. **Post-consensus re-sweep of the three remaining active engine weights
+    (`QB_RUSH_BLEND_WEIGHT`, `DROP_RATE_BLEND_WEIGHT`, `SNAP_SHARE_BLEND_WEIGHT_TE`)
+    — found two clean both-pipeline wins and confirmed the third.** The
+    RB=0 (item 144) and QB/TE consensus (item 145) wins both came from
+    "consensus reshaped the landscape, re-check the weights," so this
+    finished that pass on the weights not yet re-swept post-consensus. Same
+    proven method: an in-memory-mutation diagnostic route
+    (`/api/debug-weight-sweep`, deleted after), both pipelines + by-season.
+    Two of the three are scalars (can't mutate a primitive `const` from
+    another module), so a temporary `SWEEP_OVERRIDE` object was added to
+    `config.ts` with three fallback reads in `engine.ts` (`x ?? CONST`),
+    all reverted after the sweep — a no-op at baseline (override undefined),
+    verified reproducing 59.84/58.31 before trusting anything.
+    - **QB rush: NO CHANGE (0.3 confirmed optimal), hypothesis wrong.** I
+      expected it redundant now that QB leans 80% on consensus; instead it
+      PEAKS cleanly at 0.3 on both pipelines (primary QB 63.7 -> 66.7 across
+      0 -> 0.3, then 0.4 -> 62.7 / 0.5 -> 61.8 both decline; pooled similar).
+      A genuine QB signal even under heavy consensus — the qbRush term
+      contributes through the 20% engine portion and still moves QB +3pp.
+    - **WR drop rate: 0.2 -> 0.3 (raised).** The signal wanted MORE weight,
+      not less — the opposite of the redundancy findings, and the ONE real
+      gain for WR (the position both prior passes left untouched: it kept
+      0.5 consensus and has no volume redundancy). Clean on both pipelines
+      (primary WR 58.3 -> 59.3, pooled 55.7 -> 56.0). Higher (0.4-0.6) keeps
+      nudging pooled up but starts costing 2025 WR, so 0.3 is the balanced
+      peak.
+    - **TE snap share: 0.4 -> 0.2 PPR (lowered).** The RB=0 pattern again:
+      now that TE consensus is 0.7 (item 145), snap share at 0.4 was
+      over-weighted/redundant. 0.2 beats 0.4 on both pipelines (primary TE
+      56.4 -> 57.4, pooled 57.8 -> 58.3), cleaner by-season. Half-PPR/Standard
+      left at 0.4/0.5 (PPR-only sweep, matching RB=0's scope).
+    - **Combined (dropRate 0.3 + snapTe.ppr 0.2): a clean no-tradeoff win.**
+      Primary overall 59.84 -> 60.33 (skill-only; +0.49pp), pooled 58.31 ->
+      58.51, QB/RB byte-unchanged, no position regressing on either
+      pipeline — unlike RB=0/consensus, no philosophy shift (minor WR-
+      reliability / TE-snap weights). Verified on both real routes (primary
+      WR 59.3 / TE 57.4; pooled 58.51 / WR 56.0 / TE 58.3, matching the
+      diagnostic) and live (real Lamb-vs-Nacua WR and McBride-vs-Kittle TE
+      compares render sensibly). `tsc`/lint clean; scaffolding fully
+      reverted, diagnostic route deleted.
+
 ### Open items (as of item 141 — pick up here)
 **Item 141 (the Nash/volt + glass redesign, above) is the latest work —
 committed and pushed to `main`, current HEAD `014615b`, working tree

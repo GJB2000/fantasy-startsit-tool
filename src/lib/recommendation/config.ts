@@ -295,9 +295,16 @@ export const POINTS_PER_SNAP_SHARE_UNIT_TE: Record<ScoringFormat, number> = {
  * a joint grid search with VOLUME_BLEND_WEIGHT as part of a real,
  * every-season-improving combined optimum — see CLAUDE.md's per-format
  * weight re-sweep.
+ *
+ * PPR LOWERED 0.4 -> 0.2 post-consensus (item 146): once TE's expert-
+ * consensus weight went to 0.7 (item 145), snap share at 0.4 became
+ * over-weighted (redundant with consensus, the same pattern as RB=0).
+ * 0.2 beats 0.4 on BOTH pipelines (primary TE 56.4 -> 57.4, pooled 57.8
+ * -> 58.3), cleaner by-season. Half-PPR/Standard left at 0.4/0.5 — the
+ * sweep was PPR-only, matching the RB=0 scope.
  */
 export const SNAP_SHARE_BLEND_WEIGHT_TE: Record<ScoringFormat, number> = {
-  ppr: 0.4,
+  ppr: 0.2,
   half_ppr: 0.4,
   standard: 0.5,
 };
@@ -513,13 +520,17 @@ export const POINTS_PER_DROP_RATE_UNIT: Record<ScoringFormat, number> = {
  * engine.ts). Originally set to 0.2 from a two-season (2025/2024) sweep
  * — see CLAUDE.md item 33.
  *
- * Re-swept against the pooled 2022-2025 sample (n=812 WR pairs) as part
- * of a broader re-check of every already-shipped blend weight — see
- * CLAUDE.md's four-season re-sweep. Confirmed, not changed: 0.2 sits at
- * a genuine local peak (54.1%), backed by a real neighborhood (0.15
- * gives 53.9%, 0.25 gives 53.7%) rather than an isolated spike.
+ * Re-swept again post-consensus (item 146): raised 0.2 -> 0.3 after a
+ * clean both-pipeline gain (primary WR 58.3 -> 59.3, pooled 55.7 -> 56.0).
+ * The signal wanted MORE weight, not less — the opposite of the RB=0 /
+ * snap-share redundancy findings, and the one real gain for WR (the
+ * position the consensus-weight and volume-weight passes both left
+ * untouched). Higher weights (0.4-0.6) keep nudging pooled up but start
+ * costing 2025 WR, so 0.3 is the balanced peak. (Earlier the pooled
+ * 2022-2025 re-sweep — CLAUDE.md item 43 — had confirmed 0.2 as the local
+ * peak; the consensus retune since then shifted the optimum.)
  */
-export const DROP_RATE_BLEND_WEIGHT = 0.2;
+export const DROP_RATE_BLEND_WEIGHT = 0.3;
 
 /**
  * Empirically-derived PPR point bonus for WR when a same-position
