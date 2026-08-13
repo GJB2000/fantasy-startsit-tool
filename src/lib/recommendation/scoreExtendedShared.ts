@@ -110,6 +110,8 @@ export function skillFieldDefaults(): Omit<
     rbEpaModifier: 0,
     dropRateAvg: null,
     dropRateModifier: 0,
+    airYardsShareAvg: null,
+    airYardsModifier: 0,
     qbRushEpaAvg: null,
     qbRushEpaModifier: 0,
     teammateOutBumpModifier: 0,

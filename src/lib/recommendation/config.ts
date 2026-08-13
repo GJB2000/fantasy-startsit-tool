@@ -533,6 +533,27 @@ export const POINTS_PER_DROP_RATE_UNIT: Record<ScoringFormat, number> = {
 export const DROP_RATE_BLEND_WEIGHT = 0.3;
 
 /**
+ * Points scored per full unit of WR air-yards-share — ratio of sums
+ * (sum WR PPR points / sum WR air-yards-share) over 2022-2025 WR
+ * game-weeks (n=8039). Stable across seasons (38.3-41.4). Air yards
+ * share is a downfield-role signal, a different axis than target count;
+ * validated standalone at ~56.6% for WR (item 14) but never integrated
+ * until item 148's sweep.
+ */
+export const POINTS_PER_AIR_YARDS_SHARE_UNIT_WR = 40.43;
+
+/**
+ * WR-only air-yards-share blend weight. Shipped at 0.1 (item 148) — a
+ * small but clean both-pipeline WR gain (primary WR 59.3 -> 60.3, pooled
+ * 56.0 -> 56.4, every season >= baseline), the first real WR improvement
+ * after the consensus/volume/drop-rate passes. A narrow peak: 0.05-0.1 is
+ * a real plateau, but 0.15+ declines (air yards correlates with target
+ * volume already in the score, so a small marginal weight helps and more
+ * double-counts). PPR-only; the sweep didn't cover Half-PPR/Standard.
+ */
+export const AIR_YARDS_SHARE_BLEND_WEIGHT = 0.1;
+
+/**
  * Empirically-derived PPR point bonus for WR when a same-position
  * teammate is currently Out/Doubtful ("handcuff" bump) — within-player
  * average PPR points in teammate-out weeks minus their own average in

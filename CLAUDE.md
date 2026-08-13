@@ -502,6 +502,12 @@ This is the most important section — the "brain" of the tool.
     engine; a real WR-specific tradeoff (2025 up, 2024 down as weight
     increases), deliberately tuned to a balanced point rather than
     either season's peak — see item 33.
+  - WR air-yards share (nflverse, `AIR_YARDS_SHARE_BLEND_WEIGHT`/
+    `POINTS_PER_AIR_YARDS_SHARE_UNIT_WR` in `config.ts`) — WR only, a
+    downfield-role signal (a different axis than target count). Shipped
+    at a small 0.1 weight (item 148): a clean both-pipeline WR gain and
+    the counterexample to this app's "consensus crowds out new box-score
+    signals" pattern. PPR-only so far.
   - **RB red-zone touches and RB rushing EPA-per-play were both tried
     and shipped, then later disabled** (`REDZONE_BLEND_WEIGHT_RB`/
     `RB_EPA_BLEND_WEIGHT` both `0` in `config.ts`) — each looked like a
@@ -8478,6 +8484,53 @@ single-season numbers for those specific constants.
       same discipline as items 38/42/54/106/107/123/124. This write-up is
       the only artifact.
 
+148. **Integrated air-yards share as a WR signal — a small but clean
+    both-pipeline win, the first real WR improvement after the consensus /
+    volume / drop-rate passes, and it defied the "consensus crowds out new
+    box-score signals" expectation.** Air-yards share (a WR's share of team
+    air yards — a downfield-role signal, a different axis than target count)
+    validated standalone at ~56.6% for WR back in item 14 but was never
+    integrated; the data was already read into the week table for the
+    `airYardsShare` baseline, just not into the engine's `NflverseSignals`.
+    - **Derived the conversion factor first** (temporary route, deleted):
+      `POINTS_PER_AIR_YARDS_SHARE_UNIT_WR = 40.43`, ratio of sums (sum WR PPR
+      points / sum WR air-yards-share) over 2022-2025 WR game-weeks
+      (n=8039), stable across seasons (38.3-41.4). Air-yards share and
+      fantasy points are in the SAME `stats_player_week` CSV, so this was a
+      direct read.
+    - **Integrated** as a WR-only additive term (mirroring drop rate's
+      shape): `airYardsShare` added to `NflverseSignals`/`EMPTY`, a new
+      `averageAirYardsShare` (WR-only — TE's standalone air-yards number was
+      too noisy, item 14) in `aggregate.ts`, populated in both
+      `buildInput.ts`/`buildBacktestInput.ts`, and an `airYardsModifier` in
+      `engine.ts` blended before the consensus stage. New breakdown fields
+      `airYardsShareAvg`/`airYardsModifier` (+ a default in
+      `scoreExtendedShared.ts` for D/ST/K).
+    - **Swept the weight on both pipelines** via an in-memory-mutation
+      diagnostic (`SWEEP_AIRYARDS`, reverted after): a genuine, if narrow,
+      plateau at 0.05-0.1 — w=0.1 gives primary WR 59.3 -> 60.3, pooled WR
+      56.0 -> 56.4, overall +0.33pp primary / +0.13pp pooled, and EVERY
+      season holds or improves (pooled WR 56.4/54.9/58.0/56.4 vs baseline
+      56.4/54.4/57.5/55.9). 0.15+ declines (air yards correlates with the
+      target-volume already in the score, so a small marginal weight helps
+      and more double-counts). QB/RB/TE unaffected (WR-only).
+    - **Shipped `AIR_YARDS_SHARE_BLEND_WEIGHT = 0.1`** — picked 0.1 over the
+      slightly-higher-primary 0.05 for its uniformly->=-baseline by-season
+      profile (0.05 dipped 2022 by 0.5; the primary difference is ~1 pair of
+      2025-only noise), same "prefer the plateau over the peak" discipline
+      as items 9/10/20. PPR-only (the sweep didn't cover Half-PPR/Standard).
+      Verified on both real routes (primary WR 60.3 / pooled WR 56.4,
+      matching the diagnostic; QB/RB/TE byte-unchanged) and live (a real
+      Lamb-vs-Chase compare shows real air-yards shares — Chase 40.8%, Lamb
+      24.5% — with the modifier firing correctly at the small weight).
+      `tsc`/lint clean; scaffolding reverted, diagnostic route deleted.
+    - **Notable as the counterexample** to this session's recurring "new
+      box-score signals get crowded out by consensus" pattern (items
+      97/106/123/124 and my own low-odds prediction going in): a genuinely
+      new signal DID clear the bar here, small but real, on the one position
+      (WR) that the consensus-weight and volume-weight passes both left
+      untouched.
+
 ### Open items (as of item 141 — pick up here)
 **Item 141 (the Nash/volt + glass redesign, above) is the latest work —
 committed and pushed to `main`, current HEAD `014615b`, working tree
@@ -9595,9 +9648,11 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   signal value" layer on top of that table (`averageSnapShare`/
   `averageTargetShare`/`averageSeparation`/`averageRedZoneTouches`/
   `averageGoalLineTouches`/`averageSuccessRate`/`averageEpaPerPlay`/
-  `averageDropRate`/`averageQbRushEpa` — the last one QB-only, reading
-  the same `rushEpaPerPlay` field RB's EPA signal uses, just for a QB's
-  own carries; see item 41) —
+  `averageDropRate`/`averageQbRushEpa`/`averageAirYardsShare` —
+  `averageQbRushEpa` QB-only (reading the same `rushEpaPerPlay` field RB's
+  EPA signal uses, just for a QB's own carries; see item 41),
+  `averageAirYardsShare` WR-only (the shipped WR air-yards signal, item
+  148)) —
   used by both `recommendation/buildInput.ts`/`buildBacktestInput.ts`
   (feeding the live engine — see Recommendation Logic Philosophy and
   "Backtesting & Tuning History" item 20) and, independently,

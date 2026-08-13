@@ -4,6 +4,8 @@ import {
   DEPTH_STARTER_CONFIDENCE,
   DROP_RATE_BLEND_WEIGHT,
   ENSEMBLE_VOLUME_BLEND_RATIO,
+  AIR_YARDS_SHARE_BLEND_WEIGHT,
+  POINTS_PER_AIR_YARDS_SHARE_UNIT_WR,
   EXPERT_CONSENSUS_BLEND_WEIGHT,
   FINAL_SCORE_DEVIATION_CAP,
   GAP_CONFIDENCE_CURVE,
@@ -296,6 +298,20 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
     );
   }
 
+  let airYardsModifier = 0;
+  const airYardsShare = input.nflverse.airYardsShare;
+  if (blendedScore != null && position === "WR" && airYardsShare != null) {
+    const runningScore =
+      blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier + dropRateModifier;
+    const expectedPointsFromAirYards = airYardsShare * POINTS_PER_AIR_YARDS_SHARE_UNIT_WR;
+    const blendedWithAirYards =
+      (1 - AIR_YARDS_SHARE_BLEND_WEIGHT) * runningScore + AIR_YARDS_SHARE_BLEND_WEIGHT * expectedPointsFromAirYards;
+    airYardsModifier = blendedWithAirYards - runningScore;
+    notes.push(
+      `Commanding ${(airYardsShare * 100).toFixed(0)}% of the team's air yards recently — worth roughly ${expectedPointsFromAirYards.toFixed(1)} points at this position's typical rate.`
+    );
+  }
+
   let teammateOutBumpModifier = 0;
   if (blendedScore != null && position === "WR" && input.hasLimitedTeammate) {
     teammateOutBumpModifier = TEAMMATE_OUT_BUMP_WEIGHT_WR * POINTS_PER_TEAMMATE_OUT_BUMP_WR;
@@ -330,6 +346,7 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
       qbRushEpaModifier +
       rbEpaModifier +
       dropRateModifier +
+      airYardsModifier +
       teammateOutBumpModifier;
     const expertConsensusWeight =
       (position != null ? EXPERT_CONSENSUS_BLEND_WEIGHT[position as keyof typeof EXPERT_CONSENSUS_BLEND_WEIGHT] : null) ??
@@ -356,6 +373,7 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
         qbRushEpaModifier +
         rbEpaModifier +
         dropRateModifier +
+        airYardsModifier +
         teammateOutBumpModifier +
         expertConsensusModifier;
 
@@ -435,6 +453,8 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
     rbEpaModifier,
     dropRateAvg,
     dropRateModifier,
+    airYardsShareAvg: airYardsShare,
+    airYardsModifier,
     qbRushEpaAvg,
     qbRushEpaModifier,
     teammateOutBumpModifier,

@@ -61,6 +61,12 @@ export function averageDropRate(stats: NflverseWeekStat[], position: string | nu
   return null;
 }
 
+/** WR-only share of team air yards — a downfield-role signal (item 148). TE's standalone air-yards number was too noisy (item 14), so scoped WR-only like drop rate. */
+export function averageAirYardsShare(stats: NflverseWeekStat[], position: string | null): number | null {
+  if (position === "WR") return averageStat(stats, "airYardsShare");
+  return null;
+}
+
 /**
  * QB's own rushing EPA-per-play — reads the same `rushEpaPerPlay` field
  * RB's shipped EPA signal uses (averageEpaPerPlay above), just for a QB's

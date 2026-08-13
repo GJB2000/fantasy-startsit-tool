@@ -1,4 +1,5 @@
 import {
+  averageAirYardsShare,
   averageDropRate,
   averageEpaPerPlay,
   averageGoalLineTouches,
@@ -138,6 +139,7 @@ export function buildBacktestComparisonInput(
     epaPerPlay: averageEpaPerPlay(recentNflverseStats, position),
     dropRate: averageDropRate(recentNflverseStats, position),
     qbRushEpaPerPlay: averageQbRushEpa(recentNflverseStats, position),
+    airYardsShare: averageAirYardsShare(recentNflverseStats, position),
   };
 
   const hasLimitedTeammate = team ? weekSlice.hasLimitedTeammate(team, position, playerId, targetWeek) : false;

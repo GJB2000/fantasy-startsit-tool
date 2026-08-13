@@ -1,4 +1,5 @@
 import {
+  averageAirYardsShare,
   averageDropRate,
   averageEpaPerPlay,
   averageGoalLineTouches,
@@ -145,6 +146,7 @@ export async function buildComparisonInput(
     epaPerPlay: averageEpaPerPlay(recentNflverseStats, player.Position),
     dropRate: averageDropRate(recentNflverseStats, player.Position),
     qbRushEpaPerPlay: averageQbRushEpa(recentNflverseStats, player.Position),
+    airYardsShare: averageAirYardsShare(recentNflverseStats, player.Position),
   };
 
   const normalizedName = normalizePlayerName(`${player.FirstName} ${player.LastName}`);
