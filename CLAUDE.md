@@ -8435,6 +8435,49 @@ single-season numbers for those specific constants.
       compares render sensibly). `tsc`/lint clean; scaffolding fully
       reverted, diagnostic route deleted.
 
+147. **Tested dynamic consensus weighting by data quality — lean harder on
+    FantasyPros consensus when a player's recent-form sample is thin — and
+    it's a clean NEGATIVE finding: both directions hurt, nothing shipped.**
+    The hypothesis (the bigger "genuinely new" idea after the item 144-146
+    weight retunes): when `dataQuality === "limited"` (fewer than
+    RECENT_WEEK_COUNT recent games), the engine's own recent-form signals
+    are unreliable, so lean more on consensus — mirroring Legit Rankings'
+    item-78 `ENGINE_WEIGHT`-by-dataQuality precedent, for the start/sit
+    engine. Flagged the tension up front: item 45 already found limited-data
+    PAIRS are the MOST accurate bucket (58.8% pooled vs 52.4% confident), so
+    there might be little pick-accuracy headroom — the real motivation was
+    calibration on the thin-sample cases the backtest underrepresents.
+    - **Method**: a new `EXPERT_CONSENSUS_BLEND_WEIGHT_LIMITED` table
+      (initialized = the full weights, a verified no-op), an engine branch
+      keying on `gamesUsedForRecent < RECENT_WEEK_COUNT` inside the
+      consensus block (blendedScore != null there, so a player is "limited"
+      or "full", never "insufficient"), swept via an in-memory-mutation
+      diagnostic route reporting the confidence breakdown's `limitedData`
+      bucket specifically (n=351 primary / n=1443 pooled — healthy). All
+      reverted after; byte-clean.
+    - **Result: monotonic, both-direction, both-pipeline HURT.** From the
+      baseline (limited = the item-145 per-position weights), the
+      limitedData bucket is 63.5% primary / 60.8% pooled. RAISING the
+      limited weight drops it (boost+0.2 → 61.0%/60.4%, uniform 0.85 →
+      58.7%/59.5%, uniform 1.0 → 57.5%/59.6%) AND drops overall (60.33 →
+      56.89 at 1.0). LOWERING it also drops it (0.3 → 59.0%/59.1%, 0.0 →
+      57.5%/57.6%). The current per-position weights are already optimal for
+      limited-data players too — no data-quality-specific adjustment helps.
+    - **Why it differs from the Legit Rankings precedent (the real insight,
+      worth recording).** Rankings estimate SEASON-LONG value, where thin
+      recent data genuinely means "defer to the market's season outlook."
+      Start/sit is a THIS-WEEK decision, and a thin-data player is usually
+      thin BECAUSE of a current situation (injury return, benching, rookie
+      ramp) that the engine's recent-form signals capture better than
+      FantasyPros' slower, reputation/season-based consensus. Leaning MORE
+      on consensus removes that current-situation signal (hurts); leaning
+      LESS adds noise from the thin recent form (also hurts). The item-145
+      blend is the sweet spot for both data-quality regimes.
+    - **Not shipped — no code change** (`config.ts`/`engine.ts` byte-clean
+      reverts, diagnostic route deleted). A documented negative finding,
+      same discipline as items 38/42/54/106/107/123/124. This write-up is
+      the only artifact.
+
 ### Open items (as of item 141 — pick up here)
 **Item 141 (the Nash/volt + glass redesign, above) is the latest work —
 committed and pushed to `main`, current HEAD `014615b`, working tree
