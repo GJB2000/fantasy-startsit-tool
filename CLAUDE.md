@@ -8531,14 +8531,54 @@ single-season numbers for those specific constants.
       (WR) that the consensus-weight and volume-weight passes both left
       untouched.
 
-### Open items (as of item 141 — pick up here)
-**Item 141 (the Nash/volt + glass redesign, above) is the latest work —
-committed and pushed to `main`, current HEAD `014615b`, working tree
-CLEAN. The one open thread carried out of that session is perf fix #2
-(cap the heavy cold fetches on `/api/compare` — see the end of item
-141).** The paragraph below is the PRIOR session's record (items
-136-140), kept for context — its "as of item 140" framing and HEAD
-`cd97b87` are historical:
+### Open items (as of item 148 — pick up here)
+**This session shipped items 142-148 — all committed and pushed to
+`main`, current HEAD `645a438`, working tree CLEAN.** It began with small
+UI polish (all committed, no numbered items, same precedent as items
+133-135): trimming the repetitive tool name from each page's eyebrow +
+dropping the title subheadings (`eb15679`), coloring the sidebar "Fantasy
+Toolkit" tagline gold (`4519c12`), reformatting the Lineup starters from
+separate cards into one consolidated row-list (`fca6ded`), and increasing
+the Start/Sit verdict→first-card spacing (`408c69a`). Then, prompted by
+"does the waiver target logic make sense," a run of waiver + engine work:
+- **item 142** — waiver-ranking backtest (`c991f7e`) found the shipped
+  "gap" ranking was no better than random; reframed the Waiver Wire tool
+  around recent volume (studs excluded, buy-low demoted to a tag).
+  **Resolves Open Item #9.**
+- **item 143** — unified the waiver "top target" between the Home widget
+  and the page (value-over-replacement) + roster-need weighting (`5fbb3ae`,
+  doc `2521766`).
+- **item 144** — per-position `VOLUME_BLEND_WEIGHT`; shipped RB=0 for PPR
+  (`8bae42e`); Half-PPR/Standard swept + confirmed PPR-only (`b307e8c`).
+- **item 145** — per-position `EXPERT_CONSENSUS_BLEND_WEIGHT`; shipped
+  QB=0.8/TE=0.7, a clean no-tradeoff win (QB now leans 80% on consensus)
+  (`f463271`).
+- **item 146** — post-consensus re-sweep of the remaining active weights:
+  WR drop rate 0.2→0.3, TE snap 0.4→0.2 PPR; QB rush confirmed at 0.3
+  (`be20913`).
+- **item 147** — dynamic consensus weighting by data quality: tested and
+  REJECTED (both directions hurt), no code, documented negative finding
+  (`a55b2ff`).
+- **item 148** — integrated air-yards share as a WR signal at 0.1
+  (`645a438`) — a small clean both-pipeline win and the counterexample to
+  this session's "consensus crowds out new signals" pattern.
+The net engine state after this session: current best pooled 2022-2025 is
+~58.6% / primary 2025 ~60% skill. Remaining threads flagged in item 148:
+air-yards is PPR-only (Half-PPR/Standard unswept), and the RB=0 / TE-snap
+changes were also PPR-only. The numbered open items below were NOT touched
+this session except: **Open Item #9 fully RESOLVED** (item 142). Nothing
+else below is started or fixed unless its own entry says so.
+
+The paragraph below is the PRIOR session's record (items 136-141), kept
+for context — its "as of item 141" framing and HEAD `014615b`/`cd97b87`
+are historical:
+
+**Item 141 (the Nash/volt + glass redesign) — committed and pushed to
+`main`, HEAD `014615b` at that time, working tree CLEAN. The one open
+thread carried out of that session is perf fix #2 (cap the heavy cold
+fetches on `/api/compare` — see the end of item 141).** The paragraph
+below is the session-before's record (items 136-140), kept for context —
+its "as of item 140" framing and HEAD `cd97b87` are historical:
 
 **Everything through item 140 was committed and pushed to `main` (HEAD
 `cd97b87` at that time).** That session
