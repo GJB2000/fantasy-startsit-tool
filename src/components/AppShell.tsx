@@ -20,8 +20,8 @@ const FORMAT_LABEL: Record<ScoringFormat, string> = {
 const SCORING_FORMATS: ScoringFormat[] = ["ppr", "half_ppr", "standard"];
 const FORMAT_SHORT: Record<ScoringFormat, string> = {
   ppr: "PPR",
-  half_ppr: "Half",
-  standard: "Std",
+  half_ppr: "HALF",
+  standard: "STD",
 };
 
 const LINKS: { href: string; label: string; icon: React.ReactNode }[] = [
