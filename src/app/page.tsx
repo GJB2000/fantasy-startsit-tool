@@ -95,7 +95,7 @@ export default function HomePage() {
           className="mt-2 text-[34px] leading-none tracking-[-0.01em] text-foreground"
           style={{ fontFamily: "var(--font-jost)", fontWeight: 600 }}
         >
-          FANTASY TOOLKIT BY LEGITFOOTBALL.COM
+          FANTASY TOOLKIT
         </h1>
       </header>
 
