@@ -32,7 +32,7 @@ function BoardShell({ children }: { children: React.ReactNode }) {
   return (
     <section className="mb-8">
       <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 className="font-engraved text-[12px] uppercase tracking-[0.1em] text-foreground/50">Top of the board</h2>
+        <h2 className="font-engraved text-[12px] uppercase tracking-[0.1em] text-foreground/50">Top five players</h2>
         <Link href="/rankings" className="text-[12px] font-semibold text-accent hover:underline">
           Full Top 100 →
         </Link>
