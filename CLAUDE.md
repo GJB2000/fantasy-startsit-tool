@@ -9474,6 +9474,37 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     tradeoff, not a clean win. The live/pooled numbers today reflect the
     buggy state (weight 0.1 × PPR factor 40.43) on non-PPR, so revisiting
     this also slightly moves those baselines.
+32. **Roster import from platforms other than Sleeper (ESPN, Yahoo, etc.)
+    — deferred, not started.** Sleeper (item 59) was chosen because it's
+    uniquely easy: a fully public, free, no-auth read API keyed by
+    username. Every other platform is a meaningfully bigger lift, and the
+    notes below are from general knowledge — verify each live before
+    building, since these APIs change without notice:
+    - **ESPN** — biggest user base, cheapest to prototype, so the
+      recommended NEXT one if this is picked up. Unofficial JSON endpoint
+      (`fantasy.espn.com/apis/v3/games/ffl/seasons/...`), keyed by **league
+      ID** (not a username). Public leagues read with no auth; **private
+      leagues** (most of them) need the user to copy two cookies from their
+      browser — `espn_s2` and `SWID` — and paste them in. No official/
+      supported API, and ESPN has broken the endpoint before. Doable,
+      moderate effort, clunky private-league UX.
+    - **Yahoo** — has an *official* Fantasy Sports API, but requires full
+      **OAuth2**: register an app with Yahoo, each user logs in through a
+      Yahoo consent screen, then token storage/refresh. The most stable/
+      legitimate non-Sleeper option but the heaviest build (auth flow) and
+      heaviest UX. A larger, later project than ESPN.
+    - **CBS** — OAuth-gated like Yahoo, smaller user base — low priority.
+    - **NFL.com / NFL Fantasy** — platform discontinued/migrated; no
+      reliable public API worth targeting.
+    - **Common thread:** none match Sleeper's "just type your username" —
+      every one needs a league ID + pasted cookies (ESPN) or a real OAuth
+      login (Yahoo/CBS). The existing `lib/sleeper/resolveRoster.ts`
+      name-based join to SportsDataIO PlayerIDs would be reused regardless
+      of source (all these platforms have their own player IDs with no
+      shared key to this app's SportsDataIO space, same as Sleeper). The
+      stale "No league/team import integrations" line under Things to Avoid
+      is already contradicted by the shipped Sleeper import — this item is
+      about *additional* sources, not whether import is in scope.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
