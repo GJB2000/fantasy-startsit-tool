@@ -6,6 +6,7 @@ import { DEFAULT_SLOTS, parseSleeperRosterPositions, type SlotType } from "@/lib
 import type { MatchupContext } from "@/lib/sportsdata/positionDefense";
 import { SKILL_POSITIONS, type ExtendedPosition, type ScoringFormat, type SkillPosition } from "@/lib/sportsdata/types";
 import { ChevronIcon } from "./CollapsibleSection";
+import { CountUpNumber } from "./CountUpNumber";
 
 export interface WaiverCandidateResponse {
   playerId: number;
@@ -340,14 +341,14 @@ function SpotlightCard({
           <div className="mt-5 flex flex-wrap gap-x-7 gap-y-3">
             <div>
               <div className="font-jost text-[26px] font-semibold leading-none">
-                {candidate.recentVolumeAvg.toFixed(1)}
+                <CountUpNumber value={candidate.recentVolumeAvg} decimals={1} />
                 <span className="ml-1 text-[13px] font-medium text-foreground/40">/gm</span>
               </div>
               <div className="mt-1 text-[11px] text-foreground/40">{unit}, last {candidate.gamesUsedForRecent}</div>
             </div>
             <div>
               <div className="font-jost text-[26px] font-semibold leading-none">
-                {candidate.recentPprAvg.toFixed(1)}
+                <CountUpNumber value={candidate.recentPprAvg} decimals={1} />
                 <span className="ml-1 text-[13px] font-medium text-foreground/40">pts</span>
               </div>
               <div className="mt-1 text-[11px] text-foreground/40">recent {formatLabel}</div>
@@ -355,7 +356,7 @@ function SpotlightCard({
             {consensus != null && consensus > 0 && (
               <div>
                 <div className="font-jost text-[26px] font-semibold leading-none text-accent">
-                  {consensus.toFixed(1)}
+                  <CountUpNumber value={consensus} decimals={1} />
                   <span className="ml-1 text-[13px] font-medium text-foreground/40">pts</span>
                 </div>
                 <div className="mt-1 text-[11px] text-foreground/40">consensus proj.</div>

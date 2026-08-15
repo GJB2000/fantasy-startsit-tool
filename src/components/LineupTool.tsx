@@ -35,6 +35,12 @@ export function LineupTool() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slotsOpen, setSlotsOpen] = useState(false);
+  const resultRef = useRef<HTMLDivElement | null>(null);
+
+  // Bring the lineup into view when it renders — on mobile it lands below the fold.
+  useEffect(() => {
+    if (response) resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [response]);
 
   // Re-derive slot counts from the real, connected Sleeper league whenever
   // the connected league actually changes — a starting point, not a lock
@@ -166,10 +172,10 @@ export function LineupTool() {
       <div className="mx-auto w-full max-w-2xl">{controls}</div>
 
       {response && (
-        <>
+        <div ref={resultRef} className="scroll-mt-24">
           <p className="mt-8 text-center text-xs text-foreground/45">{response.context.contextNote}</p>
           <LineupResult slots={response.slots} bench={response.bench} scoringFormat={scoringFormat} />
-        </>
+        </div>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { TradeEvaluation, TradePlayerResult, TradeVerdict } from "@/lib/trade/evaluateTrade";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
+import { CountUpNumber } from "./CountUpNumber";
 import styles from "./TradeResult.module.css";
 
 interface TradeResultProps {
@@ -329,7 +330,14 @@ export function TradeResult({ evaluation, contextNote, scoringFormat }: TradeRes
             <div className={styles.netBlock}>
               <div className={styles.netLab}>Net value to you</div>
               <div className={`${styles.netNum} ${styles.n}`}>
-                {netValue != null ? `${netValue >= 0 ? "+" : "−"}${Math.abs(netValue).toFixed(1)}` : "—"}
+                {netValue != null ? (
+                  <>
+                    {netValue >= 0 ? "+" : "−"}
+                    <CountUpNumber value={Math.abs(netValue)} decimals={1} />
+                  </>
+                ) : (
+                  "—"
+                )}
               </div>
               <div className={styles.netSub}>
                 projected points, rest of season{weeksLeft != null ? ` · ${weeksLeft} wks` : ""}

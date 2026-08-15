@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TradeEvaluation } from "@/lib/trade/evaluateTrade";
 import type { PlayerSummary } from "@/lib/sportsdata/types";
 import { useScoringFormat } from "@/lib/useScoringFormat";
@@ -22,6 +22,12 @@ export function TradeAnalyzer() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scoringFormat, setScoringFormat] = useScoringFormat();
+  const resultRef = useRef<HTMLDivElement | null>(null);
+
+  // Bring the verdict into view when it renders — on mobile it lands below the fold.
+  useEffect(() => {
+    if (response) resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [response]);
 
   function addTo(setter: typeof setGivePlayers) {
     return (player: PlayerSummary) => {
@@ -113,11 +119,13 @@ export function TradeAnalyzer() {
       </div>
 
       {response && (
-        <TradeResult
-          evaluation={response.evaluation}
-          contextNote={response.context.contextNote}
-          scoringFormat={scoringFormat}
-        />
+        <div ref={resultRef} className="scroll-mt-24">
+          <TradeResult
+            evaluation={response.evaluation}
+            contextNote={response.context.contextNote}
+            scoringFormat={scoringFormat}
+          />
+        </div>
       )}
     </div>
   );

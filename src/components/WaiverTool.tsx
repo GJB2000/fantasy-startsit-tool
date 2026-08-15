@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExtendedPosition } from "@/lib/sportsdata/types";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useRosterModal } from "@/lib/useRosterModal";
@@ -140,6 +140,12 @@ export function WaiverTool() {
     [rostered, sleeperConnection]
   );
   const [dismissedIds, setDismissedIds] = useState<Set<number>>(new Set());
+  const resultRef = useRef<HTMLDivElement | null>(null);
+
+  // Bring the board into view when results render — on mobile they land below the fold.
+  useEffect(() => {
+    if (response) resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [response]);
 
   async function handleFind() {
     setLoading(true);
@@ -245,14 +251,16 @@ export function WaiverTool() {
       )}
 
       {response && filteredCandidatesByPosition && (
-        <WaiverResult
-          candidatesByPosition={filteredCandidatesByPosition}
-          scoringFormat={scoringFormat}
-          showRosteredButton={!sleeperConnection}
-          onMarkRostered={handleMarkRostered}
-          contextNote={response.context.contextNote}
-          rosterNeedPenalty={rosterNeedPenalty}
-        />
+        <div ref={resultRef} className="scroll-mt-24">
+          <WaiverResult
+            candidatesByPosition={filteredCandidatesByPosition}
+            scoringFormat={scoringFormat}
+            showRosteredButton={!sleeperConnection}
+            onMarkRostered={handleMarkRostered}
+            contextNote={response.context.contextNote}
+            rosterNeedPenalty={rosterNeedPenalty}
+          />
+        </div>
       )}
     </div>
   );

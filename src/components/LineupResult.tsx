@@ -5,6 +5,7 @@ import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
 import type { SlotType } from "@/lib/lineup/rosterSlots";
 import { ChevronIcon } from "./CollapsibleSection";
+import { CountUpNumber } from "./CountUpNumber";
 
 export interface LineupSlotResponse {
   slotType: SlotType;
@@ -251,7 +252,7 @@ export function LineupResult({ slots, bench, scoringFormat }: LineupResultProps)
         </div>
         <div className="shrink-0 text-right">
           <div className="font-jost text-[40px] font-semibold leading-none tabular-nums text-accent">
-            {projectedTotal.toFixed(1)}
+            <CountUpNumber value={projectedTotal} decimals={1} />
           </div>
           <div className="mt-1 font-engraved text-[10.5px] uppercase tracking-[0.08em] text-foreground/40">projected points</div>
         </div>
