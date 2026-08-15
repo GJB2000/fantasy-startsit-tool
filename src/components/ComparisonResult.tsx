@@ -4,6 +4,7 @@ import type { GameWeather } from "@/lib/nflverse/schedules";
 import type { PlayerProps } from "@/lib/oddsapi/types";
 import type { ComparisonResult as ComparisonResultData, PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
+import { CountUpNumber } from "./CountUpNumber";
 import styles from "./ComparisonResult.module.css";
 
 interface ComparisonResultProps {
@@ -397,7 +398,11 @@ function PlayerCard({
         <div>
           <div className={styles.lab}>Projection</div>
           <div className={styles.pNum}>
-            <span className={styles.n}>{player.finalScore != null ? player.finalScore.toFixed(1) : "—"}</span>
+            {player.finalScore != null ? (
+              <CountUpNumber value={player.finalScore} decimals={1} className={styles.n} />
+            ) : (
+              <span className={styles.n}>—</span>
+            )}
             <small>{formatLabel}</small>
           </div>
         </div>
@@ -498,7 +503,7 @@ export function ComparisonResult({ result, contextNote, scoringFormat, propsByPl
             <div className={styles.vgrid}>
               <div>
                 <div className={styles.cnum}>
-                  <span className={styles.n}>{confPct}</span>
+                  <CountUpNumber value={confPct} decimals={0} className={styles.n} />
                   <small>%</small>
                 </div>
                 <div className={styles.cdesc}>Confidence · {confTier(confPct)}</div>
