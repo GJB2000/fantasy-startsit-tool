@@ -8637,19 +8637,74 @@ single-season numbers for those specific constants.
       #31.**
 
 ### Open items (as of item 150 — pick up here)
-**This session shipped items 149 and 150.** Item 149 (committed `1e52771`'s
-successor — pushed) swept the items-144/146/148 weights for Half-PPR/Standard
-and shipped two clean both-pipeline wins (Half-PPR drop 0.3→0.4, Standard TE
-snap 0.5→0.2), flagging air-yards non-PPR as a no-ship + Open Item #31. Item
-150 then FIXED that air-yards bug (per-format conversion factor + Half-PPR
-weight 0.15 / Standard 0, a hybrid — see item 150; a first blanket-disable
-attempt was caught regressing Half-PPR because of the item-149 drop-0.4
-interaction, then corrected) — **resolving Open Item #31**. Item 150 is NOT
-yet committed as of this writing (only `config.ts`/`engine.ts` changed; sweep
-scaffolding removed). The earlier UI work this session (number animations,
-auto-scroll, the Opponent card line, cold-fetch timeout guard) was committed/
-pushed separately. Engine current best pooled 2022-2025: ~58.6% PPR / 57.6%
-Half-PPR / 58.9% Standard.
+**This session is fully committed and pushed to `main` (HEAD `cd7f26e`),
+working tree CLEAN.** Two engine items (149, 150 — written up above) plus a
+batch of UI/functional changes (committed, no numbered items, same precedent
+as items 133-135). In commit order after the prior session's handoff
+(`b921a2c`):
+- **Small Home/sidebar copy**: rename Home rankings heading to "Top five
+  players" (`cee5b12`); uppercase HALF/STD in the sidebar scoring control
+  (`40b51a7`); trim Home `<h1>` to "FANTASY TOOLKIT" (`787b4f1`).
+- **Start/Sit cold-start perf** (`58d3c08`): the first compare after a Vercel
+  deploy (which wipes the persistent Data Cache) was blocking on two heavy
+  nflverse parses — the depth-chart file (confidence floor only) and the
+  play-by-play red-zone aggregate (WR drop-rate only). Timeout-guarded both
+  (`withColdTimeout` in `lib/cache/liveAggregates.ts`, `COLD_FETCH_TIMEOUT_MS`)
+  so the request returns fast and the real parse finishes via `after()`,
+  warming the cache for the next request (self-healing). Extended to ALL live
+  routes (`e7e5138`) — trade/lineup/waivers/rankings/trade-suggestion all
+  share the play-by-play parse; only compare had the guard. Neither dropped
+  signal changes the actual pick. Also deferred the display-only betting props
+  to a client-side `/api/props` fetch after the verdict renders (was committed
+  earlier, `2ddaaa0`, prior session).
+- **"Calculating" number animation** (`1e52771`, extended `b7a1381`): new
+  shared `CountUpNumber.tsx` — hero numbers scramble around the answer with a
+  decaying jitter and settle on mount (SSR-safe, respects
+  prefers-reduced-motion). Wired into Start/Sit (confidence % + projections),
+  Trade (net value), Lineup (projected total), Waivers (spotlight stats).
+- **Auto-scroll to results** (`96b76f3`, `b7a1381`): Start/Sit, Trade, Waivers,
+  Lineup each scroll their result into view on render (`scroll-mt-24` clears
+  the mobile top bar).
+- **Start/Sit "Opponent" line** (`9b45f94`, moved into the Status column
+  `2c1f1a9`): each skill card states how many points the next opponent's
+  defense has allowed per game to that position, in the selected format
+  (reads `matchupContext.allowedPerGame`, already format-aware). Lives in the
+  Weather/Status aside.
+- **Mobile dropdown z-index fixes** (`ac300b9` Start/Sit, `852109d` Trade): the
+  search panels' `backdrop-blur-xl` created a stacking context with no
+  z-index, so the open player-search dropdown was painted over by the Recent-
+  comparisons rail / the trade result below. Added `relative z-20` to each
+  search card. Audited the other tools — Backtest (plain containers) and the
+  roster modal (picker is last, not clipped) don't have the issue.
+- **Home tool-card copy** (`8f9f73d`): replaced the corny rhetorical-question
+  titles ("Who should you start?" etc.) with plain value statements, matching
+  item 127's page-heading fix; tightened descriptions; corrected the Rankings
+  card, which overclaimed "every player" (it shows the top per position + the
+  Top 100).
+- **Waivers: gate D/ST and K on league slots** (`df41f44`): a connected
+  Sleeper league that doesn't roster a DEF/K slot no longer gets D/ST/K
+  targets. New `streamingPositionFlags(rosterPositions)` in
+  `lib/lineup/rosterSlots.ts` (both true when slots unknown — manual rosters
+  unchanged) → `includeDst`/`includeK` query params on `/api/waivers`, used by
+  the Waivers page AND the Home widget. The route omits the excluded positions
+  AND skips their scan (the 32-team D/ST scan is the expensive one — a perf
+  win too).
+- **Waivers: top 10 per position** (`bb19a99`): `CANDIDATES_PER_POSITION`
+  6→10 in both `rankCandidates.ts` and `rankExtendedCandidates.ts`. Same
+  commit fixed the Favorable/Tough matchup pill overlapping the GapBar labels
+  at intermediate desktop widths (kept the gap bar on its own full-width row
+  until `lg` instead of `sm`, so pill and labels never share horizontal
+  space).
+- **Removed the Home newsletter signup** (`cd7f26e`): deleted
+  `NewsletterSignup.tsx` and the unused `/api/subscribe` route (never wired to
+  a provider). Makes former Open Item #21 obsolete (see below).
+
+Engine current best pooled 2022-2025: ~58.6% PPR / 57.6% Half-PPR / 58.9%
+Standard (unchanged since item 150). Open-item deltas this session: **#31
+RESOLVED** (item 150), **#32 ADDED** (`05a6539`, ESPN/Yahoo roster import),
+**#21 now OBSOLETE** (newsletter removed), **#29 partially done** (cold-fetch
+guard shipped on all routes + betting-props deferral done; a Vercel Cron
+warmer and the real production before/after are what remain).
 
 The paragraph below is the PRIOR session's record (items 142-148), kept for
 context — its "as of item 148" framing and HEAD `645a438` are historical:
@@ -9241,20 +9296,15 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     `TradeResult` a client component with a small `useState`/`useEffect`)
     or a pure-CSS keyframe reveal keyed off a mount class. Low-priority
     polish, not a correctness issue.
-21. **Newsletter signup provider isn't wired yet (item 96).** The Home
-    page's signup band POSTs to `/api/subscribe`, which forwards the email
-    to a `NEWSLETTER_FORM_ENDPOINT` env var — currently unset, so the live
-    Subscribe button returns an honest "signup isn't connected yet"
-    message and no email is captured. To finish: set
-    `NEWSLETTER_FORM_ENDPOINT` (`.env.local` locally, Vercel project env
-    vars in production — same "never commit a secret" discipline as
-    `SPORTSDATA_API_KEY`) to Legitfootball's newsletter provider's
-    form-POST URL. Most providers (Beehiiv/ConvertKit/Substack/Mailchimp/
-    Buttondown) accept a plain `{ email }` POST; if the chosen provider
-    needs a richer call (an auth header, a different body shape, a list
-    ID), extend `/api/subscribe/route.ts` accordingly. Blocked only on
-    which platform Legitfootball actually runs on — asked, not yet
-    answered.
+21. **OBSOLETE — the Home newsletter signup was removed (commit `cd7f26e`).**
+    `NewsletterSignup.tsx` and the `/api/subscribe` route were deleted (the
+    signup band was never wired to a provider). If a newsletter signup is
+    wanted again later, it's a fresh build, not a wiring task — so this item
+    is closed rather than pending. (Original text, for context: the band
+    POSTed to `/api/subscribe`, which forwarded to an unset
+    `NEWSLETTER_FORM_ENDPOINT` env var and returned an honest "signup isn't
+    connected yet" — it just needed the provider's form-POST URL, blocked on
+    which platform Legitfootball runs on.)
 22. **Home tool grid wasn't restructured (item 96).** The approved mockup
     promoted Start/Sit to a wide "hero" card with the other tools smaller,
     but the build left the existing six-equal-card 2-col grid as-is, since
@@ -9394,7 +9444,14 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     Next.js's Data Cache (`unstable_cache`), NOT Vercel Blob — the
     aggregated outputs fit Next's ~2MB entry limit (after columnar
     encoding for the two big raw arrays), so no external store was needed.
-    Correctness is verified byte-identical (item 126); what's left:
+    Correctness is verified byte-identical (item 126). **Since then, a
+    cold-fetch timeout guard was added on top of the cache (commits `58d3c08`
+    / `e7e5138`): `withColdTimeout` / `COLD_FETCH_TIMEOUT_MS` in
+    `lib/cache/liveAggregates.ts` bounds the two heaviest cold parses
+    (depth-chart, play-by-play red-zone) so the FIRST request after a deploy
+    (which wipes the Data Cache) returns fast and the real parse warms the
+    cache via `after()` — applied to all live routes, not just compare. The
+    betting-props deferral below is also DONE.** What's left:
     - **Confirm real cold/warm latency on a Vercel deploy** — this is the
       one thing that couldn't be measured locally (the shared dev server
       can't be restarted/read from this session). Expected ~13s cold →
@@ -9403,10 +9460,10 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       ~1s, in parallel). Also worth a spot-check that a live compare
       returns an identical pick/`finalScore` to before (should — the
       byte-identical verification already proves the inputs are unchanged).
-    - **Defer the display-only betting props** (The Odds API) to a
-      client-side follow-up fetch so the verdict renders immediately. A
-      no-op right now (offseason → props empty), a real in-season UX win.
-      Independent of the caching.
+    - **DONE — Defer the display-only betting props** (The Odds API) to a
+      client-side `/api/props` fetch after the verdict renders (`2ddaaa0`),
+      so the Odds API round-trip never delays the comparison. A no-op right
+      now (offseason → props empty), a real in-season UX win.
     - **OPTIONAL: a Vercel Cron warmer** — largely unnecessary because
       `unstable_cache`'s stale-while-revalidate serves the stale value fast
       while refreshing in the background, so users only ever eat the cold
@@ -10153,7 +10210,17 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   `leagueRostered` (every player owned by any OTHER team in a connected
   Sleeper league) also excludes from the ranking pool but is never
   passed to the drop-candidate step — you can't drop a player you don't
-  own. `src/app/api/sleeper/leagues` and `src/app/api/sleeper/roster`
+  own. Two more optional params (session after item 150, commit
+  `df41f44`): `includeDst`/`includeK` (default `true`) — a connected
+  Sleeper league that doesn't roster a DEF/K slot passes `false`
+  (computed client-side by `streamingPositionFlags` in
+  `lib/lineup/rosterSlots.ts`, used by both the Waivers page and the Home
+  widget), and the route then both OMITS that position from the response
+  AND skips its scan in `rankExtendedWaiverCandidates` (the 32-team D/ST
+  scan is the expensive one, so it's a perf win too). Skill and streaming
+  candidate lists both surface up to 10 per position
+  (`CANDIDATES_PER_POSITION = 10`, raised from 6 the same session).
+  `src/app/api/sleeper/leagues` and `src/app/api/sleeper/roster`
   (item 59) orchestrate `lib/sleeper/` — `leagues` resolves a username
   to its real leagues (querying both the last-completed and upcoming
   season, since a redraft league might not have reset yet while a
@@ -10209,7 +10276,16 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   reading that player's real `.notes`. The verdict banner's confidence
   bar is now position-aware (`CONFIDENCE_BY_POSITION`, item 86) and
   shows four static reference-scale markers under the real percentage).
-  As of item 64, `StartSitTool.tsx`
+  As of the session after item 150, `ComparisonResult.tsx` also renders an
+  "Opponent" line in each skill card's Weather/Status aside — how many
+  points the next opponent's defense allows per game to that position
+  (`matchupContext.allowedPerGame`, format-aware) — and its hero numbers
+  (confidence %, projections) animate via the shared `CountUpNumber.tsx`
+  (a scramble-and-settle "calculating" effect, SSR-safe, honors
+  prefers-reduced-motion). `CountUpNumber.tsx` is reused by
+  `TradeResult`/`LineupResult`/`WaiverResult` for their hero numbers too,
+  and each of those tools' page components scrolls its result into view on
+  render (`scroll-mt-24`). As of item 64, `StartSitTool.tsx`
   lays out as a 2-column grid with a new `StartSitRail.tsx` alongside
   `ComparisonResult.tsx` — as of item 87, the sidebar holds only
   `KeyTakeawaysPanel` (`result.reasoning`, item 85 — the pairwise
