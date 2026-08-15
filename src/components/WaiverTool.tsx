@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { streamingPositionFlags } from "@/lib/lineup/rosterSlots";
 import type { ExtendedPosition } from "@/lib/sportsdata/types";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useRosterModal } from "@/lib/useRosterModal";
@@ -155,8 +156,10 @@ export function WaiverTool() {
     try {
       const rosteredParam = rostered.map((p) => p.playerId).join(",");
       const leagueRosteredParam = (sleeperConnection?.leagueRosteredPlayerIds ?? []).join(",");
+      // Don't recommend D/ST or K if the connected league doesn't roster them.
+      const { includeDst, includeK } = streamingPositionFlags(sleeperConnection?.rosterPositions);
       const res = await fetch(
-        `/api/waivers?scoringFormat=${scoringFormat}&rostered=${rosteredParam}&leagueRostered=${leagueRosteredParam}`
+        `/api/waivers?scoringFormat=${scoringFormat}&rostered=${rosteredParam}&leagueRostered=${leagueRosteredParam}&includeDst=${includeDst}&includeK=${includeK}`
       );
       const data = await res.json();
       if (!res.ok) {

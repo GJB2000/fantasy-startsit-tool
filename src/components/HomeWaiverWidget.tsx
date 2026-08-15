@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { streamingPositionFlags } from "@/lib/lineup/rosterSlots";
 import type { ExtendedPosition } from "@/lib/sportsdata/types";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useScoringFormat } from "@/lib/useScoringFormat";
@@ -55,7 +56,10 @@ export function HomeWaiverWidget() {
     setError(null);
     const rosteredParam = rostered.map((p) => p.playerId).join(",");
     const leagueRosteredParam = (sleeperConnection?.leagueRosteredPlayerIds ?? []).join(",");
-    fetch(`/api/waivers?scoringFormat=${scoringFormat}&rostered=${rosteredParam}&leagueRostered=${leagueRosteredParam}`)
+    const { includeDst, includeK } = streamingPositionFlags(sleeperConnection?.rosterPositions);
+    fetch(
+      `/api/waivers?scoringFormat=${scoringFormat}&rostered=${rosteredParam}&leagueRostered=${leagueRosteredParam}&includeDst=${includeDst}&includeK=${includeK}`
+    )
       .then(async (res) => {
         const data = await res.json();
         if (cancelled) return;

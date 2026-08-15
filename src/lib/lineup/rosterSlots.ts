@@ -103,6 +103,21 @@ export function parseSleeperRosterPositions(rosterPositions: string[]): Record<S
   return counts;
 }
 
+/**
+ * Whether a connected Sleeper league rosters a D/ST and/or K slot — used by
+ * the waiver tools to avoid recommending streaming targets the league can't
+ * even start. Returns both true when slots aren't known (no connection, or a
+ * connection saved before rosterPositions was captured): we don't filter on
+ * an unknown format.
+ */
+export function streamingPositionFlags(
+  rosterPositions: string[] | null | undefined
+): { includeDst: boolean; includeK: boolean } {
+  if (!rosterPositions || rosterPositions.length === 0) return { includeDst: true, includeK: true };
+  const slots = parseSleeperRosterPositions(rosterPositions);
+  return { includeDst: slots.DST > 0, includeK: slots.K > 0 };
+}
+
 /** Human-readable one-line summary of a slot config (e.g. "1 QB · 2 RB · 2 WR · 1 TE · 1 FLEX · 1 K · 1 D/ST"), for the collapsed lineup-slots header. Zero-count slot types are omitted. */
 export function summarizeSlots(counts: Record<SlotType, number>): string {
   const parts = SLOT_TYPES.filter((t) => counts[t] > 0).map((t) => `${counts[t]} ${SLOT_LABEL[t]}`);

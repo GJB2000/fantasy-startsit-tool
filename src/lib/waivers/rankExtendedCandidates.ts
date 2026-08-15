@@ -30,10 +30,22 @@ export async function rankExtendedWaiverCandidates(
   excludePlayerIds: Set<number>,
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   teamWeatherByTeamWeek: Map<string, GameWeather>,
-  impliedTotalsByTeamWeek: Map<string, number>
+  impliedTotalsByTeamWeek: Map<string, number>,
+  // Which streaming positions to scan — a connected Sleeper league that
+  // doesn't roster a D/ST or K slot passes false so those targets are
+  // never surfaced (see /api/waivers). Both default true (manual rosters
+  // and connections without known slots keep both). Skipping a position
+  // also skips its scan entirely — the D/ST scan (32 teams) is the
+  // expensive one, so this is a real perf win, not just a display filter.
+  opts?: { includeDst?: boolean; includeK?: boolean }
 ): Promise<{ DST: WaiverCandidate[]; K: WaiverCandidate[] }> {
-  const [dstPlayers, allExtended] = await Promise.all([getAllDstPlayers(), getActiveExtendedPlayers()]);
-  const kPlayerIds = allExtended.filter((p) => p.Position === "K").map((p) => p.PlayerID);
+  const includeDst = opts?.includeDst ?? true;
+  const includeK = opts?.includeK ?? true;
+  if (!includeDst && !includeK) return { DST: [], K: [] };
+
+  const allExtended = await getActiveExtendedPlayers();
+  const kPlayerIds = includeK ? allExtended.filter((p) => p.Position === "K").map((p) => p.PlayerID) : [];
+  const dstPlayers = includeDst ? await getAllDstPlayers() : [];
   const dstPlayerIds = dstPlayers.map((p) => p.PlayerID);
 
   // Pre-warm the per-week caches ONCE before scanning every team/kicker.
@@ -44,10 +56,10 @@ export async function rankExtendedWaiverCandidates(
   // live as a real "fetch failed" network error under that load, not a
   // hypothetical — sequenced (not Promise.all'd together) for the same
   // peak-connection-pressure reason item 27 already staged nflverse's
-  // fetches for the backtest pipeline.
+  // fetches for the backtest pipeline. Only warm what's actually scanned.
   const allWeeks = Array.from({ length: context.lastCompletedWeek }, (_, i) => i + 1);
-  await Promise.all(allWeeks.map((w) => getFantasyDefenseByWeek(context.lastCompletedApiSeason, w)));
-  await Promise.all(allWeeks.map((w) => getPlayerGameStatsByWeek(context.lastCompletedApiSeason, w)));
+  if (includeDst) await Promise.all(allWeeks.map((w) => getFantasyDefenseByWeek(context.lastCompletedApiSeason, w)));
+  if (includeK) await Promise.all(allWeeks.map((w) => getPlayerGameStatsByWeek(context.lastCompletedApiSeason, w)));
 
   async function rankOne(
     ids: number[],
@@ -94,26 +106,30 @@ export async function rankExtendedWaiverCandidates(
   }
 
   const [DST, K] = await Promise.all([
-    rankOne(dstPlayerIds, "DST", async (id) => {
-      const input = await buildDstComparisonInput(
-        id,
-        context,
-        remainingOpponentsByTeam,
-        impliedTotalsByTeamWeek,
-        teamWeatherByTeamWeek
-      );
-      return input ? scoreDst(input) : null;
-    }),
-    rankOne(kPlayerIds, "K", async (id) => {
-      const input = await buildKickerComparisonInput(
-        id,
-        context,
-        remainingOpponentsByTeam,
-        teamWeatherByTeamWeek,
-        impliedTotalsByTeamWeek
-      );
-      return input ? scoreKicker(input, format) : null;
-    }),
+    includeDst
+      ? rankOne(dstPlayerIds, "DST", async (id) => {
+          const input = await buildDstComparisonInput(
+            id,
+            context,
+            remainingOpponentsByTeam,
+            impliedTotalsByTeamWeek,
+            teamWeatherByTeamWeek
+          );
+          return input ? scoreDst(input) : null;
+        })
+      : Promise.resolve([] as WaiverCandidate[]),
+    includeK
+      ? rankOne(kPlayerIds, "K", async (id) => {
+          const input = await buildKickerComparisonInput(
+            id,
+            context,
+            remainingOpponentsByTeam,
+            teamWeatherByTeamWeek,
+            impliedTotalsByTeamWeek
+          );
+          return input ? scoreKicker(input, format) : null;
+        })
+      : Promise.resolve([] as WaiverCandidate[]),
   ]);
 
   return { DST, K };

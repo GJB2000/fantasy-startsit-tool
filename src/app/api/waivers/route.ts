@@ -47,6 +47,12 @@ export async function GET(request: Request) {
   // own matchup logic. See rankCandidates.ts.
   const rankByParam = url.searchParams.get("rankBy");
   const rankBy: WaiverRankStrategy = rankByParam === "gap" || rankByParam === "residual" ? rankByParam : "volume";
+  // Whether to surface D/ST and K targets. A connected Sleeper league that
+  // doesn't roster those slots passes false, so we neither scan nor
+  // recommend them. Default true (manual rosters / unknown-slot connections
+  // keep both) — only an explicit "false" excludes.
+  const includeDst = url.searchParams.get("includeDst") !== "false";
+  const includeK = url.searchParams.get("includeK") !== "false";
 
   try {
     const context = await getSeasonContext();
@@ -99,7 +105,8 @@ export async function GET(request: Request) {
         excludeIds,
         remainingOpponentsByTeam,
         teamWeatherByTeamWeek,
-        impliedTotalsByTeamWeek
+        impliedTotalsByTeamWeek,
+        { includeDst, includeK }
       ),
     ]);
 
@@ -119,8 +126,8 @@ export async function GET(request: Request) {
 
     const detailsByPosition = [
       ...skillDetailsByPosition,
-      ["DST", extendedCandidates.DST] as const,
-      ["K", extendedCandidates.K] as const,
+      ...(includeDst ? [["DST", extendedCandidates.DST] as const] : []),
+      ...(includeK ? [["K", extendedCandidates.K] as const] : []),
     ];
 
     const allCandidates: WaiverCandidate[] = detailsByPosition.flatMap(([, details]) => details);
