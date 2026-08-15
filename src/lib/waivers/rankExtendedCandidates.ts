@@ -10,7 +10,7 @@ import type { ScoringFormat } from "@/lib/sportsdata/types";
 import { getPlayerGameStatsByWeek } from "@/lib/sportsdata/weeklyStats";
 import type { WaiverCandidate } from "./buildWaiverReport";
 
-const CANDIDATES_PER_POSITION = 6;
+const CANDIDATES_PER_POSITION = 10;
 
 /**
  * D/ST and K's waiver mechanism, deliberately different from

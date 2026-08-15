@@ -15,7 +15,7 @@ import {
 import { getPlayerGameStatsByWeek } from "@/lib/sportsdata/weeklyStats";
 
 const MIN_RECENT_GAMES = 2;
-const CANDIDATES_PER_POSITION = 6;
+const CANDIDATES_PER_POSITION = 10;
 // A candidate needs at least this fraction of the position's own
 // FULL-SEASON efficiency baseline to qualify — see getEfficiencyStat's
 // doc comment. Two cheaper baselines were tried and rejected first: a

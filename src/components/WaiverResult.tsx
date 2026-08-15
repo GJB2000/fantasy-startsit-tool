@@ -423,7 +423,7 @@ function WaiverCandidateRow({
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="grid w-full grid-cols-[36px_1fr_auto] items-center gap-x-4 gap-y-4 px-4 py-4 text-left transition-colors hover:bg-foreground/[0.02] sm:grid-cols-[36px_minmax(150px,1.4fr)_minmax(0,1.7fr)_auto]"
+        className="grid w-full grid-cols-[36px_1fr_auto] items-center gap-x-4 gap-y-4 px-4 py-4 text-left transition-colors hover:bg-foreground/[0.02] lg:grid-cols-[36px_minmax(150px,1.4fr)_minmax(0,1.7fr)_auto]"
         aria-expanded={expanded}
       >
         <span className="text-center font-jost text-[16px] font-semibold text-foreground/40">{String(rank).padStart(2, "0")}</span>
@@ -447,7 +447,7 @@ function WaiverCandidateRow({
           </div>
         </div>
 
-        <div className="col-span-3 min-w-0 sm:col-span-1 sm:col-start-3">
+        <div className="col-span-3 min-w-0 lg:col-span-1 lg:col-start-3">
           {streaming || candidate.isBuyLow ? (
             <GapBar candidate={candidate} size="sm" />
           ) : (
@@ -457,7 +457,7 @@ function WaiverCandidateRow({
           )}
         </div>
 
-        <div className="col-start-3 row-start-1 flex items-center justify-end gap-3 sm:col-start-4 sm:row-start-auto">
+        <div className="col-start-3 row-start-1 flex items-center justify-end gap-3 lg:col-start-4 lg:row-start-auto">
           {matchup && (
             <span className={`hidden shrink-0 rounded-[3px] border px-2.5 py-1 text-[11px] font-semibold sm:inline ${MATCHUP_PILL[matchup.tone]}`}>
               {matchup.text}
