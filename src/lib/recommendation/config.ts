@@ -306,7 +306,13 @@ export const POINTS_PER_SNAP_SHARE_UNIT_TE: Record<ScoringFormat, number> = {
 export const SNAP_SHARE_BLEND_WEIGHT_TE: Record<ScoringFormat, number> = {
   ppr: 0.2,
   half_ppr: 0.4,
-  standard: 0.5,
+  // Standard re-swept per format post-consensus (item 149): 0.5 -> 0.2, a
+  // clean both-pipeline win (pooled TE 62.2 -> 63.5, all four seasons >=
+  // baseline; primary 2025 TE 70.3 -> 71.3) — the same redundancy pattern
+  // items 145/146 found for PPR (0.4 -> 0.2), now confirmed for Standard.
+  // Half-PPR stays 0.4 (its sweep was noisy with 0.4 a local peak and the
+  // primary pipeline flat — no clean signal to move it).
+  standard: 0.2,
 };
 
 /**
@@ -530,7 +536,15 @@ export const POINTS_PER_DROP_RATE_UNIT: Record<ScoringFormat, number> = {
  * 2022-2025 re-sweep — CLAUDE.md item 43 — had confirmed 0.2 as the local
  * peak; the consensus retune since then shifted the optimum.)
  */
-export const DROP_RATE_BLEND_WEIGHT = 0.3;
+export const DROP_RATE_BLEND_WEIGHT: Record<ScoringFormat, number> = {
+  ppr: 0.3,
+  // Half-PPR re-swept per format (item 149): 0.3 -> 0.4, a clean both-pipeline
+  // gain (pooled WR 56.5 -> 57.1, primary 2025 WR 55.2 -> 55.7; 0.4 is a real
+  // peak, 0.5+ decline). Standard's own sweep kept 0.3 as the both-pipeline
+  // peak, so it's unchanged. Previously a single shared scalar (0.3).
+  half_ppr: 0.4,
+  standard: 0.3,
+};
 
 /**
  * Points scored per full unit of WR air-yards-share — ratio of sums

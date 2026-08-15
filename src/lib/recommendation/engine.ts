@@ -290,8 +290,9 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
     const runningScore = blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier;
     const pointsLostFromDrops = dropRateAvg * POINTS_PER_DROP_RATE_UNIT[format];
     const expectedPointsFromDropRate = runningScore - pointsLostFromDrops;
+    const dropRateBlendWeight = DROP_RATE_BLEND_WEIGHT[format];
     const blendedWithDropRate =
-      (1 - DROP_RATE_BLEND_WEIGHT) * runningScore + DROP_RATE_BLEND_WEIGHT * expectedPointsFromDropRate;
+      (1 - dropRateBlendWeight) * runningScore + dropRateBlendWeight * expectedPointsFromDropRate;
     dropRateModifier = blendedWithDropRate - runningScore;
     notes.push(
       `Dropping ${(dropRateAvg * 100).toFixed(0)}% of recent charted targets — worth roughly ${pointsLostFromDrops.toFixed(1)} fewer points at this position's typical rate.`

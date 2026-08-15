@@ -8531,9 +8531,85 @@ single-season numbers for those specific constants.
       (WR) that the consensus-weight and volume-weight passes both left
       untouched.
 
-### Open items (as of item 148 — pick up here)
-**This session shipped items 142-148 — all committed and pushed to
-`main`, current HEAD `645a438`, working tree CLEAN.** It began with small
+149. **Swept the items-144/146/148 weights (drop rate, TE snap share,
+    air-yards) for Half-PPR and Standard on both pipelines — those were all
+    tuned PPR-only. Shipped two clean both-pipeline wins; air-yards non-PPR
+    came back a documented no-ship.** Same in-memory `SWEEP_OVERRIDE`
+    diagnostic + harness-verify discipline as items 144-146 (verified the
+    empty override reproduces the real shipped numbers on all six format×
+    pipeline baselines before trusting any swept value; e.g. pooled Half-PPR
+    baseline 57.38/WR 56.53 matched exactly). RB=0 (item 144) was already
+    confirmed PPR-only in its own follow-up, so it was excluded.
+    - **Half-PPR drop rate 0.3 → 0.4 (shipped).** `DROP_RATE_BLEND_WEIGHT`
+      was a single shared scalar (0.3); Half-PPR wanted more. Clean on both
+      pipelines (pooled WR 56.5 → 57.1, primary 2025 WR 55.2 → 55.7), 0.4 a
+      real peak (0.5+ decline), 3 of 4 pooled seasons up (2024 −0.5).
+      Converted the constant to `Record<ScoringFormat, number>`
+      {ppr:0.3, half_ppr:0.4, standard:0.3}. Same "drop rate wants MORE
+      weight" direction item 146 found for PPR, now for Half-PPR too.
+    - **Standard TE snap share 0.5 → 0.2 (shipped).** The non-PPR snap
+      values (half 0.4, std 0.5) came from item 52's PRE-consensus per-format
+      sweep; post-consensus (item 145 TE consensus → 0.7) Standard's 0.5 was
+      over-weighted, the same redundancy item 145/146 found for PPR (0.4 →
+      0.2). Clean both-pipeline win: pooled TE 62.2 → 63.5 with ALL four
+      seasons ≥ baseline, primary 2025 TE 70.3 → 71.3. Standard now matches
+      PPR at 0.2; Half-PPR stayed 0.4 (its own sweep was noisy — 0.4 a local
+      peak pooled, primary flat — no clean signal to move it).
+    - **Drop rate Standard, and TE snap Half-PPR: no change** — each was
+      already at its both-pipeline optimum (Standard drop 0.3 is the pooled+
+      primary peak; Half-PPR snap 0.4 is a noisy local peak with primary
+      flat).
+    - **Air-yards non-PPR: NOT shipped — a real methodological finding.**
+      `POINTS_PER_AIR_YARDS_SHARE_UNIT_WR` is a PPR-derived scalar (40.43),
+      so the shipped scalar weight (0.1) has been applying a PPR-scaled
+      conversion factor to non-PPR-scored games — a latent bug. Recomputed
+      the factor per format (ratio of sums, Σ WR format-points / Σ WR
+      air-yards-share over 2022-2025; PPR reproduced ~41.5 vs the shipped
+      40.43, close enough to confirm method — small diff from a different
+      WR-week set, n=9815 vs item 148's 8039), giving stable format ratios
+      (half/ppr 0.82, std/ppr 0.64 → half 33.16, std 25.87 off the shipped
+      40.43). With the CORRECT factor, air-yards adds essentially nothing to
+      either non-PPR format (it's a reception-correlated signal). Half-PPR
+      marginally prefers disabling on both pipelines but by-season mixed;
+      **Standard's apparent primary-2025 benefit is entirely a conv-factor
+      artifact** — with the correct 25.87 factor, primary Standard WR is flat
+      at ~58.3 across every weight (the shipped 59.3 only exists because the
+      inflated PPR 40.43 factor happens to correlate with 2025 outcomes), so
+      disabling/correcting it costs ~1pp primary 2025 WR while helping the
+      4-season pooled number. Neither transfers cleanly, so per the "ship
+      clean transfers" bar nothing was shipped — but the underlying wrong-
+      conv-on-non-PPR bug (air-yards weight 0.1 with the PPR 40.43 factor in
+      Half-PPR/Standard) is left standing and flagged (Open Item #31). PPR
+      air-yards untouched (validated, item 148).
+    - **Verified against the real routes after shipping (not just the sweep
+      harness):** PPR byte-identical on both pipelines (the Record refactor
+      is a true no-op for PPR — primary 60.66, pooled 58.64); Half-PPR drop
+      and Standard snap gains matched the sweep predictions exactly on both
+      pipelines; live `/api/compare` in Half-PPR and Standard returns
+      sensible WR/TE picks (the `DROP_RATE_BLEND_WEIGHT`-as-Record change is
+      safe live). `tsc`/lint clean; `SWEEP_OVERRIDE` scaffolding and the
+      `/api/debug-fmt-sweep` route both removed after recording these
+      numbers, same discipline as items 144-148 — only `config.ts`/
+      `engine.ts` changed.
+
+### Open items (as of item 149 — pick up here)
+**This session shipped item 149** — the non-PPR sweep of the items-144/146/
+148 weights (drop rate, TE snap, air-yards). NOT yet committed as of this
+writing (the earlier UI work this session — number animations, auto-scroll,
+the Opponent card line, and the cold-fetch timeout guard extension — was
+committed and pushed separately). Item 149 shipped two clean both-pipeline
+wins (Half-PPR drop 0.3→0.4, Standard TE snap 0.5→0.2) and documented
+air-yards non-PPR as a no-ship + a new **Open Item #31** (the latent
+wrong-conversion-factor bug for non-PPR air-yards). Only `config.ts`/
+`engine.ts` changed; `SWEEP_OVERRIDE` + the `/api/debug-fmt-sweep` route were
+removed. The engine's current best pooled 2022-2025 is ~58.6% (PPR); Half-PPR
+pooled 57.6% / Standard pooled 58.8% after this session's non-PPR gains.
+
+The paragraph below is the PRIOR session's record (items 142-148), kept for
+context — its "as of item 148" framing and HEAD `645a438` are historical:
+
+**That session shipped items 142-148 — all committed and pushed to
+`main`, HEAD `645a438`, working tree CLEAN.** It began with small
 UI polish (all committed, no numbered items, same precedent as items
 133-135): trimming the repetitive tool name from each page's eyebrow +
 dropping the title subheadings (`eb15679`), coloring the sidebar "Fantasy
@@ -9323,6 +9399,30 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     (Lamar's injury-limited games count as "full"); a disagreement-aware
     weight (trust the engine less when its snapshot strongly diverges from
     consensus) would target that directly, but adds a heuristic to tune.
+31. **Air-yards non-PPR uses the wrong (PPR) conversion factor — a latent
+    bug surfaced but deliberately NOT fixed in item 149.**
+    `POINTS_PER_AIR_YARDS_SHARE_UNIT_WR` (40.43) is a plain PPR-derived
+    scalar, and `AIR_YARDS_SHARE_BLEND_WEIGHT` (0.1) is also a scalar, so in
+    Half-PPR and Standard the air-yards modifier blends the running score
+    toward a PPR-SCALED estimate (~1.5x too large for Standard's lower point
+    scale). Item 149 recomputed the correct per-format factors (half 33.16,
+    std 25.87 off the shipped 40.43 × the measured format ratio) and found
+    that with the CORRECT factor air-yards adds essentially nothing to either
+    non-PPR format — it's a reception-correlated PPR signal. Two ways to fix,
+    neither a clean transfer (why it wasn't shipped): (a) make the weight
+    PPR-only (`Record` {ppr:0.1, half_ppr:0, standard:0}) — clean for
+    Half-PPR (both pipelines up slightly) but costs ~1pp primary-2025
+    Standard WR, and that primary "loss" is removing a conv-artifact "gain",
+    not a real signal; (b) make the CONVERSION FACTOR a per-format `Record`
+    (like `POINTS_PER_DROP_RATE_UNIT`/`POINTS_PER_SNAP_SHARE_UNIT_TE` already
+    are) and keep weight 0.1 — corrects the scaling, and the sweep showed
+    that also lands air-yards at ~zero marginal value for non-PPR. Cleanest
+    is probably (a): air-yards is genuinely a PPR-only signal (item 148's own
+    scoping), so disabling it for non-PPR is honest even at the small primary
+    cost. Left for a deliberate decision since it's a real (if tiny)
+    tradeoff, not a clean win. The live/pooled numbers today reflect the
+    buggy state (weight 0.1 × PPR factor 40.43) on non-PPR, so revisiting
+    this also slightly moves those baselines.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
