@@ -3,7 +3,6 @@ import { HomeLineupWidget } from "@/components/HomeLineupWidget";
 import { HomeRankingsBoard } from "@/components/HomeRankingsBoard";
 import { HomeTradeWidget } from "@/components/HomeTradeWidget";
 import { HomeWaiverWidget } from "@/components/HomeWaiverWidget";
-import { NewsletterSignup } from "@/components/NewsletterSignup";
 import { RecentComparisonsHomeCard } from "@/components/RecentComparisonsHomeCard";
 
 const TOOLS = [
@@ -98,8 +97,6 @@ export default function HomePage() {
           FANTASY TOOLKIT
         </h1>
       </header>
-
-      <NewsletterSignup />
 
       <HomeRankingsBoard />
 
