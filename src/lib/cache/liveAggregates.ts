@@ -119,6 +119,15 @@ export function getPositionDefenseTableCached(
 export { getInjuryReports };
 
 /**
+ * Timeout (ms) for the cold-cache heavy-fetch guard, shared by every live
+ * route. On a cold cache (each Vercel deploy wipes the persistent Data Cache),
+ * a request returns after at most this long rather than blocking on the
+ * ~10-13s play-by-play / depth-chart parse; the real parse finishes in the
+ * background and warms the cache for the next request. See withColdTimeout.
+ */
+export const COLD_FETCH_TIMEOUT_MS = 3000;
+
+/**
  * Cold-cache latency guard for the two heaviest, least-essential live
  * fetches (the depth-chart confidence floor and the play-by-play red-zone
  * aggregate). Returns the real cached value if it resolves within `ms`;

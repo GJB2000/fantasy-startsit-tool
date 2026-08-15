@@ -5,6 +5,7 @@ import {
   getImpliedTotalsCached,
   getPositionDefenseTableCached,
   getRemainingOpponentsCached,
+  COLD_FETCH_TIMEOUT_MS,
 } from "@/lib/cache/liveAggregates";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { getLegitRankingsForPosition, getLegitRankingsOverall, RANKABLE_POSITIONS } from "@/lib/rankings/buildRankings";
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
     const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt, expertConsensusByNormalizedName] =
       await Promise.all([
         getPositionDefenseTableCached(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
-        getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
+        getLiveNflversePlayerWeekTable(context.lastCompletedSeason, { redZoneTimeoutMs: COLD_FETCH_TIMEOUT_MS }),
         getRemainingOpponentsCached(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
           () => new Map<string, RemainingGame[]>()
         ),

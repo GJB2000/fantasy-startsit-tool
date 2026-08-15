@@ -7,6 +7,7 @@ import { compareBreakdowns } from "@/lib/recommendation/engine";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
 import {
+  COLD_FETCH_TIMEOUT_MS,
   getDepthChartRankCached,
   getGameWeatherCached,
   getImpliedTotalsCached,
@@ -24,9 +25,9 @@ export const maxDuration = 30;
 // On a cold cache (every Vercel deploy wipes the persistent Data Cache), the
 // two heaviest parses — the depth-chart file (confidence floor only, never the
 // pick) and the play-by-play red-zone aggregate (WR drop-rate only) — are
-// timeout-guarded so the first comparison returns fast; the real parse finishes
-// in the background and warms the cache for the next request (see withColdTimeout).
-const COLD_FETCH_TIMEOUT_MS = 3000;
+// timeout-guarded (COLD_FETCH_TIMEOUT_MS) so the first comparison returns fast;
+// the real parse finishes in the background and warms the cache for the next
+// request (see withColdTimeout).
 
 export async function GET(request: Request) {
   const url = new URL(request.url);

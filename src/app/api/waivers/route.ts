@@ -7,6 +7,7 @@ import {
   getImpliedTotalsCached,
   getPositionDefenseTableCached,
   getRemainingOpponentsCached,
+  COLD_FETCH_TIMEOUT_MS,
 } from "@/lib/cache/liveAggregates";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat, SKILL_POSITIONS } from "@/lib/sportsdata/types";
@@ -58,7 +59,7 @@ export async function GET(request: Request) {
       priorSeasonPprAvgByNormalizedName,
     ] = await Promise.all([
       getPositionDefenseTableCached(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
-      getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
+      getLiveNflversePlayerWeekTable(context.lastCompletedSeason, { redZoneTimeoutMs: COLD_FETCH_TIMEOUT_MS }),
       getRemainingOpponentsCached(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
         () => new Map<string, RemainingGame[]>()
       ),
