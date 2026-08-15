@@ -121,7 +121,7 @@ export function StartSitTool() {
   return (
     <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_300px]">
       <div className="flex flex-col gap-4">
-        <div className="rounded-2xl border border-foreground/12 bg-surface-glass p-5 shadow-[0_18px_46px_-24px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:p-6">
+        <div className="relative z-20 rounded-2xl border border-foreground/12 bg-surface-glass p-5 shadow-[0_18px_46px_-24px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:p-6">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <span
               className="text-[10px] uppercase tracking-[0.14em] text-accent"
