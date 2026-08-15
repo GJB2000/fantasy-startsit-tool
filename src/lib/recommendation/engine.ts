@@ -301,12 +301,16 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
 
   let airYardsModifier = 0;
   const airYardsShare = input.nflverse.airYardsShare;
-  if (blendedScore != null && position === "WR" && airYardsShare != null) {
+  const airYardsBlendWeight = AIR_YARDS_SHARE_BLEND_WEIGHT[format];
+  // Weight is 0 for Standard (air yards adds nothing there, item 150) — skip
+  // the block entirely so a Standard WR card shows no air-yards note and the
+  // modifier never applies.
+  if (blendedScore != null && position === "WR" && airYardsShare != null && airYardsBlendWeight > 0) {
     const runningScore =
       blendedScore + matchupModifier + volumeModifier + redZoneModifier + snapShareModifier + dropRateModifier;
-    const expectedPointsFromAirYards = airYardsShare * POINTS_PER_AIR_YARDS_SHARE_UNIT_WR;
+    const expectedPointsFromAirYards = airYardsShare * POINTS_PER_AIR_YARDS_SHARE_UNIT_WR[format];
     const blendedWithAirYards =
-      (1 - AIR_YARDS_SHARE_BLEND_WEIGHT) * runningScore + AIR_YARDS_SHARE_BLEND_WEIGHT * expectedPointsFromAirYards;
+      (1 - airYardsBlendWeight) * runningScore + airYardsBlendWeight * expectedPointsFromAirYards;
     airYardsModifier = blendedWithAirYards - runningScore;
     notes.push(
       `Commanding ${(airYardsShare * 100).toFixed(0)}% of the team's air yards recently — worth roughly ${expectedPointsFromAirYards.toFixed(1)} points at this position's typical rate.`

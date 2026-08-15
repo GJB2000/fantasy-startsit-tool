@@ -8592,18 +8592,64 @@ single-season numbers for those specific constants.
       numbers, same discipline as items 144-148 — only `config.ts`/
       `engine.ts` changed.
 
-### Open items (as of item 149 — pick up here)
-**This session shipped item 149** — the non-PPR sweep of the items-144/146/
-148 weights (drop rate, TE snap, air-yards). NOT yet committed as of this
-writing (the earlier UI work this session — number animations, auto-scroll,
-the Opponent card line, and the cold-fetch timeout guard extension — was
-committed and pushed separately). Item 149 shipped two clean both-pipeline
-wins (Half-PPR drop 0.3→0.4, Standard TE snap 0.5→0.2) and documented
-air-yards non-PPR as a no-ship + a new **Open Item #31** (the latent
-wrong-conversion-factor bug for non-PPR air-yards). Only `config.ts`/
-`engine.ts` changed; `SWEEP_OVERRIDE` + the `/api/debug-fmt-sweep` route were
-removed. The engine's current best pooled 2022-2025 is ~58.6% (PPR); Half-PPR
-pooled 57.6% / Standard pooled 58.8% after this session's non-PPR gains.
+150. **Fixed the item-149 air-yards non-PPR conversion-factor bug (former
+    Open Item #31) — and re-swearing at the current shipped drop weights
+    revealed the item-149 "air yards adds nothing to non-PPR" read was
+    incomplete.** Item 149 flagged that
+    `POINTS_PER_AIR_YARDS_SHARE_UNIT_WR` was a PPR-only scalar (40.43)
+    applied to non-PPR scores (~1.5x too large for Standard) and, based on a
+    sweep run at the THEN-shipped drop-rate 0.3, concluded air yards could
+    just be disabled for non-PPR. First attempt here did exactly that
+    (weight Record {ppr:0.1, half_ppr:0, standard:0}) — but verifying it
+    against the real routes showed it REGRESSED Half-PPR (pooled WR 57.1 ->
+    56.0, primary 55.7 -> 55.2). Root cause: item 149 ALSO raised Half-PPR
+    drop rate to 0.4, and air yards interacts with drop rate (both are
+    sequential WR modifiers) — at drop 0.4 air yards is a real contributor,
+    which the drop-0.3 sweep couldn't see. Rebuilt the sweep scaffolding and
+    re-swept air yards at the CURRENT shipped drop weights (half 0.4, std
+    0.3) with the CORRECT per-format conversion factors.
+    - **The correct fix is a hybrid, not a blanket disable:**
+      - **Conversion factor made per-format** (`Record` {ppr:40.43,
+        half_ppr:33.16, standard:25.87}) — 40.43 x the measured WR
+        point-scaling (half/ppr 0.82, std/ppr 0.64), keeping PPR at its
+        validated value. This is the actual bug fix.
+      - **Half-PPR air-yards weight 0 -> 0.15** — at drop 0.4 with the
+        correct 33.16 factor, air yards improves BOTH pipelines vs air-off
+        (pooled WR 56.0 -> 57.0, the pooled peak; primary 55.2 -> 55.7, flat
+        across 0.05-0.2). So it's a real Half-PPR signal, not nothing.
+      - **Standard air-yards weight stays 0** — with the correct 25.87
+        factor, air-off is the pooled peak (59.11) and primary is flat; air
+        yards genuinely adds nothing, and its pre-fix primary-2025 edge
+        (59.31) was purely the PPR-conv-factor artifact (drops to 58.33 with
+        correct handling). The engine gates the whole air-yards block on
+        `weight > 0`, so a Standard WR card shows no air-yards note.
+    - **Net vs the item-149 committed state:** PPR byte-identical on both
+      pipelines (40.43/0.1 unchanged). Half-PPR essentially neutral (pooled
+      WR 57.14 -> 57.02, primary unchanged) but now with the CORRECT
+      conversion factor — the bug is fixed without a meaningful score change.
+      Standard: pooled WR 58.99 -> 59.11 (+0.12), primary WR 59.31 -> 58.33
+      (-0.98) — the accepted cost of removing the conv-factor artifact (the
+      user chose to fix the bug knowing this ~1pp primary-2025 cost was never
+      a real signal). Verified against the real routes (all six format x
+      pipeline numbers match the sweep) and live `/api/compare` in Half-PPR/
+      Standard. `tsc`/lint clean; sweep scaffolding + `/api/debug-fmt-sweep`
+      removed; only `config.ts`/`engine.ts` changed. **Resolves Open Item
+      #31.**
+
+### Open items (as of item 150 — pick up here)
+**This session shipped items 149 and 150.** Item 149 (committed `1e52771`'s
+successor — pushed) swept the items-144/146/148 weights for Half-PPR/Standard
+and shipped two clean both-pipeline wins (Half-PPR drop 0.3→0.4, Standard TE
+snap 0.5→0.2), flagging air-yards non-PPR as a no-ship + Open Item #31. Item
+150 then FIXED that air-yards bug (per-format conversion factor + Half-PPR
+weight 0.15 / Standard 0, a hybrid — see item 150; a first blanket-disable
+attempt was caught regressing Half-PPR because of the item-149 drop-0.4
+interaction, then corrected) — **resolving Open Item #31**. Item 150 is NOT
+yet committed as of this writing (only `config.ts`/`engine.ts` changed; sweep
+scaffolding removed). The earlier UI work this session (number animations,
+auto-scroll, the Opponent card line, cold-fetch timeout guard) was committed/
+pushed separately. Engine current best pooled 2022-2025: ~58.6% PPR / 57.6%
+Half-PPR / 58.9% Standard.
 
 The paragraph below is the PRIOR session's record (items 142-148), kept for
 context — its "as of item 148" framing and HEAD `645a438` are historical:
@@ -9399,8 +9445,13 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     (Lamar's injury-limited games count as "full"); a disagreement-aware
     weight (trust the engine less when its snapshot strongly diverges from
     consensus) would target that directly, but adds a heuristic to tune.
-31. **Air-yards non-PPR uses the wrong (PPR) conversion factor — a latent
-    bug surfaced but deliberately NOT fixed in item 149.**
+31. **RESOLVED in item 150** — air-yards non-PPR conversion factor is now
+    per-format (`Record` {ppr:40.43, half_ppr:33.16, standard:25.87}), with
+    Half-PPR weight 0.15 (a real signal at drop 0.4, both pipelines up) and
+    Standard weight 0 (genuinely nothing; its pre-fix primary edge was the
+    conv-factor artifact). The original write-up below is kept as the record
+    of the bug. **Air-yards non-PPR used the wrong (PPR) conversion factor —
+    a latent bug surfaced but deliberately NOT fixed in item 149.**
     `POINTS_PER_AIR_YARDS_SHARE_UNIT_WR` (40.43) is a plain PPR-derived
     scalar, and `AIR_YARDS_SHARE_BLEND_WEIGHT` (0.1) is also a scalar, so in
     Half-PPR and Standard the air-yards modifier blends the running score

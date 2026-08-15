@@ -547,25 +547,60 @@ export const DROP_RATE_BLEND_WEIGHT: Record<ScoringFormat, number> = {
 };
 
 /**
- * Points scored per full unit of WR air-yards-share — ratio of sums
- * (sum WR PPR points / sum WR air-yards-share) over 2022-2025 WR
- * game-weeks (n=8039). Stable across seasons (38.3-41.4). Air yards
- * share is a downfield-role signal, a different axis than target count;
- * validated standalone at ~56.6% for WR (item 14) but never integrated
- * until item 148's sweep.
+ * Points scored per full unit of WR air-yards-share, per format — ratio of
+ * sums (sum WR format-points / sum WR air-yards-share) over 2022-2025 WR
+ * game-weeks. Air yards share is a downfield-role signal, a different axis
+ * than target count; validated standalone at ~56.6% for WR (item 14),
+ * integrated for PPR in item 148.
+ *
+ * PPR = 40.43 (item 148, unchanged). Half-PPR/Standard added in item 150
+ * (33.16 / 25.87) to fix a latent bug: this was a PPR-only scalar, so the
+ * non-PPR air-yards modifier had been blending toward a PPR-scaled estimate
+ * (~1.5x too large for Standard). Derived as 40.43 x the measured per-format
+ * WR point-scaling (half/ppr 0.82, std/ppr 0.64), which keeps PPR at its
+ * validated value. Standard's factor is present for completeness but unused
+ * (its blend weight is 0 — see AIR_YARDS_SHARE_BLEND_WEIGHT).
  */
-export const POINTS_PER_AIR_YARDS_SHARE_UNIT_WR = 40.43;
+export const POINTS_PER_AIR_YARDS_SHARE_UNIT_WR: Record<ScoringFormat, number> = {
+  ppr: 40.43,
+  half_ppr: 33.16,
+  standard: 25.87,
+};
 
 /**
- * WR-only air-yards-share blend weight. Shipped at 0.1 (item 148) — a
- * small but clean both-pipeline WR gain (primary WR 59.3 -> 60.3, pooled
- * 56.0 -> 56.4, every season >= baseline), the first real WR improvement
- * after the consensus/volume/drop-rate passes. A narrow peak: 0.05-0.1 is
- * a real plateau, but 0.15+ declines (air yards correlates with target
- * volume already in the score, so a small marginal weight helps and more
- * double-counts). PPR-only; the sweep didn't cover Half-PPR/Standard.
+ * WR-only air-yards-share blend weight, per format. Shipped at 0.1 for PPR
+ * (item 148) — a small but clean both-pipeline WR gain (primary WR 59.3 ->
+ * 60.3, pooled 56.0 -> 56.4, every season >= baseline), the first real WR
+ * improvement after the consensus/volume/drop-rate passes. A narrow peak:
+ * 0.05-0.1 is a real plateau, but 0.15+ declines (air yards correlates with
+ * target volume already in the score, so a small marginal weight helps and
+ * more double-counts).
+ *
+ * Half-PPR/Standard = 0 (item 149): air yards is a reception-correlated PPR
+ * signal, and `POINTS_PER_AIR_YARDS_SHARE_UNIT_WR` is a PPR-derived scalar,
+ * so the earlier shared-scalar 0.1 was blending non-PPR scores toward a
+ * PPR-scaled estimate (~1.5x too large for Standard) — a latent bug. Swept
+ * with the correct per-format factor (item 149): air yards adds essentially
+ * nothing to either non-PPR format, so it's disabled there rather than
+ * carried at a mis-scaled weight. Standard's pre-fix primary-2025 WR was a
+ * conv-factor artifact, not a real signal (see CLAUDE.md item 149 / former
+ * Open Item #31). With the weight at 0 the mis-scaled factor never applies,
+ * so the PPR-only `POINTS_PER_AIR_YARDS_SHARE_UNIT_WR` scalar is left as-is.
  */
-export const AIR_YARDS_SHARE_BLEND_WEIGHT = 0.1;
+export const AIR_YARDS_SHARE_BLEND_WEIGHT: Record<ScoringFormat, number> = {
+  ppr: 0.1,
+  // Re-swept per format at the correct per-format conversion factor and the
+  // current shipped drop-rate weights (item 150). Half-PPR wants air yards ON
+  // at 0.15 — a real signal at its drop-rate 0.4 (both pipelines >= air-off:
+  // pooled WR 56.0 -> 57.0, primary 55.2 -> 55.7). This corrects item 149's
+  // read that air yards "adds nothing to non-PPR" — that was measured at the
+  // pre-item-149 drop-rate 0.3; at 0.4 the interaction makes it a contributor.
+  half_ppr: 0.15,
+  // Standard = 0: with the correct conversion factor, air-off is the pooled
+  // peak and primary is flat — air yards genuinely adds nothing here. Its
+  // pre-fix primary-2025 edge was purely the PPR-conv-factor artifact.
+  standard: 0,
+};
 
 /**
  * Empirically-derived PPR point bonus for WR when a same-position
