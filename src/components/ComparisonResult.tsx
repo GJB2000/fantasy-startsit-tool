@@ -425,6 +425,23 @@ function PlayerCard({
         </div>
       </div>
 
+      {m && (
+        <div className={styles.mblock}>
+          <div className={styles.lab}>Opponent</div>
+          <p className={styles.mnote}>
+            <b>{m.opponentTeam}</b> has allowed{" "}
+          <b>
+            {m.allowedPerGame.toFixed(1)} {formatLabel}
+          </b>{" "}
+          points per game to opposing{" "}
+            {player.position && POSITION_DISPLAY_LABEL[player.position]
+              ? `${POSITION_DISPLAY_LABEL[player.position]}s`
+              : "players at this position"}
+            .
+          </p>
+        </div>
+      )}
+
       <div className={styles.rule} />
 
       <div className={styles.case}>

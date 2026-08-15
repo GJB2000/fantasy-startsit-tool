@@ -207,6 +207,10 @@
 .betPending { margin-top: 12px; font-size: 12px; line-height: 1.5; color: var(--muted); }
 .betf { margin-top: 10px; font-size: 10px; color: var(--faint); }
 
+.mblock { margin-top: 16px; }
+.mnote { margin-top: 6px; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+.mnote b { color: var(--ink); font-weight: 600; }
+
 .foot { margin-top: 22px; text-align: center; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
 .note { margin-top: 10px; font-size: 11px; color: var(--faint); }
 
