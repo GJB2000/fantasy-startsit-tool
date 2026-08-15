@@ -32,6 +32,13 @@ export function StartSitTool() {
   // Guards the async betting-lines fetch against a stale response landing after
   // a newer comparison has started.
   const propsTokenRef = useRef("");
+  const resultRef = useRef<HTMLDivElement | null>(null);
+
+  // When a result renders (Compare, rail re-run, or Home restore), bring it into
+  // view — on mobile especially it lands below the fold.
+  useEffect(() => {
+    if (response) resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [response]);
 
   function addPlayer(player: PlayerSummary) {
     setSelectedPlayers((prev) =>
@@ -155,13 +162,15 @@ export function StartSitTool() {
         </div>
 
         {response && (
-          <ComparisonResult
-            result={response.result}
-            contextNote={response.context.contextNote}
-            scoringFormat={scoringFormat}
-            propsByPlayerId={propsByPlayerId}
-            dataSeason={response.context.lastCompletedSeason}
-          />
+          <div ref={resultRef} className="scroll-mt-24">
+            <ComparisonResult
+              result={response.result}
+              contextNote={response.context.contextNote}
+              scoringFormat={scoringFormat}
+              propsByPlayerId={propsByPlayerId}
+              dataSeason={response.context.lastCompletedSeason}
+            />
+          </div>
         )}
       </div>
 
