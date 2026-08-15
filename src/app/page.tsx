@@ -10,9 +10,9 @@ const TOOLS = [
   {
     href: "/start-sit",
     label: "Start/Sit",
-    title: "Who should you start?",
+    title: "Settle a tough lineup call",
     description:
-      "Pick two or more players fighting for the same roster spot and get a straight answer, with the reasoning behind it.",
+      "Compare players competing for the same spot and get a clear pick, with the reasoning behind it.",
     icon: (
       <path d="M8 7l-5 5 5 5M16 7l5 5-5 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
     ),
@@ -20,9 +20,9 @@ const TOOLS = [
   {
     href: "/trade",
     label: "Trade Analyzer",
-    title: "Is this trade worth it?",
+    title: "Know if a trade is worth it",
     description:
-      "Enter who you'd give up and who you'd get back — we'll project rest-of-season value and grade the deal.",
+      "Enter both sides and get a good, fair, or bad verdict based on rest-of-season value.",
     icon: (
       <path
         d="M4 8h13M17 8l-3.5-3.5M17 8l-3.5 3.5M20 16H7M7 16l3.5-3.5M7 16l3.5 3.5"
@@ -36,8 +36,8 @@ const TOOLS = [
   {
     href: "/waivers",
     label: "Waivers",
-    title: "Who's worth a pickup?",
-    description: "We surface players whose opportunity is running ahead of their production, with a suggested drop.",
+    title: "Find your best pickup",
+    description: "Ranks the available pool by recent opportunity and flags buy-low targets, with a drop to pair.",
     icon: (
       <>
         <path d="M12 3v10m0 0l-3.5-3.5M12 13l3.5-3.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
@@ -48,9 +48,9 @@ const TOOLS = [
   {
     href: "/lineup",
     label: "Lineup",
-    title: "Who should start this week?",
+    title: "Build your best lineup",
     description:
-      "Import your roster from Sleeper or add players by hand, tell us your league's slots, and we'll fill out your best lineup.",
+      "Import your roster, set your league's slots, and get the highest-projected starting lineup.",
     icon: (
       <>
         <rect x="3" y="4" width="18" height="4" rx="1.3" stroke="currentColor" strokeWidth="1.7" />
@@ -62,8 +62,8 @@ const TOOLS = [
   {
     href: "/rankings",
     label: "Legit Rankings",
-    title: "Who's actually good right now?",
-    description: "Every rankable player at a position, ranked and scored 1-100 by the same engine behind every other tool here.",
+    title: "See the position rankings",
+    description: "The top QBs, RBs, WRs, and TEs scored 1–100 by the same engine as every tool — plus a cross-position Top 100.",
     icon: (
       <>
         <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
@@ -75,8 +75,8 @@ const TOOLS = [
   {
     href: "/backtest",
     label: "Backtest",
-    title: "Does the engine actually work?",
-    description: "Replay the recommendation engine against a completed season and see how often it called it right.",
+    title: "See how the engine performs",
+    description: "Replay the engine against completed seasons and see how often it got the call right.",
     icon: <path d="M4 20V10M12 20V4M20 20v-7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />,
   },
 ];
