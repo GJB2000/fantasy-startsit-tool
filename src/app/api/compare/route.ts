@@ -12,6 +12,7 @@ import {
   getImpliedTotalsCached,
   getPositionDefenseTableCached,
   getRemainingOpponentsCached,
+  withColdTimeout,
 } from "@/lib/cache/liveAggregates";
 import { type RemainingGame } from "@/lib/nflverse/schedules";
 
@@ -19,6 +20,13 @@ import { type RemainingGame } from "@/lib/nflverse/schedules";
 // for red-zone touches (~5-7s) on top of everything else this route
 // already does — same 30s margin the backtest routes use.
 export const maxDuration = 30;
+
+// On a cold cache (every Vercel deploy wipes the persistent Data Cache), the
+// two heaviest parses — the depth-chart file (confidence floor only, never the
+// pick) and the play-by-play red-zone aggregate (WR drop-rate only) — are
+// timeout-guarded so the first comparison returns fast; the real parse finishes
+// in the background and warms the cache for the next request (see withColdTimeout).
+const COLD_FETCH_TIMEOUT_MS = 3000;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -47,12 +55,16 @@ export async function GET(request: Request) {
       priorSeasonPprAvgByNormalizedName,
     ] = await Promise.all([
       getPositionDefenseTableCached(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
-      getLiveNflversePlayerWeekTable(context.lastCompletedSeason),
+      getLiveNflversePlayerWeekTable(context.lastCompletedSeason, { redZoneTimeoutMs: COLD_FETCH_TIMEOUT_MS }),
       getRemainingOpponentsCached(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
         () => new Map<string, RemainingGame[]>()
       ),
       getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
-      getDepthChartRankCached(context.lastCompletedSeason).catch(() => new Map<string, number>()),
+      withColdTimeout(
+        getDepthChartRankCached(context.lastCompletedSeason).catch(() => new Map<string, number>()),
+        COLD_FETCH_TIMEOUT_MS,
+        new Map<string, number>()
+      ),
       // Fallback for a player with zero games this season (week 1, a rookie
       // call-up, or a return from a long absence) — the prior season's own
       // per-game average, used only when recent + season-to-date are both

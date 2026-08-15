@@ -1,5 +1,6 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
+import { after } from "next/server";
 import { getInjuryReports } from "@/lib/nflverse/injuries";
 import { getNgsPassing, getNgsReceiving, getNgsRushing } from "@/lib/nflverse/nextGenStats";
 import { getRedZoneTouches } from "@/lib/nflverse/playByPlay";
@@ -116,3 +117,28 @@ export function getPositionDefenseTableCached(
 
 // Re-exported live (uncached) — game-day volatile, kept fresh deliberately.
 export { getInjuryReports };
+
+/**
+ * Cold-cache latency guard for the two heaviest, least-essential live
+ * fetches (the depth-chart confidence floor and the play-by-play red-zone
+ * aggregate). Returns the real cached value if it resolves within `ms`;
+ * otherwise resolves to `fallback` immediately so the request doesn't block
+ * on a ~10-13s cold parse, and lets the real fetch keep running past the
+ * response (via after()) so it still populates the persistent Data Cache —
+ * self-healing after a deploy wipes the cache, so the very next request is
+ * fully correct and instant.
+ *
+ * A no-op once the cache is warm: warm reads resolve in ~milliseconds and
+ * always beat the timeout. The only cost is on the first request after a
+ * cold cache, and only for pick-neutral (depth chart) or near-neutral
+ * (WR drop-rate) signals — never a projection or the primary pick.
+ */
+export function withColdTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  // Keep the real fetch alive past the response so unstable_cache populates.
+  after(promise.catch(() => undefined));
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
