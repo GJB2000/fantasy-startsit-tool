@@ -139,7 +139,7 @@
 .rends span { font-size: 11px; color: var(--faint); }
 
 /* stats grid + weather/status aside */
-.mid { display: grid; grid-template-columns: minmax(0, 1fr) 172px; gap: 28px; }
+.mid { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 28px; }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 22px; }
 .st { min-width: 0; }
 .stL { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
@@ -182,7 +182,7 @@
 .stTip:focus-within .tip { opacity: 1; transform: none; }
 
 /* weather/status aside — sits beside the stat grid in .mid */
-.aside { display: flex; flex-direction: column; gap: 16px; justify-content: center; border-left: 1px solid var(--line); padding-left: 26px; }
+.aside { display: flex; flex-direction: column; gap: 16px; justify-content: flex-start; border-left: 1px solid var(--line); padding-left: 26px; }
 .aiL { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
 .aiV { font-size: 14px; font-weight: 500; margin-top: 4px; }
 .aiGood { color: var(--acc); }
@@ -207,8 +207,7 @@
 .betPending { margin-top: 12px; font-size: 12px; line-height: 1.5; color: var(--muted); }
 .betf { margin-top: 10px; font-size: 10px; color: var(--faint); }
 
-.mblock { margin-top: 16px; }
-.mnote { margin-top: 6px; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+.mnote { margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .mnote b { color: var(--ink); font-weight: 600; }
 
 .foot { margin-top: 22px; text-align: center; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
