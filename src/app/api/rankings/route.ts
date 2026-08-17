@@ -8,7 +8,12 @@ import {
   COLD_FETCH_TIMEOUT_MS,
 } from "@/lib/cache/liveAggregates";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
-import { getLegitRankingsForPosition, getLegitRankingsOverall, RANKABLE_POSITIONS } from "@/lib/rankings/buildRankings";
+import {
+  getLegitRankingsForPosition,
+  getLegitRankingsOverall,
+  RANKABLE_POSITIONS,
+  type RankingMode,
+} from "@/lib/rankings/buildRankings";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat, type ExtendedPosition } from "@/lib/sportsdata/types";
 
@@ -23,6 +28,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const positionParam = url.searchParams.get("position") ?? "";
   const format = parseScoringFormat(url.searchParams.get("scoringFormat"));
+  const mode: RankingMode = url.searchParams.get("mode") === "season" ? "season" : "weekly";
 
   const isOverall = positionParam === "OVERALL";
   const isRankable = (RANKABLE_POSITIONS as readonly string[]).includes(positionParam);
@@ -69,6 +75,7 @@ export async function GET(request: Request) {
       ? await getLegitRankingsOverall(
           context,
           format,
+          mode,
           positionDefenseTable,
           nflversePlayerWeekTable,
           remainingOpponentsByTeam,
@@ -80,6 +87,7 @@ export async function GET(request: Request) {
           positionParam as ExtendedPosition,
           context,
           format,
+          mode,
           positionDefenseTable,
           nflversePlayerWeekTable,
           remainingOpponentsByTeam,
@@ -93,6 +101,7 @@ export async function GET(request: Request) {
       context: {
         lastCompletedSeason: context.lastCompletedSeason,
         lastCompletedWeek: context.lastCompletedWeek,
+        isInSeason: context.isInSeason,
         contextNote: context.isInSeason
           ? `Ranked on current form through Week ${context.lastCompletedWeek} of the ${context.lastCompletedSeason} season.`
           : `The ${context.lastCompletedSeason + 1} season hasn't started yet — ranked on current form from the completed ${context.lastCompletedSeason} season.`,

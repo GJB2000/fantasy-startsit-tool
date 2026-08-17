@@ -8,6 +8,7 @@ export interface RankingEntryResponse {
   finalScore: number | null;
   recentPprAvg: number | null;
   seasonPprAvg: number | null;
+  seasonTotalPoints: number | null;
   gamesUsedForRecent: number;
   injuryStatus: string | null;
   isOnByeThisWeek: boolean;
@@ -16,6 +17,8 @@ export interface RankingEntryResponse {
   positionRank: number;
   legitScore: number;
   fantasyProsPositionRank: number | null;
+  restOfSeasonPoints: number | null;
+  restOfSeasonGames: number;
 }
 
 interface RankingsResultProps {
@@ -23,6 +26,10 @@ interface RankingsResultProps {
   /** Display label only ("QB", "Overall", …) — not a real ExtendedPosition, since the "Overall" view spans all four rankable positions at once. */
   positionLabel: string;
   scoringFormat: ScoringFormat;
+  /** In "season" mode the meta line shows real season points scored so far; in "weekly" it shows the forward projection. */
+  mode: "weekly" | "season";
+  /** Offseason (false) shows 0 season points so far — the new season hasn't started, so nobody has scored yet. In-season shows the real running total. */
+  isInSeason: boolean;
 }
 
 const FORMAT_LABEL: Record<ScoringFormat, string> = {
@@ -65,7 +72,21 @@ function legitScoreClasses(score: number): string {
   return "bg-bad/12 text-bad";
 }
 
-function RankingRow({ entry, formatLabel }: { entry: RankingEntryResponse; formatLabel: string }) {
+function RankingRow({
+  entry,
+  formatLabel,
+  mode,
+  isInSeason,
+}: {
+  entry: RankingEntryResponse;
+  formatLabel: string;
+  mode: "weekly" | "season";
+  isInSeason: boolean;
+}) {
+  // Offseason: nobody has scored in the new season yet, so "season points
+  // so far" is 0 (the value on the breakdown is last season's completed
+  // total). In-season it's the real running total.
+  const seasonPts = isInSeason ? entry.seasonTotalPoints : 0;
   return (
     <div className="flex items-center gap-3 border-t border-foreground/[0.09] px-4 py-3.5 first:border-none">
       <span className="w-6 shrink-0 text-right font-jost text-[16px] font-semibold text-foreground/40">
@@ -89,10 +110,15 @@ function RankingRow({ entry, formatLabel }: { entry: RankingEntryResponse; forma
         <p className="truncate text-[12px] text-foreground/45">
           {entry.position}
           {entry.team ? ` · ${entry.team}` : ""}
-          {entry.finalScore != null && ` · ${entry.finalScore.toFixed(1)} proj. pts (${formatLabel})`}
-          {entry.fantasyProsPositionRank != null && ` · FantasyPros ${entry.position}${entry.fantasyProsPositionRank}`}
+          {mode === "season"
+            ? seasonPts != null && ` · ${seasonPts.toFixed(1)} season pts (${formatLabel})`
+            : entry.finalScore != null && ` · ${entry.finalScore.toFixed(1)} proj. pts (${formatLabel})`}
         </p>
-        {entry.notes[0] && <p className="mt-1 truncate text-[12px] leading-snug text-foreground/55">{entry.notes[0]}</p>}
+        {mode === "season" && entry.restOfSeasonPoints != null && (
+          <p className="mt-0.5 truncate text-[12px] text-foreground/55">
+            Projected {entry.restOfSeasonPoints.toFixed(1)} pts rest of season · {entry.restOfSeasonGames} games
+          </p>
+        )}
       </div>
       <span className={`font-jost shrink-0 rounded-[4px] px-3 py-2 text-center text-[19px] font-semibold tabular-nums ${legitScoreClasses(entry.legitScore)}`}>
         {entry.legitScore}
@@ -101,7 +127,7 @@ function RankingRow({ entry, formatLabel }: { entry: RankingEntryResponse; forma
   );
 }
 
-export function RankingsResult({ rankings, positionLabel, scoringFormat }: RankingsResultProps) {
+export function RankingsResult({ rankings, positionLabel, scoringFormat, mode, isInSeason }: RankingsResultProps) {
   const formatLabel = FORMAT_LABEL[scoringFormat];
 
   if (rankings.length === 0) {
@@ -115,7 +141,13 @@ export function RankingsResult({ rankings, positionLabel, scoringFormat }: Ranki
   return (
     <div className="glass-card mt-6 overflow-hidden rounded-2xl border border-foreground/12">
       {rankings.map((entry) => (
-        <RankingRow key={entry.playerId ?? entry.displayName} entry={entry} formatLabel={formatLabel} />
+        <RankingRow
+          key={entry.playerId ?? entry.displayName}
+          entry={entry}
+          formatLabel={formatLabel}
+          mode={mode}
+          isInSeason={isInSeason}
+        />
       ))}
     </div>
   );

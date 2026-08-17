@@ -111,6 +111,8 @@ export interface PlayerScoreBreakdown {
   recentPprFloor: number | null;
   recentPprCeiling: number | null;
   seasonPprAvg: number | null;
+  /** Total fantasy points this player has scored this season (in the selected scoring format) — a real, backward-looking cumulative number, not a projection. Full season total in the offseason; running total in-season. Null when no season stat is available. */
+  seasonTotalPoints: number | null;
   gamesUsedForRecent: number;
   blendedScore: number | null;
   matchupModifier: number;

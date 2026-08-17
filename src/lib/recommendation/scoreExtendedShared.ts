@@ -94,6 +94,7 @@ export function skillFieldDefaults(): Omit<
   | "notes"
 > {
   return {
+    seasonTotalPoints: null,
     recentVolumeAvg: null,
     volumeModifier: 0,
     redZoneTouchesAvg: null,

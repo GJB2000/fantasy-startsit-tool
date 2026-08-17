@@ -4,7 +4,7 @@ import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
 import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
 import { REPLACEMENT_PER_GAME } from "@/lib/recommendation/config";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
-import { toSdioTeam } from "@/lib/recommendation/restOfSeason";
+import { projectRestOfSeason, toSdioTeam } from "@/lib/recommendation/restOfSeason";
 import { getRecentWindow } from "@/lib/recommendation/recentWindow";
 import { scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
 import type { DataQuality, PlayerScoreBreakdown } from "@/lib/recommendation/types";
@@ -24,6 +24,10 @@ export interface LegitRankingEntry extends PlayerScoreBreakdown {
   legitScore: number;
   /** FantasyPros' current season-long consensus rank at this position, or null if this player wasn't found in their redraft rankings (e.g. a very deep bench player FantasyPros doesn't publish a rank for). Purely informational — already folded into legitScore above. */
   fantasyProsPositionRank: number | null;
+  /** Projected total points across every remaining game on this player's real schedule (the Trade Analyzer's rest-of-season projection — see restOfSeason.ts). In the offseason all games remain, so this is the full upcoming-season projection. Null when no schedule is available. */
+  restOfSeasonPoints: number | null;
+  /** How many games that projection covers (the player's remaining schedule length). */
+  restOfSeasonGames: number;
 }
 
 // A player needs at least this many played games in the recent-form
@@ -177,6 +181,28 @@ const ENGINE_WEIGHT: Record<DataQuality, number> = {
   insufficient: 0.05,
 };
 
+/**
+ * Which question the ranking answers:
+ *  - "weekly" — best play for the upcoming week. The engine's OWN
+ *    matchup-adjusted this-week/next-game snapshot leads (ENGINE_WEIGHT
+ *    above), form matters, a great/brutal matchup moves a player. This is
+ *    the tool's original behavior and stays the default.
+ *  - "season" — best rest-of-season value. Leans on FantasyPros'
+ *    season-long redraft consensus instead, at a single flat, low engine
+ *    weight (SEASON_ENGINE_WEIGHT) rather than the dataQuality split — in
+ *    the season view we deliberately take the stable, matchup-agnostic
+ *    long view regardless of how many recent games a player has, so a
+ *    thin recent sample no longer swings the score the way it can weekly.
+ */
+export type RankingMode = "weekly" | "season";
+
+// 0.25 = 75% FantasyPros season consensus / 25% our engine snapshot. Keeps
+// a "Legit" flavor (our engine can still bump a player FP undervalues)
+// while being clearly season-oriented. Same "reasoned, transparent default,
+// not a backtested weight" caveat as ENGINE_WEIGHT — there's no "was this
+// season ranking right" ground truth to tune against.
+const SEASON_ENGINE_WEIGHT = 0.25;
+
 // FantasyPros' redraft files rank WAY more players than are ever
 // "relevant" — e.g. redraft-wr has 239 rows, most of them deep-bench
 // names nobody would start. Normalizing a rank against that FULL pool
@@ -231,7 +257,10 @@ function fantasyProsKeyFor(b: PlayerScoreBreakdown, position: ExtendedPosition):
 function computeLegitScores(
   breakdowns: PlayerScoreBreakdown[],
   fpByKey: Map<string, SeasonRedraftEntry>,
-  position: ExtendedPosition
+  position: ExtendedPosition,
+  mode: RankingMode,
+  remainingOpponentsByTeam: Map<string, RemainingGame[]>,
+  positionDefenseTable: PositionDefenseTable
 ): LegitRankingEntry[] {
   const ranked = breakdowns
     // `finalScore` has no floor for very low-data players (a known,
@@ -272,19 +301,24 @@ function computeLegitScores(
     // real rank deeper than the cap (e.g. WR120) just clamps to 1 via
     // normalize()'s own clamping, rather than going negative.
     const fpNorm = 101 - normalize(fpEntry.positionRank, fpBestRank, fpWorstRank);
-    const engineWeight = ENGINE_WEIGHT[b.dataQuality];
+    const engineWeight = mode === "season" ? SEASON_ENGINE_WEIGHT : ENGINE_WEIGHT[b.dataQuality];
     const blended = engineWeight * engineNorm + (1 - engineWeight) * fpNorm;
     return { breakdown: b, blended, fantasyProsPositionRank: fpEntry.positionRank };
   });
 
   withBlend.sort((a, b) => b.blended - a.blended);
 
-  return withBlend.map((w, i) => ({
-    ...w.breakdown,
-    positionRank: i + 1,
-    legitScore: Math.round(Math.min(100, Math.max(1, w.blended))),
-    fantasyProsPositionRank: w.fantasyProsPositionRank,
-  }));
+  return withBlend.map((w, i) => {
+    const ros = projectRestOfSeason(w.breakdown, remainingOpponentsByTeam, positionDefenseTable);
+    return {
+      ...w.breakdown,
+      positionRank: i + 1,
+      legitScore: Math.round(Math.min(100, Math.max(1, w.blended))),
+      fantasyProsPositionRank: w.fantasyProsPositionRank,
+      restOfSeasonPoints: ros.total,
+      restOfSeasonGames: ros.gamesRemaining,
+    };
+  });
 }
 
 /**
@@ -311,6 +345,7 @@ async function getFullLegitRankingsForPosition(
   position: ExtendedPosition,
   context: SeasonContext,
   format: ScoringFormat,
+  mode: RankingMode,
   positionDefenseTable: PositionDefenseTable,
   nflversePlayerWeekTable: NflversePlayerWeekTable,
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
@@ -318,7 +353,7 @@ async function getFullLegitRankingsForPosition(
   impliedTotalsByTeamWeek: Map<string, number>,
   expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry>
 ): Promise<LegitRankingEntry[]> {
-  const cacheKey = `${position}:${context.lastCompletedSeason}:${context.lastCompletedWeek}:${format}`;
+  const cacheKey = `${position}:${context.lastCompletedSeason}:${context.lastCompletedWeek}:${format}:${mode}`;
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
 
@@ -343,7 +378,14 @@ async function getFullLegitRankingsForPosition(
     )
   );
 
-  const ranked = computeLegitScores(breakdowns, fpByKey, position);
+  const ranked = computeLegitScores(
+    breakdowns,
+    fpByKey,
+    position,
+    mode,
+    remainingOpponentsByTeam,
+    positionDefenseTable
+  );
   cache.set(cacheKey, { data: ranked, expiresAt: Date.now() + CACHE_TTL_MS });
   return ranked;
 }
@@ -353,6 +395,7 @@ export async function getLegitRankingsForPosition(
   position: ExtendedPosition,
   context: SeasonContext,
   format: ScoringFormat,
+  mode: RankingMode,
   positionDefenseTable: PositionDefenseTable,
   nflversePlayerWeekTable: NflversePlayerWeekTable,
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
@@ -364,6 +407,7 @@ export async function getLegitRankingsForPosition(
     position,
     context,
     format,
+    mode,
     positionDefenseTable,
     nflversePlayerWeekTable,
     remainingOpponentsByTeam,
@@ -398,12 +442,17 @@ const TOP_100_LIMIT = 100;
  * where they should) AND consensus-aware (Lamar over Shough). Falls back to
  * the engine projection alone for a player with no consensus estimate.
  */
-const OVERALL_CONSENSUS_WEIGHT = 0.5;
-function crossPositionVor(entry: LegitRankingEntry, format: ScoringFormat): number {
+// How much FantasyPros' consensus points estimate leads the cross-position
+// value. "season" leans harder on the season-long consensus than "weekly"
+// (which keeps the engine's own matchup-adjusted projection at parity),
+// mirroring the per-position blend shift above.
+const OVERALL_CONSENSUS_WEIGHT: Record<RankingMode, number> = { weekly: 0.5, season: 0.8 };
+function crossPositionVor(entry: LegitRankingEntry, format: ScoringFormat, mode: RankingMode): number {
   const engineProjection = entry.finalScore ?? 0;
+  const consensusWeight = OVERALL_CONSENSUS_WEIGHT[mode];
   const projection =
     entry.expertConsensusR2pPts != null
-      ? (1 - OVERALL_CONSENSUS_WEIGHT) * engineProjection + OVERALL_CONSENSUS_WEIGHT * entry.expertConsensusR2pPts
+      ? (1 - consensusWeight) * engineProjection + consensusWeight * entry.expertConsensusR2pPts
       : engineProjection;
   const pos = entry.position;
   if (pos != null && isSkillPosition(pos)) return projection - REPLACEMENT_PER_GAME[format][pos];
@@ -429,6 +478,7 @@ function crossPositionVor(entry: LegitRankingEntry, format: ScoringFormat): numb
 export async function getLegitRankingsOverall(
   context: SeasonContext,
   format: ScoringFormat,
+  mode: RankingMode,
   positionDefenseTable: PositionDefenseTable,
   nflversePlayerWeekTable: NflversePlayerWeekTable,
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
@@ -442,6 +492,7 @@ export async function getLegitRankingsOverall(
         position,
         context,
         format,
+        mode,
         positionDefenseTable,
         nflversePlayerWeekTable,
         remainingOpponentsByTeam,
@@ -452,7 +503,7 @@ export async function getLegitRankingsOverall(
     )
   );
 
-  const withValue = perPosition.flat().map((entry) => ({ entry, value: crossPositionVor(entry, format) }));
+  const withValue = perPosition.flat().map((entry) => ({ entry, value: crossPositionVor(entry, format, mode) }));
 
   const allValues = withValue.map((t) => t.value);
   const minValue = Math.min(...allValues);

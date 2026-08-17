@@ -108,6 +108,7 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
   const seasonPprAvg = input.seasonStat
     ? getFantasyPoints(input.seasonStat, format) / Math.max(input.seasonStat.Played, 1)
     : null;
+  const seasonTotalPoints = input.seasonStat ? getFantasyPoints(input.seasonStat, format) : null;
 
   let blendedScore: number | null = null;
   if (recentPprAvg != null && seasonPprAvg != null) {
@@ -439,6 +440,7 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
     recentPprFloor,
     recentPprCeiling,
     seasonPprAvg,
+    seasonTotalPoints,
     gamesUsedForRecent,
     blendedScore,
     matchupModifier,
