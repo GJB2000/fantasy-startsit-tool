@@ -81,7 +81,7 @@ export async function suggestDrops(
     );
     const pickupResult = toTradePlayerResult(candidate.breakdown, pickupProjection);
 
-    suggestions.set(candidate.playerId, { evaluation: evaluateTrade([worst], [pickupResult], format) });
+    suggestions.set(candidate.playerId, { evaluation: evaluateTrade([worst], [pickupResult]) });
   }
 
   return suggestions;
