@@ -14,7 +14,7 @@ export default function TradePage() {
           className="mt-2 text-[34px] leading-none tracking-[-0.01em] text-foreground"
           style={{ fontFamily: "var(--font-jost)", fontWeight: 600 }}
         >
-          TRADE ANALYZER
+          TRADE ASSISTANT
         </h1>
       </header>
       <TradeAnalyzer />

@@ -48,7 +48,7 @@ const LINKS: { href: string; label: string; icon: React.ReactNode }[] = [
   },
   {
     href: "/trade",
-    label: "Trade Analyzer",
+    label: "Trade Assistant",
     icon: (
       <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none">
         <path

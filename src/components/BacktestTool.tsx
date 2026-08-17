@@ -247,7 +247,7 @@ export function BacktestTool() {
               : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
           }`}
         >
-          Trade analyzer
+          Trade assistant
         </button>
         <button
           type="button"

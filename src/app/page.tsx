@@ -18,7 +18,7 @@ const TOOLS = [
   },
   {
     href: "/trade",
-    label: "Trade Analyzer",
+    label: "Trade Assistant",
     title: "Know if a trade is worth it",
     description:
       "Enter both sides and get a good, fair, or bad verdict based on rest-of-season value.",
