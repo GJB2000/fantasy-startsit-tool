@@ -168,7 +168,16 @@ export function LineupTool() {
   );
 
   return (
-    <div className="mx-auto mt-10 w-full max-w-4xl">
+    // Landing state centers the control deck in the space below the page
+    // header — ~57% of the viewport sat empty beneath it otherwise. Content
+    // only, no explainer panel: item 110 removed this page's landing hero on
+    // request ("the tool is self-explanatory"), and that still stands. lg-only,
+    // same as Start/Sit.
+    <div
+      className={`mx-auto mt-10 w-full max-w-4xl ${
+        response ? "" : "lg:flex lg:min-h-[calc(100vh-16rem)] lg:flex-col lg:justify-center"
+      }`}
+    >
       <div className="mx-auto w-full max-w-2xl">{controls}</div>
 
       {response && (

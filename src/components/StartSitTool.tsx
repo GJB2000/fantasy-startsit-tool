@@ -119,7 +119,18 @@ export function StartSitTool() {
   }, [pendingRestore]);
 
   return (
-    <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_300px]">
+    // Landing state (no result yet) centers its single row in the space below
+    // the page header, so the entry card reads as a deliberate composition
+    // rather than content jammed under the header with ~54% of the viewport
+    // empty beneath it. `content-center` distributes the grid's row block;
+    // `items-start` still governs alignment WITHIN the row, so the sticky rail
+    // keeps the non-stretched height it depends on. lg-only — narrower
+    // viewports fill naturally and have nothing to rebalance.
+    <div
+      className={`mx-auto grid w-full max-w-7xl grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_300px] ${
+        response ? "" : "lg:min-h-[calc(100vh-16rem)] lg:content-center"
+      }`}
+    >
       <div className="flex flex-col gap-4">
         <div className="relative z-20 rounded-2xl border border-foreground/12 bg-surface-glass p-5 shadow-[0_18px_46px_-24px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:p-6">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
