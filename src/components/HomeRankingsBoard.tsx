@@ -5,15 +5,6 @@ import { useEffect, useState } from "react";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import type { RankingEntryResponse } from "./RankingsResult";
 
-// The /api/rankings route returns the full engine breakdowns (see
-// buildRankings.ts's LegitRankingEntry, which extends PlayerScoreBreakdown),
-// so matchupContext rides along in the JSON even though RankingsResult's
-// own typed slice doesn't declare it. We use it here for the opponent +
-// favorable/tough line under each name.
-interface HomeRankingEntry extends RankingEntryResponse {
-  matchupContext: { opponentTeam: string; diffFromAverage: number } | null;
-}
-
 // How many players to surface on the Home board — a preview of the full
 // Top 100, not the whole list.
 const TOP_N = 5;
@@ -58,7 +49,7 @@ function BoardMessage({ children, tone = "muted" }: { children: React.ReactNode;
  */
 export function HomeRankingsBoard() {
   const [scoringFormat] = useScoringFormat();
-  const [rankings, setRankings] = useState<HomeRankingEntry[] | null>(null);
+  const [rankings, setRankings] = useState<RankingEntryResponse[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

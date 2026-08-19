@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { RankingsResult, type RankingEntryResponse } from "./RankingsResult";
-import { ScoringFormatToggle } from "./ScoringFormatToggle";
+import { SCORING_FORMAT_OPTIONS } from "./ScoringFormatToggle";
+import { SegmentedControl } from "./SegmentedControl";
 
 interface RankingsResponse {
   rankings: RankingEntryResponse[];
@@ -30,7 +31,9 @@ const TAB_LABEL: Record<RankingsTab, string> = {
   TE: "TE",
 };
 
-const TABS: RankingsTab[] = ["OVERALL", "QB", "RB", "WR", "TE"];
+const TAB_OPTIONS: { value: RankingsTab; label: string }[] = (
+  ["OVERALL", "QB", "RB", "WR", "TE"] as RankingsTab[]
+).map((value) => ({ value, label: TAB_LABEL[value] }));
 
 // "Weekly" = best play for the upcoming week (matchup-adjusted, form-led —
 // the tool's original behavior). "Season" = best rest-of-season value,
@@ -81,47 +84,28 @@ export function RankingsTool() {
 
   return (
     <div className="mx-auto mt-6 w-full max-w-5xl">
-      <div className="flex flex-wrap items-center justify-center gap-2.5">
-        <div className="inline-flex gap-0.5 rounded-full bg-surface-sunken p-[3px]">
-          {TABS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              style={{ fontFamily: "var(--font-engraved)" }}
-              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[11px] uppercase tracking-[0.08em] transition-colors ${
-                tab === t ? "bg-accent font-semibold text-accent-ink" : "text-foreground/55 hover:text-foreground"
-              }`}
-            >
-              {TAB_LABEL[t]}
-            </button>
-          ))}
-        </div>
-        <div className="inline-flex gap-0.5 rounded-full bg-surface-sunken p-[3px]">
-          {MODES.map((m) => (
-            <button
-              key={m.value}
-              type="button"
-              onClick={() => setMode(m.value)}
-              style={{ fontFamily: "var(--font-engraved)" }}
-              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[11px] uppercase tracking-[0.08em] transition-colors ${
-                mode === m.value ? "bg-accent font-semibold text-accent-ink" : "text-foreground/55 hover:text-foreground"
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-        <ScoringFormatToggle editorial value={scoringFormat} onChange={setScoringFormat} />
+      {/* Three independent axes, each labeled. Only "View" carries the accent —
+          when all three groups were volt-filled and unlabeled they read as one
+          control with three lit segments rather than three separate settings. */}
+      <div className="flex flex-wrap items-end gap-x-7 gap-y-4">
+        <SegmentedControl label="View" options={TAB_OPTIONS} value={tab} onChange={setTab} />
+        <SegmentedControl label="Timeframe" options={MODES} value={mode} onChange={setMode} tone="secondary" />
+        <SegmentedControl
+          label="Scoring"
+          options={SCORING_FORMAT_OPTIONS}
+          value={scoringFormat}
+          onChange={setScoringFormat}
+          tone="secondary"
+        />
       </div>
-      <p className="mt-3 text-center text-xs text-foreground/55">{MODE_BLURB[mode]}</p>
+      <p className="mt-3 text-xs text-foreground/55">{MODE_BLURB[mode]}</p>
 
       {loading && <p className="mt-8 text-center text-sm text-foreground/50">Ranking every {TAB_LABEL[tab]}…</p>}
       {error && !loading && <p className="mt-8 text-center text-sm text-bad">{error}</p>}
 
       {response && !loading && (
         <>
-          <p className="mt-6 text-center text-xs text-foreground/55">{response.context.contextNote}</p>
+          <p className="mt-6 text-xs text-foreground/55">{response.context.contextNote}</p>
           <RankingsResult
             rankings={response.rankings}
             positionLabel={TAB_LABEL[tab]}

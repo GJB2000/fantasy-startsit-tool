@@ -20,7 +20,8 @@ import { PlayerMultiSelect } from "./PlayerMultiSelect";
 import { ProjectionPlayerDetailView } from "./ProjectionPlayerDetail";
 import { ProjectionPlayerTable } from "./ProjectionPlayerTable";
 import { ProjectionSummaryView } from "./ProjectionSummary";
-import { ScoringFormatToggle } from "./ScoringFormatToggle";
+import { SCORING_FORMAT_OPTIONS } from "./ScoringFormatToggle";
+import { SegmentedControl } from "./SegmentedControl";
 import { TradeBacktestTable } from "./TradeBacktestTable";
 
 type Mode = "pair" | "broad" | "trade" | "projection";
@@ -31,6 +32,13 @@ type Mode = "pair" | "broad" | "trade" | "projection";
 // works for every season.
 type Season = "2025" | "2024" | "2023" | "2022";
 const SEASON_OPTIONS = ["2025", "2024", "2023", "2022"] as const;
+const SEASON_CHOICES: { value: Season; label: string }[] = SEASON_OPTIONS.map((s) => ({ value: s, label: s }));
+const MODE_CHOICES: { value: Mode; label: string }[] = [
+  { value: "pair", label: "Single pair" },
+  { value: "broad", label: "Broad (many pairs)" },
+  { value: "trade", label: "Trade assistant" },
+  { value: "projection", label: "Projection accuracy" },
+];
 const ALL_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 // D/ST and K only have real backtest support on the primary 2025
 // SportsDataIO pipeline (Broad mode only, not Trade analyzer) — see
@@ -215,62 +223,49 @@ export function BacktestTool() {
     <div className="mx-auto mt-8 w-full max-w-5xl space-y-6">
       <BacktestCaveatNote season={season} showNflverseCaveat={season !== "2025"} />
 
-      <div className="flex gap-2 text-sm">
-        <button
-          type="button"
-          onClick={() => setMode("pair")}
-          className={`rounded-[3px] px-3 py-1.5 font-engraved text-[11px] uppercase tracking-[0.06em] transition-colors ${
-            mode === "pair"
-              ? "bg-accent text-accent-ink"
-              : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
-          }`}
-        >
-          Single pair
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("broad")}
-          className={`rounded-[3px] px-3 py-1.5 font-engraved text-[11px] uppercase tracking-[0.06em] transition-colors ${
-            mode === "broad"
-              ? "bg-accent text-accent-ink"
-              : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
-          }`}
-        >
-          Broad (many pairs)
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("trade")}
-          className={`rounded-[3px] px-3 py-1.5 font-engraved text-[11px] uppercase tracking-[0.06em] transition-colors ${
-            mode === "trade"
-              ? "bg-accent text-accent-ink"
-              : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
-          }`}
-        >
-          Trade assistant
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setMode("projection");
-            setSeason("2025");
+      {/* Each axis labeled, and only "Mode" carries the accent — four
+          identically volt-filled rows read as one control with everything
+          lit rather than four independent settings. */}
+      <div className="flex flex-wrap items-end gap-x-7 gap-y-4">
+        <SegmentedControl
+          label="Mode"
+          options={MODE_CHOICES}
+          value={mode}
+          onChange={(next) => {
+            setMode(next);
+            // Projection accuracy is 2025-only (the primary, tuned pipeline).
+            if (next === "projection") setSeason("2025");
           }}
-          className={`rounded-[3px] px-3 py-1.5 font-engraved text-[11px] uppercase tracking-[0.06em] transition-colors ${
-            mode === "projection"
-              ? "bg-accent text-accent-ink"
-              : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
-          }`}
-        >
-          Projection accuracy
-        </button>
+        />
+        <SegmentedControl
+          label="Scoring"
+          options={SCORING_FORMAT_OPTIONS}
+          value={scoringFormat}
+          onChange={setScoringFormat}
+          tone="secondary"
+        />
+        {mode !== "projection" && (
+          <SegmentedControl
+            label="Season"
+            options={SEASON_CHOICES}
+            value={season}
+            onChange={(next) => {
+              setSeason(next);
+              setPairResult(null);
+              setBroadResult(null);
+              setTradeResult(null);
+            }}
+            tone="secondary"
+          />
+        )}
       </div>
-
-      <div className="flex items-center gap-3">
-        <span className="font-engraved text-[10px] uppercase tracking-[0.08em] text-foreground/55">
-          Scoring format
-        </span>
-        <ScoringFormatToggle value={scoringFormat} onChange={setScoringFormat} editorial />
-      </div>
+      {mode !== "projection" && (
+        <p className="-mt-3 text-xs text-foreground/55">
+          {season === "2025"
+            ? "2025 is the primary, tuned pipeline (SportsDataIO)."
+            : `${season} is out-of-sample validation (nflverse-only).`}
+        </p>
+      )}
 
       {mode === "projection" ? (
         <>
@@ -287,31 +282,7 @@ export function BacktestTool() {
             max={MAX_LOOKUP_PLAYERS}
           />
         </>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-foreground/55">Season</span>
-          {SEASON_OPTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => {
-                setSeason(s);
-                setPairResult(null);
-                setBroadResult(null);
-                setTradeResult(null);
-              }}
-              className={`rounded-[3px] px-3 py-1.5 font-engraved text-[11px] uppercase tracking-[0.06em] transition-colors ${
-                season === s ? "bg-accent text-accent-ink" : "border border-foreground/15 text-foreground/70 hover:border-foreground/25"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-          <span className="text-xs text-foreground/55">
-            {season === "2025" ? "primary, tuned" : "out-of-sample validation (nflverse-only)"}
-          </span>
-        </div>
-      )}
+      ) : null}
 
       {mode === "pair" && (
         <PlayerMultiSelect

@@ -2,11 +2,14 @@
 
 import type { ScoringFormat } from "@/lib/sportsdata/types";
 
-const OPTIONS: { value: ScoringFormat; label: string }[] = [
+/** Exported so pages that render scoring format through the shared SegmentedControl (Legit Rankings, Backtest) don't redeclare the option list. */
+export const SCORING_FORMAT_OPTIONS: { value: ScoringFormat; label: string }[] = [
   { value: "ppr", label: "PPR" },
   { value: "half_ppr", label: "Half PPR" },
   { value: "standard", label: "Standard" },
 ];
+
+const OPTIONS = SCORING_FORMAT_OPTIONS;
 
 interface ScoringFormatToggleProps {
   value: ScoringFormat;

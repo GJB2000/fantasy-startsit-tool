@@ -19,6 +19,14 @@ export interface RankingEntryResponse {
   fantasyProsPositionRank: number | null;
   restOfSeasonPoints: number | null;
   restOfSeasonGames: number;
+  /**
+   * The /api/rankings route returns the full engine breakdowns (see
+   * buildRankings.ts's LegitRankingEntry, which extends
+   * PlayerScoreBreakdown), so this rides along in the JSON. Optional here
+   * because it's only meaningful in "weekly" mode — "season" is
+   * matchup-agnostic by design.
+   */
+  matchupContext?: { opponentTeam: string; diffFromAverage: number } | null;
 }
 
 interface RankingsResultProps {
@@ -39,6 +47,30 @@ function initials(name: string) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
+}
+
+// Position accent CSS vars (globals.css, theme-aware) — the same scanning
+// cue PlayerMultiSelect/LineupResult/WaiverResult already use. In a
+// cross-position Top 100 especially, position is the thing you scan for.
+const POS_VAR: Record<string, string> = {
+  QB: "var(--pos-qb)",
+  RB: "var(--pos-rb)",
+  WR: "var(--pos-wr)",
+  TE: "var(--pos-te)",
+  K: "var(--pos-k)",
+  DST: "var(--pos-dst)",
+};
+function posVar(position: string | null): string {
+  return (position && POS_VAR[position]) ?? "var(--foreground)";
+}
+
+// Same thresholds ComparisonResult.tsx's matchupLabel uses, so "favorable"
+// / "tough" mean the same thing everywhere. Keyed off diffFromAverage, not
+// the raw rank — the rank direction is counterintuitive (positionDefense.ts).
+function matchupLabel(diff: number): { text: string; className: string } {
+  if (diff > 1.5) return { text: "Favorable", className: "text-good" };
+  if (diff < -1.5) return { text: "Tough", className: "text-bad" };
+  return { text: "Even", className: "text-foreground/55" };
 }
 
 function injuryBadgeClasses(status: string) {
@@ -66,6 +98,14 @@ function legitScoreClasses(score: number): string {
   return "bg-bad/12 text-bad";
 }
 
+/** Bar fill for the score meter — matches the badge's own tier color so the two never disagree. */
+function legitScoreVar(score: number): string {
+  if (score >= 90) return "var(--premium)";
+  if (score >= 70) return "var(--good)";
+  if (score >= 45) return "var(--info)";
+  return "var(--bad)";
+}
+
 function RankingRow({
   entry,
   mode,
@@ -79,12 +119,19 @@ function RankingRow({
   // so far" is 0 (the value on the breakdown is last season's completed
   // total). In-season it's the real running total.
   const seasonPts = isInSeason ? entry.seasonTotalPoints : 0;
+  const color = posVar(entry.position);
+  // Matchup is only meaningful in weekly mode — "season" is matchup-agnostic.
+  const matchup = mode === "weekly" && entry.matchupContext ? entry.matchupContext : null;
+  const label = matchup ? matchupLabel(matchup.diffFromAverage) : null;
   return (
     <div className="flex items-center gap-3 border-t border-foreground/[0.09] px-4 py-3.5 first:border-none">
-      <span className="w-6 shrink-0 text-right font-jost text-[16px] font-semibold text-foreground/55">
+      <span className="w-6 shrink-0 text-right font-jost text-[16px] font-semibold tabular-nums text-foreground/55">
         {entry.positionRank}
       </span>
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] bg-accent/12 font-jost text-[13px] font-semibold text-accent">
+      <span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] font-jost text-[13px] font-semibold text-white"
+        style={{ background: `linear-gradient(150deg, ${color}, color-mix(in srgb, ${color} 55%, #000))` }}
+      >
         {initials(entry.displayName)}
       </span>
       <div className="min-w-0 flex-1">
@@ -112,6 +159,23 @@ function RankingRow({
           </p>
         )}
       </div>
+      {/* Desktop-only detail. On a wide screen the row used to run ~500px of
+          dead space between the name and the score; these give that gap a job
+          without crowding the mobile layout, which is already tight. */}
+      {label && matchup && (
+        <div className="hidden w-24 shrink-0 text-right lg:block">
+          <p className="truncate font-engraved text-[10px] uppercase tracking-[0.08em] text-foreground/55">
+            vs {matchup.opponentTeam}
+          </p>
+          <p className={`truncate text-[12px] font-medium ${label.className}`}>{label.text}</p>
+        </div>
+      )}
+      <span className="hidden h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-surface-sunken sm:block md:w-32 lg:w-40">
+        <span
+          className="block h-full rounded-full"
+          style={{ width: `${entry.legitScore}%`, background: legitScoreVar(entry.legitScore) }}
+        />
+      </span>
       <span className={`font-jost shrink-0 rounded-[4px] px-3 py-2 text-center text-[19px] font-semibold tabular-nums ${legitScoreClasses(entry.legitScore)}`}>
         {entry.legitScore}
       </span>
