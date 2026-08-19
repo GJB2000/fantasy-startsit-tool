@@ -68,12 +68,12 @@ export function TradeAnalyzer() {
     <div className="mx-auto mt-10 w-full max-w-4xl">
       <div className="relative z-20 rounded-2xl border border-foreground/12 bg-surface-glass p-5 shadow-[0_18px_46px_-24px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:p-6">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <span
+          <h2
             className="text-[10px] uppercase tracking-[0.14em] text-accent"
             style={{ fontFamily: "var(--font-engraved)" }}
           >
             Build the Trade
-          </span>
+          </h2>
           <ScoringFormatToggle
             editorial
             value={scoringFormat}

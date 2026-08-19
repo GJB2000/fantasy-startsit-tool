@@ -123,12 +123,12 @@ export function StartSitTool() {
       <div className="flex flex-col gap-4">
         <div className="relative z-20 rounded-2xl border border-foreground/12 bg-surface-glass p-5 shadow-[0_18px_46px_-24px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:p-6">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <span
+            <h2
               className="text-[10px] uppercase tracking-[0.14em] text-accent"
               style={{ fontFamily: "var(--font-engraved)" }}
             >
               Set the Matchup
-            </span>
+            </h2>
             <ScoringFormatToggle
               editorial
               value={scoringFormat}
@@ -153,11 +153,14 @@ export function StartSitTool() {
             onClick={handleCompare}
             disabled={selectedPlayers.length < 2 || loading}
             style={{ fontFamily: "var(--font-engraved)" }}
-            className="mt-5 w-full rounded-full bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
+            className="mt-5 w-full rounded-full bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-surface-sunken disabled:text-foreground/45 disabled:shadow-none"
           >
             {loading ? "Comparing…" : "Compare"}
           </button>
 
+          {selectedPlayers.length < 2 && !loading && (
+            <p className="mt-2.5 text-center text-[11px] text-foreground/55">Add two players to compare.</p>
+          )}
           {error && <p className="mt-3 text-sm text-bad">{error}</p>}
         </div>
 

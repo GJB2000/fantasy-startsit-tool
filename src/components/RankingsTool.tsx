@@ -81,7 +81,7 @@ export function RankingsTool() {
 
   return (
     <div className="mx-auto mt-6 w-full max-w-5xl">
-      <div className="flex flex-wrap items-center justify-center gap-3">
+      <div className="flex flex-wrap items-center justify-center gap-2.5">
         <div className="inline-flex gap-0.5 rounded-full bg-surface-sunken p-[3px]">
           {TABS.map((t) => (
             <button

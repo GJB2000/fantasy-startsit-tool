@@ -155,13 +155,13 @@ export function LineupTool() {
         onClick={handleBuildLineup}
         disabled={loading || rostered.length === 0}
         style={{ fontFamily: "var(--font-engraved)" }}
-        className="w-full rounded-full bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40 disabled:shadow-none"
+        className="w-full rounded-full bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-surface-sunken disabled:text-foreground/45 disabled:shadow-none"
       >
         {loading ? "Building your lineup…" : "Build my lineup"}
       </button>
 
       {rostered.length === 0 && !error && (
-        <p className="text-center text-[12px] text-foreground/45">Add players to your roster to build a lineup.</p>
+        <p className="text-center text-[12px] text-foreground/55">Add players to your roster to build a lineup.</p>
       )}
       {error && <p className="text-sm text-bad">{error}</p>}
     </div>

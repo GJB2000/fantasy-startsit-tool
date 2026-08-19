@@ -145,7 +145,7 @@ export function HomeRankingsBoard() {
                 )}
               </p>
             </div>
-            <span className="hidden h-1.5 w-28 shrink-0 overflow-hidden rounded-full bg-surface-sunken sm:block">
+            <span className="hidden h-1.5 w-28 shrink-0 overflow-hidden rounded-full bg-surface-sunken sm:block md:w-48 lg:w-72">
               <span
                 className="block h-full rounded-full"
                 style={{ width: `${entry.legitScore}%`, background: elite ? "var(--premium)" : "var(--accent)" }}
