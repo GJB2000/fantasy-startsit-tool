@@ -24,11 +24,96 @@
   --rose-soft: color-mix(in srgb, var(--bad) 15%, transparent);
   --neutral-bar: color-mix(in srgb, var(--foreground) 28%, transparent);
 
+  /* Hierarchy tokens — light values here, dark overridden below.
+     The two themes need different MECHANISMS, not the same one dialed
+     up: on dark, --accent is bright volt and a translucent glow against
+     near-black instantly marks the pick. On light, --accent is a deep
+     navy, where that same glow is invisible on white — so light
+     separates by EDGE + ELEVATION + RECESSION instead: an opaque raised
+     card, a solid accent spine down the pick, and a recessed (sunken,
+     flat) bench panel, so the contrast runs in both directions. */
+  --panel-bg: color-mix(in srgb, var(--card) 94%, transparent);
+  --panel-border: color-mix(in srgb, var(--foreground) 12%, transparent);
+  --panel-shadow:
+    0 12px 30px -18px rgba(14, 17, 22, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --pick-bg:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 9%, transparent), transparent 200px),
+    var(--card);
+  --pick-border: color-mix(in srgb, var(--accent) 34%, transparent);
+  --pick-shadow:
+    0 18px 40px -20px color-mix(in srgb, var(--accent) 45%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --pick-spine: 4px;
+  --bench-bg: var(--sunken);
+  --bench-border: color-mix(in srgb, var(--foreground) 9%, transparent);
+  --bench-shadow: none;
+  --verdict-border: color-mix(in srgb, var(--accent) 38%, transparent);
+  --verdict-shadow:
+    0 26px 60px -30px rgba(14, 17, 22, 0.45),
+    0 10px 24px -18px rgba(14, 17, 22, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
   position: relative;
   color: var(--ink);
   font-family: var(--font-sans);
 }
 .body { position: relative; }
+
+@media (prefers-color-scheme: dark) {
+  :global(:root:not([data-theme="light"])) .sheet {
+    --panel-bg: color-mix(in srgb, var(--card) 58%, transparent);
+    --panel-border: color-mix(in srgb, var(--foreground) 10%, transparent);
+    --panel-shadow:
+      0 18px 46px -24px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 color-mix(in srgb, var(--foreground) 7%, transparent);
+    --pick-bg:
+      linear-gradient(180deg, var(--acc-soft), transparent 150px),
+      color-mix(in srgb, var(--card) 58%, transparent);
+    --pick-border: var(--acc-line);
+    --pick-shadow:
+      0 18px 54px -22px color-mix(in srgb, var(--accent) 34%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--foreground) 10%, transparent);
+    /* dark marks the pick with the glow above, not a spine */
+    --pick-spine: 0px;
+    --bench-bg: color-mix(in srgb, var(--card) 58%, transparent);
+    --bench-border: color-mix(in srgb, var(--foreground) 10%, transparent);
+    --bench-shadow:
+      0 18px 46px -24px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 color-mix(in srgb, var(--foreground) 7%, transparent);
+    --verdict-border: var(--acc-line);
+    --verdict-shadow:
+      0 24px 64px -28px color-mix(in srgb, var(--accent) 28%, transparent),
+      0 12px 32px -18px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 color-mix(in srgb, var(--foreground) 9%, transparent);
+  }
+}
+:global(:root[data-theme="dark"]) .sheet {
+    --panel-bg: color-mix(in srgb, var(--card) 58%, transparent);
+    --panel-border: color-mix(in srgb, var(--foreground) 10%, transparent);
+    --panel-shadow:
+      0 18px 46px -24px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 color-mix(in srgb, var(--foreground) 7%, transparent);
+    --pick-bg:
+      linear-gradient(180deg, var(--acc-soft), transparent 150px),
+      color-mix(in srgb, var(--card) 58%, transparent);
+    --pick-border: var(--acc-line);
+    --pick-shadow:
+      0 18px 54px -22px color-mix(in srgb, var(--accent) 34%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--foreground) 10%, transparent);
+    /* dark marks the pick with the glow above, not a spine */
+    --pick-spine: 0px;
+    --bench-bg: color-mix(in srgb, var(--card) 58%, transparent);
+    --bench-border: color-mix(in srgb, var(--foreground) 10%, transparent);
+    --bench-shadow:
+      0 18px 46px -24px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 color-mix(in srgb, var(--foreground) 7%, transparent);
+    --verdict-border: var(--acc-line);
+    --verdict-shadow:
+      0 24px 64px -28px color-mix(in srgb, var(--accent) 28%, transparent),
+      0 12px 32px -18px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 color-mix(in srgb, var(--foreground) 9%, transparent);
+}
 
 .n { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; letter-spacing: -0.02em; }
 .lab { font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
@@ -39,17 +124,14 @@
 .verdict {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--acc-line);
+  border: 1px solid var(--verdict-border);
   border-radius: 18px;
   padding: 28px 30px 24px;
   margin-bottom: 4px;
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent 46%),
     var(--card);
-  box-shadow:
-    0 24px 64px -28px color-mix(in srgb, var(--accent) 28%, transparent),
-    0 12px 32px -18px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 color-mix(in srgb, var(--foreground) 9%, transparent);
+  box-shadow: var(--verdict-shadow);
 }
 /* a bright volt spine down the left edge as a verdict marker */
 .verdict::before {
@@ -83,24 +165,39 @@
 /* panels — single-column, hairline-ruled sections (almanac layout, Nash skin) */
 .panels { display: flex; flex-direction: column; gap: 14px; margin-top: 22px; }
 .panel {
-  background: color-mix(in srgb, var(--card) 58%, transparent);
+  position: relative;
+  overflow: hidden;
+  background: var(--panel-bg);
   backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
-  border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+  border: 1px solid var(--panel-border);
   border-radius: 18px;
-  box-shadow:
-    0 18px 46px -24px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 color-mix(in srgb, var(--foreground) 7%, transparent);
+  box-shadow: var(--panel-shadow);
   padding: 24px 30px;
 }
 .pick {
-  border-color: var(--acc-line);
-  background:
-    linear-gradient(180deg, var(--acc-soft), transparent 150px),
-    color-mix(in srgb, var(--card) 58%, transparent);
-  box-shadow:
-    0 18px 54px -22px color-mix(in srgb, var(--accent) 34%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--foreground) 10%, transparent);
+  border-color: var(--pick-border);
+  background: var(--pick-bg);
+  box-shadow: var(--pick-shadow);
+}
+/* Solid accent spine — the light theme's primary "this is the pick" marker,
+   and the same device the verdict hero already uses, so it reads as one
+   family rather than a new idea. Zero-width on dark, where the glow does it. */
+.pick::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--pick-spine);
+  background: var(--acc);
+}
+/* The other half of the light-mode contrast: the bench panel recedes into
+   the page instead of sitting level with the pick. A no-op on dark. */
+.bench {
+  background: var(--bench-bg);
+  border-color: var(--bench-border);
+  box-shadow: var(--bench-shadow);
 }
 
 /* header: rank · name/meta · Start/Bench tag */

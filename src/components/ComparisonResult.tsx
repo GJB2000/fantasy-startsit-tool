@@ -360,7 +360,7 @@ function PlayerCard({
 
   return (
     <article
-      className={`${styles.panel} ${isRecommended ? styles.pick : ""} ${styles.rise}`}
+      className={`${styles.panel} ${isRecommended ? styles.pick : styles.bench} ${styles.rise}`}
       style={{ animationDelay: `${0.1 + rank * 0.06}s` }}
     >
       <header className={styles.chead}>
