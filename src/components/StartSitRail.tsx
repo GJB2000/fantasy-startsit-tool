@@ -84,6 +84,16 @@ export function RecentComparisonsPanel({
  * context, injury status, and next-opponent/weather live in each player
  * card instead (ComparisonResult.tsx), so this rail is just genuine
  * session history (useRecentComparisons), not placeholder content.
+ *
+ * Sticky from `lg` up, where the layout is two columns: a full result runs
+ * far taller than this short panel, so without it the rail scrolls away and
+ * leaves ~300px of blank column beside the player cards for the rest of the
+ * page. The parent grid sets `items-start`, so rows aren't stretched and
+ * sticky has room to travel. Below `lg` the grid collapses to one column and
+ * the rail simply stacks under the result, where sticky would have no travel
+ * — hence the breakpoint prefix on every part of this. The max-height guard
+ * keeps a long history scrollable inside the rail instead of pinning content
+ * out of reach.
  */
 export function StartSitRail({
   recent,
@@ -93,7 +103,7 @@ export function StartSitRail({
   onSelectRecent?: (entry: RecentComparison) => void;
 }) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:self-start lg:overflow-y-auto">
       {/* StartSitRail only renders on the editorial Start/Sit page. */}
       <RecentComparisonsPanel recent={recent} onSelect={onSelectRecent} editorial />
     </div>
