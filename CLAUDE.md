@@ -8751,7 +8751,153 @@ single-season numbers for those specific constants.
       repo). No code shipped; this write-up + the two reverted config edits are
       the only artifacts. See new Open Item #33.
 
-### Open items (as of item 153 — pick up here)
+154. **UI review, then five fixes: rankings row density, control-cluster
+    hierarchy, position-color consistency, a light-mode-specific separation
+    mechanism, and a sticky Start/Sit rail. Presentation only — no engine,
+    scoring, or API change anywhere in this item.** Started from a
+    fresh rating pass of the whole app driven in the browser (desktop 1400px
+    and mobile 375px, both themes, real data), which came back **8/10** — up
+    from the ~7.5 the item-151-153 session's own review gave, with that
+    session's contrast/focus-ring/desktop-width fixes confirmed holding.
+    Strongest: the Start/Sit result card's information hierarchy (verdict →
+    matchup → projection+range → stat grid → case for/against) and the
+    mobile drawer nav. Weakest: desktop space economy and control hierarchy.
+    - **(a) The Rankings row's dead gap (`RankingsResult.tsx`).** At 1400px
+      each row ran ~1080px wide with the name left and the score badge right
+      and roughly 500px of nothing between — while the SAME list on mobile
+      was tight and good, because the constrained width removes the void.
+      Each row gained two desktop-only cells: the upcoming matchup (`vs OPP`
+      + Favorable/Tough/Even, keyed off `diffFromAverage` via the same
+      thresholds `ComparisonResult.tsx`'s own `matchupLabel` uses, so the
+      word means one thing app-wide) and a score meter tinted to the same
+      tier color as the badge, so bar and number can never disagree. The
+      matchup cell is hidden in Season mode — that view is matchup-agnostic
+      by design (item 151), so showing one would be a lie. Both are
+      `sm:`/`lg:`-gated, so the mobile row is byte-identical to before.
+      `matchupContext` was already in the `/api/rankings` payload (the route
+      returns the full `LegitRankingEntry` breakdowns) and was already being
+      read by `HomeRankingsBoard` via a local type extension — that
+      extension was deleted and the field declared on the shared
+      `RankingEntryResponse` instead, so there's one definition.
+    - **(b) Control clusters, and a deliberate reversal of the prior
+      session's call.** Rankings stacked three identically volt-filled,
+      unlabeled pill groups (Top 100 / Weekly / PPR) and Backtest four —
+      which read as ONE control with several segments lit, not as
+      independent axes. The item-151-153 session had looked at this and
+      dropped it as "no clean win; desktop was already one row and mobile's
+      three are inherent to three multi-option controls" — that framing
+      treated it as a LAYOUT problem (how to fit three groups), when it's
+      really a LABELING + WEIGHT problem. New shared
+      `SegmentedControl.tsx` with a `label` and a `tone`: each axis gets a
+      small engraved caption, and only a page's PRIMARY axis carries the
+      accent while supporting settings get a quiet fill. Rankings is now
+      View / Timeframe / Scoring, left-aligned so it lines up with its own
+      page header instead of centering at three ragged widths; Backtest is
+      Mode / Scoring / Season, which also moved it off its old squared
+      bordered buttons onto the app's shared pill language.
+      `SCORING_FORMAT_OPTIONS` is now exported from `ScoringFormatToggle.tsx`
+      so those two pages don't redeclare the option list.
+      **The sidebar's own scoring pill deliberately stays volt** — in that
+      rail volt means "selected" for nav too, and it's a separate
+      always-dark surface; the tone split is WITHIN-page hierarchy.
+    - **(c) Position colors were inconsistent.** The `--pos-qb/rb/wr/te`
+      tokens (globals.css) are used as a scanning cue by
+      `PlayerMultiSelect`/`LineupResult`/`WaiverResult`, but every Rankings
+      avatar rendered volt regardless of position (confirmed by reading
+      computed styles, not by eye). Now uses the same gradient tile. In the
+      cross-position Top 100 this is exactly the cue that was missing — the
+      position mix is scannable down the left edge.
+    - **(d) Light mode had no hierarchy mechanism of its own — the real
+      finding of this pass.** In dark, `--accent` is bright volt, so the
+      recommended panel's translucent glow against near-black instantly
+      marks the pick. In light, `--accent` is a deep navy and that same glow
+      is invisible on white, so the two player cards looked nearly identical
+      apart from the START/BENCH pill, and the white verdict card sat flush
+      on a near-white page. The fix is NOT the dark treatment dialed up:
+      light now separates by **edge + elevation + recession** — the verdict
+      hero gets a real neutral drop shadow so it lifts off the page ground;
+      the pick panel becomes an opaque raised card with a solid 4px accent
+      spine down the left edge (the same marker the verdict hero already
+      uses, so it reads as one family rather than a new device); and the
+      bench panel RECEDES (sunken background, flat, no shadow, no spine).
+      That last part is the half that does the real work — the contrast now
+      runs in both directions instead of resting on the pick alone being
+      slightly different. Implemented as module-local custom properties
+      (`--pick-bg`/`--pick-spine`/`--bench-bg`/`--verdict-shadow`/…) with
+      light values on `.sheet` and dark values in two override blocks, using
+      the same three-state guard `globals.css` uses (`prefers-color-scheme`
+      + a `:root:not([data-theme="light"])` guard, plus a duplicated
+      `:root[data-theme="dark"]` so the toggle wins both ways — plain CSS
+      can't share a ruleset across a media-query boundary). The dark values
+      are the exact previous literals and `--pick-spine` is `0px` there, so
+      **dark is byte-identical, verified by reading computed styles before
+      and after** (pick: card-58% bg, volt 42% border, volt 34% glow, spine
+      `0px`; bench: identical to the base panel). `.panel` gained
+      `overflow: hidden` so the spine respects the corner radius — checked
+      that this doesn't clip the item-121 stat tooltips by measuring all
+      four tooltip rects against the panel bounds (all fully inside, worst
+      case 216px of clearance) rather than assuming.
+    - **(e) The Start/Sit right rail is now sticky from `lg` up
+      (`StartSitRail.tsx`).** A full two-player result runs far taller than
+      the short Recent-comparisons panel, so the rail scrolled away and left
+      ~300px of blank column beside the player cards for the rest of the
+      page. **It only works because the parent grid sets `items-start`** — a
+      stretched grid item is full-height by definition, so sticky would have
+      zero travel and silently do nothing; that alignment is load-bearing,
+      not incidental, and is now commented as such. Every part is
+      `lg:`-gated on purpose: below `lg` the grid collapses to one column
+      and the rail stacks under the result, where sticky has no room to
+      travel (confirmed `position: static` there). Measured travel rather
+      than eyeballed: rail top sits at 142px at scroll 0 (its natural spot,
+      below the page header), then pins at 24px through scroll 600 and on to
+      the bottom of the page. The `max-h`/`overflow-y-auto` are defensive,
+      not load-bearing — `useRecentComparisons` caps history at 5 entries
+      (~200px against an 852px allowance), but without a cap a future taller
+      rail could pin content permanently out of reach.
+    - **One non-finding worth recording so it isn't "fixed" later**: the
+      dark circle that overlaps the sidebar footer and a Rankings row in dev
+      screenshots is **Next's dev-mode indicator**, not app UI — it does not
+      exist in production.
+    - **Verified live throughout, not just via `tsc`/lint**: both themes at
+      1400px/1366px and 375px; Rankings Season mode correctly drops the
+      matchup column; Backtest projection mode still hides Season and forces
+      2025; and a real Broad backtest run returned **60.7% overall / QB 66.7
+      / RB 59.6 / WR 60.3 / TE 57.4**, matching the documented current
+      engine numbers exactly and confirming the control rework changed no
+      behavior. `npx tsc --noEmit -p .` and `npm run lint` clean at every
+      step. No `next build` — the user's dev server holds the same working
+      directory and a production build would contend over `.next`.
+    - Commits: `dd4c5c3` (a/b/c), `6004c8a` (d), `27a00e6` (e).
+
+### Open items (as of item 154 — pick up here)
+**Everything through item 154 is committed and pushed to `main` (HEAD
+`27a00e6`), working tree CLEAN.** This session was a UI rating pass plus the
+fixes that came out of it — **item 154 above, presentation only, no engine,
+scoring, or API change** (same precedent as items 133-135/141). In commit
+order: `dd4c5c3` (rankings row gap + labeled control clusters + position
+colors), `6004c8a` (light-mode Start/Sit hierarchy), `27a00e6` (sticky
+Start/Sit rail). The app now rates **8/10** on its own review, up from the
+~7.5 of the prior session.
+
+Two things from this session that a future session should NOT silently
+undo:
+- **`items-start` on the Start/Sit grid is load-bearing** for the sticky
+  rail (item 154e). It looks like an incidental alignment choice.
+- **The light/dark blocks in `ComparisonResult.module.css` are deliberately
+  duplicated** (item 154d). "Simplifying" them into one ruleset breaks the
+  forced-theme toggle, and collapsing light onto the dark treatment removes
+  light's only hierarchy mechanism.
+
+**New Open Item #34** added (the three review findings deliberately left
+undone). Otherwise the numbered open items below are unchanged from prior
+sessions — nothing below is started or fixed unless its own entry says so.
+One correction to the historical record: the prior session's note that it
+"dropped the condense-rankings-toggles review item — no clean win" is
+**superseded by item 154b**, which found a clean win once the problem was
+reframed from layout to labeling + weight.
+
+The paragraph below is the PRIOR session's record (items 151-153), kept for
+context — its "as of item 153" framing and HEAD `c043aef` are historical:
 **Everything through item 153 is committed and pushed to `main` (HEAD
 `c043aef`), working tree CLEAN.** This session shipped items 151-153
 (rankings Weekly/Season toggle `edb7753`; Trade Assistant uneven-trade
@@ -9746,6 +9892,33 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       FantasyPros. A proper exposure analysis for nflverse (which signals die/
       degrade/survive without it, what's substitutable) is unstarted; item 153
       flagged it as where a licensing review should actually start.
+34. **Three UI review findings deliberately left undone (item 154).** All
+    presentation-only, all ranked below what that item shipped:
+    - **Home's three "This week" widgets sit empty in prime position.** The
+      lineup / top-waiver-target / suggested-trade cards (item 77) occupy the
+      first screenful above the tool grid, and for a user with no roster
+      connected they're three honest-but-empty CTAs. The empty states are
+      correct (this app's standing no-dummy-data rule), but the placement
+      spends the best real estate on nothing. Options if picked up: collapse
+      them into a single "connect your roster" band until a roster exists,
+      or move the row below the tool grid until it has real content.
+    - **The offseason "Betting lines" block reserves a full card section to
+      say nothing.** `ComparisonResult.tsx` always renders the section for
+      skill positions with a "lines post closer to kickoff" message — that
+      was deliberate (item 98: a hidden-when-empty section is invisible for
+      the ~6 weeks until props post, and the user specifically noticed its
+      absence), so this is a real tradeoff, not an oversight. Worth
+      revisiting only once real props exist in-season and the empty state
+      stops being the common case.
+    - **The stat-grid magnitude bars use fixed reference maxima**, so "full"
+      doesn't communicate anything to the reader — a 52% success rate and a
+      +0.14 EPA/dropback both render as near-full bars against invented
+      scales. The displayed NUMBER is always real (that part is fine); it's
+      the bar that implies a comparison it isn't making. A real fix would
+      scale each bar against that position's actual distribution, which
+      means deriving per-position reference points the same empirical way
+      this app's conversion factors were derived — a small data task, not a
+      styling one, which is why it wasn't bundled into item 154.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
@@ -10571,7 +10744,15 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   pick a genuine top 100 across positions rather than whatever was left
   over from each tab's own cap) rather than reusing whichever position's
   rank the row happened to carry from its own position-specific
-  computation, and
+  computation. As of item 154, `RankingsTool.tsx`'s three toggle groups and
+  `BacktestTool.tsx`'s mode/scoring/season groups both render through a
+  shared `SegmentedControl.tsx` (a labeled pill group with a
+  `tone: "primary" | "secondary"` — only a page's primary axis carries the
+  accent, so several adjacent groups stop reading as one control with
+  everything lit; `SCORING_FORMAT_OPTIONS` is exported from
+  `ScoringFormatToggle.tsx` so neither page redeclares the option list),
+  and `RankingsResult.tsx`'s rows carry desktop-only matchup and
+  score-meter cells plus the shared `--pos-*` position-colored avatar. And
   `BacktestTool.tsx`/`BacktestWeekTable.tsx`/`BacktestSummary.tsx`/
   `BacktestCaveatNote.tsx`/`TradeBacktestTable.tsx`/`ProjectionSummary.tsx`/
   `ProjectionPlayerTable.tsx`/`ProjectionPlayerDetail.tsx`
