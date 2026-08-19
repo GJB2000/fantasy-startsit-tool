@@ -32,12 +32,6 @@ interface RankingsResultProps {
   isInSeason: boolean;
 }
 
-const FORMAT_LABEL: Record<ScoringFormat, string> = {
-  ppr: "PPR",
-  half_ppr: "Half PPR",
-  standard: "Standard",
-};
-
 function initials(name: string) {
   return name
     .split(" ")
@@ -74,12 +68,10 @@ function legitScoreClasses(score: number): string {
 
 function RankingRow({
   entry,
-  formatLabel,
   mode,
   isInSeason,
 }: {
   entry: RankingEntryResponse;
-  formatLabel: string;
   mode: "weekly" | "season";
   isInSeason: boolean;
 }) {
@@ -107,12 +99,12 @@ function RankingRow({
             </span>
           )}
         </div>
-        <p className="truncate text-[12px] text-foreground/45">
+        <p className="truncate text-[12px] text-foreground/60">
           {entry.position}
           {entry.team ? ` · ${entry.team}` : ""}
           {mode === "season"
-            ? seasonPts != null && ` · ${seasonPts.toFixed(1)} season pts (${formatLabel})`
-            : entry.finalScore != null && ` · ${entry.finalScore.toFixed(1)} proj. pts (${formatLabel})`}
+            ? seasonPts != null && ` · ${seasonPts.toFixed(1)} season pts`
+            : entry.finalScore != null && ` · ${entry.finalScore.toFixed(1)} proj. pts`}
         </p>
         {mode === "season" && entry.restOfSeasonPoints != null && (
           <p className="mt-0.5 truncate text-[12px] text-foreground/55">
@@ -127,9 +119,7 @@ function RankingRow({
   );
 }
 
-export function RankingsResult({ rankings, positionLabel, scoringFormat, mode, isInSeason }: RankingsResultProps) {
-  const formatLabel = FORMAT_LABEL[scoringFormat];
-
+export function RankingsResult({ rankings, positionLabel, mode, isInSeason }: RankingsResultProps) {
   if (rankings.length === 0) {
     return (
       <p className="mt-10 text-center text-sm text-foreground/50">
@@ -141,13 +131,7 @@ export function RankingsResult({ rankings, positionLabel, scoringFormat, mode, i
   return (
     <div className="glass-card mt-6 overflow-hidden rounded-2xl border border-foreground/12">
       {rankings.map((entry) => (
-        <RankingRow
-          key={entry.playerId ?? entry.displayName}
-          entry={entry}
-          formatLabel={formatLabel}
-          mode={mode}
-          isInSeason={isInSeason}
-        />
+        <RankingRow key={entry.playerId ?? entry.displayName} entry={entry} mode={mode} isInSeason={isInSeason} />
       ))}
     </div>
   );

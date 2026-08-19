@@ -126,6 +126,13 @@ body {
   background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
+/* Consistent, on-brand keyboard focus ring — replaces the inconsistent
+   browser-default (light-blue) outline. Only shows for keyboard focus. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* iOS Safari auto-zooms the page when a focused form control's font-size is
    under 16px. Force ≥16px on small screens (overriding smaller Tailwind
    text utilities) so tapping a search box or field doesn't zoom in. */
@@ -157,7 +164,7 @@ body {
   --alm-surface-sunken: #eef1f6;
   --alm-ink: #0e1116;
   --alm-muted: rgba(14, 17, 22, 0.62);
-  --alm-faint: rgba(14, 17, 22, 0.44);
+  --alm-faint: rgba(14, 17, 22, 0.6);
   --alm-line: rgba(14, 17, 22, 0.12);
   --alm-line2: rgba(14, 17, 22, 0.07);
   --alm-green: #16265f;
@@ -180,7 +187,7 @@ body {
     --alm-surface-sunken: #0d1129;
     --alm-ink: #ffffff;
     --alm-muted: rgba(255, 255, 255, 0.62);
-    --alm-faint: rgba(255, 255, 255, 0.4);
+    --alm-faint: rgba(255, 255, 255, 0.55);
     --alm-line: rgba(255, 255, 255, 0.1);
     --alm-line2: rgba(255, 255, 255, 0.06);
     --alm-green: #c8ff00;
@@ -202,7 +209,7 @@ body {
   --alm-surface-sunken: #0d1129;
   --alm-ink: #ffffff;
   --alm-muted: rgba(255, 255, 255, 0.62);
-  --alm-faint: rgba(255, 255, 255, 0.4);
+  --alm-faint: rgba(255, 255, 255, 0.55);
   --alm-line: rgba(255, 255, 255, 0.1);
   --alm-line2: rgba(255, 255, 255, 0.06);
   --alm-green: #c8ff00;

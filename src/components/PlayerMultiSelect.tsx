@@ -176,7 +176,7 @@ export function PlayerMultiSelect({
         <div className="mb-2.5 flex items-center justify-between gap-3">
           {label ? (
             <span
-              className={`uppercase text-foreground/40 ${editorial ? "text-[11px] tracking-[0.1em]" : "text-[11px] font-semibold tracking-wide"}`}
+              className={`uppercase text-foreground/55 ${editorial ? "text-[11px] tracking-[0.1em]" : "text-[11px] font-semibold tracking-wide"}`}
               style={editorial ? { fontFamily: "var(--font-engraved)" } : undefined}
             >
               {label}
@@ -196,7 +196,7 @@ export function PlayerMultiSelect({
                   />
                 ))}
               </div>
-              <span className="font-mono text-xs text-foreground/45 tabular-nums">
+              <span className="font-mono text-xs text-foreground/60 tabular-nums">
                 {selected.length} of {max}
               </span>
             </div>
