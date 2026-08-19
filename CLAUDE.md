@@ -8751,10 +8751,11 @@ single-season numbers for those specific constants.
       repo). No code shipped; this write-up + the two reverted config edits are
       the only artifacts. See new Open Item #33.
 
-154. **UI review, then five fixes: rankings row density, control-cluster
+154. **UI review, then six fixes: rankings row density, control-cluster
     hierarchy, position-color consistency, a light-mode-specific separation
-    mechanism, and a sticky Start/Sit rail. Presentation only — no engine,
-    scoring, or API change anywhere in this item.** Started from a
+    mechanism, a sticky Start/Sit rail, and balanced landing states.
+    Presentation only — no engine, scoring, or API change anywhere in this
+    item.** Started from a
     fresh rating pass of the whole app driven in the browser (desktop 1400px
     and mobile 375px, both themes, real data), which came back **8/10** — up
     from the ~7.5 the item-151-153 session's own review gave, with that
@@ -8854,6 +8855,37 @@ single-season numbers for those specific constants.
       not load-bearing — `useRecentComparisons` caps history at 5 entries
       (~200px against an 852px allowance), but without a cap a future taller
       rail could pin content permanently out of reach.
+    - **(f) The Start/Sit and Lineup landing states were mostly empty
+      viewport (`StartSitTool.tsx`/`LineupTool.tsx`).** Measured at
+      1366x908: `/lineup` left **514px empty below its content (57% of the
+      viewport)** and `/start-sit` **490px (54%)**, with the entry control
+      jammed under the page header. Pre-result, each block now centers
+      itself in the space below the header
+      (`lg:min-h-[calc(100vh-16rem)]` plus `content-center` on Start/Sit's
+      grid, `justify-center` on Lineup's flex column); the classes drop the
+      moment a result exists and the layout returns to normal top-anchored
+      flow. Result: Start/Sit 490px → 303px empty below (217 above / 303
+      below), Lineup 514px → 310px (248 / 310) — slightly top-weighted on
+      purpose, which is what reads as optically centered.
+      **Recompose only, no new content** — the obvious fix (copy Waivers'
+      method hero, item 109) was put to the user and deliberately NOT taken
+      for Lineup, because item 110 removed that page's landing hero on
+      request ("the tool is self-explanatory") and that still stands; the
+      user chose the content-free option for both pages.
+      **`content-center`, NOT `items-center`, is the load-bearing detail on
+      Start/Sit**: it centers the grid's ROW BLOCK within the container
+      while `items-start` still governs alignment WITHIN the row — which is
+      exactly the non-stretched height (e)'s sticky rail depends on.
+      `items-center` would silently break the rail added the same day.
+      `min-height` also can't truncate: at a 470px-tall viewport the
+      computed min-height (214px) is under the content height (237px) and
+      the container simply grows — verified no clipping and no scrollbar
+      there or at 620px.
+      **Waivers was checked and left alone** — it measures only 243px empty
+      (27%), because item 109's method hero already fills it. An earlier
+      claim in this session that Waivers "occupies roughly the top-left
+      third" was wrong, and came from reading a half-scale screenshot
+      instead of measuring; recorded here so the mistake isn't inherited.
     - **One non-finding worth recording so it isn't "fixed" later**: the
       dark circle that overlaps the sidebar footer and a Rankings row in dev
       screenshots is **Next's dev-mode indicator**, not app UI — it does not
@@ -8867,22 +8899,30 @@ single-season numbers for those specific constants.
       behavior. `npx tsc --noEmit -p .` and `npm run lint` clean at every
       step. No `next build` — the user's dev server holds the same working
       directory and a production build would contend over `.next`.
-    - Commits: `dd4c5c3` (a/b/c), `6004c8a` (d), `27a00e6` (e).
+    - Commits: `dd4c5c3` (a/b/c), `6004c8a` (d), `27a00e6` (e), `4e3b943`
+      (f).
 
 ### Open items (as of item 154 — pick up here)
-**Everything through item 154 is committed and pushed to `main` (HEAD
-`27a00e6`), working tree CLEAN.** This session was a UI rating pass plus the
-fixes that came out of it — **item 154 above, presentation only, no engine,
-scoring, or API change** (same precedent as items 133-135/141). In commit
-order: `dd4c5c3` (rankings row gap + labeled control clusters + position
-colors), `6004c8a` (light-mode Start/Sit hierarchy), `27a00e6` (sticky
-Start/Sit rail). The app now rates **8/10** on its own review, up from the
-~7.5 of the prior session.
+**Everything through item 154 is committed and pushed to `main` (last code
+commit `4e3b943`), working tree CLEAN.** This session was a UI rating pass
+plus the fixes that came out of it — **item 154 above, presentation only, no
+engine, scoring, or API change** (same precedent as items 133-135/141). In
+commit order: `dd4c5c3` (rankings row gap + labeled control clusters +
+position colors), `6004c8a` (light-mode Start/Sit hierarchy), `27a00e6`
+(sticky Start/Sit rail), `4e3b943` (balanced Start/Sit + Lineup landing
+states). The app rated **8/10** on its own review after the first three, up
+from the ~7.5 of the prior session; the landing-state fix came after that
+rating and isn't reflected in it.
 
-Two things from this session that a future session should NOT silently
+Three things from this session that a future session should NOT silently
 undo:
 - **`items-start` on the Start/Sit grid is load-bearing** for the sticky
   rail (item 154e). It looks like an incidental alignment choice.
+- **The Start/Sit landing centers with `content-center`, not
+  `items-center`** (item 154f). They look interchangeable; `items-center`
+  would stretch nothing but WOULD override the row-level alignment the
+  sticky rail depends on, breaking 154e from a change that appears to be
+  about something else entirely.
 - **The light/dark blocks in `ComparisonResult.module.css` are deliberately
   duplicated** (item 154d). "Simplifying" them into one ruleset breaks the
   forced-theme toggle, and collapsing light onto the dark treatment removes
