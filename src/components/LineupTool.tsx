@@ -168,7 +168,7 @@ export function LineupTool() {
   );
 
   return (
-    <div className="mx-auto mt-10 w-full max-w-3xl">
+    <div className="mx-auto mt-10 w-full max-w-4xl">
       <div className="mx-auto w-full max-w-2xl">{controls}</div>
 
       {response && (

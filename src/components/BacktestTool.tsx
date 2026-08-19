@@ -212,7 +212,7 @@ export function BacktestTool() {
   }
 
   return (
-    <div className="mx-auto mt-8 w-full max-w-2xl space-y-6">
+    <div className="mx-auto mt-8 w-full max-w-5xl space-y-6">
       <BacktestCaveatNote season={season} showNflverseCaveat={season !== "2025"} />
 
       <div className="flex gap-2 text-sm">

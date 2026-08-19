@@ -3,7 +3,7 @@ import { LineupTool } from "@/components/LineupTool";
 export default function LineupPage() {
   return (
     <main className="matchup-page min-h-full px-6 py-10 font-sans sm:px-10 sm:py-12">
-      <header className="mb-7">
+      <header className="mx-auto w-full max-w-4xl mb-7">
         <span
           className="text-[11px] uppercase tracking-[0.14em] text-accent"
           style={{ fontFamily: "var(--font-engraved)" }}

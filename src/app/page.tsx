@@ -83,6 +83,7 @@ const TOOLS = [
 export default function HomePage() {
   return (
     <main className="matchup-page min-h-full px-6 py-10 font-sans sm:px-10 sm:py-12">
+      <div className="mx-auto w-full max-w-6xl">
       <header className="mb-7">
         <span
           className="text-[11px] uppercase tracking-[0.14em] text-accent"
@@ -135,6 +136,7 @@ export default function HomePage() {
             </span>
           </Link>
         ))}
+      </div>
       </div>
     </main>
   );
