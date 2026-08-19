@@ -48,7 +48,9 @@ nflverse-only pipeline for anything before 2025) in both Single pair and
 Broad modes, plus a permanent pooled-multi-season route/summary for
 validating tuning decisions across all four at once — see "Backtesting &
 Tuning History" items 24/36/39. A second live tool, the Trade Analyzer
-(`/trade`), shipped after v1 — enter any number of players on each side
+(`/trade`) — **user-facing name later changed to "Trade Assistant," item
+152; the component/route are still `TradeAnalyzer`/`/trade`** —
+shipped after v1: enter any number of players on each side
 of a trade and get a graded verdict (good/fair/bad) with reasoning,
 built on a rest-of-season value projection rather than a single game
 (see "Backtesting & Tuning History" items 47-49 and the Trade Analyzer
@@ -8636,8 +8638,161 @@ single-season numbers for those specific constants.
       removed; only `config.ts`/`engine.ts` changed. **Resolves Open Item
       #31.**
 
-### Open items (as of item 150 — pick up here)
-**This session is fully committed and pushed to `main` (HEAD `cd7f26e`),
+151. **Added a Weekly/Season mode toggle to Legit Rankings (`/rankings`),
+    plus row-display cleanups — a blend-weight/presentation change, no new
+    scoring signal.** The ranking already blended two signals per player —
+    the engine's matchup-adjusted `finalScore` (weekly) and FantasyPros'
+    season-long redraft consensus (season) — at `ENGINE_WEIGHT`; the toggle
+    just shifts that blend.
+    - **Weekly** (default, = the prior behavior): engine snapshot leads
+      (`ENGINE_WEIGHT` by dataQuality, 0.65 for full data), matchup-adjusted
+      → "best plays this week."
+    - **Season** (new): a flat `SEASON_ENGINE_WEIGHT = 0.25` (75% FantasyPros
+      season consensus), matchup-agnostic → "best rest-of-season value." The
+      Top 100 cross-position VOR also leans harder on consensus
+      (`OVERALL_CONSENSUS_WEIGHT` = {weekly:0.5, season:0.8}). `RankingMode`
+      threaded through `getLegitRankingsForPosition`/`getLegitRankingsOverall`/
+      `computeLegitScores`/`crossPositionVor` and the cache key (modes cache
+      separately); the route parses `?mode=`. No backtest — rankings have no
+      pick ground truth (items 78/139); a reasoned, tunable weight.
+    - **Row-display changes (same feature):** removed the per-row FantasyPros
+      rank and the opponent sentence (`notes[0]`) from `RankingsResult.tsx`,
+      on request. Season mode shows real **season points scored so far** (new
+      `seasonTotalPoints` on `PlayerScoreBreakdown`, from the season stat's
+      format-aware total) **plus a rest-of-season projection** (reuses the
+      Trade Assistant's `projectRestOfSeason` — `restOfSeasonPoints`/
+      `restOfSeasonGames` on `LegitRankingEntry`). Offseason shows **0** season
+      points (nobody's scored in the new season yet; gated on
+      `context.isInSeason`), auto-switching to the real running total
+      in-season. Committed `edb7753`.
+
+152. **Reworked the Trade Assistant's uneven-trade (e.g. 2-for-1) verdict —
+    three iterations, landed on the conservative, backtest-aligned model.
+    Renamed "Trade Analyzer" → "Trade Assistant" along the way.** Prompted by
+    two user reports of nonsensical uneven-trade verdicts (Washington+Walker
+    for Gibbs said "+85 good" when giving up ~120 more raw points;
+    Metcalf+Javonte for Gibbs said "fair" when getting an elite RB for two
+    lesser players should favor the getter).
+    - **Iteration 1 (shipped, then superseded):** shrank the item-138
+      freed-roster-spot filler to 35% (`FREED_ROSTER_SPOT_FRACTION`) — it had
+      over-credited the freed spot at a full startable starter's season
+      (~207 pts). Fixed case A, not case B.
+    - **Iteration 2 (shipped, then reverted):** replaced the filler with a
+      **diminishing-returns** value model (`EXTRA_PLAYER_VALUE_RATIO = 0.4` —
+      best player full value, each extra at 40%, so one elite outweighs two
+      mids). Fixed both cases. But the user asked **"is this in line with our
+      backtest model?"** and the honest answer is no: the discount is a
+      lineup-scarcity *value judgment* that the multi-player trade backtest
+      (which grades against *actual total points scored*, where two players
+      always accumulate more) structurally cannot validate — the same
+      un-backtestable status the freed-spot filler always had.
+    - **Iteration 3 (SHIPPED, final — `03405c7`):** per the user's explicit
+      choice, went **conservative/backtest-aligned** — grade uneven trades on
+      **raw rest-of-season point totals** (no filler, no discount), so the
+      side totals equal the sum of the player cards and the verdict rests only
+      on the validated projections. The lineup-scarcity nuance is surfaced as
+      a **caveat note** (naming the single most valuable player), not baked
+      into the number. Both example trades now read "bad" (the package
+      out-totals Gibbs) — the accepted tradeoff for backtest fidelity. Even
+      trades (1-for-1/2-for-2) unchanged. `evaluateTrade.ts` is raw-sums +
+      note (dropped the now-unused `format` param, 3 callers updated);
+      `config.ts`/`TradeResult.tsx` reverted to their pre-session state; the
+      multi-player trade backtest kept at its item-138 full-filler state (it
+      measures actual points, which can't be "discounted" — a deliberate
+      live-vs-backtest decoupling). Verified: the naive "more players"
+      baseline is back to exactly 17.7% and 2-for-2 at 54.3% (matching item
+      138).
+    - **Rename:** the four user-facing "Trade Analyzer" labels → "Trade
+      Assistant" (`cdd04c5`); the internal component/file (`TradeAnalyzer`)
+      and code comments still use the old name.
+
+153. **FantasyPros commercial-licensing exposure analysis — a strategic
+    investigation (no engine change), with validated fallback numbers.** The
+    user asked what the real exposure is if FantasyPros denies commercial
+    licensing (our consensus comes via the `dynastyprocess/data` community
+    SCRAPE, not a licensed feed). Ran the backtests with
+    `EXPERT_CONSENSUS_BLEND_WEIGHT` set to 0 (temporary config edit, reverted)
+    to measure the exact current fallback.
+    - **The exposure is concentrated in QB and is largely unrecoverable.**
+      Primary 2025 with vs. without consensus: QB **66.7% → 52.9%** (−13.8pp),
+      RB 59.6→51.7, WR 60.3→60.8 (unaffected), TE 57.4→54.5, overall
+      59.9→56.9. Pooled 2022-2025 overall 58.6→54.9. QB (shipped at 0.8
+      consensus weight, item 145) has no substitute — item 30a found 2025 QB
+      without consensus only ties the naive recentVolume baseline.
+    - **RB's apparent −8pp is recoverable:** item 144 zeroed RB's volume
+      weight *because consensus covered it*, so removing consensus
+      double-exposes RB; restoring `VOLUME_BLEND_WEIGHT.ppr.RB` to 0.9 recovers
+      RB to **57.6%** (re-tuned overall fallback 58.0%) — matching item 70's
+      documented pre-consensus numbers exactly. So the realistic fallback =
+      remove consensus AND revert the consensus-dependent retunes.
+    - **Legit Rankings has NO backtestable fallback number** (no pick ground
+      truth); losing consensus there costs the market-anchoring safety net
+      (item 139 Lamar) — a credibility/UX exposure, not an accuracy one.
+    - **"Engine as a whole" reframe (the user pushed on this):** (1) any
+      consensus swap forces a full weight re-tune, since every weight was
+      tuned *with* consensus present; (2) a strong projection could be a
+      re-*anchor*, not a patch — standalone FantasyPros consensus (item 69)
+      backtested as strong as the whole engine (WR consensus-alone 60.3% >
+      engine WR 56.5%); (3) **if the driver is licensing, nflverse is the
+      larger exposure than FantasyPros** — it feeds a dozen live signals + the
+      entire 2022-2024 backtest, and SDIO can't replace it (no snap/target/
+      air-yards at any tier).
+    - **SportsDataIO paid tier**: could substitute FantasyPros *only via their
+      projections product* (a same-kind market signal), NOT the box-score
+      unlocks (which won't fix QB). Make-or-break unknown: whether their
+      projections are **historically backtestable** (point-in-time archive/
+      replay) — without that we can't validate before buying. Also: the free
+      "Discovery Lab" tier isn't confirmed to serve live 2026 in-season weekly
+      stats (the foundational data), so paid may be needed just to operate
+      in-season regardless. Headshots: low-res already free (`photoUrl`,
+      unused — too muddy, item 99); high-res exists but is access-gated (paid),
+      with separate image-likeness licensing. Drafted a SDIO sales-call
+      requirements checklist + inquiry email (delivered in-chat, not in the
+      repo). No code shipped; this write-up + the two reverted config edits are
+      the only artifacts. See new Open Item #33.
+
+### Open items (as of item 153 — pick up here)
+**Everything through item 153 is committed and pushed to `main` (HEAD
+`c043aef`), working tree CLEAN.** This session shipped items 151-153
+(rankings Weekly/Season toggle `edb7753`; Trade Assistant uneven-trade
+conservative rework `03405c7` + rename `cdd04c5`; item 153's FantasyPros
+exposure analysis was investigation-only, no code) plus a full UI review and
+fix batch (presentation-only, no engine/scoring change — same precedent as
+items 133-135):
+- **UI review** — audited every page at desktop (1440px) and mobile (375px)
+  via the in-app browser + DOM contrast/focus/a11y checks. Rated ~7.5/10
+  (strong on mobile, weak on desktop).
+- `c6f3831` **quick wins**: global `:focus-visible` brand-accent (volt) ring
+  replacing the browser-default blue; raised the flagged low-contrast labels;
+  Trade "Analyze" disabled state → muted (not faded-volt) + a helper line;
+  rankings rows drop the redundant per-row `(PPR)` so the projection number
+  stops truncating.
+- `9a8d25d` **desktop-width rework**: page headers were full-bleed while tools
+  centered at inconsistent widths (2xl–7xl), leaving asymmetric voids on large
+  screens. Gave each page header the same max-width as its tool (Rankings
+  `max-w-5xl`, Trade/Lineup `4xl`, Backtest `5xl`, Waivers/Start-Sit already
+  wide, Home capped `6xl`) so header+content align and center. Verified
+  aligned/centered/no-overflow at 1440px; mobile unaffected (`max-w` >
+  viewport = full width).
+- `57fa698` **P2 polish**: glass cards more solid (`--surface` 44%→72%, blur
+  26→16px) so hierarchy stops flattening; Home "Top five" score bars widen on
+  md/lg to close the name→score gap; Start/Sit + Trade section labels →
+  `<h2>`; extended the disabled-CTA fix to Start/Sit + Lineup. (Dropped the
+  "condense rankings toggles" review item — no clean win; desktop was already
+  one row and mobile's three are inherent to three multi-option controls.)
+- `c043aef` **AA contrast sweep**: re-running the audit confirmed the fixes
+  held but surfaced a systemic pattern — muted text app-wide at
+  `text-foreground/40–/45` (~3.8–4.1:1, just under AA). Swept all to `/55`
+  (~5.5:1) across components + the rank numbers. Re-audit: 0 low-contrast
+  failures on Rankings (was 100)/Home/Trade; focus ring confirmed volt.
+
+The numbered open items below are unchanged from prior sessions except:
+**new Open Item #33 added** (FantasyPros/SDIO/nflverse licensing — see item
+153). Nothing else below is started or fixed unless its own entry says so.
+
+The paragraph below is the PRIOR session's record (items 149-150), kept for
+context — its "as of item 150" framing and HEAD `cd7f26e` are historical:
+**That session was fully committed and pushed to `main` (HEAD `cd7f26e`),
 working tree CLEAN.** Two engine items (149, 150 — written up above) plus a
 batch of UI/functional changes (committed, no numbered items, same precedent
 as items 133-135). In commit order after the prior session's handoff
@@ -9562,6 +9717,35 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       stale "No league/team import integrations" line under Things to Avoid
       is already contradicted by the shipped Sleeper import — this item is
       about *additional* sources, not whether import is in scope.
+33. **Data-source commercial-licensing decisions — FantasyPros, SportsDataIO,
+    nflverse (opened by item 153, not started).** Three linked open decisions,
+    in priority order:
+    - **FantasyPros consensus (the trigger):** our consensus signal comes via
+      the `dynastyprocess/data` community scrape, not a licensed feed — a real
+      commercial-use risk. Item 153 quantified the fallback: losing it costs
+      ~QB −14pp primary (unrecoverable) and ~−3pp overall (re-tuned), with RB
+      recoverable by restoring `VOLUME_BLEND_WEIGHT.ppr.RB`. If we ever ship a
+      FantasyPros-free build, the tested fallback = zero the per-position
+      `EXPERT_CONSENSUS_BLEND_WEIGHT` **and** revert the consensus-dependent
+      retunes (RB volume), then re-sweep every weight (they were all tuned with
+      consensus present). Live-tool integration would also need the live
+      current-snapshot path removed/replaced.
+    - **SportsDataIO paid tier (the candidate fix):** could replace FantasyPros
+      *only* via their **projections** product, and only if those projections
+      are **historically backtestable** (point-in-time archive/replay) — the
+      make-or-break question to confirm with them. Separately, confirm the free
+      tier serves **live 2026 in-season weekly stats** (the foundational data);
+      if not, a paid tier is needed to operate in-season regardless. A
+      sales-call requirements checklist + inquiry email were drafted in-chat
+      (not committed) — reuse them. Buying it is the user's action (account
+      creation isn't something this assistant does).
+    - **nflverse (the larger, un-reviewed exposure):** feeds ~a dozen live
+      signals + the entire 2022-2024 backtest, and is NOT substitutable by SDIO
+      (no snap/target/air-yards at any tier). Its commercial-use terms have
+      never been reviewed — arguably the bigger licensing question than
+      FantasyPros. A proper exposure analysis for nflverse (which signals die/
+      degrade/survive without it, what's substitutable) is unstarted; item 153
+      flagged it as where a licensing review should actually start.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
