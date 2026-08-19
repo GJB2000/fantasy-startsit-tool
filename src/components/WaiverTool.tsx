@@ -70,10 +70,10 @@ function SchematicGapBar() {
       </div>
       <div className="mt-2.5 flex items-start justify-between gap-3 text-[12px]">
         <span className="font-semibold text-accent">
-          Recent usage <span className="text-[10px] uppercase tracking-wide text-foreground/40">opportunity</span>
+          Recent usage <span className="text-[10px] uppercase tracking-wide text-foreground/55">opportunity</span>
         </span>
         <span className="text-right text-foreground/55">
-          Recent points <span className="text-[10px] uppercase tracking-wide text-foreground/40">production</span>
+          Recent points <span className="text-[10px] uppercase tracking-wide text-foreground/55">production</span>
         </span>
       </div>
     </div>
@@ -197,7 +197,7 @@ export function WaiverTool() {
         >
           Set up your search
         </div>
-        <p className="mt-1.5 text-[12.5px] text-foreground/45">Two quick inputs, then we scan the pool.</p>
+        <p className="mt-1.5 text-[12.5px] text-foreground/55">Two quick inputs, then we scan the pool.</p>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

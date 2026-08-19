@@ -102,7 +102,7 @@ export function HomeTradeWidget() {
   if (!sleeperConnection) {
     return (
       <WidgetShell>
-        <p className="text-[12px] leading-relaxed text-foreground/45">
+        <p className="text-[12px] leading-relaxed text-foreground/55">
           Connect Sleeper on the Waivers or Lineup page to see a real trade suggestion from your league here.
         </p>
       </WidgetShell>
@@ -112,7 +112,7 @@ export function HomeTradeWidget() {
   if (loading && !response) {
     return (
       <WidgetShell>
-        <p className="text-[12px] leading-relaxed text-foreground/45">Scanning your league for a fair trade…</p>
+        <p className="text-[12px] leading-relaxed text-foreground/55">Scanning your league for a fair trade…</p>
       </WidgetShell>
     );
   }
@@ -130,7 +130,7 @@ export function HomeTradeWidget() {
   if (!response.suggestion) {
     return (
       <WidgetShell>
-        <p className="text-[12px] leading-relaxed text-foreground/45">
+        <p className="text-[12px] leading-relaxed text-foreground/55">
           {response.reason ?? "No fair trade found in your league right now."}
         </p>
       </WidgetShell>
@@ -143,7 +143,7 @@ export function HomeTradeWidget() {
 
   return (
     <WidgetShell>
-      <p className="font-engraved text-[10px] uppercase tracking-[0.08em] text-foreground/45">With {otherTeamName}</p>
+      <p className="font-engraved text-[10px] uppercase tracking-[0.08em] text-foreground/55">With {otherTeamName}</p>
       <div className="mt-1.5 flex items-center gap-2 font-jost text-[14px] font-semibold tracking-tight">
         <span className="truncate">{give?.displayName ?? "—"}</span>
         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-foreground/35" fill="none">

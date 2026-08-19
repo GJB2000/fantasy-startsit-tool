@@ -29,7 +29,7 @@ export function CollapsibleSection({ label, defaultOpen = true, children, classN
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex min-w-0 items-center gap-2 text-left text-[11px] font-semibold uppercase tracking-wide text-foreground/40"
+          className="flex min-w-0 items-center gap-2 text-left text-[11px] font-semibold uppercase tracking-wide text-foreground/55"
           aria-expanded={open}
         >
           <span className="truncate">{label}</span>

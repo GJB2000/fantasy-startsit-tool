@@ -40,13 +40,13 @@ function SlotRow({ slot }: { slot: LineupSlotResponse }) {
   return (
     <div className="flex items-center justify-between gap-2 border-t border-foreground/[0.07] py-2 first:border-none first:pt-0">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="w-9 shrink-0 font-engraved text-[9.5px] uppercase tracking-[0.06em] text-foreground/45">
+        <span className="w-9 shrink-0 font-engraved text-[9.5px] uppercase tracking-[0.06em] text-foreground/55">
           {slot.label}
         </span>
         {b ? (
           <span className="truncate text-[12.5px] font-medium">{b.displayName}</span>
         ) : (
-          <span className="truncate text-[12.5px] text-foreground/40">Empty — add a player</span>
+          <span className="truncate text-[12.5px] text-foreground/55">Empty — add a player</span>
         )}
       </div>
       {b?.finalScore != null && (
@@ -113,7 +113,7 @@ export function HomeLineupWidget() {
   if (rostered.length === 0) {
     return (
       <WidgetShell>
-        <p className="text-[12px] leading-relaxed text-foreground/45">
+        <p className="text-[12px] leading-relaxed text-foreground/55">
           Add your roster on the Lineup page to see this week&apos;s suggested starters here.
         </p>
       </WidgetShell>
@@ -123,7 +123,7 @@ export function HomeLineupWidget() {
   if (loading && !response) {
     return (
       <WidgetShell>
-        <p className="text-[12px] leading-relaxed text-foreground/45">Building your lineup…</p>
+        <p className="text-[12px] leading-relaxed text-foreground/55">Building your lineup…</p>
       </WidgetShell>
     );
   }

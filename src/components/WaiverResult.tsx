@@ -250,11 +250,11 @@ function GapBar({ candidate, size }: { candidate: WaiverCandidateResponse; size:
       <div className="mt-2.5 flex items-start justify-between gap-3 text-[12px]">
         <span className="font-semibold text-accent">
           <span className="font-mono">{candidate.positionLabel}</span>{" "}
-          <span className="text-[10px] uppercase tracking-wide text-foreground/40">{streaming ? "this week" : "opportunity"}</span>
+          <span className="text-[10px] uppercase tracking-wide text-foreground/55">{streaming ? "this week" : "opportunity"}</span>
         </span>
         <span className="text-right text-foreground/55">
           <span className="font-mono font-bold">{candidate.productionLabel}</span>{" "}
-          <span className="text-[10px] uppercase tracking-wide text-foreground/40">{streaming ? "season" : "production"}</span>
+          <span className="text-[10px] uppercase tracking-wide text-foreground/55">{streaming ? "season" : "production"}</span>
         </span>
       </div>
     </div>
@@ -291,7 +291,7 @@ function DropSuggestion({ evaluation, formatLabel }: { evaluation: TradeEvaluati
         </span>
       </div>
       <p className="mt-1.5 text-[13px] leading-relaxed text-foreground/65">{moveHeadline(evaluation)}</p>
-      <p className="mt-0.5 text-[11px] text-foreground/40">Rest-of-season value, {formatLabel}.</p>
+      <p className="mt-0.5 text-[11px] text-foreground/55">Rest-of-season value, {formatLabel}.</p>
     </div>
   );
 }
@@ -342,24 +342,24 @@ function SpotlightCard({
             <div>
               <div className="font-jost text-[26px] font-semibold leading-none">
                 <CountUpNumber value={candidate.recentVolumeAvg} decimals={1} />
-                <span className="ml-1 text-[13px] font-medium text-foreground/40">/gm</span>
+                <span className="ml-1 text-[13px] font-medium text-foreground/55">/gm</span>
               </div>
-              <div className="mt-1 text-[11px] text-foreground/40">{unit}, last {candidate.gamesUsedForRecent}</div>
+              <div className="mt-1 text-[11px] text-foreground/55">{unit}, last {candidate.gamesUsedForRecent}</div>
             </div>
             <div>
               <div className="font-jost text-[26px] font-semibold leading-none">
                 <CountUpNumber value={candidate.recentPprAvg} decimals={1} />
-                <span className="ml-1 text-[13px] font-medium text-foreground/40">pts</span>
+                <span className="ml-1 text-[13px] font-medium text-foreground/55">pts</span>
               </div>
-              <div className="mt-1 text-[11px] text-foreground/40">recent {formatLabel}</div>
+              <div className="mt-1 text-[11px] text-foreground/55">recent {formatLabel}</div>
             </div>
             {consensus != null && consensus > 0 && (
               <div>
                 <div className="font-jost text-[26px] font-semibold leading-none text-accent">
                   <CountUpNumber value={consensus} decimals={1} />
-                  <span className="ml-1 text-[13px] font-medium text-foreground/40">pts</span>
+                  <span className="ml-1 text-[13px] font-medium text-foreground/55">pts</span>
                 </div>
-                <div className="mt-1 text-[11px] text-foreground/40">consensus proj.</div>
+                <div className="mt-1 text-[11px] text-foreground/55">consensus proj.</div>
               </div>
             )}
           </div>
@@ -426,7 +426,7 @@ function WaiverCandidateRow({
         className="grid w-full grid-cols-[36px_1fr_auto] items-center gap-x-4 gap-y-4 px-4 py-4 text-left transition-colors hover:bg-foreground/[0.02] lg:grid-cols-[36px_minmax(150px,1.4fr)_minmax(0,1.7fr)_auto]"
         aria-expanded={expanded}
       >
-        <span className="text-center font-jost text-[16px] font-semibold text-foreground/40">{String(rank).padStart(2, "0")}</span>
+        <span className="text-center font-jost text-[16px] font-semibold text-foreground/55">{String(rank).padStart(2, "0")}</span>
 
         <div className="flex min-w-0 items-center gap-3">
           <Avatar candidate={candidate} size={38} />
@@ -440,7 +440,7 @@ function WaiverCandidateRow({
                 </span>
               )}
             </div>
-            <p className="mt-0.5 truncate text-[12px] text-foreground/45">
+            <p className="mt-0.5 truncate text-[12px] text-foreground/55">
               {candidate.team ?? "FA"}
               {candidate.breakdown?.matchupContext ? ` · vs ${candidate.breakdown.matchupContext.opponentTeam}` : ""}
             </p>
@@ -451,7 +451,7 @@ function WaiverCandidateRow({
           {streaming || candidate.isBuyLow ? (
             <GapBar candidate={candidate} size="sm" />
           ) : (
-            <p className="text-[12px] leading-relaxed text-foreground/40">
+            <p className="text-[12px] leading-relaxed text-foreground/55">
               Producing in line with the workload — a volume play, not a buy-low.
             </p>
           )}
@@ -465,7 +465,7 @@ function WaiverCandidateRow({
           )}
           <div className="text-right">
             <div className="font-jost text-[18px] font-semibold tabular-nums">{stat.toFixed(1)}</div>
-            <div className="text-[10px] text-foreground/40">{statLabel}</div>
+            <div className="text-[10px] text-foreground/55">{statLabel}</div>
           </div>
           <ChevronIcon open={expanded} />
         </div>
@@ -519,7 +519,7 @@ function Section({
         <span className="h-px flex-1 bg-foreground/15" />
       </div>
       {streaming && (
-        <p className="mb-3 text-[12px] text-foreground/40">
+        <p className="mb-3 text-[12px] text-foreground/55">
           Defenses swing week to week, so these rank by <b className="font-semibold text-foreground/60">this week&apos;s matchup</b> against their season baseline — a spot start, not a season hold.
         </p>
       )}
@@ -649,7 +649,7 @@ export function WaiverResult({
 
   return (
     <div className="mt-10">
-      {contextNote && <p className="text-[12px] text-foreground/40">{contextNote}</p>}
+      {contextNote && <p className="text-[12px] text-foreground/55">{contextNote}</p>}
 
       {showSpotlight && spotlight && (
         <SpotlightCard
@@ -669,7 +669,7 @@ export function WaiverResult({
           onClick={() => setTab("ALL")}
           className={`relative -mb-px py-2.5 font-engraved text-[12px] uppercase tracking-[0.08em] transition-colors ${tab === "ALL" ? "text-foreground" : "text-foreground/50 hover:text-foreground/80"}`}
         >
-          All <span className="font-mono text-[11px] text-foreground/40">{total}</span>
+          All <span className="font-mono text-[11px] text-foreground/55">{total}</span>
           {tab === "ALL" && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-accent" />}
         </button>
         {availablePositions.map((p) => {
@@ -684,7 +684,7 @@ export function WaiverResult({
               onClick={() => setTab(p)}
               className={`relative -mb-px py-2.5 font-engraved text-[12px] uppercase tracking-[0.08em] transition-colors ${active ? "text-foreground" : "text-foreground/50 hover:text-foreground/80"}`}
             >
-              {p === "DST" ? "D/ST" : p} <span className="font-mono text-[11px] text-foreground/40">{count}</span>
+              {p === "DST" ? "D/ST" : p} <span className="font-mono text-[11px] text-foreground/55">{count}</span>
               {active && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-accent" />}
             </button>
           );
@@ -713,7 +713,7 @@ export function WaiverResult({
         })}
       </div>
 
-      <p className="mt-10 max-w-[68ch] border-t border-foreground/10 pt-5 text-[12px] leading-relaxed text-foreground/40">
+      <p className="mt-10 max-w-[68ch] border-t border-foreground/10 pt-5 text-[12px] leading-relaxed text-foreground/55">
         <b className="text-foreground/55">How to read the board.</b> Players are ranked by recent{" "}
         <b className="text-foreground/55">usage</b> — the touches or targets already coming their way, the strongest
         signal for what&apos;s ahead. A <b className="text-foreground/55">Buy-low</b> tag (and the green→hollow bar) flags

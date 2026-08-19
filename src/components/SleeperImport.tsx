@@ -109,7 +109,7 @@ export function SleeperImport({ connection, onConnectionChange, onImportPlayers 
   if (connection) {
     return (
       <div>
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/55">
           My roster — synced from Sleeper
         </h2>
         <p className="mt-1.5 text-xs leading-relaxed text-foreground/50">
@@ -142,7 +142,7 @@ export function SleeperImport({ connection, onConnectionChange, onImportPlayers 
           </p>
         )}
         {connection.leagueRosteredPlayerIds.length > 0 && (
-          <p className="mt-1.5 text-xs text-foreground/45">
+          <p className="mt-1.5 text-xs text-foreground/55">
             Also excluding {connection.leagueRosteredPlayerIds.length} player
             {connection.leagueRosteredPlayerIds.length === 1 ? "" : "s"} already rostered by other teams in this
             league.
@@ -155,7 +155,7 @@ export function SleeperImport({ connection, onConnectionChange, onImportPlayers 
 
   return (
     <div>
-      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">
+      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/55">
         My roster — connect Sleeper
       </h2>
       <p className="mt-1.5 text-xs leading-relaxed text-foreground/50">
@@ -194,7 +194,7 @@ export function SleeperImport({ connection, onConnectionChange, onImportPlayers 
               className="flex items-center justify-between rounded-2xl border border-foreground/10 bg-surface px-4 py-2.5 text-left text-sm shadow-sm transition-colors hover:border-accent/40 disabled:opacity-50"
             >
               <span className="font-medium">{league.name}</span>
-              <span className="text-xs text-foreground/45">{league.season}</span>
+              <span className="text-xs text-foreground/55">{league.season}</span>
             </button>
           ))}
         </div>

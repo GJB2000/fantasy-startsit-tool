@@ -83,7 +83,7 @@ export function HomeWaiverWidget() {
   if (rostered.length === 0) {
     return (
       <WidgetShell>
-        <p className="text-[12px] leading-relaxed text-foreground/45">
+        <p className="text-[12px] leading-relaxed text-foreground/55">
           Add your roster on the Waivers page to see a suggested pickup here.
         </p>
       </WidgetShell>
@@ -93,7 +93,7 @@ export function HomeWaiverWidget() {
   if (loading && !response) {
     return (
       <WidgetShell>
-        <p className="text-[12px] leading-relaxed text-foreground/45">Scanning the player pool…</p>
+        <p className="text-[12px] leading-relaxed text-foreground/55">Scanning the player pool…</p>
       </WidgetShell>
     );
   }
@@ -116,7 +116,7 @@ export function HomeWaiverWidget() {
   if (!top) {
     return (
       <WidgetShell>
-        <p className="text-[12px] leading-relaxed text-foreground/45">
+        <p className="text-[12px] leading-relaxed text-foreground/55">
           No standout opportunity-vs-production gaps right now — check back after a few more weeks of games.
         </p>
       </WidgetShell>
@@ -133,7 +133,7 @@ export function HomeWaiverWidget() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate font-jost text-[14px] font-semibold tracking-tight">{top.displayName}</p>
-          <p className="truncate text-[11px] text-foreground/45">
+          <p className="truncate text-[11px] text-foreground/55">
             {top.position}
             {top.team ? ` · ${top.team}` : ""}
           </p>
@@ -149,7 +149,7 @@ export function HomeWaiverWidget() {
       </div>
       {top.reasoning[0] && <p className="mt-2.5 text-[12px] leading-relaxed text-foreground/65">{top.reasoning[0]}</p>}
       {top.dropSuggestion?.give[0] && (
-        <p className="mt-2 border-t border-foreground/[0.09] pt-2 text-[11px] leading-relaxed text-foreground/45">
+        <p className="mt-2 border-t border-foreground/[0.09] pt-2 text-[11px] leading-relaxed text-foreground/55">
           <span className="font-medium text-foreground/60">Suggested drop: {top.dropSuggestion.give[0].displayName}.</span>{" "}
           {moveHeadline(top.dropSuggestion)}
         </p>

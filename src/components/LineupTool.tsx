@@ -102,7 +102,7 @@ export function LineupTool() {
                 <span className="font-jost text-[20px] font-semibold">{rostered.length}</span>
                 <span className="ml-1 text-[12px] text-foreground/50">players</span>
               </span>
-              <span className="mt-1 block truncate text-[11px] text-foreground/45">
+              <span className="mt-1 block truncate text-[11px] text-foreground/55">
                 {sleeperConnection ? sleeperConnection.leagueName : "Tap to connect or add"}
               </span>
             </span>
@@ -124,7 +124,7 @@ export function LineupTool() {
                 <span className="font-jost text-[20px] font-semibold">{totalStarters(slotCounts)}</span>
                 <span className="ml-1 text-[12px] text-foreground/50">starters</span>
               </span>
-              <span className="mt-1 block truncate text-[11px] text-foreground/45">{summarizeSlots(slotCounts)}</span>
+              <span className="mt-1 block truncate text-[11px] text-foreground/55">{summarizeSlots(slotCounts)}</span>
             </span>
             <ChevronIcon open={slotsOpen} />
           </button>
@@ -155,7 +155,7 @@ export function LineupTool() {
         onClick={handleBuildLineup}
         disabled={loading || rostered.length === 0}
         style={{ fontFamily: "var(--font-engraved)" }}
-        className="w-full rounded-full bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-surface-sunken disabled:text-foreground/45 disabled:shadow-none"
+        className="w-full rounded-full bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-surface-sunken disabled:text-foreground/55 disabled:shadow-none"
       >
         {loading ? "Building your lineup…" : "Build my lineup"}
       </button>
@@ -173,7 +173,7 @@ export function LineupTool() {
 
       {response && (
         <div ref={resultRef} className="scroll-mt-24">
-          <p className="mt-8 text-center text-xs text-foreground/45">{response.context.contextNote}</p>
+          <p className="mt-8 text-center text-xs text-foreground/55">{response.context.contextNote}</p>
           <LineupResult slots={response.slots} bench={response.bench} scoringFormat={scoringFormat} />
         </div>
       )}

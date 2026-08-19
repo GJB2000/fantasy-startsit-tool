@@ -25,7 +25,7 @@ const TOP_N = 5;
 function matchupLabel(diff: number): { text: string; className: string } {
   if (diff > 1.5) return { text: "favorable", className: "text-good" };
   if (diff < -1.5) return { text: "tough", className: "text-bad" };
-  return { text: "even matchup", className: "text-foreground/45" };
+  return { text: "even matchup", className: "text-foreground/55" };
 }
 
 function BoardShell({ children }: { children: React.ReactNode }) {
@@ -44,7 +44,7 @@ function BoardShell({ children }: { children: React.ReactNode }) {
 
 function BoardMessage({ children, tone = "muted" }: { children: React.ReactNode; tone?: "muted" | "bad" }) {
   return (
-    <p className={`px-4 py-6 text-center text-[13px] ${tone === "bad" ? "text-bad" : "text-foreground/45"}`}>{children}</p>
+    <p className={`px-4 py-6 text-center text-[13px] ${tone === "bad" ? "text-bad" : "text-foreground/55"}`}>{children}</p>
   );
 }
 
@@ -118,7 +118,7 @@ export function HomeRankingsBoard() {
             href="/rankings"
             className="flex items-center gap-3 border-t border-foreground/[0.09] px-4 py-3 transition-colors first:border-none hover:bg-foreground/[0.05]"
           >
-            <span className="w-5 shrink-0 text-right font-jost text-[15px] font-semibold tabular-nums text-foreground/40">
+            <span className="w-5 shrink-0 text-right font-jost text-[15px] font-semibold tabular-nums text-foreground/55">
               {i + 1}
             </span>
             <span className="inline-flex h-8 min-w-[44px] shrink-0 items-center justify-center rounded-[3px] bg-surface-sunken px-2 font-engraved text-[10px] uppercase tracking-[0.08em] text-foreground/55">
@@ -133,7 +133,7 @@ export function HomeRankingsBoard() {
                   </span>
                 )}
               </div>
-              <p className="truncate text-[11.5px] text-foreground/45">
+              <p className="truncate text-[11.5px] text-foreground/55">
                 {entry.team ?? "—"}
                 {label && (
                   <>

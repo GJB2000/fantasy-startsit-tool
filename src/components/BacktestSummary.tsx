@@ -14,7 +14,7 @@ function AccuracyBanner({ label, summary }: AccuracyBannerProps) {
         <span className="font-jost text-[15px] font-semibold">
           {summary.accuracyPct != null ? `${summary.accuracyPct.toFixed(1)}%` : "—"}
         </span>{" "}
-        <span className="font-mono text-foreground/45">
+        <span className="font-mono text-foreground/55">
           ({summary.correct}-{summary.incorrect}
           {summary.push > 0 ? `, ${summary.push} push` : ""}
           {summary.noPick > 0 ? `, ${summary.noPick} no-pick` : ""})

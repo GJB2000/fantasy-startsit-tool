@@ -59,19 +59,19 @@ function DetailCard({ detail }: { detail: PlayerProjectionDetail }) {
       <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
         <span className="font-medium">
           {detail.displayName}{" "}
-          <span className="text-foreground/45">
+          <span className="text-foreground/55">
             {detail.position ?? "—"}
             {detail.team ? ` · ${detail.team}` : ""}
           </span>
         </span>
-        <span className="font-mono text-xs text-foreground/45">
+        <span className="font-mono text-xs text-foreground/55">
           {summary.mae != null
             ? `MAE ${summary.mae.toFixed(1)} (RMSE ${summary.rmse!.toFixed(1)}, bias ${signedLabel(summary.bias)}, n=${summary.n})`
             : "No graded weeks in this range"}
         </span>
       </div>
       {closer.graded > 0 && (
-        <div className="font-mono text-xs text-foreground/45">
+        <div className="font-mono text-xs text-foreground/55">
           Closer to actual: <span className="font-semibold text-foreground">Engine {closer.engine}</span>
           {" · "}
           <span className="font-semibold text-foreground">FantasyPros {closer.fantasyPros}</span>

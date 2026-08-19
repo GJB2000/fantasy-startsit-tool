@@ -274,7 +274,7 @@ export function BacktestTool() {
 
       {mode === "projection" ? (
         <>
-          <p className="text-xs text-foreground/45">
+          <p className="text-xs text-foreground/55">
             2025 season only — how close the engine&apos;s own score comes to real points scored, not just
             whether it picked the right player. Scored in the selected format above.
           </p>
@@ -289,7 +289,7 @@ export function BacktestTool() {
         </>
       ) : (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-foreground/45">Season</span>
+          <span className="text-foreground/55">Season</span>
           {SEASON_OPTIONS.map((s) => (
             <button
               key={s}
@@ -307,7 +307,7 @@ export function BacktestTool() {
               {s}
             </button>
           ))}
-          <span className="text-xs text-foreground/45">
+          <span className="text-xs text-foreground/55">
             {season === "2025" ? "primary, tuned" : "out-of-sample validation (nflverse-only)"}
           </span>
         </div>
@@ -366,7 +366,7 @@ export function BacktestTool() {
               ))}
           </div>
           {mode === "broad" && season === "2025" && (
-            <p className="text-xs text-foreground/45">
+            <p className="text-xs text-foreground/55">
               D/ST and K run on a much simpler model than the skill positions — recent scoring plus one
               matchup signal, not a blend of a dozen. D/ST&apos;s own signal backtested strong; K&apos;s was
               weaker than just ranking kickers by season average. Only available on the 2025 season for now.
@@ -391,7 +391,7 @@ export function BacktestTool() {
               ))}
             </select>
           </label>
-          <span className="text-xs text-foreground/45">
+          <span className="text-xs text-foreground/55">
             trades are built from data through this week, then graded against weeks {asOfWeek + 1}-18
           </span>
         </div>
@@ -411,7 +411,7 @@ export function BacktestTool() {
               ))}
             </select>
           </label>
-          <span className="text-foreground/45">to</span>
+          <span className="text-foreground/55">to</span>
           <select
             value={weekTo}
             onChange={(e) => setWeekTo(Number(e.target.value))}
@@ -429,7 +429,7 @@ export function BacktestTool() {
               setWeekFrom(1);
               setWeekTo(18);
             }}
-            className="text-xs text-foreground/45 underline"
+            className="text-xs text-foreground/55 underline"
           >
             All weeks
           </button>
@@ -450,7 +450,7 @@ export function BacktestTool() {
 
       {pairResult && (
         <div className="space-y-4">
-          <p className="text-xs font-medium text-foreground/45">
+          <p className="text-xs font-medium text-foreground/55">
             Showing {pairResultSeason} results ({pairResultSeason === "2025" ? "SportsDataIO" : "nflverse-only"})
           </p>
           <BacktestSummaryView
@@ -465,7 +465,7 @@ export function BacktestTool() {
 
       {broadResult && (
         <div className="space-y-4">
-          <p className="text-xs font-medium text-foreground/45">
+          <p className="text-xs font-medium text-foreground/55">
             Showing {broadResultSeason} results ({broadResultSeason === "2025" ? "SportsDataIO" : "nflverse-only"})
           </p>
           <BacktestSummaryView
@@ -480,7 +480,7 @@ export function BacktestTool() {
 
       {tradeResult && (
         <div className="space-y-4">
-          <p className="text-xs font-medium text-foreground/45">
+          <p className="text-xs font-medium text-foreground/55">
             Showing {tradeResultSeason} results ({tradeResultSeason === "2025" ? "SportsDataIO" : "nflverse-only"}) —{" "}
             {tradeResult.results.length} synthetic trade{tradeResult.results.length === 1 ? "" : "s"}
           </p>
@@ -491,7 +491,7 @@ export function BacktestTool() {
 
       {projectionResult && (
         <div className="space-y-4">
-          <p className="text-xs font-medium text-foreground/45">Showing 2025 results (SportsDataIO, PPR)</p>
+          <p className="text-xs font-medium text-foreground/55">Showing 2025 results (SportsDataIO, PPR)</p>
 
           {projectionResult.playerDetail && projectionResult.playerDetail.length > 0 && (
             <div className="space-y-2">

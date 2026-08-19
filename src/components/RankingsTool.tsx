@@ -114,14 +114,14 @@ export function RankingsTool() {
         </div>
         <ScoringFormatToggle editorial value={scoringFormat} onChange={setScoringFormat} />
       </div>
-      <p className="mt-3 text-center text-xs text-foreground/45">{MODE_BLURB[mode]}</p>
+      <p className="mt-3 text-center text-xs text-foreground/55">{MODE_BLURB[mode]}</p>
 
       {loading && <p className="mt-8 text-center text-sm text-foreground/50">Ranking every {TAB_LABEL[tab]}…</p>}
       {error && !loading && <p className="mt-8 text-center text-sm text-bad">{error}</p>}
 
       {response && !loading && (
         <>
-          <p className="mt-6 text-center text-xs text-foreground/45">{response.context.contextNote}</p>
+          <p className="mt-6 text-center text-xs text-foreground/55">{response.context.contextNote}</p>
           <RankingsResult
             rankings={response.rankings}
             positionLabel={TAB_LABEL[tab]}

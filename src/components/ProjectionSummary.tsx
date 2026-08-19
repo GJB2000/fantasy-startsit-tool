@@ -10,7 +10,7 @@ function ProjectionRow({ label, summary }: ProjectionBanner) {
     return (
       <div className="flex items-center justify-between rounded-[4px] border border-foreground/12 bg-surface px-3.5 py-2.5 text-sm shadow-sm">
         <span className="font-medium">{label}</span>
-        <span className="text-foreground/45">— (n=0)</span>
+        <span className="text-foreground/55">— (n=0)</span>
       </div>
     );
   }
@@ -22,7 +22,7 @@ function ProjectionRow({ label, summary }: ProjectionBanner) {
       <span className="font-medium">{label}</span>
       <span>
         <span className="font-jost text-[15px] font-semibold">{summary.mae.toFixed(1)} MAE</span>{" "}
-        <span className="font-mono text-foreground/45">
+        <span className="font-mono text-foreground/55">
           (RMSE {summary.rmse!.toFixed(1)}, bias {biasLabel}, n={summary.n})
         </span>
       </span>

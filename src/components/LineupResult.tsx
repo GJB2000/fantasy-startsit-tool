@@ -131,8 +131,8 @@ function EmptySlotRow({ heading }: { heading: string }) {
         +
       </span>
       <div className="min-w-0">
-        <div className="font-engraved text-[9.5px] uppercase tracking-[0.11em] text-foreground/40">{heading}</div>
-        <p className="mt-0.5 text-[12.5px] text-foreground/45">No eligible player on your roster — add one to fill it.</p>
+        <div className="font-engraved text-[9.5px] uppercase tracking-[0.11em] text-foreground/55">{heading}</div>
+        <p className="mt-0.5 text-[12.5px] text-foreground/55">No eligible player on your roster — add one to fill it.</p>
       </div>
     </div>
   );
@@ -162,12 +162,12 @@ function StarterRow({
       >
         <Avatar breakdown={breakdown} size={40} />
         <div className="min-w-0 flex-1">
-          <div className="font-engraved text-[9.5px] uppercase tracking-[0.11em] text-foreground/40">{heading}</div>
+          <div className="font-engraved text-[9.5px] uppercase tracking-[0.11em] text-foreground/55">{heading}</div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
             <h3 className="truncate font-jost text-[15px] font-semibold tracking-tight">{breakdown.displayName}</h3>
             <StatusPills breakdown={breakdown} />
           </div>
-          <p className="truncate text-[11.5px] text-foreground/45">
+          <p className="truncate text-[11.5px] text-foreground/55">
             {breakdown.position ?? ""}
             {breakdown.team ? ` · ${breakdown.team}` : ""}
             {opp ? ` · ${opp}` : ""}
@@ -183,7 +183,7 @@ function StarterRow({
             <div className="font-jost text-[19px] font-semibold leading-none tabular-nums">
               {breakdown.finalScore != null ? breakdown.finalScore.toFixed(1) : "—"}
             </div>
-            <div className="mt-1 font-engraved text-[9.5px] uppercase tracking-[0.08em] text-foreground/40">proj · {formatLabel}</div>
+            <div className="mt-1 font-engraved text-[9.5px] uppercase tracking-[0.08em] text-foreground/55">proj · {formatLabel}</div>
           </div>
           {hasNotes ? <ChevronIcon open={open} /> : <span className="w-4 shrink-0" />}
         </div>
@@ -211,7 +211,7 @@ function BenchRow({ breakdown }: { breakdown: PlayerScoreBreakdown }) {
       <Avatar breakdown={breakdown} size={32} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13.5px] font-medium">{breakdown.displayName}</p>
-        <p className="truncate text-[11.5px] text-foreground/45">
+        <p className="truncate text-[11.5px] text-foreground/55">
           {breakdown.position ?? ""}
           {breakdown.team ? ` · ${breakdown.team}` : ""}
         </p>
@@ -254,7 +254,7 @@ export function LineupResult({ slots, bench, scoringFormat }: LineupResultProps)
           <div className="font-jost text-[40px] font-semibold leading-none tabular-nums text-accent">
             <CountUpNumber value={projectedTotal} decimals={1} />
           </div>
-          <div className="mt-1 font-engraved text-[10.5px] uppercase tracking-[0.08em] text-foreground/40">projected points</div>
+          <div className="mt-1 font-engraved text-[10.5px] uppercase tracking-[0.08em] text-foreground/55">projected points</div>
         </div>
       </div>
 

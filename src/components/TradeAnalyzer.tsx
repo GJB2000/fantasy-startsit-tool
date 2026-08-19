@@ -110,7 +110,7 @@ export function TradeAnalyzer() {
           onClick={handleAnalyze}
           disabled={givePlayers.length === 0 || getPlayers.length === 0 || loading}
           style={{ fontFamily: "var(--font-engraved)" }}
-          className="mt-5 w-full rounded-full bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-surface-sunken disabled:text-foreground/45 disabled:shadow-none"
+          className="mt-5 w-full rounded-full bg-accent px-4 py-3.5 text-[12px] uppercase tracking-[0.14em] text-accent-ink shadow-[0_10px_22px_-8px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all hover:-translate-y-px active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-surface-sunken disabled:text-foreground/55 disabled:shadow-none"
         >
           {loading ? "Analyzing…" : "Analyze trade"}
         </button>

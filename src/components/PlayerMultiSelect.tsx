@@ -78,7 +78,7 @@ function SelectedCard({ player, onRemove, editorial }: { player: PlayerSummary; 
       <Avatar player={player} size={36} />
       <div className="min-w-0">
         <div className="truncate text-[13.5px] font-semibold leading-tight tracking-tight">{player.name}</div>
-        <div className="text-[11px] text-foreground/45">
+        <div className="text-[11px] text-foreground/55">
           {player.position}
           {player.team ? ` · ${player.team}` : ""}
         </div>
@@ -86,7 +86,7 @@ function SelectedCard({ player, onRemove, editorial }: { player: PlayerSummary; 
       <button
         type="button"
         onClick={onRemove}
-        className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full border border-foreground/15 bg-surface text-[11px] text-foreground/40 shadow-sm transition-colors hover:border-bad hover:text-bad"
+        className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full border border-foreground/15 bg-surface text-[11px] text-foreground/55 shadow-sm transition-colors hover:border-bad hover:text-bad"
         aria-label={`Remove ${player.name}`}
       >
         ✕
@@ -255,7 +255,7 @@ export function PlayerMultiSelect({
                     <Avatar player={player} size={38} />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold tracking-tight">{player.name}</div>
-                      <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-foreground/45">
+                      <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-foreground/55">
                         <span
                           className="rounded px-1.5 py-0.5 text-[9.5px] font-extrabold tracking-wide text-white"
                           style={{ background: posVar(player.position) }}

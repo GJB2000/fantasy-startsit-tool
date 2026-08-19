@@ -58,7 +58,7 @@ export function ConfirmButton({ onConfirm, label, confirmLabel, className }: Con
       type="button"
       onClick={handleClick}
       className={`${className ?? ""} font-semibold uppercase tracking-wide transition-colors ${
-        armed ? "bg-bad/12 text-bad" : "text-foreground/40 hover:bg-bad/10 hover:text-bad"
+        armed ? "bg-bad/12 text-bad" : "text-foreground/55 hover:bg-bad/10 hover:text-bad"
       }`}
     >
       {armed ? confirmLabel : label}

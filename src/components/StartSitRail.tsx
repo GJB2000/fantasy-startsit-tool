@@ -28,7 +28,7 @@ export function RecentComparisonsPanel({
         Recent comparisons
       </div>
       {recent.length === 0 ? (
-        <p className="text-[12px] leading-relaxed text-foreground/45">
+        <p className="text-[12px] leading-relaxed text-foreground/55">
           Run a comparison and it&apos;ll show up here — nothing yet this session.
         </p>
       ) : (
@@ -46,7 +46,7 @@ export function RecentComparisonsPanel({
                     <>
                       <span className="font-semibold">Start</span> {entry.recommendedName}
                       {entry.otherNames.length > 0 && (
-                        <span className="text-foreground/45"> over {entry.otherNames.join(", ")}</span>
+                        <span className="text-foreground/55"> over {entry.otherNames.join(", ")}</span>
                       )}
                     </>
                   ) : (

@@ -81,7 +81,7 @@ function RankingRow({
   const seasonPts = isInSeason ? entry.seasonTotalPoints : 0;
   return (
     <div className="flex items-center gap-3 border-t border-foreground/[0.09] px-4 py-3.5 first:border-none">
-      <span className="w-6 shrink-0 text-right font-jost text-[16px] font-semibold text-foreground/40">
+      <span className="w-6 shrink-0 text-right font-jost text-[16px] font-semibold text-foreground/55">
         {entry.positionRank}
       </span>
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] bg-accent/12 font-jost text-[13px] font-semibold text-accent">
