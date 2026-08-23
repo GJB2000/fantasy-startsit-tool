@@ -331,7 +331,14 @@ knowable that far ahead from this data source.
   4-season nflverse-only sample is the current out-of-sample check, not
   a wait for the 2026 season.
 - **SportsDataIO does not offer snap counts, target share, or air yards
-  at any tier** — confirmed against the live NFL API doc catalog (not
+  at any tier — SUPERSEDED, see item 155. It DOES, via a product that is
+  deliberately absent from the public catalogue ("NFL Advanced Metrics",
+  whose endpoints SportsDataIO's own onboarding email describes as
+  "hidden from the front end").** The original finding below was a
+  correct reading of the documented catalogue and stays as the record of
+  why `src/lib/nflverse/` exists at all; it is no longer a true statement
+  about what SportsDataIO sells. Original note: confirmed against the
+  live NFL API doc catalog (not
   just skimmed): zero endpoints or fields for any of the three,
   anywhere. Red zone stats *do* exist as a real SportsDataIO product
   (`PlayerGameRedZoneStats`/`PlayerSeasonRedZoneStats`, plus "Inside
@@ -353,7 +360,12 @@ knowable that far ahead from this data source.
   nflverse is caught and degrades to empty data (new baselines just
   report `no_pick`) rather than taking down the whole backtest — it's a
   third-party source being trialed, not the app's primary data path.
-- **SportsDataIO has no game-schedule endpoint on this plan** —
+- **SportsDataIO has no game-schedule endpoint on this plan — PLAN-
+  SPECIFIC, and no longer true of the 2026 subscription (item 155):**
+  `v3/nfl/scores/json/Schedules/2026REG` returns a real 304-game list on
+  the new key. The finding below remains correct for the ORIGINAL plan
+  and legacy host, and is why nflverse's `schedules` release is still
+  what every shipped code path reads. Original note:
   confirmed live while building the Trade Analyzer (item 47): every
   plausible path (`/Schedules`, `/Games`, `/GamesByWeek`, etc., on both
   the `fantasy` and `odds` hosts) returns a clean `404 Resource not
@@ -428,6 +440,62 @@ knowable that far ahead from this data source.
   four seasons). Used only for backtest-side kicker analysis on the
   nflverse pipeline (item 97); the shipped K scorer runs on SportsDataIO's
   own kicker FantasyPoints and is unaffected.
+- **TWO SportsDataIO subscriptions now exist, on a DIFFERENT host path
+  and scoped to 2026 only (item 155). Neither can run the app today.**
+  `SPORTSDATA_API_KEY` ("SportsDataIO API") and
+  `SPORTSDATA_ADVANCED_API_KEY` ("NFL Advanced Metrics API"), both
+  reported active by the user. Three things differ from the original
+  subscription and each one is load-bearing:
+  1. **Host path.** The new keys authenticate against
+     `https://api.sportsdata.io/v3/nfl/{package}/json/…`. Every shipped
+     path in `src/lib/sportsdata/client.ts` uses the LEGACY
+     `https://api.sportsdata.io/api/nfl/{fantasy,odds}/json/…`, where
+     both new keys return `401`. So the new keys are not a drop-in swap;
+     migrating hosts is a real, verify-everything change.
+  2. **Season scope.** Only 2026 is entitled. Every 2021-2025 request
+     `401`s. Since 2026 hasn't kicked off (SportsDataIO's own
+     `Timeframes/current` reports Preseason Week 2), the season-scoped
+     stats endpoints return 200 with ZERO rows.
+  3. **`PlayerGameStatsByWeek` is NOT entitled** — `401` on every season
+     and season-type tried (2026REG/1, 2026PRE/1, 2026PRE/2). That
+     endpoint is the app's backbone (`weeklyStats.ts` feeds essentially
+     every tool), so the new plan cannot run this app even after kickoff
+     unless it's added.
+  **Auth differs by product**: the `v3` packages accept the
+  `Ocp-Apim-Subscription-Key` header like the legacy host, but the
+  advanced-metrics endpoints were verified with the `?key=` query
+  parameter its onboarding email documents — header auth was never
+  tested against a VALID advanced endpoint (the earlier `404`s there
+  were a bad probe path, `/Teams`, which doesn't exist in that package),
+  so treat "header works on advanced-metrics" as unknown, not disproven.
+- **NFL Advanced Metrics carries, first-party, nearly every signal this
+  app currently sources from nflverse — plus a lot that has never been
+  available here (item 155).** Base
+  `https://api.sportsdata.io/v3/nfl/advanced-metrics/json/`; three
+  endpoints, none in the public catalogue:
+  `AdvancedPlayerGameStats/{season}/{week}`,
+  `AdvancedPlayerSeasonStats/{season}/{team}`,
+  `AdvancedPlayerInfo/{PlayerId}`. `AdvancedPlayerInfo` returns combine/
+  athleticism data (SPARQx, SpeedScore, AgilityScore, ThreeConeDrill, …)
+  and — the important part — embeds `AdvancedPlayerGames` (per-week) and
+  `AdvancedPlayerSeasons` (~300 fields). Between them they carry
+  `SnapShare`/`Snaps`, `TargetShare`, `AirYards` (+PerTarget/PerGame/
+  PerReception), `TargetSeparation`, `AverageCushion`, `RedZoneTargets`/
+  `RedZoneTouches`/`RedZoneCarries`/`GoalLineCarries`, `DropRate`/
+  `Drops`, plus signals never previously obtainable: `RouteParticipation`,
+  `PassRoutes`, `YardsPerRouteRun`, `ExpectedFantasyPoints`,
+  `OpportunityShare`, `WeightedOpportunities`, `TargetQualityRating`,
+  `PressuredCompletionPercentage`, `TotalQBR`, `SlotRate`/`SlotSnaps`,
+  `PlayactionPassAttempts`, `BreakawayRunRate`, `YardsCreated`.
+  **One genuinely useful quirk, verified:** the season-scoped advanced
+  endpoints `401` for 2025, but `AdvancedPlayerInfo/{PlayerId}` returns
+  that player's REAL 2025 per-week rows anyway (confirmed: Joe Burrow,
+  PlayerID 21693, 8 rows — weeks 1, 2, 13-18, matching his real
+  injury-shortened season, with per-week `SnapShare` and `FantasyPoints`,
+  and a 2025 season row showing `AirYards` 1868). So historical advanced
+  data IS reachable on this plan — but only one HTTP call per player,
+  which is fine for a Start/Sit comparison and impractical for Legit
+  Rankings' whole-pool scan.
 - **The Odds API (`the-odds-api.com`) — free tier; key in `ODDS_API_KEY`
   (`.env.local` locally / Vercel env in production, never committed, same
   discipline as `SPORTSDATA_API_KEY`).** Confirmed live (item 98): the
@@ -8902,19 +8970,90 @@ single-season numbers for those specific constants.
     - Commits: `dd4c5c3` (a/b/c), `6004c8a` (d), `27a00e6` (e), `4e3b943`
       (f).
 
-### Open items (as of item 154 — pick up here)
-**Everything through item 154 is committed and pushed to `main` (last code
-commit `4e3b943`), working tree CLEAN.** This session was a UI rating pass
-plus the fixes that came out of it — **item 154 above, presentation only, no
-engine, scoring, or API change** (same precedent as items 133-135/141). In
-commit order: `dd4c5c3` (rankings row gap + labeled control clusters +
-position colors), `6004c8a` (light-mode Start/Sit hierarchy), `27a00e6`
-(sticky Start/Sit rail), `4e3b943` (balanced Start/Sit + Lineup landing
-states). The app rated **8/10** on its own review after the first three, up
-from the ~7.5 of the prior session; the landing-state fix came after that
-rating and isn't reflected in it.
+155. **Probed two new SportsDataIO subscriptions (a higher-tier
+    "SportsDataIO API" key plus a separate "NFL Advanced Metrics API"
+    key) and mapped exactly what they can and can't reach. No code
+    change — this is a capability/decision write-up, and it both answers
+    a long-standing open question and falsifies two documented "facts"
+    in Data Source Notes.**
+    - **Operational state at the time of writing: the app was BROKEN
+      locally**, because `SPORTSDATA_API_KEY` in `.env.local` had been
+      swapped to the new key. `/api/players` returned 502 and every
+      SportsDataIO call `401`d. The fix is to restore the OLD key —
+      documented here because the failure looks like a code regression
+      and isn't one. Production (Vercel) was untouched at the time, so
+      the deployed site kept working on the old key.
+    - **Method**: `curl` probes with each key against a matrix of hosts,
+      packages, seasons and season-types, reading only status codes and
+      row counts (no key values printed). Findings below are all live-
+      verified, not read off documentation — the docs page for the NFL
+      API doesn't even expose the per-package base paths (checked), and
+      the advanced-metrics product isn't in the public catalogue at all.
+    - **What the new main key unlocks (2026 only)**: `scores/json/Teams`,
+      `Players` (6,245 rows), `Timeframes/current`, `Schedules/2026REG`
+      (304 games), `Byes/2026`;
+      `projections/json/PlayerSeasonProjectionStats/2026` (1,937 rows);
+      `stats/json/PlayerGameRedZoneStats/2026REG/1`;
+      `stats/json/PlayerSeasonStats/2026` and `/2026PRE` (200 but ZERO
+      rows — the season hasn't kicked off).
+    - **What it does NOT unlock**: `PlayerGameStatsByWeek` on ANY season
+      or season-type (`401` — the app's backbone), `stats/json/Players`,
+      `scores/json/DepthCharts`, and every season 2021-2025.
+    - **Two documented facts in Data Source Notes are now wrong, and
+      both have been marked superseded there rather than deleted:**
+      (a) "SportsDataIO does not offer snap counts, target share, or air
+      yards at any tier" — it does, through the hidden advanced-metrics
+      product; the original note was a correct reading of the public
+      catalogue, which is exactly why it was wrong. (b) "SportsDataIO has
+      no game-schedule endpoint on this plan" — true of the original
+      plan, false of the 2026 one.
+    - **Partially answers item 153 / Open Item #33 (the FantasyPros
+      licensing exposure).** The make-or-break question there was whether
+      SportsDataIO's projections are historically backtestable. Answer on
+      THIS plan: no — `projections/*/2026` works, every earlier season
+      `401`s, so a projections-for-FantasyPros swap could not be
+      validated against history without buying past seasons. The
+      projections product does exist and is real (1,937 players), so the
+      question is now about season entitlements, not product existence.
+    - **The bigger strategic prize is nflverse, not FantasyPros.** Open
+      Item #33 flagged nflverse as the larger un-reviewed licensing
+      exposure (it feeds ~a dozen live signals and the whole 2022-2024
+      backtest). Advanced Metrics carries first-party equivalents for
+      nearly all of them (snap share, target share, air yards,
+      separation, red-zone/goal-line touches, drop rate) — so this is the
+      first credible path to retiring that dependency for the LIVE tools.
+      It would also delete the single biggest performance cost in the
+      app: red-zone touches currently come from parsing a ~98MB
+      play-by-play release (items 27/125/126), and would become a direct
+      field read.
+    - **Deliberately did NOT start the migration.** Three blockers, any
+      one of which would have made it wasted work: the missing
+      `PlayerGameStatsByWeek` entitlement, the 2026-only season scope
+      (the app runs on last-completed-season data, and 2026 has no rows
+      yet), and the unresolved question of whether historical seasons can
+      be added. Building against endpoints that `401` would have replaced
+      a working architecture with a broken one and been unverifiable.
+      See new Open Item #35.
+    - No repo artifact beyond this write-up and the two Data Source Notes
+      corrections — same discipline as every other probe-only
+      investigation in this document (items 34/38/97/106).
 
-Three things from this session that a future session should NOT silently
+### Open items (as of item 155 — pick up here)
+**Code through item 154 is committed and pushed to `main` (last code commit
+`4e3b943`); item 155 is investigation-only and changed no code.** Two
+distinct pieces of work this session:
+1. **A UI rating pass and six presentation-only fixes (item 154)** — see
+   that item and the note below on what not to undo.
+2. **A SportsDataIO subscription probe (item 155)** — two new keys mapped,
+   two Data Source Notes falsified and corrected.
+
+**READ THIS FIRST IF THE APP IS BROKEN:** item 155 left the local
+`.env.local` holding the NEW `SPORTSDATA_API_KEY`, which `401`s on every
+endpoint this app calls. `/api/players` returning 502 is that, not a code
+regression. Restore the OLD key and restart the dev server. Do not let the
+old subscription lapse — it is the only one that can currently run the app.
+
+Three things from the UI work that a future session should NOT silently
 undo:
 - **`items-start` on the Start/Sit grid is load-bearing** for the sticky
   rail (item 154e). It looks like an incidental alignment choice.
@@ -8928,14 +9067,15 @@ undo:
   forced-theme toggle, and collapsing light onto the dark treatment removes
   light's only hierarchy mechanism.
 
-**New Open Item #34** added (the three review findings deliberately left
-undone). Otherwise the numbered open items below are unchanged from prior
-sessions — nothing below is started or fixed unless its own entry says so.
-One correction to the historical record: the prior session's note that it
-"dropped the condense-rankings-toggles review item — no clean win" is
-**superseded by item 154b**, which found a clean win once the problem was
-reframed from layout to labeling + weight.
+**Open Items #34 and #35 added** this session. Otherwise the numbered open
+items below are unchanged from prior sessions — nothing below is started or
+fixed unless its own entry says so. One correction to the historical record:
+the prior session's note that it "dropped the condense-rankings-toggles
+review item — no clean win" is **superseded by item 154b**, which found a
+clean win once the problem was reframed from layout to labeling + weight.
 
+The paragraph below is the PRIOR session's record (items 151-153), kept for
+context — its "as of item 153" framing and HEAD `c043aef` are historical:
 The paragraph below is the PRIOR session's record (items 151-153), kept for
 context — its "as of item 153" framing and HEAD `c043aef` are historical:
 **Everything through item 153 is committed and pushed to `main` (HEAD
@@ -9959,6 +10099,49 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       means deriving per-position reference points the same empirical way
       this app's conversion factors were derived — a small data task, not a
       styling one, which is why it wasn't bundled into item 154.
+
+35. **Decide what to do with the two new SportsDataIO subscriptions
+    (item 155). Blocked on entitlement answers, not on engineering.**
+    - **Ask SportsDataIO two questions first.** (a) Is
+      `PlayerGameStatsByWeek` included? It `401`s on every season and
+      season-type while projections, schedules, red-zone stats and
+      Advanced Metrics all work — that combination looks like an
+      omission rather than a tier boundary, and without it the new plan
+      cannot run this app at all. (b) Can historical seasons (2022-2025)
+      be added? Only 2026 is entitled today, which leaves the entire
+      backtest — the thing that validates the engine — dependent on
+      nflverse regardless.
+    - **If weekly stats get added, the migration is worth doing, and it
+      is a multi-session project, not a swap.** Scope: every path in
+      `src/lib/sportsdata/` moves from the legacy
+      `api/nfl/{fantasy,odds}/json` host to `v3/nfl/{package}/json`;
+      `API_BASES` grows a per-base key mapping (the two keys are not
+      interchangeable); the advanced-metrics base needs `?key=` query
+      auth alongside the header auth everything else uses; and every
+      migrated reader needs re-verification against real data, since
+      field names and shapes differ between the legacy fantasy feed and
+      the v3 stats/scores packages. Do NOT attempt this as a
+      find-and-replace.
+    - **The prize, in priority order.** (1) Retiring the live tools'
+      nflverse dependency — Open Item #33's larger exposure — since
+      Advanced Metrics carries first-party snap share, target share, air
+      yards, separation, red-zone/goal-line touches and drop rate. (2)
+      Deleting the ~98MB play-by-play parse that currently computes
+      red-zone touches, which is the app's single biggest performance
+      cost (items 27/125/126). (3) Genuinely new signals worth a proper
+      backtest if history is ever purchased: `RouteParticipation`,
+      `YardsPerRouteRun`, `ExpectedFantasyPoints`, `OpportunityShare`,
+      `TargetQualityRating`.
+    - **A real constraint on (1) even in the best case:** the backtest
+      would still need nflverse for 2022-2025 unless historical seasons
+      are bought, so a live-only migration would mean the live engine and
+      the backtest read different sources for the same signals. That is a
+      genuine methodological hazard — every tuned weight in this document
+      was validated on nflverse-derived values, and item 53 already
+      documented one signal (the WR ensemble ratio) that validated
+      cleanly on one pipeline and reversed on the other. Any migration
+      plan needs an explicit answer for how the two stay comparable.
+    - **Do not let the old subscription lapse** until this is resolved.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
