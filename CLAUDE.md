@@ -8984,8 +8984,12 @@ single-season numbers for those specific constants.
       SportsDataIO to resolve the entitlements. Documented here because
       the failure looks exactly like a code regression and isn't one; see
       the READ THIS FIRST banner in the handoff for what this rules out.
-      Production (Vercel) was untouched at the time, so the deployed site
-      kept working on the old key.
+      Production was swapped to the new key as well and went down with it
+      — confirmed by black-box test of the live domain (`/api/players`
+      and `/api/rankings` both `502`, page shell `200`). An earlier draft
+      of this item asserted Vercel was untouched; that was assumed, never
+      checked, and wrong. The lesson worth keeping: this document's value
+      depends on not recording assumptions as findings.
     - **Method**: `curl` probes with each key against a matrix of hosts,
       packages, seasons and season-types, reading only status codes and
       row counts (no key values printed). Findings below are all live-
@@ -9070,10 +9074,15 @@ What that means for a session picking this up:
   work; `tsc`, lint and `next build` are unaffected. Plan verification
   accordingly, and say plainly when something couldn't be verified rather
   than assuming it works.
-- **Production is a separate question.** At the time of writing, Vercel had
-  NOT been updated, so the deployed site was still running fine on the old
-  key. If the live site is failing, check whether the Vercel env var was
-  swapped — that's the likely cause.
+- **Production was ALSO swapped to the new key, and went down because of
+  it.** Verified by black-box test, not assumed: `/api/players` and
+  `/api/rankings` on `https://fantasy-startsit-tool.vercel.app` both
+  returned `502` while the page shell rendered `200`. An earlier version
+  of this note claimed Vercel had not been updated and production was
+  fine — that was an unverified assumption and it was wrong. **Local and
+  production are independent**: restoring the old key in the Vercel env
+  vars and redeploying brings the live site back without disturbing the
+  local holding state.
 - **The old subscription must not lapse or be cancelled** while this holds.
   It is the only one that can serve this app, and it is what keeps
   production alive.
