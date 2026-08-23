@@ -386,8 +386,13 @@ knowable that far ahead from this data source.
   receptions, matching exactly). This is what makes half-PPR scoring a
   free derivation (`getFantasyPoints()` in `sportsdata/types.ts`) rather
   than needing a new data source or endpoint — see item 50.
-- **Sleeper's API is free, fully public, and needs no auth or API
-  key** — confirmed live (item 59): a nonexistent username returns HTTP
+- **Sleeper's API is free, fully public, and needs no auth or API key —
+  but it is licensed for NON-COMMERCIAL use only.** `docs.sleeper.com`:
+  "free to use for non-commercial purposes"; commercial use requires
+  contacting Sleeper for licensing (read live, Aug 2026). Tracked as one
+  of the four items in Open Item #33 — it is live in shipped code
+  (`src/lib/sleeper/`), so it is not a hypothetical. The rest of this
+  note remains accurate. Confirmed live (item 59): a nonexistent username returns HTTP
   200 with a JSON `null` body, not a 404, so "not found" has to be
   detected from the parsed body, not the status code. Like nflverse and
   unlike SportsDataIO, Sleeper has no ID shared with this app's
@@ -10078,8 +10083,9 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       is already contradicted by the shipped Sleeper import — this item is
       about *additional* sources, not whether import is in scope.
 33. **Data-source commercial-licensing decisions — FantasyPros, SportsDataIO,
-    nflverse (opened by item 153, not started).** Three linked open decisions,
-    in priority order:
+    nflverse, Sleeper (opened by item 153, not started).** Four linked open
+    decisions, in priority order. All four are LIVE in shipped code, so none
+    of them is hypothetical:
     - **FantasyPros consensus (the trigger):** our consensus signal comes via
       the `dynastyprocess/data` community scrape, not a licensed feed — a real
       commercial-use risk. Item 153 quantified the fallback: losing it costs
@@ -10099,6 +10105,21 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       sales-call requirements checklist + inquiry email were drafted in-chat
       (not committed) — reuse them. Buying it is the user's action (account
       creation isn't something this assistant does).
+    - **Sleeper — the most concrete of the four, because the restriction is
+      explicit rather than unknown.** `docs.sleeper.com` states the API is
+      "free to use for **non-commercial purposes**" and that "for commercial
+      use of the Sleeper API, please reach out to us directly to discuss
+      licensing" (read live, Aug 2026). This app ships Sleeper league import
+      today (`src/lib/sleeper/`, item 59-60), and it's being built as a
+      candidate tool for a newsletter with ~16k subscribers — so whether that
+      counts as commercial is a question to put to Sleeper, not to assume
+      either way. Cheapest of the four to resolve: one email, and Sleeper runs
+      a partner program, so a small read-only integration may well be free.
+      If the answer is no, the fallback already exists and is not fatal —
+      manual roster entry via `PlayerMultiSelect` predates the Sleeper import
+      (item 58) and still works; what's lost is one-click sync and the
+      league-wide waiver exclusion (item 60), which would degrade to
+      "your own roster only."
     - **nflverse (the larger, un-reviewed exposure):** feeds ~a dozen live
       signals + the entire 2022-2024 backtest, and is NOT substitutable by SDIO
       (no snap/target/air-yards at any tier). Its commercial-use terms have
