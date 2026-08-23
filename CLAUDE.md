@@ -8976,13 +8976,16 @@ single-season numbers for those specific constants.
     change — this is a capability/decision write-up, and it both answers
     a long-standing open question and falsifies two documented "facts"
     in Data Source Notes.**
-    - **Operational state at the time of writing: the app was BROKEN
-      locally**, because `SPORTSDATA_API_KEY` in `.env.local` had been
-      swapped to the new key. `/api/players` returned 502 and every
-      SportsDataIO call `401`d. The fix is to restore the OLD key —
-      documented here because the failure looks like a code regression
-      and isn't one. Production (Vercel) was untouched at the time, so
-      the deployed site kept working on the old key.
+    - **Operational state: the app is intentionally non-functional
+      locally**, because `SPORTSDATA_API_KEY` in `.env.local` was swapped
+      to the new key. `/api/players` returns 502 and every SportsDataIO
+      call `401`s. Restoring the old key would fix it, but the user chose
+      NOT to — the decision is to hold on the new key and wait for
+      SportsDataIO to resolve the entitlements. Documented here because
+      the failure looks exactly like a code regression and isn't one; see
+      the READ THIS FIRST banner in the handoff for what this rules out.
+      Production (Vercel) was untouched at the time, so the deployed site
+      kept working on the old key.
     - **Method**: `curl` probes with each key against a matrix of hosts,
       packages, seasons and season-types, reading only status codes and
       row counts (no key values printed). Findings below are all live-
@@ -9047,11 +9050,33 @@ distinct pieces of work this session:
 2. **A SportsDataIO subscription probe (item 155)** — two new keys mapped,
    two Data Source Notes falsified and corrected.
 
-**READ THIS FIRST IF THE APP IS BROKEN:** item 155 left the local
-`.env.local` holding the NEW `SPORTSDATA_API_KEY`, which `401`s on every
-endpoint this app calls. `/api/players` returning 502 is that, not a code
-regression. Restore the OLD key and restart the dev server. Do not let the
-old subscription lapse — it is the only one that can currently run the app.
+**READ THIS FIRST — THE APP IS INTENTIONALLY NON-FUNCTIONAL LOCALLY.**
+`.env.local` holds the NEW `SPORTSDATA_API_KEY`, which `401`s on every
+endpoint this app calls (see item 155), so `/api/players` returns 502 and
+every tool fails. **This is a deliberate holding state, not a regression —
+do not "fix" it.** The user decided (Aug 2026) to leave the new key in
+place and wait for SportsDataIO to sort out the entitlements rather than
+revert to the old key.
+
+What that means for a session picking this up:
+- **Do not restore the old key or edit `.env.local`** unless the user asks.
+  It's their credential file and the decision is theirs, already made.
+- **Do not start the v3 migration** until Open Item #35's two questions are
+  answered — chiefly whether `PlayerGameStatsByWeek` is included. Building
+  against endpoints that currently `401` is unverifiable work.
+- **Anything needing live SportsDataIO data cannot be verified locally**
+  while this holds. That rules out end-to-end checks of Start/Sit, Trade,
+  Waivers, Lineup and Rankings. Backtest routes that read nflverse still
+  work; `tsc`, lint and `next build` are unaffected. Plan verification
+  accordingly, and say plainly when something couldn't be verified rather
+  than assuming it works.
+- **Production is a separate question.** At the time of writing, Vercel had
+  NOT been updated, so the deployed site was still running fine on the old
+  key. If the live site is failing, check whether the Vercel env var was
+  swapped — that's the likely cause.
+- **The old subscription must not lapse or be cancelled** while this holds.
+  It is the only one that can serve this app, and it is what keeps
+  production alive.
 
 Three things from the UI work that a future session should NOT silently
 undo:
