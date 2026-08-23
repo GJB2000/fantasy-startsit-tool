@@ -91,9 +91,17 @@ export function RecentComparisonsPanel({
  * page. The parent grid sets `items-start`, so rows aren't stretched and
  * sticky has room to travel. Below `lg` the grid collapses to one column and
  * the rail simply stacks under the result, where sticky would have no travel
- * — hence the breakpoint prefix on every part of this. The max-height guard
- * keeps a long history scrollable inside the rail instead of pinning content
- * out of reach.
+ * — hence the breakpoint prefix on every part of this.
+ *
+ * Deliberately NO `overflow-y-auto`/`max-h` here, though a scroll guard looks
+ * like the obvious companion to sticky. It was tried and reverted: an overflow
+ * container clips at its own square-cornered padding box, and this panel fills
+ * the wrapper exactly, so the card's soft drop shadow (which paints OUTSIDE its
+ * border box) got sliced into a hard rectangle — reading as a sharp-edged
+ * outline around the rail. The guard was defensive only: useRecentComparisons
+ * caps history at 5 entries (~250px against an ~850px viewport), so it could
+ * never actually fire. If the rail ever gains taller content, put the overflow
+ * on an inner element rather than this wrapper.
  */
 export function StartSitRail({
   recent,
@@ -103,7 +111,7 @@ export function StartSitRail({
   onSelectRecent?: (entry: RecentComparison) => void;
 }) {
   return (
-    <div className="flex flex-col gap-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:self-start lg:overflow-y-auto">
+    <div className="flex flex-col gap-4 lg:sticky lg:top-6 lg:self-start">
       {/* StartSitRail only renders on the editorial Start/Sit page. */}
       <RecentComparisonsPanel recent={recent} onSelect={onSelectRecent} editorial />
     </div>
