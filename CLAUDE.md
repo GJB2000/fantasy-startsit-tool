@@ -10682,6 +10682,43 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     - **Do not let the legacy subscription lapse** until 2026 data is
       flowing and verified in production. It is the only key serving the app
       today.
+36. **Feed SportsDataIO's SEASON-level advanced metrics into Legit Rankings —
+    not started, and the highest-value use of the advanced subscription
+    currently available.** Item 160 established that the marquee advanced
+    fields (`ExpectedFantasyPoints`, `YardsPerRouteRun`, `RouteParticipation`,
+    `TargetQualityRating`, `WeightedOpportunities`, `TotalQBR`,
+    `PressuredCompletionPercentage`, `AirYards`, `DropRate`,
+    `TargetSeparation`, `AverageCushion`) exist ONLY on the season row (445
+    fields) and not per-week (83) — which is why they can't be backtested and
+    can't enter `finalScore`. **Legit Rankings is the exception, because it
+    has no per-week prediction to make and no pick ground truth to backtest
+    against in the first place** (items 78/139): it answers "how good is this
+    player" over a season, which is exactly the shape this data comes in.
+    Season-shaped data fits it natively, with no per-week reconstruction and
+    no leakage question.
+    - **Why this is worth doing**: Rankings currently blends the engine's own
+      weekly snapshot with FantasyPros' consensus rank (`ENGINE_WEIGHT`,
+      `SEASON_ENGINE_WEIGHT`). `ExpectedFantasyPoints` in particular is a
+      genuinely independent third input — an opportunity-quality model, not a
+      market opinion and not this app's own blend — and Season mode (item
+      151) is precisely where it belongs.
+    - **Cost/shape**: one `AdvancedPlayerInfo/{PlayerId}` call per player,
+      cached. That is impractical for a whole-pool weekly scan but fine for a
+      ranking that is already cached 30 minutes per (position, season, week,
+      format) — and it can be limited to the rankable pool rather than every
+      player.
+    - **No backtest is possible OR required here** — the same reason item 78
+      shipped `ENGINE_WEIGHT` as "a reasoned default". Any weight would be a
+      judgment call, so it wants a deliberate decision (and ideally a
+      sanity-check against several known players, the way items 139/140 were
+      validated) rather than a sweep. Related: Open Item #30 is the standing
+      question about how hard Rankings should lean on consensus at all — these
+      two should probably be decided together, since adding a third input
+      changes that balance.
+    - **Depends on the advanced subscription surviving** past 15 Sept 2026
+      (see #35). Build it behind the same fail-open pattern the player pages
+      use (item 159): if the feed is unavailable, the ranking falls back to
+      what it does today rather than breaking.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
