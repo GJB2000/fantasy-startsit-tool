@@ -75,6 +75,22 @@ export interface PlayerSeasonStat {
   RushingYards: number;
   ReceivingTargets: number;
   ReceivingYards: number;
+  PassingCompletions?: number;
+  PassingTouchdowns?: number;
+  PassingInterceptions?: number;
+  PassingRating?: number;
+  PassingLong?: number;
+  RushingTouchdowns?: number;
+  RushingLong?: number;
+  ReceivingTouchdowns?: number;
+  ReceivingLong?: number;
+  Fumbles?: number;
+  FumblesLost?: number;
+  FieldGoalsMade?: number;
+  FieldGoalsAttempted?: number;
+  FieldGoalsMade50Plus?: number;
+  ExtraPointsMade?: number;
+  ExtraPointsAttempted?: number;
 }
 
 export interface PlayerGameStat {
@@ -96,6 +112,24 @@ export interface PlayerGameStat {
   PassingYards: number;
   RushingYards: number;
   ReceivingYards: number;
+  PassingCompletions?: number;
+  PassingTouchdowns?: number;
+  PassingInterceptions?: number;
+  PassingRating?: number;
+  PassingLong?: number;
+  RushingTouchdowns?: number;
+  RushingLong?: number;
+  ReceivingTouchdowns?: number;
+  ReceivingLong?: number;
+  Fumbles?: number;
+  FumblesLost?: number;
+  /** "HOME" | "AWAY" — game rows only. */
+  HomeOrAway?: string | null;
+  FieldGoalsMade?: number;
+  FieldGoalsAttempted?: number;
+  FieldGoalsMade50Plus?: number;
+  ExtraPointsMade?: number;
+  ExtraPointsAttempted?: number;
 }
 
 /**

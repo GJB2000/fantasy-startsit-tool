@@ -84,6 +84,16 @@ const LINKS: { href: string; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    href: "/stats",
+    label: "Player Stats",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none">
+        <path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <circle cx="18.5" cy="18" r="2.2" stroke="currentColor" strokeWidth="1.6" />
+      </svg>
+    ),
+  },
+  {
     href: "/rankings",
     label: "Legit Rankings",
     icon: (
