@@ -1,6 +1,6 @@
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat } from "@/lib/sportsdata/types";
-import { getLiveExpertConsensusByNormalizedName } from "@/lib/fantasypros/liveConsensus";
+import { getLiveProjectedPointsByPlayerId } from "@/lib/sportsdata/liveProjections";
 import { getPriorSeasonPprAveragesByNormalizedName } from "@/lib/nflverse/priorSeasonAverage";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { projectExtendedRestOfSeason, scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
       positionDefenseTable,
       nflversePlayerWeekTable,
       firstAttempt,
-      expertConsensusByNormalizedName,
+      projectedPointsByPlayerId,
       priorSeasonPprAvgByNormalizedName,
     ] = await Promise.all([
       getPositionDefenseTableCached(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
       getRemainingOpponentsCached(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
         () => new Map<string, RemainingGame[]>()
       ),
-      getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
+      getLiveProjectedPointsByPlayerId(context, format).catch(() => new Map<number, number>()),
       // Prior-season per-game average — fallback for a player with zero games
       // this season (see buildInput.ts / scorePlayer's blendedScore fallback).
       getPriorSeasonPprAveragesByNormalizedName(context.lastCompletedSeason - 1, format).catch(
@@ -92,7 +92,7 @@ export async function GET(request: Request) {
         remainingOpponentsByTeam,
         teamWeatherByTeamWeek,
         impliedTotalsByTeamWeek,
-        expertConsensusByNormalizedName,
+        projectedPointsByPlayerId,
         priorSeasonPprAvgByNormalizedName
       );
       const projection = projectExtendedRestOfSeason(

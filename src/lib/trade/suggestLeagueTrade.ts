@@ -1,4 +1,3 @@
-import type { ExpertConsensusEntry } from "@/lib/fantasypros/weeklyConsensus";
 import { optimizeLineup } from "@/lib/lineup/optimizeLineup";
 import { SLOT_ELIGIBILITY, type SlotType } from "@/lib/lineup/rosterSlots";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
@@ -68,7 +67,7 @@ export async function suggestLeagueTrade(
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   teamWeatherByTeamWeek: Map<string, GameWeather>,
   impliedTotalsByTeamWeek: Map<string, number>,
-  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map(),
+  projectedPointsByPlayerId: Map<number, number> = new Map(),
   priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map()
 ): Promise<LeagueTradeResult> {
   if (yourPlayerIds.length === 0) return { suggestion: null, reason: "Your roster is empty." };
@@ -86,7 +85,7 @@ export async function suggestLeagueTrade(
       remainingOpponentsByTeam,
       teamWeatherByTeamWeek,
       impliedTotalsByTeamWeek,
-      expertConsensusByNormalizedName,
+      projectedPointsByPlayerId,
       priorSeasonPprAvgByNormalizedName
     );
   }

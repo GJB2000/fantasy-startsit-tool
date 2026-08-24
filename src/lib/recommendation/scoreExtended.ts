@@ -1,5 +1,4 @@
 import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
-import type { ExpertConsensusEntry } from "@/lib/fantasypros/weeklyConsensus";
 import { buildComparisonInput } from "@/lib/recommendation/buildInput";
 import { scorePlayer } from "@/lib/recommendation/engine";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
@@ -31,7 +30,7 @@ export async function scoreExtendedPlayer(
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   teamWeatherByTeamWeek: Map<string, GameWeather>,
   impliedTotalsByTeamWeek: Map<string, number>,
-  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map(),
+  projectedPointsByPlayerId: Map<number, number> = new Map(),
   priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map()
 ): Promise<PlayerScoreBreakdown> {
   if (isDst(playerId)) {
@@ -67,7 +66,7 @@ export async function scoreExtendedPlayer(
     remainingOpponentsByTeam,
     teamWeatherByTeamWeek,
     priorSeasonPprAvgByNormalizedName,
-    expertConsensusByNormalizedName
+    projectedPointsByPlayerId
   );
   return withFreeAgentProjection(scorePlayer(input, format));
 }

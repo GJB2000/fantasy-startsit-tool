@@ -1,4 +1,3 @@
-import type { ExpertConsensusEntry } from "@/lib/fantasypros/weeklyConsensus";
 import { getSeasonRedraftRankByKey, type SeasonRedraftEntry } from "@/lib/fantasypros/seasonProjections";
 import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
 import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
@@ -351,7 +350,7 @@ async function getFullLegitRankingsForPosition(
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   teamWeatherByTeamWeek: Map<string, GameWeather>,
   impliedTotalsByTeamWeek: Map<string, number>,
-  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry>
+  projectedPointsByPlayerId: Map<number, number>
 ): Promise<LegitRankingEntry[]> {
   const cacheKey = `${position}:${context.lastCompletedSeason}:${context.lastCompletedWeek}:${format}:${mode}`;
   const cached = cache.get(cacheKey);
@@ -373,7 +372,7 @@ async function getFullLegitRankingsForPosition(
         remainingOpponentsByTeam,
         teamWeatherByTeamWeek,
         impliedTotalsByTeamWeek,
-        expertConsensusByNormalizedName
+        projectedPointsByPlayerId
       )
     )
   );
@@ -401,7 +400,7 @@ export async function getLegitRankingsForPosition(
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   teamWeatherByTeamWeek: Map<string, GameWeather>,
   impliedTotalsByTeamWeek: Map<string, number>,
-  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map()
+  projectedPointsByPlayerId: Map<number, number> = new Map()
 ): Promise<LegitRankingEntry[]> {
   const ranked = await getFullLegitRankingsForPosition(
     position,
@@ -413,7 +412,7 @@ export async function getLegitRankingsForPosition(
     remainingOpponentsByTeam,
     teamWeatherByTeamWeek,
     impliedTotalsByTeamWeek,
-    expertConsensusByNormalizedName
+    projectedPointsByPlayerId
   );
   const limit = RANKING_LIMIT[position];
   return limit != null ? ranked.slice(0, limit) : ranked;
@@ -484,7 +483,7 @@ export async function getLegitRankingsOverall(
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   teamWeatherByTeamWeek: Map<string, GameWeather>,
   impliedTotalsByTeamWeek: Map<string, number>,
-  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map()
+  projectedPointsByPlayerId: Map<number, number> = new Map()
 ): Promise<LegitRankingEntry[]> {
   const perPosition = await Promise.all(
     RANKABLE_POSITIONS.map((position) =>
@@ -498,7 +497,7 @@ export async function getLegitRankingsOverall(
         remainingOpponentsByTeam,
         teamWeatherByTeamWeek,
         impliedTotalsByTeamWeek,
-        expertConsensusByNormalizedName
+        projectedPointsByPlayerId
       )
     )
   );

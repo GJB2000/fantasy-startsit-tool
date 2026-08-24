@@ -10,7 +10,6 @@ import {
   averageSuccessRate,
   averageTargetShare,
 } from "@/lib/nflverse/aggregate";
-import type { ExpertConsensusEntry } from "@/lib/fantasypros/weeklyConsensus";
 import { getByeWeekForTeam } from "@/lib/sportsdata/byes";
 import { getScorablePlayerById, getAllPlayers, getAnyPlayerById } from "@/lib/sportsdata/players";
 import { getMatchupContext, type PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
@@ -35,7 +34,7 @@ export async function buildComparisonInput(
   remainingOpponentsByTeam: Map<string, RemainingGame[]> = new Map(),
   teamWeatherByTeamWeek: Map<string, GameWeather> = new Map(),
   priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map(),
-  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map()
+  projectedPointsByPlayerId: Map<number, number> = new Map()
 ): Promise<PlayerComparisonInput> {
   const player = await getScorablePlayerById(playerId).catch(() => null);
 
@@ -160,7 +159,7 @@ export async function buildComparisonInput(
   // there's no week dimension here, just "what does the consensus say
   // right now" (see fantasypros/weeklyConsensus.ts's
   // getCurrentExpertConsensusByNormalizedName).
-  const expertConsensusR2pPts = expertConsensusByNormalizedName.get(normalizedName)?.r2pPts ?? null;
+  const expertConsensusR2pPts = projectedPointsByPlayerId.get(playerId) ?? null;
 
   return {
     requestedPlayerId: playerId,

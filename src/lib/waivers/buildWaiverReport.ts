@@ -1,4 +1,3 @@
-import type { ExpertConsensusEntry } from "@/lib/fantasypros/weeklyConsensus";
 import { buildComparisonInput } from "@/lib/recommendation/buildInput";
 import { POINTS_PER_VOLUME_UNIT, REPLACEMENT_PER_GAME } from "@/lib/recommendation/config";
 import { scorePlayer } from "@/lib/recommendation/engine";
@@ -69,7 +68,7 @@ export async function buildWaiverCandidateDetails(
   format: ScoringFormat,
   positionDefenseTable: PositionDefenseTable,
   nflversePlayerWeekTable: NflversePlayerWeekTable,
-  expertConsensusByNormalizedName: Map<string, ExpertConsensusEntry> = new Map()
+  projectedPointsByPlayerId: Map<number, number> = new Map()
 ): Promise<WaiverCandidate[]> {
   const details = await Promise.all(
     ranks.map(async (rank): Promise<WaiverCandidate | null> => {
@@ -81,7 +80,7 @@ export async function buildWaiverCandidateDetails(
         undefined,
         undefined,
         undefined,
-        expertConsensusByNormalizedName
+        projectedPointsByPlayerId
       );
       const breakdown = scorePlayer(input, format);
       if (breakdown.playerId == null || !breakdown.position) return null;

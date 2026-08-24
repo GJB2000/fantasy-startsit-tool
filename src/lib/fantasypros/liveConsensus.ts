@@ -1,3 +1,10 @@
+// CURRENTLY UNUSED by the live tools. The engine's consensus signal moved to
+// SportsDataIO's own projections in item 161 (see sportsdata/liveProjections.ts),
+// which are keyed by PlayerID and need no name join. Kept, not deleted, as the
+// revert path if that source swap is ever reversed — the same "keep it, don't
+// delete it" treatment config.ts gives zeroed-out signals. The HISTORICAL
+// FantasyPros path (weeklyConsensus.ts) is still live: it's the only consensus
+// source with 2022-2024 coverage, so the nflverse-only pipeline still uses it.
 import type { SeasonContext } from "@/lib/sportsdata/timeframes";
 import type { ExtendedPosition } from "@/lib/sportsdata/types";
 import { fetchCurrentSnapshot } from "./client";

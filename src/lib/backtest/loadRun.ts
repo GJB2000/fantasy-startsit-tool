@@ -1,4 +1,3 @@
-import { getExpertConsensusByNormalizedNameWeek } from "@/lib/fantasypros/weeklyConsensus";
 import { getInjuryReports } from "@/lib/nflverse/injuries";
 import { getReserveStatusReports } from "@/lib/nflverse/rosters";
 import { getNgsPassing, getNgsReceiving, getNgsRushing } from "@/lib/nflverse/nextGenStats";
@@ -13,8 +12,9 @@ import { getFantasyDefenseByWeek, type TeamDefenseGameStat } from "@/lib/sportsd
 import { getAllDstPlayers } from "@/lib/sportsdata/defenseTeams";
 import { getAllPlayers } from "@/lib/sportsdata/players";
 import { getTeamGameStatsByWeek } from "@/lib/sportsdata/teamGameStats";
+import { getPlayerGameProjectionsByWeek } from "@/lib/sportsdata/projections";
 import { getPlayerGameStatsByWeek } from "@/lib/sportsdata/weeklyStats";
-import type { Player, PlayerGameStat, TeamGameStat } from "@/lib/sportsdata/types";
+import { getFantasyPoints, type Player, type PlayerGameStat, type TeamGameStat } from "@/lib/sportsdata/types";
 
 export interface BacktestRunData {
   season: number;
@@ -186,24 +186,42 @@ export async function loadBacktestRunData(
     buildSdioPlayerIdByNormalizedName(allPlayers)
   );
 
-  // Fetched alone, after the main batch — same "one heavy, many-request
-  // source at a time" discipline loadRunNflverseOnly.ts uses for this
-  // exact same source (see CLAUDE.md item 27/69): up to ~18 sequential
-  // per-week fetches plus a paginated commit-history lookup, not one big
-  // file, so it doesn't belong racing the Promise.all above for
-  // connections.
-  const expertConsensusByNormalizedNameWeek = await getExpertConsensusByNormalizedNameWeek(season, maxWeek).catch(
-    (err) => {
-      console.error("Failed to load FantasyPros weekly consensus:", err);
-      return new Map<string, Map<number, { rank: number; r2pPts: number | null }>>();
-    }
-  );
-  const sdioPlayerIdByNormalizedName = buildSdioPlayerIdByNormalizedName(allPlayers);
+  // SportsDataIO's own weekly projections are the consensus source here,
+  // replacing the FantasyPros scrape (see CLAUDE.md item 161). Keyed by the
+  // same PlayerID as everything else, so there is no name join and no
+  // coverage gap — 1224/1224 pool player-weeks vs FantasyPros' 1203.
+  //
+  // The nflverse-only pipeline still reads FantasyPros: SportsDataIO's
+  // projections 401 for 2022-2024 on this subscription, and that pipeline's
+  // whole job is the multi-season check. Each pipeline uses the only source
+  // it can actually get for its seasons — see loadRunNflverseOnly.ts.
   const expertConsensusByPlayerIdWeek = new Map<number, Map<number, { rank: number; r2pPts: number | null }>>();
-  for (const [normalizedName, byWeek] of expertConsensusByNormalizedNameWeek) {
-    const playerId = sdioPlayerIdByNormalizedName.get(normalizedName);
-    if (playerId == null) continue;
-    expertConsensusByPlayerIdWeek.set(playerId, byWeek);
+  for (let week = 1; week <= maxWeek; week += 1) {
+    let rows: PlayerGameStat[];
+    try {
+      rows = await getPlayerGameProjectionsByWeek(apiSeason, week);
+    } catch (err) {
+      console.error(`Failed to load SportsDataIO projections for week ${week}:`, err);
+      continue;
+    }
+    const byPosition = new Map<string, PlayerGameStat[]>();
+    for (const row of rows) {
+      const list = byPosition.get(row.Position);
+      if (list) list.push(row);
+      else byPosition.set(row.Position, [row]);
+    }
+    for (const list of byPosition.values()) {
+      // Rank within position by projected points — the `rank` field is what
+      // the standalone consensus baseline reads; the engine uses r2pPts.
+      list.sort((a, b) => getFantasyPoints(b, "ppr") - getFantasyPoints(a, "ppr"));
+      list.forEach((row, index) => {
+        const points = getFantasyPoints(row, "ppr");
+        if (points <= 0) return;
+        const byWeek = expertConsensusByPlayerIdWeek.get(row.PlayerID) ?? new Map();
+        byWeek.set(week, { rank: index + 1, r2pPts: points });
+        expertConsensusByPlayerIdWeek.set(row.PlayerID, byWeek);
+      });
+    }
   }
 
   return {

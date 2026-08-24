@@ -1,4 +1,4 @@
-import { getLiveExpertConsensusByNormalizedName } from "@/lib/fantasypros/liveConsensus";
+import { getLiveProjectedPointsByPlayerId } from "@/lib/sportsdata/liveProjections";
 import { getPriorSeasonPprAveragesByNormalizedName } from "@/lib/nflverse/priorSeasonAverage";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { type RemainingGame } from "@/lib/nflverse/schedules";
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
       positionDefenseTable,
       nflversePlayerWeekTable,
       firstAttempt,
-      expertConsensusByNormalizedName,
+      projectedPointsByPlayerId,
       priorSeasonPprAvgByNormalizedName,
     ] = await Promise.all([
       getPositionDefenseTableCached(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
       getRemainingOpponentsCached(context.lastCompletedSeason, context.lastCompletedWeek + 1).catch(
         () => new Map<string, RemainingGame[]>()
       ),
-      getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
+      getLiveProjectedPointsByPlayerId(context, format).catch(() => new Map<number, number>()),
       // Prior-season per-game average — fallback for a rostered player with
       // zero games this season (e.g. back from a long absence), used when
       // scoring drop candidates below (see buildInput.ts / scorePlayer).
@@ -118,7 +118,7 @@ export async function GET(request: Request) {
           format,
           positionDefenseTable,
           nflversePlayerWeekTable,
-          expertConsensusByNormalizedName
+          projectedPointsByPlayerId
         );
         return [position, details] as const;
       })
@@ -142,7 +142,7 @@ export async function GET(request: Request) {
       remainingOpponentsByTeam,
       teamWeatherByTeamWeek,
       impliedTotalsByTeamWeek,
-      expertConsensusByNormalizedName,
+      projectedPointsByPlayerId,
       priorSeasonPprAvgByNormalizedName
     );
 

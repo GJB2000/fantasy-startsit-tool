@@ -9448,7 +9448,108 @@ single-season numbers for those specific constants.
       after recording these numbers, same precedent as items 22/29/34/38/97/
       106/123/124 — this write-up is the only lasting artifact.
 
-### Open items (as of item 160 — pick up here)
+161. **Replaced the FantasyPros consensus with SportsDataIO's own weekly
+    projections as the engine's consensus signal — a real accuracy gain
+    (primary 2025 overall 60.66% -> 61.80%), full coverage, and a licensed
+    source instead of a community scrape. The biggest single source change
+    the engine has had.**
+    - **The make-or-break question from item 153 has an answer: they ARE
+      backtestable.** `PlayerGameProjectionStatsByWeek/2025REG/{week}` returns
+      200 on the LEGACY key the app already uses (671 rows for week 8), and
+      they are genuine PREGAME projections, not backfilled actuals —
+      confirmed by comparing 350 played players against their real scores:
+      ZERO matched, with big misses both ways (Bijan projected 24.0, scored
+      5.8; Jonathan Taylor projected 22.6, scored 37.4). A backfilled feed
+      would look far more accurate than that.
+    - **Projection accuracy, graded on identical rows** (same startable pool
+      as item 71, only rows where BOTH sources have a projection, n=1203).
+      The FantasyPros column reproduces item 71's documented figures exactly,
+      which is what validates the harness:
+
+      | | SportsDataIO | FantasyPros |
+      |---|---|---|
+      | ALL | MAE 6.22, RMSE 7.88, bias +0.64 | 6.35 / 8.05 / +0.91 |
+      | QB | 6.37 / 7.94 / +0.93 | 6.52 / 8.16 / +2.00 |
+      | RB | 6.41 / 8.14 / +0.46 | 6.47 / 8.24 / +0.55 |
+      | WR | 6.39 / 7.93 / +1.02 | 6.56 / 8.16 / +1.16 |
+      | TE | 5.33 / 7.15 / -0.06 | 5.52 / 7.32 / +0.00 |
+
+      SportsDataIO wins MAE and RMSE at every position, and bias everywhere
+      but TE (a tie).
+    - **But MAE is not what the engine is tuned on, so PICK accuracy was
+      tested before shipping** — and the first result was a trap worth
+      recording. Swapped the consensus source inside the real engine (the
+      map `sliceWeekData` already takes, so the source is the only variable)
+      and graded on the primary 2025 pipeline. Harness verified against
+      `/api/backtest/broad` first (60.66% overall, every position matching)
+      per items 43/44's rule:
+
+      | config | overall | QB | RB | WR | TE |
+      |---|---|---|---|---|---|
+      | FantasyPros (was shipped) | 60.66% | 66.7 | 59.6 | 60.3 | 57.4 |
+      | SportsDataIO @ FP's weights | **60.00%** | 67.7 | 57.6 | 61.3 | 54.5 |
+      | SportsDataIO @ peak weights | 62.79% | 70.6 | 63.0 | 61.3 | 57.4 |
+      | **SportsDataIO @ shipped (conservative)** | **61.80%** | 67.7 | 61.6 | 61.3 | 57.4 |
+
+      **At FantasyPros' own weights SportsDataIO looks WORSE** — those
+      weights were swept against FantasyPros' r2pPts distribution (items
+      70/145) and are simply the wrong optimum for a different source. Any
+      "just repoint it" swap would have measured a regression and concluded
+      the wrong thing.
+    - **Shipped the conservative weights, not the peaks** (`QB 0.8 / RB 0.9 /
+      WR 0.5 / TE 0.9`). The measured optima were RB 1.0 and QB 0.9, and RB
+      1.0 sits on the BOUNDARY — it would mean the engine contributes nothing
+      to an RB's score, the exact shape item 20 rejected, and a red flag
+      about RB rather than a result to bank. QB's 0.9 is a spike flanked by
+      lower values. The conservative set still beats FantasyPros (61.80% vs
+      60.66%) and wins or ties at every position, so the gain is not purely
+      peak-chasing. **User chose this over the peaks**, same
+      put-it-to-the-user precedent as items 30/33/41/44/53/70.
+    - **A real cross-check that the retune isn't overfitting**: the pooled
+      2022-2025 nflverse-only pipeline still runs on FantasyPros (below), and
+      under the NEW weights it reads 58.68% vs 58.64% before — essentially
+      unchanged, with every season healthy. The retuned weights therefore
+      hold up on a DIFFERENT consensus source across four seasons, which is
+      more than the single-season swap evidence on its own could show.
+    - **Deliberately a HYBRID across the two pipelines, not a clean swap.**
+      SportsDataIO's projections `401` for 2022/2023/2024 (verified), so the
+      nflverse-only multi-season pipeline still reads FantasyPros — it is the
+      only consensus source with history, and that pipeline's entire job is
+      the cross-season check. Each pipeline uses the only source it can
+      actually get for its seasons. The primary pipeline (which validates
+      what the live tools do) uses SportsDataIO, matching live.
+    - **Two operational wins beyond accuracy**: coverage is 1224/1224 pool
+      player-weeks vs FantasyPros' 1203 — keyed by the same PlayerID as
+      everything else, so there is NO name join and no missing players — and
+      it replaces a community scrape of a third party with a product the
+      project licenses, which is the whole of Open Item #33's FantasyPros
+      exposure.
+    - **Code**: new `sportsdata/projections.ts` (season-routed like every
+      other reader — legacy host for <=2025, the v3 `projectionsV3` package
+      for 2026+) and `sportsdata/liveProjections.ts`
+      (`getLiveProjectedPointsByPlayerId`, offseason-aware exactly the way
+      item 103's FantasyPros path was: the upcoming week's projection
+      in-season, the coming season's projection divided by projected games
+      between seasons, since there is no upcoming week then). `loadRun.ts`
+      builds the consensus map from projections instead of the scrape. The
+      live threading changed from a NAME-keyed map to a PlayerID-keyed one
+      across `buildInput.ts`/`scoreExtended.ts`/`buildWaiverReport.ts`/
+      `suggestDrop.ts`/`suggestLeagueTrade.ts`/`buildRankings.ts` and all six
+      live routes. `fantasypros/liveConsensus.ts` is now unused and carries a
+      header saying so — kept, not deleted, as the revert path.
+    - **User-facing copy updated**: the reasoning note said "FantasyPros'
+      weekly consensus projects roughly X points" and now reads "The
+      consensus projection has them at roughly X points". The Backtest
+      page's projection-accuracy mode still names FantasyPros deliberately —
+      that is a separate comparison series, still sourced from FantasyPros.
+    - **Verified end to end**: real backtest 61.80% (matching the
+      diagnostic's prediction exactly, QB 67.65 / RB 61.58 / WR 61.27 / TE
+      57.43), pooled 58.68%, all six live routes 200 with real consensus
+      values flowing (McCaffrey 19.5, Kamara 6.6 via the offseason path), all
+      eight pages 200, `tsc`/lint clean. All three diagnostic routes deleted
+      after recording, same precedent as every other one-off in this file.
+
+### Open items (as of item 161 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `1cc5b49`), working
 tree CLEAN.** The most recent session added the player stat pages (item 159 —
 `/stats` and `/stats/[playerId]`, with search and advanced metrics) and
@@ -10719,6 +10820,38 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       (see #35). Build it behind the same fail-open pattern the player pages
       use (item 159): if the feed is unavailable, the ranking falls back to
       what it does today rather than breaking.
+
+37. **Re-validate the SportsDataIO consensus swap across seasons once
+    2022-2025 projections are purchasable — the one real weakness in item
+    161.** The swap is shipped on **single-season evidence** for the engine's
+    single biggest lever (QB leans 80% on it). Verified live that
+    `PlayerGameProjectionStatsByWeek` `401`s for 2022REG, 2023REG and
+    2024REG on the current subscription and returns 200 only for 2025, so
+    cross-season validation is impossible today. Items 24-30 are this
+    project's long record of single-season tuning being misleading, so this
+    is a genuine open risk, not a formality.
+    - **What to do when history is available**: re-run the source swap and
+      the per-position weight sweep against the pooled multi-season sample
+      the way items 145/146 did, and check whether the conservative weights
+      (`QB 0.8 / RB 0.9 / WR 0.5 / TE 0.9`) still hold. Specifically worth
+      re-checking: whether RB really wants a weight near 1.0 — its 2025
+      optimum sat on the boundary, which would mean the engine adds nothing
+      to an RB's score, and that is either a real finding about RB or a
+      single-season artifact.
+    - **This is a much stronger case for buying historical access than YPRR
+      was** (item 160, where the answer was "don't buy"): here the
+      single-season evidence is favorable and the purchase would be
+      confirming something promising rather than re-checking a rejection.
+      Fold into the Open Item #35 pricing conversation.
+    - **Second-order cost already accepted**: the pooled 2022-2025 pipeline
+      still runs on FantasyPros, so the app's multi-season check no longer
+      validates the consensus source the live tools actually use. Buying
+      history would close that gap too, letting both pipelines run the same
+      source.
+    - **Revert path if it goes wrong**: `fantasypros/liveConsensus.ts` is
+      kept and marked unused, the historical FantasyPros reader is still
+      live for the nflverse pipeline, and the old weights are recorded in
+      config.ts's comment (`RB 0.5 / TE 0.7`).
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that

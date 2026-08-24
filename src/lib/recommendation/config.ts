@@ -780,7 +780,8 @@ export const ENSEMBLE_VOLUME_BLEND_RATIO: Record<ScoringFormat, Record<SkillPosi
 };
 
 /**
- * How much weight FantasyPros' weekly expert-consensus point estimate
+ * How much weight the external consensus point estimate (SportsDataIO's
+ * own weekly projections since item 161; FantasyPros' scrape before that)
  * (`r2p_pts`, dynastyprocess/data — see fantasypros/weeklyConsensus.ts)
  * carries against the running score, blended in last, after every other
  * modifier above. Unlike every conversion-factor-based signal in this
@@ -834,12 +835,23 @@ export const ENSEMBLE_VOLUME_BLEND_RATIO: Record<ScoringFormat, Record<SkillPosi
  * — a deliberate, user-confirmed shift toward the market signal for the
  * position where it's most predictive. See CLAUDE.md's per-position
  * consensus-weight sweep.
+ *
+ * RB 0.5 -> 0.9 and TE 0.7 -> 0.9 came later, when the consensus SOURCE
+ * changed from the FantasyPros scrape to SportsDataIO's own weekly
+ * projections (item 161). The old values were swept against FantasyPros'
+ * r2pPts distribution and are simply the wrong optimum for a different
+ * source — at them, SportsDataIO scores WORSE than FantasyPros (60.00% vs
+ * 60.66%); re-swept, it wins (61.80%). These are plateau-picked, not peak:
+ * the measured optima were RB 1.0 and QB 0.9, and RB 1.0 sits on the
+ * boundary, which would mean the engine contributes nothing to an RB's
+ * score — the shape item 20 rejected. Single-season evidence; see Open
+ * Item #37.
  */
 export const EXPERT_CONSENSUS_BLEND_WEIGHT: Record<SkillPosition, number> = {
   QB: 0.8,
-  RB: 0.5,
+  RB: 0.9,
   WR: 0.5,
-  TE: 0.7,
+  TE: 0.9,
 };
 
 /**

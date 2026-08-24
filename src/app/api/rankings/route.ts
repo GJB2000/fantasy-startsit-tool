@@ -1,4 +1,4 @@
-import { getLiveExpertConsensusByNormalizedName } from "@/lib/fantasypros/liveConsensus";
+import { getLiveProjectedPointsByPlayerId } from "@/lib/sportsdata/liveProjections";
 import { type RemainingGame } from "@/lib/nflverse/schedules";
 import {
   getGameWeatherCached,
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
   try {
     const context = await getSeasonContext();
 
-    const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt, expertConsensusByNormalizedName] =
+    const [positionDefenseTable, nflversePlayerWeekTable, firstAttempt, projectedPointsByPlayerId] =
       await Promise.all([
         getPositionDefenseTableCached(context.lastCompletedApiSeason, context.lastCompletedWeek, format),
         getLiveNflversePlayerWeekTable(context.lastCompletedSeason, { redZoneTimeoutMs: COLD_FETCH_TIMEOUT_MS }),
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
         // simply absent, so his engine snapshot got NO consensus support and
         // his injury-tanked recent games dominated his (mislabeled "full")
         // score, ranking him far below his real value. See buildRankings.ts.
-        getLiveExpertConsensusByNormalizedName(context).catch(() => new Map()),
+        getLiveProjectedPointsByPlayerId(context, format).catch(() => new Map<number, number>()),
       ]);
 
     // Same season-rollforward pattern as every other live route.
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
           remainingOpponentsByTeam,
           teamWeatherByTeamWeek,
           impliedTotalsByTeamWeek,
-          expertConsensusByNormalizedName
+          projectedPointsByPlayerId
         )
       : await getLegitRankingsForPosition(
           positionParam as ExtendedPosition,
@@ -93,7 +93,7 @@ export async function GET(request: Request) {
           remainingOpponentsByTeam,
           teamWeatherByTeamWeek,
           impliedTotalsByTeamWeek,
-          expertConsensusByNormalizedName
+          projectedPointsByPlayerId
         );
 
     return Response.json({

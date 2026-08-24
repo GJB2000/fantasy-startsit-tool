@@ -39,6 +39,10 @@ const API_BASES = {
     url: "https://api.sportsdata.io/v3/nfl/stats/json",
     keyEnv: "SPORTSDATA_API_KEY",
   },
+  projectionsV3: {
+    url: "https://api.sportsdata.io/v3/nfl/projections/json",
+    keyEnv: "SPORTSDATA_API_KEY",
+  },
   /**
    * NFL Advanced Metrics — a separate subscription with its own key, and
    * absent from SportsDataIO's public catalogue. Unlike the other v3 hosts
@@ -61,6 +65,7 @@ export const REVALIDATE = {
   byes: 24 * 60 * 60,
   teamStats: 24 * 60 * 60,
   advancedMetrics: 24 * 60 * 60,
+  projections: 6 * 60 * 60,
 } as const;
 
 export class SportsDataError extends Error {

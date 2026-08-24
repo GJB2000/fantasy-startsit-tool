@@ -326,14 +326,14 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
     );
   }
 
-  // Blends the running score toward FantasyPros' own weekly consensus
+  // Blends the running score toward the external consensus projection
   // point estimate — unlike every modifier above, this signal is already
   // points-denominated (no POINTS_PER_X conversion factor needed) and is
   // deliberately position-agnostic (universal across QB/RB/WR/TE), since
   // the standalone pickByExpertConsensus baseline validated strong at
   // every position (57-60% pooled pick accuracy, 2022-2025) rather than
   // needing the usual per-position scoping — see CLAUDE.md item 69/70.
-  // Blends the whole running score toward FantasyPros' consensus estimate
+  // Blends the whole running score toward the consensus projection
   // at a per-position weight (EXPERT_CONSENSUS_BLEND_WEIGHT). Populated in
   // both backtest AND live mode (the live current-snapshot path was wired
   // in later — see CLAUDE.md's live-consensus item), so this has a real
@@ -361,7 +361,7 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
       (1 - expertConsensusWeight) * runningScore + expertConsensusWeight * input.expertConsensusR2pPts;
     expertConsensusModifier = blendedWithExpertConsensus - runningScore;
     notes.push(
-      `FantasyPros' weekly consensus projects roughly ${input.expertConsensusR2pPts.toFixed(1)} points this week — blended in at this position's typical rate.`
+      `The consensus projection has them at roughly ${input.expertConsensusR2pPts.toFixed(1)} points this week — blended in at this position's typical rate.`
     );
   }
 
