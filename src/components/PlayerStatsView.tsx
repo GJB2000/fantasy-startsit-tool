@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useScoringFormat } from "@/lib/useScoringFormat";
+import { ADVANCED_GAME_COLUMNS, formatMetric } from "@/lib/stats/advanced";
 import { STAT_COLUMNS, formatStat } from "@/lib/stats/columns";
 import { isStatsPosition, type PlayerStatsDetail } from "@/lib/stats/types";
 import { SCORING_FORMAT_OPTIONS } from "./ScoringFormatToggle";
@@ -31,6 +32,7 @@ export function PlayerStatsView({ playerId }: { playerId: number }) {
   const [detail, setDetail] = useState<PlayerStatsDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [logView, setLogView] = useState<"standard" | "advanced">("standard");
 
   useEffect(() => {
     let cancelled = false;
@@ -62,9 +64,12 @@ export function PlayerStatsView({ playerId }: { playerId: number }) {
       </div>
     );
 
-  const { player, totals, gameLog, positionRank, positionCount } = detail;
+  const { player, totals, gameLog, advanced, positionRank, positionCount } = detail;
   const statColumns = isStatsPosition(player.position) ? STAT_COLUMNS[player.position] : [];
   const tint = POSITION_TINT[player.position] ?? "var(--accent)";
+  const advancedColumns =
+    advanced && isStatsPosition(player.position) ? ADVANCED_GAME_COLUMNS[player.position] : [];
+  const showAdvancedLog = logView === "advanced" && advancedColumns.length > 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -116,10 +121,47 @@ export function PlayerStatsView({ playerId }: { playerId: number }) {
         </div>
       </div>
 
+      {advanced && (
+        <div className="glass-card rounded-[14px] p-5 sm:p-6">
+          <h3 className="font-engraved text-[10px] uppercase tracking-[0.12em] text-foreground/55">
+            Advanced metrics
+          </h3>
+          <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-5">
+            {advanced.summary.map((metric) => (
+              <Stat
+                key={metric.label}
+                label={metric.label}
+                value={formatMetric(metric.value, metric.format)}
+              />
+            ))}
+          </div>
+          {advanced.summary.some((metric) => metric.isAverage) && (
+            <p className="mt-4 border-t border-foreground/10 pt-3 text-[12px] text-foreground/45">
+              Share metrics are per-game averages — the team totals they divide by aren&rsquo;t
+              exposed, so they can&rsquo;t be summed across the season the way the counting stats
+              are.
+            </p>
+          )}
+        </div>
+      )}
+
       <div>
-        <h3 className="mb-3 font-engraved text-[10px] uppercase tracking-[0.12em] text-foreground/55">
-          {detail.season} game log
-        </h3>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-engraved text-[10px] uppercase tracking-[0.12em] text-foreground/55">
+            {detail.season} game log
+          </h3>
+          {advancedColumns.length > 0 && (
+            <SegmentedControl
+              options={[
+                { value: "standard" as const, label: "Standard" },
+                { value: "advanced" as const, label: "Advanced" },
+              ]}
+              value={logView}
+              onChange={setLogView}
+              tone="secondary"
+            />
+          )}
+        </div>
         {gameLog.length === 0 ? (
           <p className="text-[13px] text-foreground/55">No games recorded this season.</p>
         ) : (
@@ -138,14 +180,23 @@ export function PlayerStatsView({ playerId }: { playerId: number }) {
                   <th className="px-3 py-2.5 text-right font-engraved text-[10px] uppercase tracking-[0.1em] text-foreground/55">
                     PTS
                   </th>
-                  {statColumns.map((col) => (
-                    <th
-                      key={col.key}
-                      className="px-3 py-2.5 text-right font-engraved text-[10px] uppercase tracking-[0.1em] text-foreground/55"
-                    >
-                      {col.label}
-                    </th>
-                  ))}
+                  {showAdvancedLog
+                    ? advancedColumns.map((col) => (
+                        <th
+                          key={col.key}
+                          className="px-3 py-2.5 text-right font-engraved text-[10px] uppercase tracking-[0.1em] text-foreground/55"
+                        >
+                          {col.label}
+                        </th>
+                      ))
+                    : statColumns.map((col) => (
+                        <th
+                          key={col.key}
+                          className="px-3 py-2.5 text-right font-engraved text-[10px] uppercase tracking-[0.1em] text-foreground/55"
+                        >
+                          {col.label}
+                        </th>
+                      ))}
                 </tr>
               </thead>
               <tbody>
@@ -158,11 +209,23 @@ export function PlayerStatsView({ playerId }: { playerId: number }) {
                     <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums text-foreground">
                       {game.played ? formatStat(game.points, 1) : "DNP"}
                     </td>
-                    {statColumns.map((col) => (
-                      <td key={col.key} className="px-3 py-2 text-right font-mono tabular-nums text-foreground/75">
-                        {game.played ? formatStat(game[col.key]) : "—"}
-                      </td>
-                    ))}
+                    {showAdvancedLog
+                      ? advancedColumns.map((col) => {
+                          const row = advanced?.byWeek[game.week];
+                          return (
+                            <td
+                              key={col.key}
+                              className="px-3 py-2 text-right font-mono tabular-nums text-foreground/75"
+                            >
+                              {game.played && row ? formatMetric(row[col.key] as number | undefined, col.format) : "—"}
+                            </td>
+                          );
+                        })
+                      : statColumns.map((col) => (
+                          <td key={col.key} className="px-3 py-2 text-right font-mono tabular-nums text-foreground/75">
+                            {game.played ? formatStat(game[col.key]) : "—"}
+                          </td>
+                        ))}
                   </tr>
                 ))}
               </tbody>

@@ -1,8 +1,10 @@
 import "server-only";
+import { getAdvancedPlayerGames, type AdvancedPlayerGame } from "../sportsdata/advancedMetrics";
 import { getAnyExtendedPlayerById } from "../sportsdata/players";
 import { getPlayerSeasonStat } from "../sportsdata/seasonStats";
 import { getPlayerGameStatsByWeek } from "../sportsdata/weeklyStats";
 import { getFantasyPoints, type PlayerGameStat, type ScoringFormat } from "../sportsdata/types";
+import { buildAdvancedSummary } from "./advanced";
 import { getPositionRank, toStatTotals } from "./leaderboard";
 import { isStatsPosition, type GameLogRow, type PlayerStatsDetail, type StatTotals } from "./types";
 
@@ -88,9 +90,13 @@ export async function getPlayerStatsDetail(
   const player = await getAnyExtendedPlayerById(playerId);
   if (!player) return null;
 
-  const [seasonRow, gameLog] = await Promise.all([
+  const [seasonRow, gameLog, advancedRows] = await Promise.all([
     getPlayerSeasonStat(season, playerId),
     getGameLog(apiSeason, lastWeek, playerId, format),
+    // Optional by design: this rides on a separate advanced-metrics
+    // subscription, so a missing key or a lapsed plan drops the section
+    // rather than breaking the page.
+    getAdvancedPlayerGames(playerId, season).catch(() => [] as AdvancedPlayerGame[]),
   ]);
 
   // Prefer the season endpoint's own totals; fall back to summing the game log
@@ -104,6 +110,15 @@ export async function getPlayerStatsDetail(
   const { rank, count } = isStatsPosition(position)
     ? await getPositionRank(season, playerId, position, format)
     : { rank: null, count: 0 };
+
+  const advancedSummary = isStatsPosition(position) ? buildAdvancedSummary(position, advancedRows) : [];
+  const advanced =
+    advancedRows.length > 0 && advancedSummary.length > 0
+      ? {
+          summary: advancedSummary,
+          byWeek: Object.fromEntries(advancedRows.map((row) => [row.Week, row])),
+        }
+      : null;
 
   return {
     player: {
@@ -125,6 +140,7 @@ export async function getPlayerStatsDetail(
       pointsPerGame: games > 0 ? points / games : 0,
     },
     gameLog,
+    advanced,
     positionRank: rank,
     positionCount: count || null,
   };

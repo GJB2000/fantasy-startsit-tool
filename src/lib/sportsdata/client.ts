@@ -39,6 +39,18 @@ const API_BASES = {
     url: "https://api.sportsdata.io/v3/nfl/stats/json",
     keyEnv: "SPORTSDATA_API_KEY",
   },
+  /**
+   * NFL Advanced Metrics — a separate subscription with its own key, and
+   * absent from SportsDataIO's public catalogue. Unlike the other v3 hosts
+   * this one DOES serve 2025 through the per-player AdvancedPlayerInfo
+   * endpoint, even though its season-scoped endpoints 401 for 2025 (see
+   * CLAUDE.md item 155). Header auth is confirmed working here, so it needs
+   * no special-casing; item 155 had only ever tested `?key=`.
+   */
+  advancedV3: {
+    url: "https://api.sportsdata.io/v3/nfl/advanced-metrics/json",
+    keyEnv: "SPORTSDATA_ADVANCED_API_KEY",
+  },
 } as const;
 
 export const REVALIDATE = {
@@ -48,6 +60,7 @@ export const REVALIDATE = {
   weeklyStats: 24 * 60 * 60,
   byes: 24 * 60 * 60,
   teamStats: 24 * 60 * 60,
+  advancedMetrics: 24 * 60 * 60,
 } as const;
 
 export class SportsDataError extends Error {

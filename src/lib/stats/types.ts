@@ -1,4 +1,6 @@
+import type { AdvancedPlayerGame } from "../sportsdata/advancedMetrics";
 import type { ScoringFormat } from "../sportsdata/types";
+import type { AdvancedMetric } from "./advanced";
 
 /**
  * Positions the stat pages cover. D/ST is excluded: SportsDataIO models a
@@ -71,6 +73,16 @@ export interface PlayerStatsDetail {
   format: ScoringFormat;
   totals: StatTotals & { games: number; started: number; points: number; pointsPerGame: number };
   gameLog: GameLogRow[];
+  /**
+   * Advanced usage/efficiency, when available. Null when the player has no
+   * advanced rows, or when the separate advanced-metrics subscription this
+   * rides on is unavailable — the page renders without the section rather
+   * than failing (see Open Item #35).
+   */
+  advanced: {
+    summary: AdvancedMetric[];
+    byWeek: Record<number, AdvancedPlayerGame>;
+  } | null;
   /** Rank among players at the same position by total points, 1-based. */
   positionRank: number | null;
   positionCount: number | null;
