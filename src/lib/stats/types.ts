@@ -38,6 +38,10 @@ export interface StatTotals {
 }
 
 export interface LeaderboardRow extends StatTotals {
+  /** Per-game share averages (0-100), null when nflverse has no rows for the player. */
+  snapShare: number | null;
+  targetShare: number | null;
+  airYardsShare: number | null;
   playerId: number;
   name: string;
   team: string | null;

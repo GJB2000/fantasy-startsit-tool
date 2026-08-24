@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useScoringFormat } from "@/lib/useScoringFormat";
-import { STAT_COLUMNS, formatStat } from "@/lib/stats/columns";
+import { advancedColumns, formatColumn, standardColumns } from "@/lib/stats/columns";
 import type { LeaderboardRow, StatsPosition } from "@/lib/stats/types";
 import { SCORING_FORMAT_OPTIONS } from "./ScoringFormatToggle";
 import { SegmentedControl } from "./SegmentedControl";
@@ -16,28 +16,10 @@ const POSITIONS: { value: StatsPosition; label: string }[] = [
   { value: "K", label: "K" },
 ];
 
-type NumericKey = {
-  [K in keyof LeaderboardRow]: LeaderboardRow[K] extends number ? K : never;
-}[keyof LeaderboardRow];
-
-interface Column {
-  key: NumericKey;
-  label: string;
-  /** One decimal place for rates/averages; counting stats stay whole. */
-  decimals?: number;
-}
-
-const COLUMNS: Record<StatsPosition, Column[]> = Object.fromEntries(
-  (Object.keys(STAT_COLUMNS) as StatsPosition[]).map((position) => [
-    position,
-    [
-      { key: "points", label: "PTS", decimals: 1 },
-      { key: "pointsPerGame", label: "PPG", decimals: 1 },
-      { key: "games", label: "G" },
-      ...STAT_COLUMNS[position],
-    ] as Column[],
-  ])
-) as Record<StatsPosition, Column[]>;
+const VIEWS = [
+  { value: "standard" as const, label: "Standard" },
+  { value: "advanced" as const, label: "Advanced" },
+];
 
 /**
  * Lowercase and drop everything that isn't a letter or digit, so "jamarr"
@@ -50,12 +32,13 @@ function normalize(value: string) {
 export function StatsBrowser() {
   const [scoringFormat, setScoringFormat] = useScoringFormat();
   const [position, setPosition] = useState<StatsPosition>("QB");
+  const [view, setView] = useState<"standard" | "advanced">("standard");
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [season, setSeason] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [sortKey, setSortKey] = useState<NumericKey>("points");
+  const [sortId, setSortId] = useState("points");
   const [ascending, setAscending] = useState(false);
 
   useEffect(() => {
@@ -82,19 +65,35 @@ export function StatsBrowser() {
     };
   }, [position, scoringFormat]);
 
-  const columns = COLUMNS[position];
+  const columns = useMemo(
+    () => (view === "advanced" ? advancedColumns(position) : standardColumns(position)),
+    [view, position]
+  );
+
+  const sortColumn = columns.find((col) => col.id === sortId) ?? columns[0];
 
   /**
    * Rank is assigned BEFORE filtering, so a searched player keeps their real
    * standing in the current sort — a filtered table that renumbered from 1
    * would say the guy you looked up is the best at his position.
+   *
+   * Rows with no value for the sorted column always sort last, in both
+   * directions: "—" is missing data, not a low score, so floating it to the
+   * top on an ascending sort would be a lie.
    */
   const ranked = useMemo(() => {
     if (!rows) return null;
     return [...rows]
-      .sort((a, b) => (ascending ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]))
+      .sort((a, b) => {
+        const left = sortColumn.value(a);
+        const right = sortColumn.value(b);
+        if (left == null && right == null) return 0;
+        if (left == null) return 1;
+        if (right == null) return -1;
+        return ascending ? left - right : right - left;
+      })
       .map((row, index) => ({ row, rank: index + 1 }));
-  }, [rows, sortKey, ascending]);
+  }, [rows, sortColumn, ascending]);
 
   const visible = useMemo(() => {
     if (!ranked) return null;
@@ -105,11 +104,11 @@ export function StatsBrowser() {
     );
   }, [ranked, query]);
 
-  function toggleSort(key: NumericKey) {
-    if (key === sortKey) {
+  function toggleSort(id: string) {
+    if (id === sortId) {
       setAscending((prev) => !prev);
     } else {
-      setSortKey(key);
+      setSortId(id);
       setAscending(false);
     }
   }
@@ -118,6 +117,7 @@ export function StatsBrowser() {
     <div className="mx-auto w-full max-w-6xl">
       <div className="mb-6 flex flex-wrap items-end gap-x-8 gap-y-4">
         <SegmentedControl label="Position" options={POSITIONS} value={position} onChange={setPosition} />
+        <SegmentedControl label="Columns" options={VIEWS} value={view} onChange={setView} tone="secondary" />
         <SegmentedControl
           label="Scoring"
           options={SCORING_FORMAT_OPTIONS}
@@ -203,58 +203,71 @@ export function StatsBrowser() {
       )}
 
       {!loading && !error && visible && visible.length > 0 && (
-        <div className="glass-card overflow-x-auto rounded-[12px]">
-          <table className="w-full min-w-[720px] border-collapse text-[13px]">
-            <thead>
-              <tr className="border-b border-foreground/12">
-                <th className="sticky left-0 z-10 bg-surface px-3 py-2.5 text-left font-engraved text-[10px] uppercase tracking-[0.1em] text-foreground/55">
-                  Player
-                </th>
-                {columns.map((col) => (
-                  <th key={col.key} className="px-3 py-2.5 text-right">
-                    <button
-                      type="button"
-                      onClick={() => toggleSort(col.key)}
-                      className={`font-engraved text-[10px] uppercase tracking-[0.1em] transition-colors hover:text-foreground ${
-                        sortKey === col.key ? "text-accent" : "text-foreground/55"
-                      }`}
-                    >
-                      {col.label}
-                      {sortKey === col.key && <span aria-hidden>{ascending ? " ↑" : " ↓"}</span>}
-                    </button>
+        <>
+          <div className="glass-card overflow-x-auto rounded-[12px]">
+            <table className="w-full min-w-[720px] border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-foreground/12">
+                  <th className="sticky left-0 z-10 bg-surface px-3 py-2.5 text-left font-engraved text-[10px] uppercase tracking-[0.1em] text-foreground/55">
+                    Player
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map(({ row, rank }) => (
-                <tr key={row.playerId} className="border-b border-foreground/8 last:border-b-0 hover:bg-foreground/[0.04]">
-                  <td className="sticky left-0 z-10 bg-surface px-3 py-2">
-                    <Link href={`/stats/${row.playerId}`} className="flex items-center gap-2.5 hover:text-accent">
-                      <span className="w-6 shrink-0 text-right font-mono text-[11px] text-foreground/45">
-                        {rank}
-                      </span>
-                      <span className="whitespace-nowrap font-medium text-foreground">{row.name}</span>
-                      <span className="whitespace-nowrap font-mono text-[11px] text-foreground/45">
-                        {row.team ?? "FA"}
-                      </span>
-                    </Link>
-                  </td>
                   {columns.map((col) => (
-                    <td
-                      key={col.key}
-                      className={`px-3 py-2 text-right font-mono tabular-nums ${
-                        sortKey === col.key ? "text-foreground" : "text-foreground/75"
-                      }`}
-                    >
-                      {formatStat(row[col.key], col.decimals)}
-                    </td>
+                    <th key={col.id} className="px-3 py-2.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(col.id)}
+                        className={`whitespace-nowrap font-engraved text-[10px] uppercase tracking-[0.1em] transition-colors hover:text-foreground ${
+                          sortColumn.id === col.id ? "text-accent" : "text-foreground/55"
+                        }`}
+                      >
+                        {col.label}
+                        {sortColumn.id === col.id && <span aria-hidden>{ascending ? " ↑" : " ↓"}</span>}
+                      </button>
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {visible.map(({ row, rank }) => (
+                  <tr
+                    key={row.playerId}
+                    className="border-b border-foreground/8 last:border-b-0 hover:bg-foreground/[0.04]"
+                  >
+                    <td className="sticky left-0 z-10 bg-surface px-3 py-2">
+                      <Link href={`/stats/${row.playerId}`} className="flex items-center gap-2.5 hover:text-accent">
+                        <span className="w-6 shrink-0 text-right font-mono text-[11px] text-foreground/45">
+                          {rank}
+                        </span>
+                        <span className="whitespace-nowrap font-medium text-foreground">{row.name}</span>
+                        <span className="whitespace-nowrap font-mono text-[11px] text-foreground/45">
+                          {row.team ?? "FA"}
+                        </span>
+                      </Link>
+                    </td>
+                    {columns.map((col) => (
+                      <td
+                        key={col.id}
+                        className={`px-3 py-2 text-right font-mono tabular-nums ${
+                          sortColumn.id === col.id ? "text-foreground" : "text-foreground/75"
+                        }`}
+                      >
+                        {formatColumn(col.value(row), col)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {view === "advanced" && position !== "K" && (
+            <p className="mt-3 text-[12px] text-foreground/45">
+              Snap, target and air-yards share are per-game averages from nflverse, joined by name — a
+              player whose name doesn&rsquo;t match shows “—” rather than a guess. The rate columns are
+              derived from the season totals.
+            </p>
+          )}
+        </>
       )}
     </div>
   );

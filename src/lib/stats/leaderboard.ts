@@ -2,6 +2,7 @@ import "server-only";
 import { getAllPlayers } from "../sportsdata/players";
 import { getPlayerSeasonStats } from "../sportsdata/seasonStats";
 import { getFantasyPoints, type PlayerGameStat, type PlayerSeasonStat, type ScoringFormat } from "../sportsdata/types";
+import { getLeaderboardAdvanced } from "./leaderboardAdvanced";
 import type { LeaderboardRow, StatTotals, StatsPosition } from "./types";
 
 /**
@@ -46,7 +47,13 @@ export async function getStatsLeaderboard(
   position: StatsPosition,
   format: ScoringFormat
 ): Promise<LeaderboardRow[]> {
-  const [seasonStats, players] = await Promise.all([getPlayerSeasonStats(season), getAllPlayers()]);
+  const [seasonStats, players, advanced] = await Promise.all([
+    getPlayerSeasonStats(season),
+    getAllPlayers(),
+    // Supplementary: a nflverse hiccup should cost the advanced columns,
+    // not the whole table.
+    getLeaderboardAdvanced(season).catch(() => new Map()),
+  ]);
   const byId = new Map(players.map((p) => [p.PlayerID, p]));
 
   return seasonStats
@@ -54,8 +61,12 @@ export async function getStatsLeaderboard(
     .map((row) => {
       const player = byId.get(row.PlayerID);
       const points = getFantasyPoints(row, format);
+      const adv = advanced.get(row.PlayerID);
       return {
         ...toStatTotals(row),
+        snapShare: adv?.snapShare ?? null,
+        targetShare: adv?.targetShare ?? null,
+        airYardsShare: adv?.airYardsShare ?? null,
         playerId: row.PlayerID,
         name: player ? `${player.FirstName} ${player.LastName}`.trim() : `Player ${row.PlayerID}`,
         team: row.Team ?? player?.Team ?? null,
