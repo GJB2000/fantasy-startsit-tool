@@ -9243,7 +9243,116 @@ single-season numbers for those specific constants.
       starting with `_` is a PRIVATE folder and is excluded from routing, so
       a temp route at `api/__v3check` 404s silently.
 
-### Open items (as of item 158 — pick up here)
+159. **Built the player stat pages — a sortable league-wide browser
+    (`/stats`) plus per-player season/game-log pages (`/stats/[playerId]`) —
+    then added search and advanced metrics. Presentation and data-surfacing
+    only; no engine, scoring or backtest change anywhere in this item.**
+    - **Most of the data was already being paid for and thrown away.**
+      `PlayerGameStatsByWeek` returns **81 fields per row and the app read
+      18**. Touchdowns, completions, interceptions, passer rating, longs,
+      fumbles and the entire kicker line (FGM/FGA, 50+, XPM/XPA) were all
+      arriving and being discarded. Because `sportsDataFetch` casts the raw
+      JSON rather than allowlisting fields, declaring them on
+      `PlayerGameStat`/`PlayerSeasonStat` was the whole data change — no new
+      call, no new source. They're declared OPTIONAL because rows built from
+      nflverse (`gameLog.ts`) and the synthetic D/ST rows in `runBacktest.ts`
+      have no equivalent; making them required would only force fake zeros
+      into those constructors.
+    - **Season totals are one cheap call; game logs are not.** A leaderboard
+      comes from a single `PlayerSeasonStats` call (which carries team and
+      position too — the only join is onto the player list for full display
+      names, since season rows abbreviate them, "C.McCaffrey"). A game log
+      has to be assembled from per-week box scores: **SportsDataIO has no
+      per-player season endpoint on this plan** — `PlayerGameStatsBySeason/
+      {season}/{id}/all` and `PlayerSeasonStatsByPlayerID/{season}/{id}` both
+      `404`. Weeks are therefore fetched in bounded batches of 4, not all 18
+      at once, which is the memory-pressure shape item 27 fixed.
+    - **Points lead both tables rather than trailing them.** With 8-9 stat
+      columns these always scroll horizontally, and the first build had
+      PTS/PPG last — which put the numbers people actually came for off the
+      right edge. Rank is likewise assigned BEFORE the search filter runs: a
+      filtered table that renumbers from 1 would tell you whoever you looked
+      up is the best at his position.
+    - **Search normalizes punctuation and case on both sides**, so "jamarr"
+      finds Ja'Marr Chase and "aj brown" finds A.J. Brown; team codes match
+      too. A miss offers the other positions rather than dead-ending, since
+      the table only ever holds one position and searching a RB with the QB
+      tab open legitimately finds nothing.
+    - **Advanced metrics come from TWO different sources, deliberately, and
+      the reason is item 155's season entitlement — see Open Item #35.**
+      - **Player detail pages use SportsDataIO's NFL Advanced Metrics**
+        (`AdvancedPlayerInfo/{PlayerId}`, `src/lib/sportsdata/
+        advancedMetrics.ts`). Better than nflverse on every axis but
+        longevity: keyed by the same PlayerID everything else uses so there
+        is NO name join, one HTTP call per player, and it carries the
+        red-zone numbers that cost a ~98MB play-by-play parse through
+        nflverse. Surfaces snap share, target/opportunity share, routes run,
+        red-zone usage, evaded tackles, yards created, deep-ball and
+        contested-target volume, hurries.
+      - **The leaderboard CANNOT use it** — every bulk advanced path `401`s
+        for 2025 (Open Item #35), so a 252-row WR table would be 252 calls
+        per page load. It uses nflverse's `snap_counts` + `stats_player_week`
+        instead (two already-cached CSVs, no play-by-play), plus efficiency
+        rates derived from the season totals already on the row.
+      - **The two sources agreeing is a real cross-check on both**: Ja'Marr
+        Chase reads 32.1% target share from nflverse on the leaderboard and
+        32.1% from SportsDataIO on his own page; snap shares land within
+        about a point (Chase 94.4 vs 95.5, Stafford 98.5 vs 99.2 — different
+        snap definitions, same story). Stafford's derived 65.0% completion
+        rate is exactly 388/597 from the standard table.
+    - **Rates are derived from season sums, never averaged from per-game
+      percentages, wherever the components are visible** — comp %, catch
+      rate, yards per attempt/target/touch. That is the shape of the
+      miscalibration bug in item 66. Only the team-share metrics (snap,
+      target, opportunity, hog) are per-game means, because the team totals
+      they divide against aren't in the rows; the UI says so rather than
+      letting them read as season figures.
+    - **Advanced is strictly optional and fails open.** It rides on the
+      separate `SPORTSDATA_ADVANCED_API_KEY` evaluation subscription, so a
+      throw, a missing key or a player the feed doesn't cover all drop the
+      section AND its toggle, leaving the page exactly as it was. Verified
+      against a real uncovered skill player (Myles Price, 16 games, no
+      advanced rows), not just reasoned about. Kickers are excluded — the
+      feed carries nothing meaningful for them. The defensive/coverage
+      fields on these rows are deliberately skipped: they're for corner
+      matchup analysis and read as garbage on a skill player
+      (`PrimaryCorner` comes back as e.g. -9454).
+    - **Missing values sort LAST in both directions.** "—" is missing data,
+      not a low score; floating it to the top of an ascending sort would
+      present unmatched players as the league's worst.
+    - **Known gap, deliberately NOT fixed here**: the leaderboard's nflverse
+      join is by normalized name, and `normalizePlayerName` strips
+      punctuation and Jr./III suffixes but NOT diacritics, and doesn't
+      resolve nicknames — so a handful of real players show "—" (Audric
+      Estimé — accent; Kenny Gainwell — nflverse has "Kenneth"; Bam Knight —
+      nflverse has "Zonovan"). About 4% of a WR list, the rest of the nulls
+      being deep bench with no offensive snaps. Adding diacritic-stripping is
+      close to a one-line change and can only turn misses into matches, but
+      that function is SHARED WITH THE SCORING ENGINE — widening it changes
+      which players pick up nflverse signals (snap share, drop rate) that
+      feed `finalScore`, and would move backtested numbers. It needs its own
+      change with its own backtest verification, not a side effect of a stat
+      page.
+    - D/ST is excluded throughout: SportsDataIO models a team defence as a
+      team stat with no player row, so it has no game log of the shape these
+      pages assume — the same reason Legit Rankings excludes it (item 78).
+    - Verified against real 2025 data across all five positions, all three
+      scoring formats, a kicker, a player with DNP weeks, a player with no
+      games at all, and desktop/mobile with no page-level horizontal
+      overflow. Commits: `4293da5` (pages), `aac6378` (search), `7e025f6`
+      (advanced on detail), `1cc5b49` (advanced on leaderboard).
+
+### Open items (as of item 159 — pick up here)
+**Everything is committed and pushed to `main` (HEAD `1cc5b49`), working
+tree CLEAN.** The most recent session added the player stat pages (item 159 —
+`/stats` and `/stats/[playerId]`, with search and advanced metrics) and
+recorded the bulk-advanced-metrics entitlement finding in Open Item #35. It
+touched no engine, scoring or backtest code, so every accuracy number in this
+document is unchanged.
+
+The paragraph below is the PRIOR session's record (items 155-158), kept for
+context — its "HEAD `185916a`" framing is historical:
+
 **Everything is committed and pushed to `main` (HEAD `185916a`), working
 tree CLEAN. The app WORKS — locally and in production.** Five strands this
 session:
@@ -10428,6 +10537,42 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       signals worth a real backtest IF history is purchased:
       `RouteParticipation`, `YardsPerRouteRun`, `ExpectedFantasyPoints`,
       `OpportunityShare`, `TargetQualityRating`.
+    - **Bulk advanced metrics are 2026-ONLY. This is the blocker for
+      advanced stats on a whole leaderboard, and it clears itself in
+      September (see item 159).** Probed exhaustively rather than assumed:
+      every bulk advanced path that EXISTS returns `401` for 2025 and `200`
+      for 2026 — `AdvancedPlayerGameStats/{season}REG/{week}`,
+      `AdvancedPlayerSeasonStats/{season}/{team}`,
+      `AdvancedPlayerSeasonStats/{season}/all`. The 2026 calls come back with
+      ZERO rows only because the season hasn't kicked off.
+      `AdvancedPlayerGameStatsByWeek` and `AdvancedPlayerSeasonStatsByTeam`
+      `404` — they don't exist under those names. So this is a season
+      ENTITLEMENT, not a missing product, and no code change works around it.
+      Three consequences worth having written down:
+      (a) `AdvancedPlayerInfo/{PlayerId}` stays the ONLY 2025-reachable
+      advanced path (item 155's quirk) — which is exactly why the player
+      DETAIL pages carry advanced metrics and the LEADERBOARD does not;
+      filling a 252-row WR table that way is 252 HTTP calls per page load.
+      (b) Once 2026 week 1 completes, one call per week covers the whole
+      league, and the leaderboard can move to first-party advanced data,
+      retiring the nflverse name-join there. Do it in the same pass as the
+      v3 regular-season verification above — same week, same data.
+      (c) Header auth (`Ocp-Apim-Subscription-Key`) DOES work against
+      advanced-metrics, closing item 155's "treat header auth as unknown,
+      not disproven". It needs no special-casing in `client.ts`.
+    - **The legacy key has no snap-count product by any route** — the `stats`
+      package and `PlayerSeasonSnapCounts` both `404`, and none of
+      `PlayerGameStatsByWeek`'s 81 fields carries snaps. So snap share and
+      air-yards share genuinely cannot come from the legacy subscription;
+      nflverse is the only league-wide source for those until 2026 lights up.
+      **Target share and opportunity share are the exception — computable
+      exactly from SportsDataIO alone**, with zero extra calls: sum
+      `ReceivingTargets` (and `RushingAttempts`) per team across
+      `PlayerSeasonStats`, then divide. Verified against nflverse and lands
+      within ~1-2pp (Chase 30.4% vs 32.1%, McCaffrey 23.8% vs 23.4% — the gap
+      is season-total vs per-game-average, not an error). Worth remembering
+      as the no-dependency fallback if nflverse ever has to go (Open Item
+      #33), and as a way to drop the name-join misses on that one column.
     - **Do not let the legacy subscription lapse** until 2026 data is
       flowing and verified in production. It is the only key serving the app
       today.
@@ -10461,7 +10606,11 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   `TeamGames`), which also retires the `odds` base for 2026+. It fetches
   with the shared cache bypassed and caches only the trimmed slices,
   because the raw response is ~12MB/week (item 27's memory lesson).
-  `defenseTeams.ts` (item
+  `advancedMetrics.ts`
+  (item 159) reads the NFL Advanced Metrics product via the per-player
+  `AdvancedPlayerInfo/{PlayerId}` endpoint on its own key
+  (`SPORTSDATA_ADVANCED_API_KEY`, base `advancedV3`) — the only advanced path
+  that reaches 2025. `defenseTeams.ts` (item
   62) mints synthetic D/ST `Player` records from `/Teams` (SportsDataIO
   has no real player identity for a team defense) — synthetic PlayerIDs
   via a `900000 + TeamID` offset, guaranteed not to collide with any
@@ -10728,6 +10877,25 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   a single pairwise comparison. An unfillable slot renders `breakdown:
   null` rather than disappearing, so the UI can show an honest empty-slot
   message instead of silently dropping a row.
+- `src/lib/stats/` — the player stat pages' data layer (item 159), read-only
+  over data the app already fetches; nothing here feeds scoring.
+  `leaderboard.ts` builds a position's season table from ONE
+  `PlayerSeasonStats` call (which carries team/position too — the only join
+  is onto the player list for full display names). `playerStats.ts` builds a
+  single player's season totals + week-by-week game log, assembling weeks in
+  bounded batches of 4 because SportsDataIO has no per-player season endpoint
+  on this plan (both plausible paths 404) and firing all 18 at once is item
+  27's memory-pressure shape. `columns.ts` is shared, client-safe (no
+  `server-only`) column definitions — a column is a FUNCTION of the row, not
+  a plain key, so derived rates (catch %, yards per target) sit alongside
+  stored ones and sorting reads both through the same accessor.
+  `advanced.ts` aggregates SportsDataIO advanced rows for the detail page;
+  `leaderboardAdvanced.ts` builds league-wide snap/target/air-yards share
+  from nflverse for the browser. **The two advanced sources are different on
+  purpose** — every BULK advanced path 401s for 2025, so only the per-player
+  endpoint can serve a detail page and only nflverse can serve a 252-row
+  table. See item 159 and Open Item #35; this collapses to one first-party
+  source once 2026 has games.
 - `src/lib/sleeper/` — server-only client for Sleeper's free, no-auth
   public API (item 59), the real-roster-import path that replaced
   manual one-by-one roster marking as the primary way to populate the
@@ -11122,6 +11290,9 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   `scoreExtendedPlayer`, then calls `lib/lineup/optimizeLineup.ts`. Slot
   counts travel as a compact `<SlotType><count>` string parsed/serialized
   by `lib/lineup/rosterSlots.ts`'s `parseSlotsParam`/`serializeSlots`.
+  `src/app/api/stats` and `src/app/api/stats/[playerId]` (item 159 — the
+  leaderboard and one player's season + game log; the latter carries
+  `maxDuration = 30` since a cold cache means walking every completed week).
   `src/app/api/backtest/pair`,
   `src/app/api/backtest/broad` (also `scoringFormat`-aware, item 50),
   `src/app/api/backtest/broad-nflverse`,
@@ -11281,7 +11452,12 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   everything lit; `SCORING_FORMAT_OPTIONS` is exported from
   `ScoringFormatToggle.tsx` so neither page redeclares the option list),
   and `RankingsResult.tsx`'s rows carry desktop-only matchup and
-  score-meter cells plus the shared `--pos-*` position-colored avatar. And
+  score-meter cells plus the shared `--pos-*` position-colored avatar.
+  `StatsBrowser.tsx`/`PlayerStatsView.tsx` (item 159 — the sortable
+  leaderboard at `/stats` with a search filter and a Standard/Advanced
+  column toggle, and the per-player page at `/stats/[playerId]` with the
+  same toggle on its game log; rows with no value always sort LAST in both
+  directions, since "—" is missing data rather than a low score). And
   `BacktestTool.tsx`/`BacktestWeekTable.tsx`/`BacktestSummary.tsx`/
   `BacktestCaveatNote.tsx`/`TradeBacktestTable.tsx`/`ProjectionSummary.tsx`/
   `ProjectionPlayerTable.tsx`/`ProjectionPlayerDetail.tsx`
