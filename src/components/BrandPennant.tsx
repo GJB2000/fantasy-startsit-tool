@@ -1,15 +1,19 @@
 import Image from "next/image";
 
-/** Intrinsic size of public/legitfootball-pennant.png (2.56:1). */
-const SRC_W = 1610;
-const SRC_H = 628;
+/**
+ * Aspect of public/legitfootball-pennant.svg (2.6:1) — the artwork's real
+ * bounds, which is also the file's viewBox. Illustrator centres the mark in
+ * a much larger, near-square artboard; that padding is cropped out of the
+ * viewBox so the asset measures the mark itself and nothing else.
+ */
+const SRC_W = 282.26;
+const SRC_H = 108.51;
 
 /**
  * The LEGITFOOTBALL pennant mark — cream felt, blue helmet + script.
  *
- * Rendered straight from the artwork exported out of design/legitlogo2.ai
- * (transparent PNG, tightly cropped to the art), so it always matches the
- * source logo rather than a hand-built approximation. The mark carries the
+ * Rendered from the vector exported out of design/legitlogo2.ai, so it stays
+ * sharp at any size, pixel density, or zoom level. The mark carries the
  * wordmark itself, so wherever it appears it replaces — rather than sits
  * beside — a "LEGITFOOTBALL" text lockup.
  */
@@ -22,20 +26,17 @@ export function BrandPennant({
   className?: string;
   priority?: boolean;
 }) {
-  const height = Math.round((width * SRC_H) / SRC_W);
   return (
     <Image
-      src="/legitfootball-pennant.png"
+      src="/legitfootball-pennant.svg"
       alt="Legit Football"
-      // Ask for twice the pixels we actually display, then scale down in CSS.
-      // A fixed-size next/image only offers 1x and 2x of the `width` prop in
-      // its srcset, so on a 2x screen this lands 4x the CSS size — sharp on
-      // retina and still sharp zoomed in. Without it the mark renders soft:
-      // at width={142} a 2x display got a 192px-wide file for a 284px slot.
-      width={width * 2}
-      height={height * 2}
-      quality={90}
-      style={{ width, height }}
+      width={width}
+      height={Math.round((width * SRC_H) / SRC_W)}
+      // Vector — there is nothing for the image optimizer to resize or
+      // re-encode, and Next declines to process SVG anyway unless
+      // dangerouslyAllowSVG is set. Served as-is: ~11KB, one request, no
+      // per-size variants.
+      unoptimized
       priority={priority}
       className={className}
     />
