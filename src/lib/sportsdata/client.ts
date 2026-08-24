@@ -24,6 +24,21 @@ const API_BASES = {
     url: "https://api.sportsdata.io/api/nfl/odds/json",
     keyEnv: "SPORTSDATA_LEGACY_API_KEY",
   },
+  /**
+   * The modern v3 hosts, served by the 2026 subscription
+   * (`SPORTSDATA_API_KEY`). Used only for seasons >= V3_MIN_SEASON — the
+   * legacy key 401s on 2026 and this key 401s on 2025, so neither host
+   * family can serve both and every season-scoped reader dispatches on
+   * season. See seasonRouting.ts.
+   */
+  scoresV3: {
+    url: "https://api.sportsdata.io/v3/nfl/scores/json",
+    keyEnv: "SPORTSDATA_API_KEY",
+  },
+  statsV3: {
+    url: "https://api.sportsdata.io/v3/nfl/stats/json",
+    keyEnv: "SPORTSDATA_API_KEY",
+  },
 } as const;
 
 export const REVALIDATE = {
@@ -66,7 +81,17 @@ const memoryCache = new Map<string, CacheEntry>();
 
 export async function sportsDataFetch<T>(
   path: string,
-  opts: { revalidate: number; base?: keyof typeof API_BASES }
+  opts: {
+    revalidate: number;
+    base?: keyof typeof API_BASES;
+    /**
+     * Skip the shared response cache. For very large payloads whose caller
+     * immediately trims them down (see boxScores.ts, ~12MB/week raw), caching
+     * the RAW response would hold far more memory than the data actually
+     * used — the same memory-pressure problem item 27 fixed for play-by-play.
+     */
+    skipCache?: boolean;
+  }
 ): Promise<T> {
   const base = opts.base ?? "fantasy";
   const { url: baseUrl, keyEnv } = API_BASES[base];
@@ -77,9 +102,11 @@ export async function sportsDataFetch<T>(
 
   const cacheKey = `${base}:${path}`;
 
-  const cached = memoryCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.data as T;
+  if (!opts.skipCache) {
+    const cached = memoryCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data as T;
+    }
   }
 
   const url = `${baseUrl}${path}`;
@@ -99,6 +126,8 @@ export async function sportsDataFetch<T>(
   }
 
   const data = (await res.json()) as T;
-  memoryCache.set(cacheKey, { data, expiresAt: Date.now() + opts.revalidate * 1000 });
+  if (!opts.skipCache) {
+    memoryCache.set(cacheKey, { data, expiresAt: Date.now() + opts.revalidate * 1000 });
+  }
   return data;
 }

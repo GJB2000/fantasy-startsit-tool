@@ -1,10 +1,22 @@
+import { getBoxScoreSlices } from "./boxScores";
 import { REVALIDATE, sportsDataFetch } from "./client";
+import { seasonYearFromApiSeason, usesV3 } from "./seasonRouting";
 import type { PlayerGameStat } from "./types";
 
+/**
+ * Season-routed (item 156): 2025 and earlier come from the legacy
+ * PlayerGameStatsByWeek endpoint on the legacy key; 2026+ come from the v3
+ * Box Score [Final] feed, whose PlayerGames array is a field superset. The
+ * two subscriptions cover disjoint seasons, so this dispatch is what lets the
+ * app move to 2026 on its own without a redeploy. See seasonRouting.ts.
+ */
 export async function getPlayerGameStatsByWeek(
   apiSeason: string,
   week: number
 ): Promise<PlayerGameStat[]> {
+  if (usesV3(seasonYearFromApiSeason(apiSeason))) {
+    return (await getBoxScoreSlices(apiSeason, week)).playerGames;
+  }
   return sportsDataFetch<PlayerGameStat[]>(`/PlayerGameStatsByWeek/${apiSeason}/${week}`, {
     revalidate: REVALIDATE.weeklyStats,
   });

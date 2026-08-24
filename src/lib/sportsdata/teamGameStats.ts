@@ -1,7 +1,14 @@
+import { getBoxScoreSlices } from "./boxScores";
 import { REVALIDATE, sportsDataFetch } from "./client";
+import { seasonYearFromApiSeason, usesV3 } from "./seasonRouting";
 import type { TeamGameStat } from "./types";
 
+/** Season-routed — see weeklyStats.ts. 2026+ reads the same box-score call,
+ * which also retires the `odds` host (its only remaining use was this). */
 export async function getTeamGameStatsByWeek(apiSeason: string, week: number): Promise<TeamGameStat[]> {
+  if (usesV3(seasonYearFromApiSeason(apiSeason))) {
+    return (await getBoxScoreSlices(apiSeason, week)).teamGames;
+  }
   return sportsDataFetch<TeamGameStat[]>(`/TeamGameStats/${apiSeason}/${week}`, {
     revalidate: REVALIDATE.teamStats,
     base: "odds",

@@ -1,4 +1,6 @@
+import { getBoxScoreSlices } from "./boxScores";
 import { REVALIDATE, sportsDataFetch } from "./client";
+import { seasonYearFromApiSeason, usesV3 } from "./seasonRouting";
 
 /**
  * Team-level D/ST fantasy game stat — a genuinely different shape from
@@ -25,7 +27,11 @@ export interface TeamDefenseGameStat {
   FantasyPoints: number;
 }
 
+/** Season-routed — see weeklyStats.ts. 2026+ reads the same box-score call. */
 export async function getFantasyDefenseByWeek(apiSeason: string, week: number): Promise<TeamDefenseGameStat[]> {
+  if (usesV3(seasonYearFromApiSeason(apiSeason))) {
+    return (await getBoxScoreSlices(apiSeason, week)).fantasyDefenseGames;
+  }
   return sportsDataFetch<TeamDefenseGameStat[]>(`/FantasyDefenseByGame/${apiSeason}/${week}`, {
     revalidate: REVALIDATE.weeklyStats,
   });
