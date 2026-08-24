@@ -1,7 +1,7 @@
 import { buildBacktestComparisonInput } from "@/lib/recommendation/buildBacktestInput";
 import { RECENT_WEEK_COUNT } from "@/lib/recommendation/config";
 import { scorePlayer } from "@/lib/recommendation/engine";
-import { sumProjectedPoints } from "@/lib/recommendation/restOfSeason";
+import { blendRestOfSeason, sumProjectedPoints, type SeasonProjectionMap } from "@/lib/recommendation/restOfSeason";
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import type { PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getFantasyPoints, type PlayerGameStat, type ScoringFormat, type SkillPosition } from "@/lib/sportsdata/types";
@@ -71,7 +71,9 @@ export function buildOpponentsByTeamWeek(
 export function projectFromHistory(
   breakdown: PlayerScoreBreakdown,
   opponentsByTeamWeek: Map<string, string[]>,
-  positionDefenseTable: PositionDefenseTable
+  positionDefenseTable: PositionDefenseTable,
+  /** Blended in exactly as live mode does — omit for pure extrapolation. */
+  seasonProjections: SeasonProjectionMap = new Map()
 ): number | null {
   const position = breakdown.position;
   if (breakdown.finalScore == null || !breakdown.team || !position) return null;
@@ -80,7 +82,12 @@ export function projectFromHistory(
   if (!opponents || opponents.length === 0) return null;
 
   const baseRate = breakdown.finalScore - breakdown.matchupModifier;
-  return sumProjectedPoints(baseRate, opponents, position, positionDefenseTable);
+  const extrapolated = sumProjectedPoints(baseRate, opponents, position, positionDefenseTable);
+  return blendRestOfSeason(
+    extrapolated,
+    opponents.length,
+    breakdown.playerId != null ? seasonProjections.get(breakdown.playerId) : undefined
+  );
 }
 
 export function actualRestOfSeasonTotal(
@@ -154,7 +161,7 @@ function collectTradeResultsForSeason(
       });
 
       const projected = breakdowns.map((b) =>
-        projectFromHistory(b, opponentsByTeamWeek, weekSlice.positionDefenseTable)
+        projectFromHistory(b, opponentsByTeamWeek, weekSlice.positionDefenseTable, runData.seasonProjections)
       );
       const actual = pair.playerIds.map((id) => actualRestOfSeasonTotal(id, runData.allWeeklyRows, targetWeek, format));
 

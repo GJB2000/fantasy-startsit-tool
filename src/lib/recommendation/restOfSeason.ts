@@ -1,6 +1,7 @@
 import { isSkillPosition } from "@/lib/sportsdata/types";
 import { getMatchupContext, type PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import type { RemainingGame } from "@/lib/nflverse/schedules";
+import { REST_OF_SEASON_PROJECTION_BLEND } from "./config";
 import { computeMatchupModifier } from "./engine";
 import type { PlayerScoreBreakdown } from "./types";
 
@@ -16,6 +17,32 @@ export function toNflverseTeam(sdioTeam: string): string {
 
 export function toSdioTeam(nflverseTeam: string): string {
   return NFLVERSE_TO_SDIO_TEAM[nflverseTeam] ?? nflverseTeam;
+}
+
+/** A season-long projection: total projected points over projected games. */
+export interface SeasonProjection {
+  points: number;
+  games: number;
+}
+export type SeasonProjectionMap = Map<number, SeasonProjection>;
+
+/**
+ * Blends the engine's extrapolated rest-of-season total with a season-long
+ * projection pro-rated to the games actually remaining. Falls back to
+ * whichever side exists — a player the projection feed doesn't cover (a
+ * mid-season call-up, say) still gets the extrapolation rather than nothing.
+ */
+export function blendRestOfSeason(
+  extrapolated: number | null,
+  gamesRemaining: number,
+  projection: SeasonProjection | undefined
+): number | null {
+  const projected =
+    projection && projection.games > 0 ? (projection.points / projection.games) * gamesRemaining : null;
+  if (extrapolated == null) return projected;
+  if (projected == null) return extrapolated;
+  const w = REST_OF_SEASON_PROJECTION_BLEND;
+  return (1 - w) * extrapolated + w * projected;
 }
 
 export interface RestOfSeasonProjection {
@@ -65,7 +92,9 @@ export function sumProjectedPoints(
 export function projectRestOfSeason(
   breakdown: PlayerScoreBreakdown,
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
-  positionDefenseTable: PositionDefenseTable
+  positionDefenseTable: PositionDefenseTable,
+  /** Season-long projections, blended in per REST_OF_SEASON_PROJECTION_BLEND. Omit for pure extrapolation. */
+  seasonProjections: SeasonProjectionMap = new Map()
 ): RestOfSeasonProjection {
   const position = breakdown.position;
   if (breakdown.finalScore == null || !breakdown.team || !position || !isSkillPosition(position)) {
@@ -78,7 +107,14 @@ export function projectRestOfSeason(
   }
 
   const baseRate = breakdown.finalScore - breakdown.matchupModifier;
-  const total = sumProjectedPoints(baseRate, games.map((g) => toSdioTeam(g.opponent)), position, positionDefenseTable);
+  const extrapolated = sumProjectedPoints(
+    baseRate, games.map((g) => toSdioTeam(g.opponent)), position, positionDefenseTable
+  );
+  const total = blendRestOfSeason(
+    extrapolated,
+    games.length,
+    breakdown.playerId != null ? seasonProjections.get(breakdown.playerId) : undefined
+  );
 
-  return { gamesRemaining: games.length, total, perGameRate: total / games.length };
+  return { gamesRemaining: games.length, total, perGameRate: total == null ? null : total / games.length };
 }

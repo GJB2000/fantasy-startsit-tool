@@ -170,7 +170,7 @@ function projectPlayer(
     runData.byesByTeam
   );
   const breakdown = scorePlayer(input, format);
-  return projectFromHistory(breakdown, opponentsByTeamWeek, weekSlice.positionDefenseTable);
+  return projectFromHistory(breakdown, opponentsByTeamWeek, weekSlice.positionDefenseTable, runData.seasonProjections);
 }
 
 interface TradeOutcomes {

@@ -12,7 +12,8 @@ import { getFantasyDefenseByWeek, type TeamDefenseGameStat } from "@/lib/sportsd
 import { getAllDstPlayers } from "@/lib/sportsdata/defenseTeams";
 import { getAllPlayers } from "@/lib/sportsdata/players";
 import { getTeamGameStatsByWeek } from "@/lib/sportsdata/teamGameStats";
-import { getPlayerGameProjectionsByWeek } from "@/lib/sportsdata/projections";
+import { getPlayerGameProjectionsByWeek, getPlayerSeasonProjections } from "@/lib/sportsdata/projections";
+import type { SeasonProjectionMap } from "@/lib/recommendation/restOfSeason";
 import { getPlayerGameStatsByWeek } from "@/lib/sportsdata/weeklyStats";
 import { getFantasyPoints, type Player, type PlayerGameStat, type TeamGameStat } from "@/lib/sportsdata/types";
 
@@ -100,6 +101,8 @@ export interface BacktestRunData {
    * same as every other optional signal.
    */
   expertConsensusByPlayerIdWeek?: Map<number, Map<number, { rank: number; r2pPts: number | null }>>;
+  /** Season-long projections, blended into rest-of-season trade value. Absent for seasons SportsDataIO does not serve projections for. */
+  seasonProjections?: SeasonProjectionMap;
 }
 
 /**
@@ -224,9 +227,23 @@ export async function loadBacktestRunData(
     }
   }
 
+  const seasonProjections: SeasonProjectionMap = new Map();
+  try {
+    for (const row of await getPlayerSeasonProjections(season)) {
+      const games = row.Played ?? 0;
+      const points = getFantasyPoints(row, "ppr");
+      if (games > 0 && points > 0) seasonProjections.set(row.PlayerID, { points, games });
+    }
+  } catch (err) {
+    // Only 2025 is served on this subscription; earlier seasons 401. The
+    // trade projection falls back to pure extrapolation without it.
+    console.error("Failed to load SportsDataIO season projections:", err);
+  }
+
   return {
     season,
     apiSeason,
+    seasonProjections,
     allWeeklyRows,
     allTeamWeeklyRows,
     byesByTeam,

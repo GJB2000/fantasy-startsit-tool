@@ -9,6 +9,7 @@ import {
   getRemainingOpponentsCached,
   COLD_FETCH_TIMEOUT_MS,
 } from "@/lib/cache/liveAggregates";
+import { getSeasonProjectionMap } from "@/lib/sportsdata/seasonProjectionMap";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat, SKILL_POSITIONS } from "@/lib/sportsdata/types";
 import { buildWaiverCandidateDetails, type WaiverCandidate } from "@/lib/waivers/buildWaiverReport";
@@ -92,9 +93,10 @@ export async function GET(request: Request) {
 
     const excludeIds = new Set([...rosteredIds, ...leagueRosteredIds]);
 
-    const [teamWeatherByTeamWeek, impliedTotalsByTeamWeek] = await Promise.all([
+    const [teamWeatherByTeamWeek, impliedTotalsByTeamWeek, seasonProjections] = await Promise.all([
       getGameWeatherCached(scheduleSeason).catch(() => new Map()),
       getImpliedTotalsCached(scheduleSeason).catch(() => new Map()),
+      getSeasonProjectionMap(scheduleSeason, format).catch(() => new Map()),
     ]);
 
     const [ranksByPosition, extendedCandidates] = await Promise.all([
@@ -143,7 +145,8 @@ export async function GET(request: Request) {
       teamWeatherByTeamWeek,
       impliedTotalsByTeamWeek,
       projectedPointsByPlayerId,
-      priorSeasonPprAvgByNormalizedName
+      priorSeasonPprAvgByNormalizedName,
+      seasonProjections
     );
 
     const candidatesByPosition = Object.fromEntries(

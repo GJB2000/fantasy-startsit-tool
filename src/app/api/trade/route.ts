@@ -4,6 +4,7 @@ import { getLiveProjectedPointsByPlayerId } from "@/lib/sportsdata/liveProjectio
 import { getPriorSeasonPprAveragesByNormalizedName } from "@/lib/nflverse/priorSeasonAverage";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { projectExtendedRestOfSeason, scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
+import { getSeasonProjectionMap } from "@/lib/sportsdata/seasonProjectionMap";
 import { type RemainingGame } from "@/lib/nflverse/schedules";
 import {
   getGameWeatherCached,
@@ -77,9 +78,12 @@ export async function GET(request: Request) {
       );
     }
 
-    const [teamWeatherByTeamWeek, impliedTotalsByTeamWeek] = await Promise.all([
+    const [teamWeatherByTeamWeek, impliedTotalsByTeamWeek, seasonProjections] = await Promise.all([
       getGameWeatherCached(scheduleSeason).catch(() => new Map()),
       getImpliedTotalsCached(scheduleSeason).catch(() => new Map()),
+      // Blended into rest-of-season value — keyed to the SAME season the
+      // remaining schedule resolved to. Fails open to pure extrapolation.
+      getSeasonProjectionMap(scheduleSeason, format).catch(() => new Map()),
     ]);
 
     const scoreFor = async (id: number): Promise<TradePlayerResult> => {
@@ -99,7 +103,8 @@ export async function GET(request: Request) {
         breakdown,
         remainingOpponentsByTeam,
         impliedTotalsByTeamWeek,
-        positionDefenseTable
+        positionDefenseTable,
+        seasonProjections
       );
       return toTradePlayerResult(breakdown, projection);
     };

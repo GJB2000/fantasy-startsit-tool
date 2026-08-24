@@ -2,6 +2,7 @@ import { optimizeLineup } from "@/lib/lineup/optimizeLineup";
 import { SLOT_ELIGIBILITY, type SlotType } from "@/lib/lineup/rosterSlots";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { projectExtendedRestOfSeason, scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
+import type { SeasonProjectionMap } from "@/lib/recommendation/restOfSeason";
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
 import type { OtherLeagueTeam } from "@/lib/sleeper/resolveRoster";
@@ -68,7 +69,9 @@ export async function suggestLeagueTrade(
   teamWeatherByTeamWeek: Map<string, GameWeather>,
   impliedTotalsByTeamWeek: Map<string, number>,
   projectedPointsByPlayerId: Map<number, number> = new Map(),
-  priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map()
+  priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map(),
+  /** Season-long projections blended into rest-of-season value; omit for pure extrapolation. */
+  seasonProjections: SeasonProjectionMap = new Map()
 ): Promise<LeagueTradeResult> {
   if (yourPlayerIds.length === 0) return { suggestion: null, reason: "Your roster is empty." };
   if (otherTeams.length === 0) {
@@ -95,7 +98,8 @@ export async function suggestLeagueTrade(
       breakdown,
       remainingOpponentsByTeam,
       impliedTotalsByTeamWeek,
-      positionDefenseTable
+      positionDefenseTable,
+      seasonProjections
     );
     return toTradePlayerResult(breakdown, projection);
   }

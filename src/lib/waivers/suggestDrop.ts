@@ -1,5 +1,6 @@
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import { projectExtendedRestOfSeason, scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
+import type { SeasonProjectionMap } from "@/lib/recommendation/restOfSeason";
 import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
 import type { PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import type { SeasonContext } from "@/lib/sportsdata/timeframes";
@@ -35,7 +36,9 @@ export async function suggestDrops(
   teamWeatherByTeamWeek: Map<string, GameWeather>,
   impliedTotalsByTeamWeek: Map<string, number>,
   projectedPointsByPlayerId: Map<number, number> = new Map(),
-  priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map()
+  priorSeasonPprAvgByNormalizedName: Map<string, number> = new Map(),
+  /** Season-long projections blended into rest-of-season value; omit for pure extrapolation. */
+  seasonProjections: SeasonProjectionMap = new Map()
 ): Promise<Map<number, DropSuggestion>> {
   const suggestions = new Map<number, DropSuggestion>();
   if (rosteredPlayerIds.length === 0 || candidates.length === 0) return suggestions;
@@ -58,7 +61,8 @@ export async function suggestDrops(
         breakdown,
         remainingOpponentsByTeam,
         impliedTotalsByTeamWeek,
-        positionDefenseTable
+        positionDefenseTable,
+        seasonProjections
       );
       return toTradePlayerResult(breakdown, projection);
     })
@@ -76,7 +80,8 @@ export async function suggestDrops(
       candidate.breakdown,
       remainingOpponentsByTeam,
       impliedTotalsByTeamWeek,
-      positionDefenseTable
+      positionDefenseTable,
+      seasonProjections
     );
     const pickupResult = toTradePlayerResult(candidate.breakdown, pickupProjection);
 

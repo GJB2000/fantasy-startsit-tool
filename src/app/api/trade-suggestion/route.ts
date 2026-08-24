@@ -11,6 +11,7 @@ import {
   COLD_FETCH_TIMEOUT_MS,
 } from "@/lib/cache/liveAggregates";
 import { resolveSleeperRoster } from "@/lib/sleeper/resolveRoster";
+import { getSeasonProjectionMap } from "@/lib/sportsdata/seasonProjectionMap";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat } from "@/lib/sportsdata/types";
 import { suggestLeagueTrade } from "@/lib/trade/suggestLeagueTrade";
@@ -63,9 +64,10 @@ export async function GET(request: Request) {
         () => new Map<string, RemainingGame[]>()
       );
     }
-    const [teamWeatherByTeamWeek, impliedTotalsByTeamWeek] = await Promise.all([
+    const [teamWeatherByTeamWeek, impliedTotalsByTeamWeek, seasonProjections] = await Promise.all([
       getGameWeatherCached(scheduleSeason).catch(() => new Map()),
       getImpliedTotalsCached(scheduleSeason).catch(() => new Map()),
+      getSeasonProjectionMap(scheduleSeason, format).catch(() => new Map()),
     ]);
 
     const yourPlayerIds = resolved.players.map((p) => p.playerId);
@@ -82,7 +84,8 @@ export async function GET(request: Request) {
       teamWeatherByTeamWeek,
       impliedTotalsByTeamWeek,
       projectedPointsByPlayerId,
-      priorSeasonPprAvgByNormalizedName
+      priorSeasonPprAvgByNormalizedName,
+      seasonProjections
     );
 
     return Response.json({

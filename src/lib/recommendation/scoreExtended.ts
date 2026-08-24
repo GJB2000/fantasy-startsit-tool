@@ -2,7 +2,11 @@ import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
 import { buildComparisonInput } from "@/lib/recommendation/buildInput";
 import { scorePlayer } from "@/lib/recommendation/engine";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
-import { projectRestOfSeason, type RestOfSeasonProjection } from "@/lib/recommendation/restOfSeason";
+import {
+  projectRestOfSeason,
+  type RestOfSeasonProjection,
+  type SeasonProjectionMap,
+} from "@/lib/recommendation/restOfSeason";
 import type { PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import { getActiveExtendedPlayerById, getAnyExtendedPlayerById } from "@/lib/sportsdata/players";
 import type { SeasonContext } from "@/lib/sportsdata/timeframes";
@@ -108,7 +112,8 @@ export function projectExtendedRestOfSeason(
   breakdown: PlayerScoreBreakdown,
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   impliedTotalsByTeamWeek: Map<string, number>,
-  positionDefenseTable: PositionDefenseTable
+  positionDefenseTable: PositionDefenseTable,
+  seasonProjections: SeasonProjectionMap = new Map()
 ): RestOfSeasonProjection {
   if (breakdown.position === "DST") {
     return projectDstRestOfSeason(breakdown, breakdown.team, remainingOpponentsByTeam, impliedTotalsByTeamWeek);
@@ -116,5 +121,5 @@ export function projectExtendedRestOfSeason(
   if (breakdown.position === "K") {
     return projectKickerRestOfSeason(breakdown, breakdown.team, remainingOpponentsByTeam, impliedTotalsByTeamWeek);
   }
-  return projectRestOfSeason(breakdown, remainingOpponentsByTeam, positionDefenseTable);
+  return projectRestOfSeason(breakdown, remainingOpponentsByTeam, positionDefenseTable, seasonProjections);
 }

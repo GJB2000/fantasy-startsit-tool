@@ -9549,7 +9549,80 @@ single-season numbers for those specific constants.
       eight pages 200, `tsc`/lint clean. All three diagnostic routes deleted
       after recording, same precedent as every other one-off in this file.
 
-### Open items (as of item 161 — pick up here)
+162. **Blended SportsDataIO's season-long projection into rest-of-season
+    trade valuation — a bigger measured gain than the consensus swap, and
+    the opposite of the going-in expectation.** The Trade Assistant valued
+    players by EXTRAPOLATION (item 47): take a player's one-week score,
+    strip its matchup modifier, re-apply a fresh one per remaining opponent,
+    sum. SportsDataIO's season projections are a directly rest-of-season-
+    shaped number the app already fetches, so the obvious question was
+    whether they beat that.
+    - **Leakage checked FIRST**, because a season projection fetched months
+      later could easily have been updated with actuals. It has not been:
+      MAE 29.5 points against real 2025 season totals, with the top
+      performers badly UNDER-projected (McCaffrey projected 289.9, scored
+      416.6; Jonathan Taylor 261.2 vs 362.3). That is the classic PRESEASON
+      signature — a static projection never revised. A contaminated feed
+      would look far more accurate than that.
+    - **Result, 430 synthetic 1-for-1 trades across cutoff weeks 1-12 of
+      2025, graded against real rest-of-season totals:**
+
+      | method | accuracy |
+      |---|---|
+      | engine extrapolation (was shipped) | 58.33% |
+      | season projection alone | **64.88%** |
+      | 50/50 blend | **64.88%** |
+
+      +6.55pp, winning at 8 of 12 cutoffs, and winning BIGGEST late
+      (week 12: 63.9% vs 41.7%).
+    - **Why extrapolation loses — the mechanism, not just the number**: it
+      multiplies a single week's score, which is heavily recent-form driven,
+      across ten remaining games, so hot and cold streaks get extrapolated
+      wholesale. Rest-of-season value regresses toward true talent, which a
+      season-long projection captures better than a four-game sample. That
+      the gap WIDENS at late cutoffs fits exactly — that's where a streak has
+      had the most opportunity to distort the extrapolation.
+    - **Shipped the 50/50 blend, not the projection alone**, even though they
+      tie on accuracy. Checked the blend isn't degenerate before trusting the
+      tie: the two methods disagree on 28.6% of trades (123 of 430) and sit
+      on comparable scales (mean 157.2 vs 138.2), so it isn't just following
+      one source. Chosen for robustness — it keeps the engine's recent-form
+      and matchup signal in the valuation and falls back cleanly for a player
+      the projection feed doesn't cover (`blendRestOfSeason` returns whichever
+      side exists). `REST_OF_SEASON_PROJECTION_BLEND = 0.5` in `config.ts`.
+    - **Wired into both live and backtest** so they can't drift: live via
+      `sportsdata/seasonProjectionMap.ts` through `/api/trade`, `/api/waivers`
+      (drop suggestions) and `/api/trade-suggestion`, keyed to the SAME season
+      the remaining schedule resolved to; backtest via a new
+      `BacktestRunData.seasonProjections` read by `projectFromHistory`, so the
+      trade backtest measures what the live tool does.
+    - **TWO FINDINGS surfaced while verifying, neither caused by this change:**
+      - **The trade backtest does not include the expert-consensus term.**
+        `collectTradeResultsForSeason` calls `sliceWeekData` with only 7
+        arguments, so consensus is null there — meaning the trade backtest
+        scores on a materially different engine than the live tool, which
+        leans on consensus heavily (QB 0.8). This is why the shipped
+        single-cutoff numbers came in ABOVE the diagnostic's (week 4: 80.56%
+        vs 77.78%; week 12: 63.89% vs 58.33%) — the diagnostic passed the
+        full slice. A real pre-existing gap; deliberately not fixed here so
+        two changes don't get conflated. See Open Item #38.
+      - **Item 49's documented 55.2% pooled trade accuracy is stale.** The
+        nflverse multi-season trade backtest now reads 53.01%. Verified via
+        `git stash` that this is byte-identical before and after this change
+        (916/1728 both ways), so it is accumulated drift from later engine
+        tuning, not a regression here. The blend is a true no-op on that
+        pipeline by design — SportsDataIO projections 401 for 2022-2024, so
+        `seasonProjections` is absent and `blendRestOfSeason` returns the
+        pure extrapolation.
+    - **Single-season evidence again** — projections 401 for 2022-2024, so
+      this cannot be cross-validated either. Folded into Open Item #37.
+    - **Verified**: live trade returns sensible blended values (McCaffrey ROS
+      337.6 over 17 games, 19.9/gm against a 19.8 weekly score), single-cutoff
+      backtests reproduce the diagnostic's per-cutoff pattern, nflverse
+      multiseason byte-identical, all eight pages and every live route 200,
+      `tsc`/lint clean. Diagnostic route deleted after recording.
+
+### Open items (as of item 162 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `1cc5b49`), working
 tree CLEAN.** The most recent session added the player stat pages (item 159 —
 `/stats` and `/stats/[playerId]`, with search and advanced metrics) and
@@ -10852,6 +10925,25 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       kept and marked unused, the historical FantasyPros reader is still
       live for the nflverse pipeline, and the old weights are recorded in
       config.ts's comment (`RB 0.5 / TE 0.7`).
+
+38. **The trade backtest scores without the expert-consensus term — it no
+    longer measures the live engine.** Found while verifying item 162.
+    `collectTradeResultsForSeason` (`tradeBacktest.ts`) calls `sliceWeekData`
+    with 7 arguments, omitting format, defense rows, implied totals AND
+    `expertConsensusByPlayerIdWeek`. Since consensus is the engine's largest
+    signal (QB 0.8, item 145/161), the trade backtest is grading a
+    materially different engine than `/api/trade` runs. Concretely: item
+    162's diagnostic, which passed the full slice, measured week-4 accuracy
+    at 77.78% where the shipped path reports 80.56%.
+    - **Fix is small but changes published numbers**: pass the same
+      arguments `runBroadBacktest` does. Every documented trade-backtest
+      figure (items 48/49/138/162) would need re-measuring afterward, which
+      is why it wasn't folded into item 162 — two changes at once would make
+      neither attributable.
+    - **Also worth re-baselining while there**: item 49's documented 55.2%
+      pooled is stale; the same route now reads 53.01% purely from
+      accumulated engine tuning since. Verified pre-existing via `git stash`,
+      not a regression, but the number in the doc misleads until refreshed.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that

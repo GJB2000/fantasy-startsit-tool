@@ -880,3 +880,30 @@ export const REPLACEMENT_PER_GAME: Record<ScoringFormat, Record<SkillPosition, n
   half_ppr: { QB: 17.47, RB: 11.1, WR: 10.34, TE: 8.75 },
   standard: { QB: 17.47, RB: 10.27, WR: 8.13, TE: 6.89 },
 };
+
+/**
+ * How much of a rest-of-season trade valuation comes from SportsDataIO's
+ * season-long projection, versus the engine's own extrapolation (a player's
+ * current per-game rate re-projected across every remaining opponent).
+ *
+ * 0 = pure extrapolation (the original behaviour), 1 = pure projection.
+ *
+ * Backtested on 430 synthetic 1-for-1 trades across cutoff weeks 1-12 of
+ * 2025, graded against real rest-of-season totals: extrapolation alone
+ * 58.33%, projection alone 64.88%, a 50/50 blend 64.88%. The blend ties the
+ * projection on accuracy, so it's chosen for robustness rather than for a
+ * bigger number — it keeps the engine's recent-form and matchup signal in
+ * the valuation and degrades naturally for a player the projection feed
+ * doesn't cover.
+ *
+ * Why extrapolation loses: it multiplies a single week's score — which is
+ * heavily recent-form driven — across ten remaining games, so hot and cold
+ * streaks get extrapolated. Rest-of-season value regresses toward true
+ * talent, which a season-long projection captures better than a four-game
+ * sample. The gap widens at LATE cutoffs (week 12: 63.9% vs 41.7%), which
+ * is where a streak has had the most chance to distort the extrapolation.
+ *
+ * Single-season evidence — SportsDataIO's projections 401 for 2022-2024 on
+ * this subscription. See Open Item #37.
+ */
+export const REST_OF_SEASON_PROJECTION_BLEND = 0.5;
