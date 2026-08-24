@@ -1,8 +1,29 @@
 import "server-only";
 
+/**
+ * The two legacy hosts this app is built on, each paired with the env var
+ * that supplies its key. SportsDataIO issues a key per subscription, and
+ * keys are NOT interchangeable across host families: the 2026 subscription
+ * (`SPORTSDATA_API_KEY`) authenticates against the newer
+ * `api.sportsdata.io/v3/nfl/{package}/json` hosts and returns 401 here,
+ * while the legacy key works on these and covers the 2025 season the app
+ * currently runs on.
+ *
+ * Falls back to `SPORTSDATA_API_KEY` when the legacy var is unset, so this
+ * is a no-op for any environment that hasn't been given a legacy key.
+ *
+ * When the v3 migration happens, add bases here with
+ * `keyEnv: "SPORTSDATA_API_KEY"` rather than swapping these over.
+ */
 const API_BASES = {
-  fantasy: "https://api.sportsdata.io/api/nfl/fantasy/json",
-  odds: "https://api.sportsdata.io/api/nfl/odds/json",
+  fantasy: {
+    url: "https://api.sportsdata.io/api/nfl/fantasy/json",
+    keyEnv: "SPORTSDATA_LEGACY_API_KEY",
+  },
+  odds: {
+    url: "https://api.sportsdata.io/api/nfl/odds/json",
+    keyEnv: "SPORTSDATA_LEGACY_API_KEY",
+  },
 } as const;
 
 export const REVALIDATE = {
@@ -47,12 +68,13 @@ export async function sportsDataFetch<T>(
   path: string,
   opts: { revalidate: number; base?: keyof typeof API_BASES }
 ): Promise<T> {
-  const key = process.env.SPORTSDATA_API_KEY;
+  const base = opts.base ?? "fantasy";
+  const { url: baseUrl, keyEnv } = API_BASES[base];
+  const key = process.env[keyEnv] ?? process.env.SPORTSDATA_API_KEY;
   if (!key) {
-    throw new SportsDataError("Missing SPORTSDATA_API_KEY environment variable", undefined, path);
+    throw new SportsDataError(`Missing ${keyEnv} environment variable`, undefined, path);
   }
 
-  const base = opts.base ?? "fantasy";
   const cacheKey = `${base}:${path}`;
 
   const cached = memoryCache.get(cacheKey);
@@ -60,7 +82,7 @@ export async function sportsDataFetch<T>(
     return cached.data as T;
   }
 
-  const url = `${API_BASES[base]}${path}`;
+  const url = `${baseUrl}${path}`;
   let res: Response;
   try {
     res = await fetch(url, {
