@@ -9669,7 +9669,53 @@ single-season numbers for those specific constants.
       the live tool.
     - **Resolves Open Item #38.**
 
-### Open items (as of item 163 — pick up here)
+164. **Fixed a mislabel item 161 introduced: the Projection-accuracy mode's
+    third series said "FantasyPros" while actually showing SportsDataIO's
+    projections — and, more importantly, it stopped being an independent
+    benchmark.** Found by auditing every `sliceWeekData` call after item 163,
+    while checking whether the projection backtest had the trade backtests'
+    missing-consensus bug.
+    - **It did NOT have that bug** — `runProjectionBacktest.ts` and
+      `playerProjectionLookup.ts` both already passed all 11 arguments
+      (items 71/72 got that right). The audit confirmed the two trade
+      backtests were the only offenders, and item 163 fixed both.
+    - **But the audit found a different problem.** That third series reads
+      `weekSlice.expertConsensusByPlayerIdWeek`, which item 161 repointed
+      from the FantasyPros scrape to SportsDataIO's projections. The UI kept
+      calling it FantasyPros in five places (summary caption, two column
+      headers, the closer-week counter, the route's own explanatory note).
+      Relabelled to "consensus" throughout, and the `fantasyProsProjection`/
+      `fantasyProsDiff` fields renamed to `consensusProjection`/
+      `consensusDiff`. (`buildRankings.ts`'s `fantasyProsPositionRank` is
+      genuinely FantasyPros — it reads the redraft file directly — and was
+      left alone.)
+    - **The subtler half, which the label change alone wouldn't have
+      surfaced**: this series used to answer "how does the engine compare to
+      an INDEPENDENT external estimate" (item 71's whole purpose). Now that
+      the same projection is the engine's own largest input, it answers a
+      different question — what the engine's OTHER signals add on top of the
+      consensus it ingests. Still useful, but not a benchmark, and the
+      route's note now says so explicitly rather than letting it read as
+      independent.
+    - **Corrected numbers** (2025, PPR, n=1224 — these supersede item 71's):
+
+      | | MAE | RMSE | bias | n |
+      |---|---|---|---|---|
+      | engine | 6.26 | 7.98 | +0.25 | 1224 |
+      | naive season-avg | 6.85 | 8.63 | +1.90 | 1224 |
+      | consensus (SportsDataIO) | 6.19 | 7.85 | +0.63 | 1224 |
+
+      Two things worth reading off this. The engine's own calibration
+      IMPROVED from the item-161 swap (MAE 6.35 -> 6.26, bias +0.31 ->
+      +0.25). And the same relationship item 71 found with FantasyPros still
+      holds with the new source: the consensus alone has marginally better
+      MAE, while the engine has clearly better bias — the blend keeps the
+      source's accuracy while correcting some of its optimism. Coverage is
+      now the full 1224 rather than 1203, since SportsDataIO covers every
+      pool player.
+    - No scoring change; labels, field names and one measurement series only.
+
+### Open items (as of item 164 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `1cc5b49`), working
 tree CLEAN.** The most recent session added the player stat pages (item 159 —
 `/stats` and `/stats/[playerId]`, with search and advanced metrics) and

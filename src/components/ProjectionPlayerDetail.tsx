@@ -14,7 +14,7 @@ function sumColumn(weeks: PlayerWeekProjection[], pick: (w: PlayerWeekProjection
 
 interface CloserCounts {
   engine: number;
-  fantasyPros: number;
+  consensus: number;
   tie: number;
   graded: number;
 }
@@ -30,27 +30,27 @@ interface CloserCounts {
  */
 function countCloserWeeks(weeks: PlayerWeekProjection[]): CloserCounts {
   let engine = 0;
-  let fantasyPros = 0;
+  let consensus = 0;
   let tie = 0;
   for (const w of weeks) {
-    if (w.diff == null || w.fantasyProsDiff == null) continue;
+    if (w.diff == null || w.consensusDiff == null) continue;
     const engineError = Math.abs(w.diff);
-    const fantasyProsError = Math.abs(w.fantasyProsDiff);
-    if (engineError < fantasyProsError) engine++;
-    else if (fantasyProsError < engineError) fantasyPros++;
+    const consensusError = Math.abs(w.consensusDiff);
+    if (engineError < consensusError) engine++;
+    else if (consensusError < engineError) consensus++;
     else tie++;
   }
-  return { engine, fantasyPros, tie, graded: engine + fantasyPros + tie };
+  return { engine, consensus, tie, graded: engine + consensus + tie };
 }
 
 function DetailCard({ detail }: { detail: PlayerProjectionDetail }) {
   const { summary } = detail;
   const totals = {
     predicted: sumColumn(detail.weeks, (w) => w.predicted),
-    fantasyProsProjection: sumColumn(detail.weeks, (w) => w.fantasyProsProjection),
+    consensusProjection: sumColumn(detail.weeks, (w) => w.consensusProjection),
     actual: sumColumn(detail.weeks, (w) => w.actual),
     diff: sumColumn(detail.weeks, (w) => w.diff),
-    fantasyProsDiff: sumColumn(detail.weeks, (w) => w.fantasyProsDiff),
+    consensusDiff: sumColumn(detail.weeks, (w) => w.consensusDiff),
   };
   const closer = countCloserWeeks(detail.weeks);
 
@@ -74,7 +74,7 @@ function DetailCard({ detail }: { detail: PlayerProjectionDetail }) {
         <div className="font-mono text-xs text-foreground/55">
           Closer to actual: <span className="font-semibold text-foreground">Engine {closer.engine}</span>
           {" · "}
-          <span className="font-semibold text-foreground">FantasyPros {closer.fantasyPros}</span>
+          <span className="font-semibold text-foreground">Consensus {closer.consensus}</span>
           {closer.tie > 0 ? ` · Tied ${closer.tie}` : ""}
           {` (of ${closer.graded} weeks with both projections)`}
         </div>
@@ -85,10 +85,10 @@ function DetailCard({ detail }: { detail: PlayerProjectionDetail }) {
             <tr className="border-b border-foreground/15 text-left font-engraved text-[10.5px] uppercase tracking-[0.08em] text-foreground/50">
               <th className="py-2 pr-3">Week</th>
               <th className="py-2 pr-3">Projected (engine)</th>
-              <th className="py-2 pr-3">Projected (FantasyPros)</th>
+              <th className="py-2 pr-3">Projected (consensus)</th>
               <th className="py-2 pr-3">Actual</th>
               <th className="py-2 pr-3">Diff (engine)</th>
-              <th className="py-2 pr-3">Diff (FantasyPros)</th>
+              <th className="py-2 pr-3">Diff (consensus)</th>
             </tr>
           </thead>
           <tbody>
@@ -97,11 +97,11 @@ function DetailCard({ detail }: { detail: PlayerProjectionDetail }) {
                 <td className="py-2 pr-3 font-mono">{w.week}</td>
                 <td className="py-2 pr-3 font-mono">{w.predicted != null ? w.predicted.toFixed(1) : "—"}</td>
                 <td className="py-2 pr-3 font-mono">
-                  {w.fantasyProsProjection != null ? w.fantasyProsProjection.toFixed(1) : "—"}
+                  {w.consensusProjection != null ? w.consensusProjection.toFixed(1) : "—"}
                 </td>
                 <td className="py-2 pr-3 font-mono">{w.played ? (w.actual != null ? w.actual.toFixed(1) : "—") : "Bye/DNP"}</td>
                 <td className="py-2 pr-3 font-mono font-medium">{signedLabel(w.diff)}</td>
-                <td className="py-2 pr-3 font-mono font-medium">{signedLabel(w.fantasyProsDiff)}</td>
+                <td className="py-2 pr-3 font-mono font-medium">{signedLabel(w.consensusDiff)}</td>
               </tr>
             ))}
           </tbody>
@@ -110,11 +110,11 @@ function DetailCard({ detail }: { detail: PlayerProjectionDetail }) {
               <td className="py-2 pr-3">Total</td>
               <td className="py-2 pr-3 font-mono">{totals.predicted != null ? totals.predicted.toFixed(1) : "—"}</td>
               <td className="py-2 pr-3 font-mono">
-                {totals.fantasyProsProjection != null ? totals.fantasyProsProjection.toFixed(1) : "—"}
+                {totals.consensusProjection != null ? totals.consensusProjection.toFixed(1) : "—"}
               </td>
               <td className="py-2 pr-3 font-mono">{totals.actual != null ? totals.actual.toFixed(1) : "—"}</td>
               <td className="py-2 pr-3 font-mono">{signedLabel(totals.diff)}</td>
-              <td className="py-2 pr-3 font-mono">{signedLabel(totals.fantasyProsDiff)}</td>
+              <td className="py-2 pr-3 font-mono">{signedLabel(totals.consensusDiff)}</td>
             </tr>
           </tfoot>
         </table>
@@ -131,14 +131,14 @@ interface ProjectionPlayerDetailProps {
  * Week-by-week projected/actual/diff for specific searched players —
  * the individual counterpart to ProjectionSummaryView/ProjectionPlayerTable's
  * pooled-position views, added on direct follow-up request ("I want to
- * be able to search for a player"). Also shows FantasyPros' own weekly
+ * be able to search for a player"). Also shows the consensus source's own weekly
  * consensus estimate alongside the engine's for direct comparison —
  * previously only pulled ad hoc via a temporary diagnostic route each
  * time a specific player's numbers were requested; promoted into this
  * permanent view instead of re-building the one-off script every time.
- * Diff stays engine-vs-actual only — FantasyPros' number is a display
+ * Diff stays engine-vs-actual only — the consensus number is a display
  * column, not folded into any summary math here. A separate
- * fantasyProsDiff column mirrors diff's shape for that number, and a
+ * consensusDiff column mirrors diff's shape for that number, and a
  * totals row (sumColumn) sums each column over whichever weeks actually
  * have a value — bye/missing weeks don't contribute, rather than being
  * treated as zero — so the net over/under-projection across the whole

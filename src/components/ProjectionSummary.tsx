@@ -81,7 +81,7 @@ export function ProjectionSummaryView({
       {expertConsensusOverall && (
         <div className="space-y-2">
           <h3 className="font-engraved text-[11px] uppercase tracking-[0.1em] text-foreground/50">
-            vs. FantasyPros&apos; weekly consensus estimate (same player-weeks, own coverage)
+            vs. the consensus projection the engine itself blends in (same player-weeks, own coverage)
           </h3>
           <ProjectionRow label="Overall" summary={expertConsensusOverall} />
           {expertConsensusByPosition &&
