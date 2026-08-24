@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
+import { BrandPennant } from "@/components/BrandPennant";
 import { useRosterModal } from "@/lib/useRosterModal";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { useTheme } from "@/lib/useTheme";
@@ -112,37 +113,6 @@ const LINKS: { href: string; label: string; icon: React.ReactNode }[] = [
 const RAIL_BG = "linear-gradient(185deg, #0c1130 0%, #060a22 100%)";
 const RAIL_BORDER = "rgba(255, 255, 255, 0.09)";
 
-/** The Legitfootball mark: block "L", a vertical football with laces, block "F". */
-function LogoTile({ size = 30 }: { size?: number }) {
-  const bg = "#0e1330";
-  const fg = "#f4efe4";
-  return (
-    <span
-      className="flex shrink-0 items-center justify-center rounded-[7px]"
-      style={{
-        width: size,
-        height: size,
-        background: bg,
-        boxShadow: "0 4px 14px -5px rgba(0, 0, 0, 0.6)",
-        border: "1px solid rgba(244, 239, 228, 0.12)",
-      }}
-    >
-      <svg viewBox="0 0 100 100" style={{ width: size * 0.72, height: size * 0.72 }}>
-        {/* L */}
-        <path d="M17 30 H28 V61 H39 V70 H17 Z" fill={fg} />
-        {/* F */}
-        <path d="M72 30 H91 V39 H83 V45.5 H88 V54.5 H83 V70 H72 Z" fill={fg} />
-        {/* Football — centered in the gap between the L and the F */}
-        <ellipse cx="55.5" cy="50" rx="12.5" ry="22" fill={fg} />
-        <line x1="55.5" y1="33" x2="55.5" y2="67" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
-        <line x1="50" y1="43" x2="61" y2="43" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
-        <line x1="50" y1="50" x2="61" y2="50" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
-        <line x1="50" y1="57" x2="61" y2="57" stroke={bg} strokeWidth="2.2" strokeLinecap="round" />
-      </svg>
-    </span>
-  );
-}
-
 /**
  * Site-wide navigation shell — a persistent sidebar kept a fixed deep-navy
  * rail in BOTH light and dark mode (a deliberate constant spine / masthead,
@@ -223,8 +193,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </svg>
         </button>
         <Link href="/" className="flex items-center gap-2">
-          <LogoTile size={26} />
-          <span className="font-jost text-[15px] font-semibold text-[#eef1fa]">LEGITFOOTBALL</span>
+          <BrandPennant width={142} />
         </Link>
         <button
           type="button"
@@ -260,10 +229,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* masthead */}
         <div className="flex items-center justify-between gap-2">
           <Link href="/" className="flex items-center gap-2.5 px-1">
-            <LogoTile />
-            <span className="flex flex-col leading-none">
-              <span className="font-jost text-[16px] font-semibold text-[#eef1fa]">LEGITFOOTBALL</span>
-              <span className="mt-1 font-engraved text-[8.5px] uppercase tracking-[0.18em] text-[var(--premium)]">
+            <span className="flex flex-col">
+              <BrandPennant width={174} />
+              <span className="mt-1.5 pl-4 font-engraved text-[8.5px] uppercase tracking-[0.18em] text-[var(--premium)]">
                 Fantasy Toolkit
               </span>
             </span>
