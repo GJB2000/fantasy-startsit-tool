@@ -9342,7 +9342,75 @@ single-season numbers for those specific constants.
       overflow. Commits: `4293da5` (pages), `aac6378` (search), `7e025f6`
       (advanced on detail), `1cc5b49` (advanced on leaderboard).
 
-### Open items (as of item 159 — pick up here)
+160. **Tested yards per route run (YPRR) as a standalone signal — the one
+    marquee SportsDataIO advanced metric that is reconstructable per-week.
+    Real WR signal, but not integrated: it overlaps heavily with target
+    share, and it cannot be validated beyond a single season on this
+    subscription.**
+    - **Why only YPRR was testable.** Probing `AdvancedPlayerInfo` showed the
+      per-player feed carries **83 fields per GAME but 445 per SEASON**, and
+      almost every genuinely new metric is season-ONLY:
+      `ExpectedFantasyPoints`, `RouteParticipation`, `YardsPerRouteRun`,
+      `WeightedOpportunities`, `TargetQualityRating`, `TargetSeparation`,
+      `PressuredCompletionPercentage`, `TotalQBR`, `AirYards`, `DropRate`.
+      A season-final number can't be sliced into a trailing window and using
+      it to predict week N leaks the rest of the season, so **none of those
+      can be backtested at all in this form** — a shape problem, not a
+      subscription one. Per-week the feed does carry `RoutesRun`,
+      `SnapShare`, `TargetShare`, `OpportunityShare`, `Hurries`,
+      `YardsCreated`, `EvadedTackles`, `RedZone*`, `DeepBall*`,
+      `ContestedTargets` — so YPRR is reconstructable as
+      `ReceivingYards / RoutesRun` from per-week components (ratio of sums
+      over the trailing window, per items 33/159, not a mean of per-game
+      rates).
+    - **Method**: the standard harness — `buildPairsForWeek` adjacent-rank
+      pairs on the primary 2025 SportsDataIO pipeline, weeks 2-18, graded by
+      `gradeOutcome` — with reference pickers computed on the IDENTICAL pairs
+      so the comparison is apples-to-apples. 306 pairs, 81 distinct pooled
+      players, one cached `AdvancedPlayerInfo` call each (0 failures, ~12s).
+    - **Results (2025, primary pipeline):**
+
+      | signal | overall | WR | TE |
+      |---|---|---|---|
+      | **yprr** | **56.7%** (n=305) | **59.3%** (n=204) | 51.5% (n=101) |
+      | targetShare | 55.1% | 57.4% | 50.5% |
+      | targets (volume) | 54.6% | 54.2% | 55.3% |
+      | routesRun | 48.2% | 47.0% | 50.5% |
+
+    - **Route VOLUME alone is below chance (47-48%) while route EFFICIENCY is
+      the best WR number here** — worth recording, because it says YPRR is
+      not merely a volume proxy dressed up.
+    - **But it is substantially the same information as target share.** Split
+      by whether the two agree (item 17's receivingComposite methodology):
+      WR agreement **63.7% (n=124)** — the strongest number in this test —
+      while on the 80 pairs where they DISAGREE, YPRR picks right only 52.5%
+      vs target share's 47.5%. So YPRR's genuine edge over a signal the
+      engine already has is a ~5pp swing on 39% of pairs, barely above chance
+      in absolute terms. TE shows nothing at all (51.5%/50.5%, agreement
+      51.9%) — consistent with TE's chronic noisiness.
+    - **Not integrated, on three grounds:** (1) YPRR alone (59.3% WR) does not
+      beat the engine's own current WR accuracy (60.3%, primary 2025); (2) the
+      repeated pattern of items 33/35/97/106/123 is that standalone signals of
+      exactly this strength add nothing once blended into a score already
+      carrying expert consensus — item 148's air-yards share is the lone
+      counterexample and shipped at 0.1; (3) **it cannot be cross-season
+      validated** — 2022-2024 advanced data is paywalled, so this is a
+      single-season result, which items 24-30 are the long record of not
+      trusting.
+    - **What would change the answer**: buying historical seasons (Open Item
+      #35) would make a proper multi-season YPRR sweep possible, and the
+      agreement overlay (63.7%) is the shape worth testing then — as a WR
+      high-confidence tiebreaker like item 20's, not a scoring factor.
+      Separately, the season-only fields are a natural fit for **Legit
+      Rankings**, which is a season-value ranking with no pick ground truth
+      to backtest against (items 78/139) — `ExpectedFantasyPoints` and
+      `YardsPerRouteRun` are arguably better inputs there than what it has
+      now, and need no per-week reconstruction.
+    - No engine or config change. Temporary diagnostic route deleted after
+      recording these numbers, same precedent as items 22/29/34/38/97/106/
+      123/124 — this write-up is the only lasting artifact.
+
+### Open items (as of item 160 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `1cc5b49`), working
 tree CLEAN.** The most recent session added the player stat pages (item 159 —
 `/stats` and `/stats/[playerId]`, with search and advanced metrics) and
