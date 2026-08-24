@@ -9244,8 +9244,8 @@ single-season numbers for those specific constants.
       a temp route at `api/__v3check` 404s silently.
 
 ### Open items (as of item 158 — pick up here)
-**Everything is committed and pushed to `main` (HEAD `7129a2d`), working
-tree CLEAN. The app WORKS — locally and in production.** Three strands this
+**Everything is committed and pushed to `main` (HEAD `185916a`), working
+tree CLEAN. The app WORKS — locally and in production.** Five strands this
 session:
 1. **A UI rating pass and six presentation-only fixes (item 154)**, plus a
    regression fix for one of them (`5b192fe`). See the "do not undo" list
@@ -9257,6 +9257,8 @@ session:
 4. **Research/decisions with no code (item 157)** — a community page was
    proposed and declined (with a cheaper shareable-link alternative noted),
    and platform-sync/licensing research folded into Open Items #32 and #33.
+5. **The v3 migration, mapped then shipped (item 158)** — season-routed, so
+   2025 keeps working today and 2026 takes over by itself in September.
 
 **THE ONE DATE THAT MATTERS: ~15 September 2026 — but the migration has now
 LANDED (item 158), so this is a verification date, not a deadline.** The app
@@ -9281,6 +9283,16 @@ correction to the historical record: the prior session's note that it
 "dropped the condense-rankings-toggles review item — no clean win" is
 **superseded by item 154b**, which found a clean win once the problem was
 reframed from layout to labeling + weight.
+
+Two things from the MIGRATION that a future session should NOT "simplify"
+(item 158):
+- **`seasonRouting.ts` is not indirection for its own sake.** The two
+  SportsDataIO subscriptions cover DISJOINT seasons — the legacy key 401s on
+  2026, the 2026 key 401s on 2025 — so collapsing the dispatch and picking
+  one host family breaks either today or September, depending which you pick.
+- **`Players`/`Teams`/`Timeframes` are on legacy DELIBERATELY**, even though
+  v3 serves them fine. The 2026 keys are an evaluation; always-on endpoints
+  shouldn't depend on one. Flip them only once the 2026 plan is bought.
 
 Three things from the UI work that a future session should NOT silently
 undo:
@@ -10432,7 +10444,24 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   `weeklyStats.ts`, `byes.ts`, `timeframes.ts`, `positionDefense.ts`,
   `seasonToDatePlayerStats.ts`, `teamGameStats.ts`, `defense.ts` — item
   62, a thin typed reader over `FantasyDefenseByGame`, the same
-  per-week-reader shape as `weeklyStats.ts`). `defenseTeams.ts` (item
+  per-week-reader shape as `weeklyStats.ts`). **As of item 158 this
+  directory is SEASON-ROUTED**: `seasonRouting.ts` (`V3_MIN_SEASON = 2026`,
+  `usesV3()`, `seasonYearFromApiSeason()`) decides, per call, whether a
+  season-scoped reader hits the legacy hosts with
+  `SPORTSDATA_LEGACY_API_KEY` (2025 and earlier) or the v3 hosts with
+  `SPORTSDATA_API_KEY` (2026+) — the two subscriptions cover DISJOINT
+  seasons, so neither can serve both. `client.ts`'s `API_BASES` therefore
+  pairs each base with the env var supplying its key (`fantasy`, `odds`,
+  `scoresV3`, `statsV3`), and `sportsDataFetch` takes an optional
+  `skipCache` for payloads whose caller immediately trims them.
+  `boxScores.ts` (item 158) reads `BoxScoresFinal` — the Final-Only
+  equivalent of `PlayerGameStatsByWeek` — and is the 2026+ source for
+  THREE readers at once (`weeklyStats.ts`/`defense.ts`/`teamGameStats.ts`
+  each take their slice from its `PlayerGames`/`FantasyDefenseGames`/
+  `TeamGames`), which also retires the `odds` base for 2026+. It fetches
+  with the shared cache bypassed and caches only the trimmed slices,
+  because the raw response is ~12MB/week (item 27's memory lesson).
+  `defenseTeams.ts` (item
   62) mints synthetic D/ST `Player` records from `/Teams` (SportsDataIO
   has no real player identity for a team defense) — synthetic PlayerIDs
   via a `900000 + TeamID` offset, guaranteed not to collide with any
