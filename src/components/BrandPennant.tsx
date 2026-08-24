@@ -1,8 +1,8 @@
 import Image from "next/image";
 
 /** Intrinsic size of public/legitfootball-pennant.png (2.56:1). */
-const SRC_W = 1090;
-const SRC_H = 426;
+const SRC_W = 1610;
+const SRC_H = 628;
 
 /**
  * The LEGITFOOTBALL pennant mark — cream felt, blue helmet + script.
@@ -22,12 +22,20 @@ export function BrandPennant({
   className?: string;
   priority?: boolean;
 }) {
+  const height = Math.round((width * SRC_H) / SRC_W);
   return (
     <Image
       src="/legitfootball-pennant.png"
       alt="Legit Football"
-      width={width}
-      height={Math.round((width * SRC_H) / SRC_W)}
+      // Ask for twice the pixels we actually display, then scale down in CSS.
+      // A fixed-size next/image only offers 1x and 2x of the `width` prop in
+      // its srcset, so on a 2x screen this lands 4x the CSS size — sharp on
+      // retina and still sharp zoomed in. Without it the mark renders soft:
+      // at width={142} a 2x display got a 192px-wide file for a 284px slot.
+      width={width * 2}
+      height={height * 2}
+      quality={90}
+      style={{ width, height }}
       priority={priority}
       className={className}
     />
