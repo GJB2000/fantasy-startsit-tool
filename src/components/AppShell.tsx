@@ -242,7 +242,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="flex flex-col">
               <BrandPennant width={174} />
               <span className="mt-1.5 pl-4 font-engraved text-[8.5px] uppercase tracking-[0.18em] text-[var(--premium)]">
-                Fantasy Toolkit
+                LEGITFOOTBALL PREMIUM
               </span>
             </span>
           </Link>
