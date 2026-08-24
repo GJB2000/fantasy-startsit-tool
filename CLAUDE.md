@@ -9622,7 +9622,54 @@ single-season numbers for those specific constants.
       multiseason byte-identical, all eight pages and every live route 200,
       `tsc`/lint clean. Diagnostic route deleted after recording.
 
-### Open items (as of item 162 — pick up here)
+163. **Fixed the trade backtests to grade the engine that actually ships —
+    they were scoring without the expert-consensus term entirely. A
+    correctness fix, and the largest single jump in a trade number this
+    document records.** Found while verifying item 162 and logged as Open
+    Item #38; picked up immediately after.
+    - **The bug**: `collectTradeResultsForSeason` (`tradeBacktest.ts`) and its
+      counterpart in `multiPlayerTradeBacktest.ts` both called `sliceWeekData`
+      with SEVEN arguments, stopping at `depthChartByPlayerIdWeek`. That
+      silently dropped four: `format`, `allDefenseWeeklyRows`,
+      `impliedTotalsByTeamWeek` and — the one that matters —
+      `expertConsensusByPlayerIdWeek`. So every trade backtest ever recorded
+      graded an engine with NO consensus signal, while `/api/trade` has run
+      with it since item 70, and leans on it heavily since item 145 (QB 0.8).
+      The dropped `format` is a second, smaller bug in the same call: item
+      137 made the trade backtest format-aware, but this slice defaulted to
+      PPR, so a Half-PPR or Standard run was pairing and building its
+      position-defense table in PPR regardless.
+    - **Confirmed as the cause, not a guess**: item 162's diagnostic passed
+      the full slice and predicted week-4 77.78% / week-12 58.33% where the
+      shipped path reported 80.56% / 63.89%. After this fix the shipped path
+      returns exactly 77.78% and 58.33% — the diagnostic and production now
+      agree to the decimal.
+    - **Before / after** (PPR):
+
+      | measure | before | after |
+      |---|---|---|
+      | nflverse multiseason 1-for-1 (pooled) | 53.01% | **61.40%** |
+      | multi-player 2-for-2 (the clean skill measure) | 54.35% | **60.02%** |
+      | multi-player 2-for-1 | 81.29% | 82.09% |
+      | multi-player pooled overall | 64.19% | 68.09% |
+      | primary single cutoff wk4 / wk8 / wk12 | 80.56 / 72.22 / 63.89 | 77.78 / 77.78 / 58.33 |
+
+      The pooled 1-for-1 gain (+8.39pp) is also much more CONSISTENT by
+      season — 62.5 / 60.2 / 60.2 / 62.7 for 2022-2025, against a previous
+      spread of 50.7 / 52.8 / 49.5 / 59.0. Single cutoffs move both ways,
+      which is expected at n=36 each.
+    - **These supersede every previously documented trade-backtest figure**,
+      including item 49's 55.2% pooled (already stale at 53.01% from
+      accumulated tuning — see item 162) and item 138's 2-for-2 54.3%/55.5%.
+      The 2-for-1 naive "more players" baseline is unchanged at 17.71%, as
+      expected: it doesn't depend on scoring at all.
+    - **Not a tuning change** — no weight moved, and the broad backtest is
+      byte-identical at 61.80% (it always passed the full slice). This only
+      changes what the trade backtests MEASURE, bringing them in line with
+      the live tool.
+    - **Resolves Open Item #38.**
+
+### Open items (as of item 163 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `1cc5b49`), working
 tree CLEAN.** The most recent session added the player stat pages (item 159 —
 `/stats` and `/stats/[playerId]`, with search and advanced metrics) and
@@ -10926,24 +10973,12 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       live for the nflverse pipeline, and the old weights are recorded in
       config.ts's comment (`RB 0.5 / TE 0.7`).
 
-38. **The trade backtest scores without the expert-consensus term — it no
-    longer measures the live engine.** Found while verifying item 162.
-    `collectTradeResultsForSeason` (`tradeBacktest.ts`) calls `sliceWeekData`
-    with 7 arguments, omitting format, defense rows, implied totals AND
-    `expertConsensusByPlayerIdWeek`. Since consensus is the engine's largest
-    signal (QB 0.8, item 145/161), the trade backtest is grading a
-    materially different engine than `/api/trade` runs. Concretely: item
-    162's diagnostic, which passed the full slice, measured week-4 accuracy
-    at 77.78% where the shipped path reports 80.56%.
-    - **Fix is small but changes published numbers**: pass the same
-      arguments `runBroadBacktest` does. Every documented trade-backtest
-      figure (items 48/49/138/162) would need re-measuring afterward, which
-      is why it wasn't folded into item 162 — two changes at once would make
-      neither attributable.
-    - **Also worth re-baselining while there**: item 49's documented 55.2%
-      pooled is stale; the same route now reads 53.01% purely from
-      accumulated engine tuning since. Verified pre-existing via `git stash`,
-      not a regression, but the number in the doc misleads until refreshed.
+38. **RESOLVED in item 163** — the trade backtests now pass the full
+    `sliceWeekData` arguments, so they grade the engine that actually ships
+    (consensus included) rather than one without its largest signal. Pooled
+    1-for-1 went 53.01% -> 61.40% and 2-for-2 54.35% -> 60.02%; every
+    previously published trade-backtest figure is superseded. The dropped
+    `format` argument, a second bug in the same call, is fixed too.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that

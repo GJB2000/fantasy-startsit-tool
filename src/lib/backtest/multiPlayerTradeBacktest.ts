@@ -280,6 +280,11 @@ function collectMultiTradeResultsForSeason(
 
   for (const asOfWeek of asOfWeeks) {
     const targetWeek = asOfWeek + 1;
+    // Full slice, matching runBroadBacktest. The 7-argument version this
+    // replaced silently dropped `format` (so a Half-PPR/Standard run sliced
+    // in PPR) and, more importantly, `expertConsensusByPlayerIdWeek` — which
+    // meant the trade backtest graded an engine WITHOUT its largest signal
+    // while /api/trade runs with it. See CLAUDE.md item 163.
     const weekSlice = sliceWeekData(
       runData.allWeeklyRows,
       targetWeek,
@@ -287,7 +292,11 @@ function collectMultiTradeResultsForSeason(
       runData.allTeamWeeklyRows,
       runData.nflversePlayerWeekTable,
       runData.teamWeatherByTeamWeek,
-      runData.depthChartByPlayerIdWeek
+      runData.depthChartByPlayerIdWeek,
+      format,
+      runData.allDefenseWeeklyRows,
+      runData.impliedTotalsByTeamWeek,
+      runData.expertConsensusByPlayerIdWeek
     );
     const opponentsByTeamWeek = buildOpponentsByTeamWeek(runData.allWeeklyRows, targetWeek);
     const ranked = buildPooledRanking(weekSlice, format);
