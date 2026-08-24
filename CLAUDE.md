@@ -9406,9 +9406,47 @@ single-season numbers for those specific constants.
       to backtest against (items 78/139) — `ExpectedFantasyPoints` and
       `YardsPerRouteRun` are arguably better inputs there than what it has
       now, and need no per-week reconstruction.
-    - No engine or config change. Temporary diagnostic route deleted after
-      recording these numbers, same precedent as items 22/29/34/38/97/106/
-      123/124 — this write-up is the only lasting artifact.
+    - **FOLLOW-UP — the agreement overlay was then tested as a real
+      integration, and it FAILS. This closes the question, and it means
+      buying historical data for YPRR would be wasted money.** The obvious
+      next step from the 63.7% agreement number was to try it the way item
+      20's WR tiebreaker works: on a close call, defer to the players two
+      signals independently agree on. Tested against the real engine on the
+      primary 2025 pipeline, WR pairs, weeks 2-18.
+      - **Harness verified against the real engine first** (items 43/44's
+        rule): the diagnostic's baseline reproduced `/api/backtest/broad`
+        WR EXACTLY — 60.29%, 123/204 — before any variant was trusted.
+      - **Results:**
+
+        | variant | WR accuracy | picks changed |
+        |---|---|---|
+        | baseline (engine as-is) | **60.29%** (123/204) | — |
+        | + YPRR & target share agree | 57.84% (118/204) | 15 |
+        | YPRR replacing separation | 57.84% (118/204) | 15 |
+        | three-way agreement | 60.29% (123/204) | 0 |
+
+      - The overlay overrode 15 picks and lost 5 net — **a 2.45pp
+        regression**. The three-way variant never fires at all, which makes
+        sense once traced: when target share and separation agree the engine
+        ALREADY flips to them (item 20), so requiring YPRR to agree too adds
+        no new overrides.
+      - **Why the standalone number didn't survive**: on exactly the close
+        calls this gates, the engine's pick is already informed by target
+        share, separation, drop rate, air-yards share AND expert consensus.
+        A two-signal heuristic overriding that is strictly less informed.
+        Same failure mode as QB success rate (item 33) and the teammate-out
+        bump (item 35) — a real standalone signal that adds nothing, or here
+        actively hurts, once blended into an already-tuned score.
+      - **Practical consequence for Open Item #35**: do NOT buy historical
+        seasons on YPRR's account. It failed its first integration test on
+        the one season available, so paying to validate it across more
+        seasons would be spending money to re-check something already
+        rejected. Any future case for buying history has to rest on a
+        different signal, or on the backtest-pipeline argument already
+        recorded in #35.
+    - No engine or config change. Both temporary diagnostic routes deleted
+      after recording these numbers, same precedent as items 22/29/34/38/97/
+      106/123/124 — this write-up is the only lasting artifact.
 
 ### Open items (as of item 160 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `1cc5b49`), working
