@@ -39,6 +39,14 @@ const COLUMNS: Record<StatsPosition, Column[]> = Object.fromEntries(
   ])
 ) as Record<StatsPosition, Column[]>;
 
+/**
+ * Lowercase and drop everything that isn't a letter or digit, so "jamarr"
+ * finds "Ja'Marr Chase" and "aj brown" finds "A.J. Brown".
+ */
+function normalize(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 export function StatsBrowser() {
   const [scoringFormat, setScoringFormat] = useScoringFormat();
   const [position, setPosition] = useState<StatsPosition>("QB");
@@ -46,6 +54,7 @@ export function StatsBrowser() {
   const [season, setSeason] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<NumericKey>("points");
   const [ascending, setAscending] = useState(false);
 
@@ -75,10 +84,26 @@ export function StatsBrowser() {
 
   const columns = COLUMNS[position];
 
-  const sorted = useMemo(() => {
+  /**
+   * Rank is assigned BEFORE filtering, so a searched player keeps their real
+   * standing in the current sort — a filtered table that renumbered from 1
+   * would say the guy you looked up is the best at his position.
+   */
+  const ranked = useMemo(() => {
     if (!rows) return null;
-    return [...rows].sort((a, b) => (ascending ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]));
+    return [...rows]
+      .sort((a, b) => (ascending ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]))
+      .map((row, index) => ({ row, rank: index + 1 }));
   }, [rows, sortKey, ascending]);
+
+  const visible = useMemo(() => {
+    if (!ranked) return null;
+    const needle = normalize(query);
+    if (!needle) return ranked;
+    return ranked.filter(
+      ({ row }) => normalize(row.name).includes(needle) || normalize(row.team ?? "").startsWith(needle)
+    );
+  }, [ranked, query]);
 
   function toggleSort(key: NumericKey) {
     if (key === sortKey) {
@@ -100,11 +125,47 @@ export function StatsBrowser() {
           onChange={setScoringFormat}
           tone="secondary"
         />
+        <div className="min-w-0 grow basis-[240px] sm:max-w-xs">
+          <span className="mb-1.5 block font-engraved text-[9.5px] uppercase tracking-[0.12em] text-foreground/55">
+            Search
+          </span>
+          <div className="relative">
+            <svg
+              viewBox="0 0 24 24"
+              className="pointer-events-none absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-foreground/40"
+              fill="none"
+              aria-hidden
+            >
+              <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.7" />
+              <path d="M16 16l4 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+            </svg>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Find a player…"
+              aria-label={`Search ${position} players`}
+              className="w-full rounded-full border border-foreground/12 bg-surface-sunken py-1.5 pl-9 pr-8 text-[13px] text-foreground placeholder:text-foreground/40 focus:border-accent/50 focus:outline-none"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[15px] leading-none text-foreground/45 transition-colors hover:text-foreground"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {season && (
         <p className="mb-4 text-[13px] text-foreground/55">
-          {season} season totals · {sorted?.length ?? 0} players · click a player for their game log
+          {season} season totals ·{" "}
+          {query ? `${visible?.length ?? 0} of ${ranked?.length ?? 0}` : (ranked?.length ?? 0)} players · click a
+          player for their game log
         </p>
       )}
 
@@ -116,7 +177,32 @@ export function StatsBrowser() {
 
       {loading && !error && <p className="text-[13px] text-foreground/55">Loading {position} stats…</p>}
 
-      {!loading && !error && sorted && (
+      {/* A search that misses in the current position is the obvious trap here
+          — the table only ever holds one position, so looking up a RB while
+          the QB tab is open finds nothing. Rather than a dead end, offer the
+          other positions; the query carries over. */}
+      {!loading && !error && visible?.length === 0 && (
+        <div className="rounded-[12px] border border-foreground/12 px-4 py-5 text-[13px] text-foreground/70">
+          <p>
+            No {position} matches “{query}”.
+          </p>
+          <p className="mt-2.5 flex flex-wrap items-center gap-2">
+            <span className="text-foreground/55">Try</span>
+            {POSITIONS.filter((option) => option.value !== position).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setPosition(option.value)}
+                className="rounded-full bg-foreground/8 px-2.5 py-1 font-engraved text-[10px] uppercase tracking-[0.08em] text-foreground/75 transition-colors hover:bg-foreground/15 hover:text-foreground"
+              >
+                {option.label}
+              </button>
+            ))}
+          </p>
+        </div>
+      )}
+
+      {!loading && !error && visible && visible.length > 0 && (
         <div className="glass-card overflow-x-auto rounded-[12px]">
           <table className="w-full min-w-[720px] border-collapse text-[13px]">
             <thead>
@@ -141,12 +227,12 @@ export function StatsBrowser() {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((row, index) => (
+              {visible.map(({ row, rank }) => (
                 <tr key={row.playerId} className="border-b border-foreground/8 last:border-b-0 hover:bg-foreground/[0.04]">
                   <td className="sticky left-0 z-10 bg-surface px-3 py-2">
                     <Link href={`/stats/${row.playerId}`} className="flex items-center gap-2.5 hover:text-accent">
                       <span className="w-6 shrink-0 text-right font-mono text-[11px] text-foreground/45">
-                        {index + 1}
+                        {rank}
                       </span>
                       <span className="whitespace-nowrap font-medium text-foreground">{row.name}</span>
                       <span className="whitespace-nowrap font-mono text-[11px] text-foreground/45">
