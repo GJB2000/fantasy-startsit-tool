@@ -9864,6 +9864,66 @@ single-season numbers for those specific constants.
       as the active-nav highlight and the scoring chip — the tie-in that
       did not exist before.
 
+168. **Restored the replacement-level (value-over-replacement) normalization
+    for uneven trades — reversing item 152's iteration 3, on a concrete
+    failing case the user hit.** Reported: giving D'Andre Swift + DK Metcalf
+    for Jahmyr Gibbs graded as not-a-win when an elite RB for two mids is
+    plainly the good side.
+    - **Reproduced before changing anything, and the engine was NOT at
+      fault.** The per-game valuations are right: Gibbs 21.8/gm, Swift 12.6,
+      Metcalf 11.1 (Gibbs' season average 21.6 vs Swift's 14.3, and his
+      consensus projection 21.8 — the elite gap is fully present). The
+      failure was entirely in how the SIDES were compared: raw rest-of-season
+      sums, 401.7 vs 369.8, giving "fair" with a caveat note. Raw totals
+      accumulate with headcount, so two startable players out-total one elite
+      no matter how big the talent gap, because nothing accounts for the fact
+      that you can only start so many each week.
+    - **The fix is item 138's model, restored.** Credit the shorter side one
+      replacement-level filler per freed roster spot (`REPLACEMENT_PER_GAME`,
+      the empirically-derived startable-pool cutoff value), priced at the
+      extra players' own positions and remaining games. Extras are the
+      LOWEST-value players on the longer side. Even-count trades get zero
+      filler, so 1-for-1 and 2-for-2 are byte-identical.
+    - **Why this is not the arbitrary "stud premium" item 152 rejected.**
+      Crediting the short side a replacement filler is algebraically identical
+      to comparing the two sides' points ABOVE replacement — the standard way
+      fantasy value is measured, and the same VOR the Top 100 already uses
+      (item 140). Item 152 iteration 2's `EXTRA_PLAYER_VALUE_RATIO = 0.4` WAS
+      a tuned judgment call and deserved rejecting; iteration 3 then threw out
+      the empirically-grounded VOR credit along with it. That was too
+      conservative, and this report is the evidence.
+    - **It also re-couples live with the backtest.** `multiPlayerTradeBacktest.ts`
+      never stopped applying the filler (item 152 deliberately decoupled the
+      two), so since then the live tool graded uneven trades a different way
+      than the backtest validated. They now measure the same thing again.
+      The backtest itself is provably untouched by this item — it does not
+      import `evaluateTrade` at all (only mentions it in a comment).
+    - **Three UI inconsistencies this surfaced and fixed**, all from
+      `netValue` no longer equalling `getTotal - giveTotal`: the balance meter
+      drew the longer side's bar longer while the verdict said it lost; the
+      gold "Higher value" tag sat next to a visibly smaller number; and the
+      summary strip showed give/get/net that didn't reconcile. Now
+      `TradeEvaluation` also exposes `adjustedGiveTotal`/`adjustedGetTotal`
+      (equal to the raw totals on even trades) — the meter uses those with a
+      "+ N open spot" sub-label, the strip gains a "Spot you free"/"Spot you
+      fill" cell so every number adds up, and the tag reads "Better side".
+      The per-player cards and each column's header total stay RAW, so they
+      still sum to what is displayed above them.
+    - **Verified live end to end**: the reported trade now grades "good"
+      (+175.9, freed spot credited ~208); the mirror is exactly symmetric at
+      −175.9; 1-for-1 and 2-for-2 have `netValue` exactly equal to
+      `getTotal - giveTotal` with no note; 3-for-1 correctly credits two
+      spots; and the credit is scoring-format aware (Standard's WR filler is
+      138.2 against PPR's 207.7, matching `REPLACEMENT_PER_GAME`). Waiver
+      drop suggestions and the Home trade widget are unaffected — both are
+      always 1-for-1. `tsc`/lint clean.
+    - **Honest limitation, unchanged from item 138**: the credit assumes the
+      freed spot is genuinely refillable at replacement level, which is right
+      for a normal roster but overstates the gain for someone whose bench is
+      already all waiver-tier. The tool does not know the user's full roster
+      in the general case, and every mainstream trade calculator makes the
+      same assumption.
+
 ### Open items (as of item 166 — pick up here)
 **Everything is committed and pushed to `main`, working tree CLEAN.** The
 most recent session (items 159-166) was the largest change to the engine's

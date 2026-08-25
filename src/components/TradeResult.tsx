@@ -160,10 +160,26 @@ function VerdictIcon({ verdict }: { verdict: TradeVerdict }) {
   );
 }
 
-function BalanceRow({ label, total, proportion, isGet }: { label: string; total: number; proportion: number; isGet: boolean }) {
+function BalanceRow({
+  label,
+  total,
+  proportion,
+  isGet,
+  credit,
+}: {
+  label: string;
+  total: number;
+  proportion: number;
+  isGet: boolean;
+  /** Replacement value credited for a freed roster spot on an uneven trade, so the bar matches the verdict instead of the raw card totals. */
+  credit?: number | null;
+}) {
   return (
     <div className={styles.balRow}>
-      <span className={styles.balLab}>{label}</span>
+      <span className={styles.balLab}>
+        {label}
+        {credit ? <span className={styles.balCredit}> + {credit.toFixed(0)} open spot</span> : null}
+      </span>
       <span className={styles.balTrack}>
         <span
           className={`${styles.balFill} ${isGet ? styles.balFillGet : styles.balFillGive}`}
@@ -253,7 +269,7 @@ function SideColumn({
       <div className={styles.sideHead}>
         <span className={styles.sideL}>
           <span className={styles.sideLab}>{label}</span>
-          {isBetter && <span className={styles.sideTag}>Higher value</span>}
+          {isBetter && <span className={styles.sideTag}>Better side</span>}
         </span>
         <span className={`${styles.sideTot} ${isGive ? "" : styles.sideTotGet} ${styles.n}`}>
           {total != null ? total.toFixed(1) : "—"}
@@ -308,7 +324,15 @@ export function TradeResult({ evaluation, contextNote, scoringFormat }: TradeRes
   }
 
   const betterSide: "give" | "get" | null = verdict === "good" ? "get" : verdict === "bad" ? "give" : null;
-  const balanceMax = giveTotal != null && getTotal != null ? Math.max(giveTotal, getTotal, 1) : null;
+  // The meter compares the values the VERDICT uses (raw totals plus any
+  // roster-spot credit), not the raw card sums — otherwise on an uneven trade
+  // the longer side's bar runs longer while the verdict says it lost.
+  const adjGive = evaluation.adjustedGiveTotal ?? giveTotal;
+  const adjGet = evaluation.adjustedGetTotal ?? getTotal;
+  const giveCredit = adjGive != null && giveTotal != null ? adjGive - giveTotal : 0;
+  const getCredit = adjGet != null && getTotal != null ? adjGet - getTotal : 0;
+  const balanceMax = adjGive != null && adjGet != null ? Math.max(adjGive, adjGet, 1) : null;
+  const rosterCredit = Math.max(giveCredit, getCredit);
 
   const toneStyle = { "--tone": TONE[verdict] } as CSSProperties;
 
@@ -345,12 +369,24 @@ export function TradeResult({ evaluation, contextNote, scoringFormat }: TradeRes
             </div>
           </div>
 
-          {balanceMax != null && giveTotal != null && getTotal != null && (
+          {balanceMax != null && adjGive != null && adjGet != null && (
             <>
               <div className={styles.vrule} />
               <div className={styles.bal}>
-                <BalanceRow label="You give" total={giveTotal} proportion={giveTotal / balanceMax} isGet={false} />
-                <BalanceRow label="You get" total={getTotal} proportion={getTotal / balanceMax} isGet />
+                <BalanceRow
+                  label="You give"
+                  total={adjGive}
+                  proportion={adjGive / balanceMax}
+                  isGet={false}
+                  credit={giveCredit > 0 ? giveCredit : null}
+                />
+                <BalanceRow
+                  label="You get"
+                  total={adjGet}
+                  proportion={adjGet / balanceMax}
+                  isGet
+                  credit={getCredit > 0 ? getCredit : null}
+                />
               </div>
             </>
           )}
@@ -411,11 +447,18 @@ export function TradeResult({ evaluation, contextNote, scoringFormat }: TradeRes
             </div>
           </div>
 
+          {/* Every cell adds up: on an uneven trade the freed roster spot is its
+              own line, so give + spot - get reconciles to the net rather than
+              leaving the reader to wonder why the two totals don't. */}
           <div className={styles.strip}>
             <StripCell label="You give" value={giveTotal} />
             <StripCell label="You get" value={getTotal} />
+            {rosterCredit > 0 ? (
+              <StripCell label={getCredit > 0 ? "Spot you free" : "Spot you fill"} value={rosterCredit} signed={getCredit > 0} />
+            ) : (
+              <StripCell label="Weeks left" value={weeksLeft} />
+            )}
             <StripCell label="Net value" value={netValue} isNet signed />
-            <StripCell label="Weeks left" value={weeksLeft} />
           </div>
         </div>
       </div>

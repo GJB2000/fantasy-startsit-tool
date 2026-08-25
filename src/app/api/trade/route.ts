@@ -111,7 +111,7 @@ export async function GET(request: Request) {
 
     const [give, get] = await Promise.all([Promise.all(giveIds.map(scoreFor)), Promise.all(getIds.map(scoreFor))]);
 
-    const evaluation = evaluateTrade(give, get);
+    const evaluation = evaluateTrade(give, get, format);
 
     return Response.json({
       evaluation,

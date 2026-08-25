@@ -1,4 +1,5 @@
-import { CLOSE_CALL_ABS_POINTS, CLOSE_CALL_RELATIVE_PCT } from "@/lib/recommendation/config";
+import { CLOSE_CALL_ABS_POINTS, CLOSE_CALL_RELATIVE_PCT, REPLACEMENT_PER_GAME } from "@/lib/recommendation/config";
+import { isSkillPosition, type ScoringFormat } from "@/lib/sportsdata/types";
 import type { RestOfSeasonProjection } from "@/lib/recommendation/restOfSeason";
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
 
@@ -13,21 +14,26 @@ export interface TradePlayerResult extends PlayerScoreBreakdown {
 export interface TradeEvaluation {
   give: TradePlayerResult[];
   get: TradePlayerResult[];
-  /** Raw sum of each side's rest-of-season point projections — what the verdict and netValue are based on, and what the UI shows, so the side totals always equal the sum of the player cards. */
+  /** RAW sum of each side's rest-of-season point projections — what the UI shows, so the side totals always equal the sum of the player cards. On uneven trades the verdict and netValue are computed from these PLUS a replacement-level roster-spot adjustment (see rosterNote), so netValue deliberately does not equal getTotal - giveTotal there. */
   giveTotal: number | null;
   getTotal: number | null;
+  /**
+   * Side totals INCLUDING the replacement-level roster-spot adjustment — what
+   * the verdict is actually based on, so `adjustedGetTotal - adjustedGiveTotal`
+   * always equals `netValue`. Identical to the raw totals on even trades. Use
+   * these wherever the UI compares the two sides, and the raw totals wherever
+   * it has to agree with the sum of the player cards.
+   */
+  adjustedGiveTotal: number | null;
+  adjustedGetTotal: number | null;
   netValue: number | null;
   verdict: TradeVerdict;
   headline: string;
   reasoning: string[];
   /**
-   * Set on UNEVEN trades (unequal player counts) — a plain-English caveat
-   * that grading on total points favors the side with more bodies, and that
-   * lineup scarcity means a deeper package out-totaling a single star isn't
-   * automatically the better side. This is the transparent, backtest-aligned
-   * stance: the totals stay honest (no synthetic roster-spot credit or
-   * stud-premium discount) and the nuance is surfaced as a note for the user
-   * to weigh. null on even trades.
+   * Set on UNEVEN trades (unequal player counts) — explains the
+   * replacement-level roster-spot adjustment applied to the verdict. null on
+   * even trades, where no adjustment is made.
    */
   rosterNote: string | null;
 }
@@ -90,30 +96,46 @@ function playerLines(p: TradePlayerResult): string[] {
   return lines;
 }
 
-/** The single most valuable (highest-projected) player across the whole trade — named in the uneven-trade caveat so the user can weigh top-end talent against raw totals. */
-function bestPlayer(counted: TradePlayerResult[]): TradePlayerResult | null {
-  let best: TradePlayerResult | null = null;
-  for (const p of counted) {
-    if (p.restOfSeasonTotal != null && (best == null || p.restOfSeasonTotal > (best.restOfSeasonTotal ?? -Infinity))) {
-      best = p;
-    }
-  }
-  return best;
+/**
+ * A freed (or extra) roster spot from an uneven trade is worth a
+ * replacement-level filler over that player's own remaining games (see
+ * REPLACEMENT_PER_GAME). D/ST and K have no replacement constant here, so a
+ * non-skill extra credits 0 — a minor, documented simplification, since
+ * they're rare in multi-player trades and their replacement value is
+ * lower/noisier anyway.
+ */
+function replacementRestOfSeason(p: TradePlayerResult, format: ScoringFormat): number {
+  if (p.position == null || !isSkillPosition(p.position)) return 0;
+  return REPLACEMENT_PER_GAME[format][p.position] * p.gamesRemaining;
 }
 
 /**
- * Grades a trade on raw rest-of-season point totals (the projection engine's
- * own validated output — see recommendation/restOfSeason.ts). Deliberately
- * transparent and backtest-aligned: no stud-premium discount and no
- * roster-spot filler, so the side totals equal the sum of the player cards
- * and the verdict rests only on what the backtest can actually validate (the
- * point projections). For UNEVEN trades, total points structurally favor the
- * side with more players; rather than fudge the number, that nuance is
- * surfaced as a caveat note (see rosterNote). The close-call threshold is
- * reused unchanged from the single-game comparison engine — there's no
- * backtest ground truth for "was this trade good" to re-tune it against.
+ * Sums each side's rest-of-season projections (see
+ * recommendation/restOfSeason.ts), then — on UNEVEN trades — normalizes both
+ * sides to the same number of roster spots before comparing. Raw point totals
+ * accumulate with headcount, so without that normalization the side with more
+ * bodies is structurally over-valued: two mid starters out-total one elite
+ * even when the elite is plainly the better asset, because you can only start
+ * so many players each week.
+ *
+ * The adjustment is value-over-replacement in disguise: crediting the shorter
+ * side one replacement-level filler per freed roster spot is algebraically
+ * identical to comparing the two sides' points ABOVE replacement, the standard
+ * way fantasy value is measured. The replacement levels are empirical
+ * (REPLACEMENT_PER_GAME — the startable-pool cutoff player's per-game value,
+ * derived from the real 2025 season), not a tuned fudge factor, and
+ * multiPlayerTradeBacktest.ts grades against the same normalization, so the
+ * live tool and the backtest measure the same thing.
+ *
+ * The close-call threshold is reused unchanged from the single-game comparison
+ * engine — there's no backtest ground truth for "was this trade good" to
+ * re-tune it against.
  */
-export function evaluateTrade(give: TradePlayerResult[], get: TradePlayerResult[]): TradeEvaluation {
+export function evaluateTrade(
+  give: TradePlayerResult[],
+  get: TradePlayerResult[],
+  format: ScoringFormat = "ppr"
+): TradeEvaluation {
   const giveSide = sideTotal(give);
   const getSide = sideTotal(get);
   const reasoning = [...giveSide.excludedNotes, ...getSide.excludedNotes];
@@ -125,6 +147,8 @@ export function evaluateTrade(give: TradePlayerResult[], get: TradePlayerResult[
       get,
       giveTotal: giveSide.total,
       getTotal: getSide.total,
+      adjustedGiveTotal: null,
+      adjustedGetTotal: null,
       netValue: null,
       verdict: "unknown",
       headline: "Not enough data to grade this trade.",
@@ -135,24 +159,43 @@ export function evaluateTrade(give: TradePlayerResult[], get: TradePlayerResult[
 
   const giveTotal = giveSide.total;
   const getTotal = getSide.total;
-  const netValue = getTotal - giveTotal;
 
-  // Uneven trade: total points favor the side with more players (they simply
-  // accumulate more). Surface that as a caveat rather than adjusting the
-  // number, and point at the single best player so the user can weigh
-  // top-end talent against the raw totals.
+  // Uneven trade: normalize both sides to the same number of roster spots.
+  // Consolidating frees spot(s) you refill off waivers, so the shorter side is
+  // credited a replacement-level filler; taking on extra bodies displaces
+  // players you'd otherwise stream, so the longer side is charged the same way.
+  // The extras are the LOWEST-value players on the longer side (those are the
+  // ones a freed spot actually replaces), and each filler is priced at that
+  // player's own position and remaining games. Even-count trades get zero
+  // filler, so 1-for-1 and 2-for-2 are unaffected.
+  const countedGive = giveSide.counted;
+  const countedGet = getSide.counted;
+  const byLowestValue = (a: TradePlayerResult, b: TradePlayerResult) =>
+    (a.restOfSeasonTotal ?? 0) - (b.restOfSeasonTotal ?? 0);
+
+  let giveFiller = 0;
+  let getFiller = 0;
   let rosterNote: string | null = null;
-  if (giveSide.counted.length !== getSide.counted.length) {
-    const best = bestPlayer([...giveSide.counted, ...getSide.counted]);
-    const bestPart =
-      best?.restOfSeasonTotal != null
-        ? ` The single most valuable player here is ${best.displayName} (~${best.restOfSeasonTotal.toFixed(0)} projected).`
-        : "";
-    rosterNote = `Heads up: this grades on total projected points, so the side with more players is favored — they simply accumulate more. Because you can only start so many each week, a deeper package that out-totals one elite isn't automatically the better side; weigh the top-end talent too.${bestPart}`;
-    reasoning.push(rosterNote);
+  const countDiff = countedGive.length - countedGet.length;
+  if (countDiff > 0) {
+    const extras = [...countedGive].sort(byLowestValue).slice(0, countDiff);
+    getFiller = extras.reduce((sum, p) => sum + replacementRestOfSeason(p, format), 0);
+    rosterNote = `Uneven trade: sending ${countedGive.length} players for ${countedGet.length} frees ${countDiff} roster spot${countDiff === 1 ? "" : "s"}, credited to your side at about ${getFiller.toFixed(0)} points of replacement (waiver) value the rest of the season. Consolidating depth into one better player is judged on more than raw point totals, since you can only start so many each week.`;
+  } else if (countDiff < 0) {
+    const extras = [...countedGet].sort(byLowestValue).slice(0, -countDiff);
+    giveFiller = extras.reduce((sum, p) => sum + replacementRestOfSeason(p, format), 0);
+    rosterNote = `Uneven trade: taking on ${countedGet.length} players for ${countedGive.length} uses ${-countDiff} extra roster spot${-countDiff === 1 ? "" : "s"}, charged at about ${giveFiller.toFixed(0)} points of replacement (waiver) value — those spots displace players you'd otherwise stream.`;
   }
+  if (rosterNote) reasoning.push(rosterNote);
 
-  const threshold = Math.max(CLOSE_CALL_ABS_POINTS, CLOSE_CALL_RELATIVE_PCT * Math.max(giveTotal, getTotal, 1));
+  const adjustedGive = giveTotal + giveFiller;
+  const adjustedGet = getTotal + getFiller;
+  const netValue = adjustedGet - adjustedGive;
+
+  const threshold = Math.max(
+    CLOSE_CALL_ABS_POINTS,
+    CLOSE_CALL_RELATIVE_PCT * Math.max(adjustedGive, adjustedGet, 1)
+  );
 
   let verdict: TradeVerdict;
   let headline: string;
@@ -172,6 +215,8 @@ export function evaluateTrade(give: TradePlayerResult[], get: TradePlayerResult[
     get,
     giveTotal,
     getTotal,
+    adjustedGiveTotal: adjustedGive,
+    adjustedGetTotal: adjustedGet,
     netValue,
     verdict,
     headline,
