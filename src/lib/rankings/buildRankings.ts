@@ -1,3 +1,4 @@
+import { getExpectedPointsPerGameByPlayerId } from "@/lib/sportsdata/advancedMetrics";
 import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
 import { REPLACEMENT_PER_GAME } from "@/lib/recommendation/config";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
@@ -22,6 +23,8 @@ export interface LegitRankingEntry extends PlayerScoreBreakdown {
   legitScore: number;
   /** The season-long consensus projection (total points, in the selected format) this ranking blended in, or null if the feed doesn't cover this player. Purely informational — already folded into legitScore above. */
   consensusProjectedPoints: number | null;
+  /** What this player's usage was WORTH last season, per game (SportsDataIO advanced metrics). Null outside the advanced shortlist, for a player under the games floor, or when that feed is unavailable. Already folded into legitScore. */
+  expectedPointsPerGame: number | null;
   /** Projected total points across every remaining game on this player's real schedule (the Trade Analyzer's rest-of-season projection — see restOfSeason.ts). In the offseason all games remain, so this is the full upcoming-season projection. Null when no schedule is available. */
   restOfSeasonPoints: number | null;
   /** How many games that projection covers (the player's remaining schedule length). */
@@ -202,6 +205,50 @@ export type RankingMode = "weekly" | "season";
 // season ranking right" ground truth to tune against.
 const SEASON_ENGINE_WEIGHT = 0.25;
 
+/**
+ * How much of OUR OWN half of the blend comes from expected fantasy points
+ * (SportsDataIO's advanced metrics) rather than the engine's own snapshot.
+ *
+ * Deliberately a refinement of our view, not a third axis: the blend stays
+ * "our read vs the market's", and ENGINE_WEIGHT keeps its meaning. What this
+ * changes is what "our read" means — the engine scores what a player DID,
+ * expected points score what their usage was WORTH, which strips the
+ * touchdown luck raw production carries. A back who scored 14 TDs on
+ * mid-tier usage and one who scored 5 on the same usage look very different
+ * to the engine and nearly identical here.
+ *
+ * 0.3 is a reasoned default, not a tuned weight — same standing caveat as
+ * ENGINE_WEIGHT and SEASON_ENGINE_WEIGHT: a ranking has no "was this right"
+ * ground truth to tune against (see CLAUDE.md items 78/139). Kept modest so
+ * a season-long, backward-looking measure informs the order without
+ * overriding either the engine's recency or the market's forward view.
+ */
+const EXPECTED_POINTS_WEIGHT = 0.3;
+
+/**
+ * QB is deliberately excluded. Checked rather than assumed: across the 2025
+ * ranked pools, expected points per game track real points per game at
+ * r=0.92 (RB), 0.91 (WR) and 0.96 (TE) — but only 0.66 at QB, with residuals
+ * in both directions (Josh Allen under-modelled by 2.6/game, Joe Burrow
+ * over-modelled by 2.8). That fits an opportunity model that handles designed
+ * quarterback rushing poorly, and it fits this app's own long record of QB
+ * signals behaving unlike the skill positions (CLAUDE.md items 24-30/41/66).
+ * Same position-scoping discipline as the QB exemption on snap/target share
+ * (item 15) and the TE exemption on drop rate (item 33) — and the cost of
+ * excluding is nil, since QB simply keeps the behaviour it already had.
+ */
+const EXPECTED_POINTS_POSITIONS: readonly ExtendedPosition[] = ["RB", "WR", "TE"];
+
+/**
+ * How many players per position get an advanced lookup. This is one HTTP
+ * call per player against a pool that runs to hundreds, so the full blend is
+ * computed first and only the top of that list is refined — the same
+ * shortlist discipline the waiver ranking uses (item 171). Comfortably
+ * deeper than anything displayed: the largest position cap is 25, and the
+ * Top 100 has never pulled more than ~34 from one position.
+ */
+const ADVANCED_SHORTLIST = 45;
+
 function normalize(value: number, min: number, max: number): number {
   if (max === min) return 100;
   return Math.min(100, Math.max(1, 1 + 99 * ((value - min) / (max - min))));
@@ -230,7 +277,8 @@ function computeLegitScores(
   position: ExtendedPosition,
   mode: RankingMode,
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
-  positionDefenseTable: PositionDefenseTable
+  positionDefenseTable: PositionDefenseTable,
+  expectedPointsByPlayerId: Map<number, number> = new Map()
 ): LegitRankingEntry[] {
   const ranked = breakdowns
     // `finalScore` has no floor for very low-data players (a known,
@@ -269,18 +317,52 @@ function computeLegitScores(
   const consensusMin = consensusPoints.length > 0 ? Math.min(...consensusPoints) : 0;
   const consensusMax = consensusPoints.length > 0 ? Math.max(...consensusPoints) : 0;
 
+  // Expected points are normalized over whoever HAS them (the shortlist —
+  // see ADVANCED_SHORTLIST), not the whole pool, so the scale isn't set by
+  // the deep bench the lookup deliberately skips.
+  const expectedValues = ranked
+    .map((b) => (b.playerId != null ? expectedPointsByPlayerId.get(b.playerId) : undefined))
+    .filter((v): v is number => v != null);
+  const expectedMin = expectedValues.length > 0 ? Math.min(...expectedValues) : 0;
+  const expectedMax = expectedValues.length > 0 ? Math.max(...expectedValues) : 0;
+
   const withBlend = ranked.map((b) => {
     const engineNorm = normalize(b.finalScore, engineMin, engineMax);
+
+    // Our own half of the blend: what the player did, refined by what their
+    // usage was worth. A player the advanced feed doesn't cover (or the
+    // whole feed being unavailable) just leaves this as the engine score —
+    // the same honest degrade every optional signal here has.
+    const expected =
+      b.playerId != null && EXPECTED_POINTS_POSITIONS.includes(position)
+        ? expectedPointsByPlayerId.get(b.playerId)
+        : undefined;
+    const ourView =
+      expected != null && expectedMax > expectedMin
+        ? (1 - EXPECTED_POINTS_WEIGHT) * engineNorm +
+          EXPECTED_POINTS_WEIGHT * normalize(expected, expectedMin, expectedMax)
+        : engineNorm;
+
     const projected = b.playerId != null ? seasonProjections.get(b.playerId)?.points : undefined;
 
     if (projected == null) {
-      return { breakdown: b, blended: engineNorm, consensusProjectedPoints: null as number | null };
+      return {
+        breakdown: b,
+        blended: ourView,
+        consensusProjectedPoints: null as number | null,
+        expectedPointsPerGame: expected ?? null,
+      };
     }
 
     const consensusNorm = normalize(projected, consensusMin, consensusMax);
     const engineWeight = mode === "season" ? SEASON_ENGINE_WEIGHT : ENGINE_WEIGHT[b.dataQuality];
-    const blended = engineWeight * engineNorm + (1 - engineWeight) * consensusNorm;
-    return { breakdown: b, blended, consensusProjectedPoints: projected };
+    const blended = engineWeight * ourView + (1 - engineWeight) * consensusNorm;
+    return {
+      breakdown: b,
+      blended,
+      consensusProjectedPoints: projected,
+      expectedPointsPerGame: expected ?? null,
+    };
   });
 
   withBlend.sort((a, b) => b.blended - a.blended);
@@ -292,6 +374,7 @@ function computeLegitScores(
       positionRank: i + 1,
       legitScore: Math.round(Math.min(100, Math.max(1, w.blended))),
       consensusProjectedPoints: w.consensusProjectedPoints,
+      expectedPointsPerGame: w.expectedPointsPerGame,
       restOfSeasonPoints: ros.total,
       restOfSeasonGames: ros.gamesRemaining,
     };
@@ -353,7 +436,13 @@ async function getFullLegitRankingsForPosition(
     )
   );
 
-  const ranked = computeLegitScores(
+  // Two passes. The first blends engine + consensus over the whole pool;
+  // the second refines the top of that list with expected fantasy points,
+  // which cost one HTTP call per player and so can't be fetched pool-wide.
+  // A modest EXPECTED_POINTS_WEIGHT can reorder the shortlist but was never
+  // going to lift a player from deep in the tail into the displayed rows,
+  // which is what makes the shortlist safe rather than merely cheap.
+  const firstPass = computeLegitScores(
     breakdowns,
     seasonProjections,
     position,
@@ -361,6 +450,31 @@ async function getFullLegitRankingsForPosition(
     remainingOpponentsByTeam,
     positionDefenseTable
   );
+
+  const shortlist = EXPECTED_POINTS_POSITIONS.includes(position)
+    ? firstPass
+        .slice(0, ADVANCED_SHORTLIST)
+        .map((e) => e.playerId)
+        .filter((id): id is number => id != null)
+    : [];
+  const expectedPointsByPlayerId = await getExpectedPointsPerGameByPlayerId(
+    shortlist,
+    context.lastCompletedSeason
+  ).catch(() => new Map<number, number>());
+
+  const ranked =
+    expectedPointsByPlayerId.size > 0
+      ? computeLegitScores(
+          breakdowns,
+          seasonProjections,
+          position,
+          mode,
+          remainingOpponentsByTeam,
+          positionDefenseTable,
+          expectedPointsByPlayerId
+        )
+      : firstPass;
+
   cache.set(cacheKey, { data: ranked, expiresAt: Date.now() + CACHE_TTL_MS });
   return ranked;
 }

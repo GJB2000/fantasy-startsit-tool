@@ -10286,6 +10286,80 @@ single-season numbers for those specific constants.
       (100 entries, mix RB 29 / WR 34 / TE 18 / QB 19) render correctly with
       real data. `tsc`/lint clean.
 
+175. **Wired SportsDataIO's advanced metrics into Legit Rankings — expected
+    fantasy points, scoped to RB/WR/TE after checking that QB doesn't hold
+    up.** Resolves Open Item #36. Two real mistakes were caught before
+    shipping, both by measuring rather than reasoning.
+    - **Why Rankings and nowhere else**: the marquee advanced fields exist
+      only at SEASON level (`AdvancedPlayerSeasons`, ~445 fields — confirmed
+      live for 2025 despite the bulk season endpoints 401ing, item 155's
+      quirk). Season-shaped data can't feed the week-by-week engine and can't
+      be backtested (item 160), but Rankings is a season-value ranking with no
+      pick ground truth anyway, so it's the one place the shape fits.
+    - **Blended as a refinement of OUR side, not a third axis.** The score
+      stays "our read vs the market's" and `ENGINE_WEIGHT` keeps its meaning;
+      what changed is what "our read" means:
+      `ourView = (1-w)*engineNorm + w*expectedNorm`, `w = 0.3`. The engine
+      scores what a player DID; expected points score what their usage was
+      WORTH, which strips the touchdown luck raw production carries. Another
+      reasoned default, same standing no-ground-truth caveat as the other two
+      weights.
+    - **Mistake 1, caught by spot-checking the board: expected points are a
+      season TOTAL.** The first pass blended the raw total, which punishes a
+      player for games missed — precisely the injury-shortened case a
+      forward-looking ranking must not get wrong. It showed up immediately as
+      Brock Bowers dropping 95 -> 85: his 151.6 expected points read as poor
+      until you notice it's over 12 games, a healthy 12.6 a game. Now divided
+      by the row's own `Games`, with a 4-game floor (matching the engine's
+      recent-form window) below which the rate is too thin to trust. Bowers
+      lands at 89.
+    - **Mistake 2, caught by testing rather than accepting a plausible
+      result: QB.** With per-game expected points, Lamar Jackson fell QB4 ->
+      QB9 against a market that has him near the top — a big enough move to
+      be worth verifying instead of shipping. Correlating expected points per
+      game against real points per game across the 2025 ranked pools:
+
+      | position | r |
+      |---|---|
+      | TE | 0.96 |
+      | RB | 0.92 |
+      | WR | 0.91 |
+      | **QB** | **0.66** |
+
+      QB is the clear outlier, with large residuals both directions (Josh
+      Allen under-modelled by 2.6/game, Joe Burrow over-modelled by 2.8) —
+      consistent with an opportunity model that handles designed quarterback
+      rushing poorly, and consistent with this app's own long record of QB
+      signals behaving unlike skill positions (items 24-30/41/66). Scoped to
+      RB/WR/TE, the same position-scoping discipline as item 15's QB
+      exemption and item 33's TE exemption. QB's board is now byte-identical
+      to before, and the Lamar concern evaporates with it.
+    - **Cost is handled by a shortlist, measured not assumed.** This is one
+      HTTP call per player against pools of hundreds, so the engine+consensus
+      blend is computed over the whole pool first and only the top
+      `ADVANCED_SHORTLIST` (45) is refined — the same two-pass discipline as
+      the waiver ranking (item 171), and deep enough to cover anything
+      displayed (largest position cap is 25; the Top 100 has never drawn more
+      than ~34 from one position). A 0.3-of-our-view weight can reorder that
+      shortlist but was never going to lift a player out of the tail into the
+      displayed rows, which is what makes it safe rather than merely cheap.
+      Observed cold cost ~13s for a position's 45 calls, then cached; QB now
+      skips the fetch entirely.
+    - **Net effect on the board is modest and defensible**, which is what a
+      30% refinement of one half should look like: RB — McCaffrey 3rd -> 2nd
+      on a genuinely elite 26.4 expected points a game against Bijan's and
+      Gibbs' ~18.7; WR — Smith-Njigba edges past St. Brown (19.1 vs 17.3);
+      TE — Pitts past Warren (12.1 vs 10.6). Everything else holds.
+    - **Fails open throughout**: this rides on the separate advanced
+      evaluation subscription (Open Item #35). A missing player, a
+      sub-4-game player, or the whole feed being unavailable leaves
+      `expectedPointsByPlayerId` empty and the ranking falls back to exactly
+      the item-174 behaviour — verified by the fact that QB, which now never
+      fetches, produces byte-identical output.
+    - Verified live: all four boards plus the Top 100 render with real data,
+      100% expected-points coverage on every displayed RB/WR/TE. `tsc`/lint
+      clean.
+
 ### Open items (as of item 166 — pick up here)
 **Everything is committed and pushed to `main`, working tree CLEAN.** The
 most recent session (items 159-166) was the largest change to the engine's
