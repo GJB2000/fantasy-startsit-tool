@@ -10387,6 +10387,35 @@ single-season numbers for those specific constants.
     - The caption's other content was redundant rather than lost: the season
       is in the toggle, "click a player for their game log" is already in the
       page subheading, and the row count was noise.
+    - **Follow-up: made the season LIST roll forward properly, not just the
+      default.** The default already worked and needed no change —
+      `getSeasonContext` resolves `lastCompletedSeason` from the last
+      completed WEEK, so it flips to the new season the moment its week 1
+      finishes, which is exactly when a stats browser should stop defaulting
+      to last year. The real defect was the option list: a naive
+      `[lastCompleted, lastCompleted + 1]` would have silently DROPPED 2025
+      the week 2026 kicked off, so the archive would vanish precisely when
+      there was finally something to compare it against. Options are now every
+      servable season (`MIN_STATS_SEASON`..last completed), plus the
+      not-yet-started one only while it's genuinely next up — in season it is
+      over a year away and just clutter.
+    - **Verified the FUTURE behaviour, not only today's**, by patching
+      `window.fetch` in the page to rewrite the response's `context` and
+      re-running — the component can't tell it's a fixture, so this exercises
+      the real derivation:
+
+      | simulated | options | default |
+      |---|---|---|
+      | today (offseason, 2025 complete) | 2025, 2026 | 2025 |
+      | mid-2026 season | 2025, 2026 | **2026** |
+      | after 2026 ends | 2025, 2026, 2027 | 2026 |
+      | mid-2027 season | 2025, 2026, 2027 | **2027** |
+
+      Worth recording one trap in that exercise rather than the result alone:
+      an intermediate run appeared to show a wrong default, and it was the
+      test harness — it re-clicked the position that was already selected, so
+      no refetch happened and it was reading the previous scenario's data. The
+      fixture, not the app.
     - Verified live at desktop and 375px: toggle switches both ways (2025 → 83
       rows, 2026 → the empty state, back to 2025 → 83 rows), and the page
       still measures `scrollWidth === clientWidth` on mobile with a fourth

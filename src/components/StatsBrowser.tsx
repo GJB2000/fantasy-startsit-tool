@@ -29,6 +29,9 @@ function normalize(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+/** Matches the route's own floor — earlier seasons 401 on this app's subscriptions. */
+const MIN_STATS_SEASON = 2025;
+
 export function StatsBrowser() {
   const [scoringFormat, setScoringFormat] = useScoringFormat();
   const [position, setPosition] = useState<StatsPosition>("QB");
@@ -39,6 +42,7 @@ export function StatsBrowser() {
   // the toggle doesn't need to know the calendar before the first response.
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
   const [lastCompletedSeason, setLastCompletedSeason] = useState<number | null>(null);
+  const [isInSeason, setIsInSeason] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -63,6 +67,7 @@ export function StatsBrowser() {
         setRows(body.rows);
         setSeason(body.season);
         setLastCompletedSeason(body.context?.lastCompletedSeason ?? null);
+        setIsInSeason(Boolean(body.context?.isInSeason));
       })
       .catch((err: Error) => !cancelled && setError(err.message))
       .finally(() => !cancelled && setLoading(false));
@@ -119,17 +124,32 @@ export function StatsBrowser() {
     }
   }
 
-  // The completed season and the one after it — derived, not hardcoded, so
-  // this rolls forward on its own. Hidden until the first response tells us
-  // where the calendar actually is.
+  // Every season we can actually serve, newest last, derived rather than
+  // hardcoded. Hidden until the first response tells us where the calendar is.
+  //
+  // The DEFAULT needs no special handling: getSeasonContext resolves
+  // lastCompletedSeason from the last completed WEEK, so it flips to the new
+  // season the moment its week 1 finishes — which is exactly when a stats
+  // browser should stop defaulting to last year.
+  //
+  // What that does require is keeping the PRIOR seasons listed. A naive
+  // "[lastCompleted, lastCompleted + 1]" would have quietly dropped 2025 the
+  // week 2026 kicked off, so the archive would disappear precisely when there
+  // was finally something to compare against.
+  //
+  // The not-yet-started season is offered only in the offseason. Once games
+  // are being played it's over a year away and just clutter. (For the few days
+  // between the season opening and its week 1 completing, isInSeason is
+  // already true while lastCompletedSeason still trails — so the new season
+  // briefly isn't listed. That's honest: it has no completed games to show.)
   const activeSeason = selectedSeason ?? season;
-  const seasonOptions =
-    lastCompletedSeason == null
-      ? []
-      : [lastCompletedSeason, lastCompletedSeason + 1].map((year) => ({
-          value: String(year),
-          label: String(year),
-        }));
+  const seasonOptions = useMemo(() => {
+    if (lastCompletedSeason == null) return [];
+    const newest = isInSeason ? lastCompletedSeason : lastCompletedSeason + 1;
+    const years: number[] = [];
+    for (let year = MIN_STATS_SEASON; year <= newest; year++) years.push(year);
+    return years.map((year) => ({ value: String(year), label: String(year) }));
+  }, [lastCompletedSeason, isInSeason]);
 
   return (
     <div className="mx-auto w-full max-w-6xl">
