@@ -10421,6 +10421,81 @@ single-season numbers for those specific constants.
       still measures `scrollWidth === clientWidth` on mobile with a fourth
       control group added. `tsc`/lint clean.
 
+177. **Probed SportsDataIO's betting/props endpoints (the untested item from
+    155/156). They are entitled, and materially better than The Odds API on
+    every axis except the one that would let them become a signal.** Research
+    only — no code shipped.
+    - **Two separate product families, both live on the 2026 key
+      (`v3/nfl/odds`):**
+      1. **`PlayerPropsByWeek/{season}/{week}`** — a flat per-player line
+         feed. 1,117 rows / 136 players / 15 market types for 2026 week 1,
+         keyed by **PlayerID** (no name join, unlike The Odds API). Markets:
+         passing/rushing/receiving yards, attempts, completions, receptions,
+         TDs, interceptions — and, notably, **"Fantasy Points" and "Fantasy
+         Points PPR"**, a market-implied fantasy line directly comparable to
+         the engine's own `finalScore`.
+      2. **Sportsbook Group** — `BettingEventsByDate/{date}` →
+         `BettingMarkets/{eventId}`. 496 markets for one game, 354 of them
+         player props, with real per-book prices (FanDuel, Caesars,
+         Consensus…) across 17 books including DraftKings, BetMGM,
+         PrizePicks, Underdog and Sleeper. `ActiveSportsbooks` lists them.
+    - **Coverage is the standout difference.** Props are already posted for
+      the WHOLE 2026 season — week 1 1,117 rows, week 2 and 3 1,520 each,
+      week 5 1,429, week 8 1,378, in August. The Odds API's free tier had
+      **zero** props for 2026 week 1 six weeks out (item 98), because real
+      books post props days before kickoff. Plus no name join, no
+      500-requests/month quota, and one fewer third-party dependency and env
+      var.
+    - **The wall is unchanged, and it's the one that matters for scoring:
+      historical props 401.** Tried 2025REG and 2024REG against both the 2026
+      and legacy keys, and the legacy `api/nfl/odds` host — all 401 or 404.
+      So props still cannot be backtested, exactly as item 98 found for The
+      Odds API's paid-only history. They stay a display/context feature, not
+      a signal. **Open Item #24 stays open**, and its premise is now
+      confirmed from a second vendor rather than assumed.
+    - **One honest uncertainty about family (1):** whether those lines are
+      live book consensus or SportsDataIO's own modelled lines can't be
+      determined from the payload — there is no `SportsBook` field on that
+      endpoint, the payouts vary continuously (-153, -150, -147…) rather than
+      clustering at a few book prices, and real books do not post week-8
+      props in August. Family (2) is unambiguously real per-book prices.
+      Worth knowing which before leaning on family (1) for anything beyond
+      display.
+    - **Shipped the swap (same session).** `src/lib/oddsapi/` is deleted, along
+      with `ODDS_API_KEY` — the app now has one fewer third-party dependency
+      and one fewer env var. Replaced by `sportsdata/playerProps.ts` (server
+      reader) + `sportsdata/playerPropTypes.ts` (plain display types with no
+      `server-only` import, so the client card can `import type` them — the
+      same split the deleted module used). New `oddsV3` base and a
+      `playerProps` revalidate (1h). `/api/props` keeps its shape, so the
+      client-side deferred fetch (item 141) is unchanged.
+    - **The upcoming week is derived from `lastCompletedWeek`, not
+      `isInSeason`** — deliberately. `isInSeason` flips true a few days before
+      a season's first week completes (item 47), and in that window
+      `lastCompletedSeason` still trails by a year, so asking it directly
+      would request week 19 of a finished season. `lastCompletedWeek >= 18`
+      means "roll to next season, week 1"; otherwise it's this season's next
+      week.
+    - **It works in the offseason, which is the whole point**: a real
+      comparison now renders populated lines where The Odds API returned an
+      empty object every time. Bijan Robinson, 2026 week 1 — market Fantasy
+      Points PPR 20.5 against our projection of 21.7, plus rush yards 86.5,
+      receptions 4.5, total TDs 1.5.
+    - **Caught a real labelling error before shipping.** The first pass
+      labelled the `Total Touchdowns` market "Anytime TD". It isn't — it's an
+      over/under on touchdowns scored (Bijan's line is O/U 1.5), while an
+      anytime-TD price is a yes/no at around +122. Mislabelling a real betting
+      line is worse than showing none, so it reads "Total TDs". The genuine
+      anytime market exists, but only in the Sportsbook Group family, not this
+      feed.
+    - **Coverage is partial and degrades honestly**: the week-1 feed carries
+      136 players — the top of each offence — so a deeper player (DK Metcalf,
+      confirmed absent rather than mis-joined) simply keeps the existing
+      "lines post closer to kickoff" state.
+    - **Still contingent on the 2026 subscription** past 15 Sept, same as item
+      175's advanced metrics. If it lapses the section falls back to its empty
+      state rather than breaking, but it would need re-pointing.
+
 ### Open items (as of item 166 — pick up here)
 **Everything is committed and pushed to `main`, working tree CLEAN.** The
 most recent session (items 159-166) was the largest change to the engine's

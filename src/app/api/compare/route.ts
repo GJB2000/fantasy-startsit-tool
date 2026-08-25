@@ -121,7 +121,7 @@ export async function GET(request: Request) {
     const result = compareBreakdowns(breakdowns, depthRankByPlayerId);
 
     // Betting lines (display-only) are fetched separately by the client via
-    // /api/props after this verdict renders, so the Odds API round-trip never
+    // /api/props after this verdict renders, so that round-trip never
     // delays the comparison.
     return Response.json({
       result,

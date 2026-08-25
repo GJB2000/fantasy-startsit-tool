@@ -1,7 +1,7 @@
 "use client";
 
 import type { GameWeather } from "@/lib/nflverse/schedules";
-import type { PlayerProps } from "@/lib/oddsapi/types";
+import type { PlayerProps } from "@/lib/sportsdata/playerPropTypes";
 import type { ComparisonResult as ComparisonResultData, PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
 import { CountUpNumber } from "./CountUpNumber";
@@ -11,7 +11,7 @@ interface ComparisonResultProps {
   result: ComparisonResultData;
   contextNote: string;
   scoringFormat: ScoringFormat;
-  /** Display-only betting lines per playerId (The Odds API) — empty in the offseason before books post props. */
+  /** Display-only betting lines per playerId (SportsDataIO player props) — empty for any player or week the feed doesn't cover. */
   propsByPlayerId?: Record<number, PlayerProps>;
   /** Season the underlying data is from (last completed season) — shown in the footer; auto-advances when the next season starts. */
   dataSeason?: number;
@@ -460,7 +460,7 @@ function PlayerCard({
           <div className={styles.betRow}>
             <div className={styles.betH}>
               <div className={styles.lab}>Betting Lines</div>
-              {betLines.length > 0 && <div className={styles.bk}>{props?.bookmaker}</div>}
+              {betLines.length > 0 && props?.game && <div className={styles.bk}>{props.game}</div>}
             </div>
             {betLines.length > 0 ? (
               <>

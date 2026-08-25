@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { PlayerProps } from "@/lib/oddsapi/types";
+import type { PlayerProps } from "@/lib/sportsdata/playerPropTypes";
 import type { ComparisonResult as ComparisonResultData } from "@/lib/recommendation/types";
 import type { PlayerSummary, ScoringFormat } from "@/lib/sportsdata/types";
 import { usePendingRestoreComparison } from "@/lib/usePendingRestoreComparison";

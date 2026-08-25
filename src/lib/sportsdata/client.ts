@@ -55,6 +55,15 @@ const API_BASES = {
     url: "https://api.sportsdata.io/v3/nfl/advanced-metrics/json",
     keyEnv: "SPORTSDATA_ADVANCED_API_KEY",
   },
+  /**
+   * Betting. Player props are 2026+ only (historical seasons 401 on every
+   * key — see CLAUDE.md item 177), which is fine because they're display
+   * context and never a scoring signal.
+   */
+  oddsV3: {
+    url: "https://api.sportsdata.io/v3/nfl/odds/json",
+    keyEnv: "SPORTSDATA_API_KEY",
+  },
 } as const;
 
 export const REVALIDATE = {
@@ -66,6 +75,8 @@ export const REVALIDATE = {
   teamStats: 24 * 60 * 60,
   advancedMetrics: 24 * 60 * 60,
   projections: 6 * 60 * 60,
+  /** Lines move, but this is display context on a page that isn't a betting product — an hour is plenty fresh and keeps the fetch off the hot path. */
+  playerProps: 60 * 60,
 } as const;
 
 export class SportsDataError extends Error {
