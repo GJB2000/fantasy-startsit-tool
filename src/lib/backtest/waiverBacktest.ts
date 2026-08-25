@@ -1,15 +1,21 @@
 import { BROAD_MODE_POOL_SIZE } from "@/lib/backtest/config";
+import { loadNflverseOnlyRunData } from "@/lib/backtest/loadRunNflverseOnly";
+import { sliceWeekData } from "@/lib/backtest/weekData";
 import { getNflverseGameLog } from "@/lib/nflverse/gameLog";
+import { buildBacktestComparisonInput } from "@/lib/recommendation/buildBacktestInput";
 import { RECENT_WEEK_COUNT } from "@/lib/recommendation/config";
+import { scorePlayer } from "@/lib/recommendation/engine";
 import {
   computeEfficiencyBaseline,
   scoreWaiverPool,
   selectWaiverCandidates,
+  SHORTLIST_PER_POSITION,
   type WaiverCandidateRank,
 } from "@/lib/waivers/rankCandidates";
 import {
   getFantasyPoints,
   SKILL_POSITIONS,
+  type Player,
   type PlayerGameStat,
   type ScoringFormat,
   type SkillPosition,
@@ -53,9 +59,26 @@ const FORWARD_WINDOW = 4;
 const CANDIDATES_PER_POSITION = 6;
 const MAX_WEEK = 18;
 
-export type WaiverStrategyId = "gap" | "residual" | "volumeOnly" | "pointsOnly" | "blindPool";
+export type WaiverStrategyId =
+  /** What ships: narrow by volume, then rank the shortlist by the engine's own projection. */
+  | "finalScoreShortlist"
+  /** Same, but scoring the ENTIRE eligible pool — the ceiling the shortlist is measured against. */
+  | "finalScore"
+  | "gap"
+  | "residual"
+  | "volumeOnly"
+  | "pointsOnly"
+  | "blindPool";
 
-export const WAIVER_STRATEGY_IDS: WaiverStrategyId[] = ["gap", "residual", "volumeOnly", "pointsOnly", "blindPool"];
+export const WAIVER_STRATEGY_IDS: WaiverStrategyId[] = [
+  "finalScoreShortlist",
+  "finalScore",
+  "gap",
+  "residual",
+  "volumeOnly",
+  "pointsOnly",
+  "blindPool",
+];
 
 interface Accumulator {
   totalForwardPpg: number;
@@ -159,9 +182,24 @@ export interface WaiverBacktestResult {
 /** Selects a strategy's top-N from a scored eligible pool for one position. */
 function selectForStrategy(
   strategy: WaiverStrategyId,
-  pool: WaiverCandidateRank[]
+  pool: WaiverCandidateRank[],
+  finalScoreOf: (playerId: number) => number | null
 ): WaiverCandidateRank[] {
+  const byProjection = (candidates: WaiverCandidateRank[]) =>
+    candidates
+      .map((c) => ({ c, score: finalScoreOf(c.playerId) }))
+      .filter((e): e is { c: WaiverCandidateRank; score: number } => e.score != null)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, CANDIDATES_PER_POSITION)
+      .map((e) => e.c);
+
   switch (strategy) {
+    case "finalScore":
+      return byProjection(pool);
+    case "finalScoreShortlist":
+      // Exactly what the live tool does: the cheap bulk pass narrows to
+      // SHORTLIST_PER_POSITION by volume, then the engine re-ranks it.
+      return byProjection([...pool].sort((a, b) => b.recentVolumeAvg - a.recentVolumeAvg).slice(0, SHORTLIST_PER_POSITION));
     case "gap":
     case "residual":
       return selectWaiverCandidates(pool, strategy, CANDIDATES_PER_POSITION);
@@ -187,6 +225,11 @@ export async function runWaiverBacktest(
   // discipline the other multi-season nflverse backtests use.
   for (const season of seasons) {
     const { allWeeklyRows, players } = await getNflverseGameLog(season, MAX_WEEK);
+    // The full run data the engine needs (nflverse signals, weather, implied
+    // totals, consensus). Heavier than the game log alone, but it's what makes
+    // grading the SHIPPED projection-based ranking possible at all.
+    const runData = await loadNflverseOnlyRunData(season, MAX_WEEK);
+    const playerById = new Map<number, Player>(players.map((p) => [p.PlayerID, p]));
     const positionByPlayerId = new Map(players.map((p) => [p.PlayerID, p.Position as SkillPosition]));
 
     // Forward-production lookup: player -> week -> that week's played row.
@@ -261,6 +304,37 @@ export async function runWaiverBacktest(
         for (const [id] of ranked) startableExclude.add(id);
       }
 
+      // The engine's projection for the week a claim would actually start.
+      const targetWeek = cutoff + 1;
+      const weekSlice = sliceWeekData(
+        runData.allWeeklyRows,
+        targetWeek,
+        RECENT_WEEK_COUNT,
+        runData.allTeamWeeklyRows,
+        runData.nflversePlayerWeekTable,
+        runData.teamWeatherByTeamWeek,
+        runData.depthChartByPlayerIdWeek,
+        format,
+        runData.allDefenseWeeklyRows ?? [],
+        runData.impliedTotalsByTeamWeek ?? new Map(),
+        runData.expertConsensusByPlayerIdWeek ?? new Map()
+      );
+      const finalScoreCache = new Map<number, number | null>();
+      const finalScoreOf = (playerId: number): number | null => {
+        const cached = finalScoreCache.get(playerId);
+        if (cached !== undefined) return cached;
+        const input = buildBacktestComparisonInput(
+          playerId,
+          playerById.get(playerId) ?? null,
+          targetWeek,
+          weekSlice,
+          runData.byesByTeam
+        );
+        const score = scorePlayer(input, format).finalScore;
+        finalScoreCache.set(playerId, score);
+        return score;
+      };
+
       const fullPool = scoreWaiverPool(players, recentGamesByPlayer, efficiencyBaseline, new Set(), format);
       const waiverPool = scoreWaiverPool(players, recentGamesByPlayer, efficiencyBaseline, startableExclude, format);
 
@@ -270,7 +344,7 @@ export async function runWaiverBacktest(
       ] as const) {
         for (const strategy of WAIVER_STRATEGY_IDS) {
           for (const position of SKILL_POSITIONS) {
-            for (const candidate of selectForStrategy(strategy, pool[position])) {
+            for (const candidate of selectForStrategy(strategy, pool[position], finalScoreOf)) {
               const fwd = forwardPpg(candidate.playerId, cutoff);
               if (fwd == null) continue;
               accumulate(variant, strategy, position, season, fwd);

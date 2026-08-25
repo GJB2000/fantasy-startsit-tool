@@ -10039,6 +10039,76 @@ single-season numbers for those specific constants.
       plainly on the spotlight.
     - Verified live end to end on the real connected league; `tsc`/lint clean.
 
+171. **Backtested whether the Waiver Wire's per-position LISTS should rank by
+    the engine's projection rather than recent volume — they should, clearly,
+    and it shipped.** Item 169 changed the cross-position spotlight to a
+    projection basis but deliberately left the lists on volume, because that
+    was the ordering item 142 actually validated and testing the alternative
+    looked expensive. This ran that test.
+    - **Why it had never been tested**: `scoreWaiverPool` is a deliberately
+      cheap bulk pass that does NOT run the engine, so item 142's harness
+      could only compare strategies computable from the pool rows (volume,
+      points, gap, residual, random). Grading a projection-based ranking means
+      running `buildBacktestComparisonInput` + `scorePlayer` over the whole
+      eligible pool, per cutoff, per season — which needs the full
+      `loadNflverseOnlyRunData` slice, not just the game log.
+    - **Harness verified before any new number was trusted**, per the standing
+      rule from items 43/44/74: the rebuilt harness reproduces item 142's
+      published figures for every pre-existing strategy on the waiver-tier
+      pool — volumeOnly 11.99, pointsOnly 11.98, residual 10.18, blindPool
+      8.87, gap 9.01 (item 142 recorded 9.00). Since the old numbers come back
+      identical, the new one is measuring the same thing.
+    - **Result — pooled 2022-2025, cutoffs 5-13, mean forward PPG over the
+      next 4 weeks, on the realistic waiver-tier pool** (startable/rostered
+      tier excluded):
+
+      | strategy | PPG | QB | RB | WR | TE | 2022 | 2023 | 2024 | 2025 |
+      |---|---|---|---|---|---|---|---|---|---|
+      | finalScore (shortlist) | **12.82** | 15.7 | 12.1 | 13.6 | 9.9 | 12.2 | 12.9 | 13.7 | 12.6 |
+      | finalScore (full pool) | 12.81 | 15.7 | 12.1 | 13.6 | 9.9 | 12.1 | 12.9 | 13.7 | 12.6 |
+      | volumeOnly (was shipped) | 11.99 | 14.0 | 11.3 | 13.2 | 9.6 | 11.5 | 12.0 | 12.8 | 11.7 |
+      | pointsOnly | 11.98 | 14.8 | 10.8 | 13.0 | 9.4 | 11.1 | 12.3 | 12.9 | 11.7 |
+      | residual | 10.18 | 13.5 | 9.9 | 10.0 | 7.6 | 10.3 | 10.4 | 10.3 | 9.8 |
+      | gap | 9.01 | 13.7 | 8.2 | 8.2 | 6.2 | 9.1 | 8.7 | 9.4 | 8.8 |
+      | blindPool (random) | 8.87 | 14.1 | 8.4 | 8.8 | 6.8 | 8.7 | 9.0 | 9.1 | 8.6 |
+
+      **+0.83 PPG over volume, and the cleanest shape this document asks
+      for**: better at every position AND in every season, no tradeoff to put
+      to the user. Same story on the unrestricted pool (16.85 vs 15.43).
+    - **A volume shortlist gives up nothing, which is what made it shippable.**
+      Scoring the entire eligible pool is impractical live (hundreds of engine
+      calls per request), so the two-stage version was measured rather than
+      assumed: narrowing to the top 25 per position by volume and then
+      re-ranking by projection scores **12.82** against the full pool's 12.81
+      — identical within noise. A tighter top-15 shortlist scores 12.74, a
+      real if small loss, so 25 is the shipped `SHORTLIST_PER_POSITION`.
+      In live terms that is 100 engine calls per request instead of 40 — a
+      real cost, but the same order of magnitude, and a warm request measured
+      ~7.6s end to end.
+    - **Shipped**: `rankWaiverCandidates` now returns
+      `SHORTLIST_PER_POSITION` (25) per position instead of 10, and
+      `buildWaiverCandidateDetails` — which already computes a real breakdown
+      for every candidate it's handed — sorts by `finalScore` and cuts to 10.
+      Each candidate's reasoning now leads with the projection it's ordered
+      by, keeping the volume line as support. The landing copy moved off
+      "ranked by opportunity" to describe what the tool now actually does.
+    - **The permanent harness now grades what ships**, rather than only the
+      strategies that predate it: `finalScoreShortlist` (the live behaviour)
+      and `finalScore` (the full-pool ceiling it's measured against) are both
+      permanent entries in `WAIVER_STRATEGY_IDS`. This is the item-163 lesson
+      applied preemptively — a backtest that measures something the live tool
+      no longer does is worse than no backtest.
+    - **Note on why volume still looked good in item 142**: it beats gap,
+      residual and random by 2-3 PPG, and that finding stands. It just isn't
+      the best available ranking once the full engine is on the table — which
+      item 142 couldn't see, because the engine was too expensive to run over
+      the pool at the time. The buy-low framing is unaffected: it remains a
+      per-candidate tag, not a sort key.
+    - Verified live end to end on the user's real connected league; the lists
+      now pull in genuinely better projections from deeper volume ranks (e.g.
+      an RB ranked 16th by volume surfacing above one ranked 3rd).
+      `tsc`/lint clean.
+
 ### Open items (as of item 166 — pick up here)
 **Everything is committed and pushed to `main`, working tree CLEAN.** The
 most recent session (items 159-166) was the largest change to the engine's

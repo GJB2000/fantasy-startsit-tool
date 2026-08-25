@@ -6,7 +6,7 @@ import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import type { PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import type { SeasonContext } from "@/lib/sportsdata/timeframes";
 import type { ExtendedPosition, ScoringFormat, SkillPosition } from "@/lib/sportsdata/types";
-import type { WaiverCandidateRank } from "./rankCandidates";
+import { CANDIDATES_PER_POSITION, type WaiverCandidateRank } from "./rankCandidates";
 
 export interface WaiverCandidate {
   playerId: number;
@@ -81,7 +81,8 @@ export async function buildWaiverCandidateDetails(
   format: ScoringFormat,
   positionDefenseTable: PositionDefenseTable,
   nflversePlayerWeekTable: NflversePlayerWeekTable,
-  projectedPointsByPlayerId: Map<number, number> = new Map()
+  projectedPointsByPlayerId: Map<number, number> = new Map(),
+  limit = CANDIDATES_PER_POSITION
 ): Promise<WaiverCandidate[]> {
   const details = await Promise.all(
     ranks.map(async (rank): Promise<WaiverCandidate | null> => {
@@ -104,7 +105,7 @@ export async function buildWaiverCandidateDetails(
       // the ranking no longer requires it (see WaiverRankStrategy).
       const isBuyLow = rank.residualScore > 0;
       const reasoning: string[] = [
-        `${rank.position}${rank.volumeRank} by recent volume (${rank.recentVolumeAvg.toFixed(1)} ${UNIT_LABEL[rank.position]}/game) — one of the highest-usage players still available.`,
+        `Averaging ${rank.recentVolumeAvg.toFixed(1)} ${UNIT_LABEL[rank.position]}/game — ${rank.position}${rank.volumeRank} by recent volume among available players.`,
       ];
       if (isBuyLow) {
         reasoning.push(
@@ -156,5 +157,30 @@ export async function buildWaiverCandidateDetails(
     })
   );
 
-  return details.filter((d): d is WaiverCandidate => d != null);
+  // Final cut: re-rank the volume-shortlisted candidates by the engine's own
+  // projection and keep the best `limit`. The bulk pass that produced `ranks`
+  // can't do this — it deliberately doesn't run the engine — so the shortlist
+  // is narrowed on volume first and sharpened here.
+  //
+  // Backtested, not assumed (CLAUDE.md item 171): pooled 2022-2025 on the
+  // realistic waiver-tier pool, ranking by projection returns 12.81 mean
+  // forward PPG against volume's 11.99, and wins at every position and in
+  // every season. The same harness reproduces item 142's published numbers
+  // for the older strategies exactly, which is what makes this number
+  // trustworthy.
+  const ranked = details
+    .filter((d): d is WaiverCandidate => d != null)
+    .sort((a, b) => (b.breakdown.finalScore ?? -Infinity) - (a.breakdown.finalScore ?? -Infinity))
+    .slice(0, limit);
+
+  // Lead each candidate's reasoning with the thing they're now ordered by.
+  return ranked.map((d, i) => {
+    const score = d.breakdown.finalScore;
+    if (score == null) return d;
+    const lead =
+      i === 0
+        ? `Our top projection among available ${d.position}s — about ${score.toFixed(1)} points next week.`
+        : `Projects for about ${score.toFixed(1)} points next week, ${d.position}${i + 1} among available players by our projection.`;
+    return { ...d, reasoning: [lead, ...d.reasoning] };
+  });
 }

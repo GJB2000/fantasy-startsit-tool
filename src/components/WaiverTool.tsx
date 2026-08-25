@@ -81,7 +81,7 @@ function SchematicGapBar() {
 }
 
 const HERO_FEATURES: { title: string; body: string }[] = [
-  { title: "Ranked by opportunity", body: "The touches and targets already there — the strongest forward signal, and the best in our backtests." },
+  { title: "Ranked by projection", body: "Every available player scored by the same engine behind Start/Sit — the best-performing waiver ranking in our backtests." },
   { title: "Buy-lows flagged", body: "When the usage is there but the points haven't followed, the pickup gets a Buy-low tag." },
   { title: "A drop to pair with it", body: "Every pickup comes with a same-position drop, graded on rest-of-season value." },
 ];
@@ -93,17 +93,18 @@ function MethodHero() {
         className="text-[11px] uppercase tracking-[0.16em] text-accent"
         style={{ fontFamily: "var(--font-engraved)" }}
       >
-        The opportunity board
+        The waiver board
       </span>
       <h2
         className="mt-2 text-[27px] leading-[1.05] tracking-[-0.01em] sm:text-[31px]"
         style={{ fontFamily: "var(--font-jost)", fontWeight: 600 }}
       >
-        Grab the opportunity before your league does
+        Find the best add before your league does
       </h2>
       <p className="mt-2.5 max-w-[52ch] text-[13.5px] leading-relaxed text-foreground/60">
-        We rank every available player by recent opportunity — the touches and targets already coming
-        their way, the strongest signal for what&apos;s ahead. When the points haven&apos;t caught up yet, that&apos;s a{" "}
+        We score every available player with the same engine behind Start/Sit — recent form, opportunity,
+        matchup and expert consensus — and rank them by what they project going forward. When a player&apos;s
+        workload is already there but the points haven&apos;t caught up, that&apos;s a{" "}
         <span className="font-semibold text-foreground/75">buy-low</span>.
       </p>
 

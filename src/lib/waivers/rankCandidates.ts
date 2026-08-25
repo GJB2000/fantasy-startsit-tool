@@ -15,7 +15,21 @@ import {
 import { getPlayerGameStatsByWeek } from "@/lib/sportsdata/weeklyStats";
 
 const MIN_RECENT_GAMES = 2;
-const CANDIDATES_PER_POSITION = 10;
+export const CANDIDATES_PER_POSITION = 10;
+
+/**
+ * How many volume-ranked players per position get handed to the engine before
+ * the final projection-ranked cut (see buildWaiverCandidateDetails). The
+ * bulk pass here is deliberately cheap and doesn't run the engine, so this is
+ * the shortlist it narrows to first.
+ *
+ * 25 was chosen from the backtest, not guessed: ranking the FULL eligible pool
+ * by finalScore scores 12.81 mean forward PPG, a top-25 shortlist scores 12.82
+ * (identical within noise) and a top-15 shortlist 12.74 — so 25 gives up
+ * nothing versus scoring everyone, at a fraction of the engine calls. See
+ * CLAUDE.md item 171.
+ */
+export const SHORTLIST_PER_POSITION = 25;
 // A candidate needs at least this fraction of the position's own
 // FULL-SEASON efficiency baseline to qualify — see getEfficiencyStat's
 // doc comment. Two cheaper baselines were tried and rejected first: a
@@ -370,7 +384,7 @@ export async function rankWaiverCandidates(
 
   const byPosition = {} as Record<SkillPosition, WaiverCandidateRank[]>;
   for (const position of SKILL_POSITIONS) {
-    byPosition[position] = selectWaiverCandidates(pool[position], strategy, CANDIDATES_PER_POSITION);
+    byPosition[position] = selectWaiverCandidates(pool[position], strategy, SHORTLIST_PER_POSITION);
   }
   return byPosition;
 }
