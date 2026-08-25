@@ -9924,6 +9924,121 @@ single-season numbers for those specific constants.
       in the general case, and every mainstream trade calculator makes the
       same assumption.
 
+169. **Audited the Waiver Wire's D/ST-K gating (working) and its "top
+    target" selection (three real defects, all fixed).** Prompted by a user
+    asking whether the streaming-position gate had regressed and whether the
+    top-target logic makes sense. First half was a false alarm; the second
+    half was not.
+    - **The D/ST-K gate works — verified against the user's own connected
+      league, not just by reading the code.** Their league rosters
+      `QB/RB/RB/WR/WR/WR/TE/FLEX/FLEX/FLEX` and no DEF or K slot, and the
+      page correctly renders only QB/RB/WR/TE tabs. `streamingPositionFlags`
+      is threaded through both the Waivers page and the Home widget.
+      **The one real gap, deliberately left alone**: it defaults BOTH on when
+      slots are unknown — no Sleeper connection, or a connection saved before
+      `rosterPositions` was captured — so a manual-roster user in a no-kicker
+      league has no way to turn them off. `DEFAULT_SLOTS` does include K and
+      DST, so showing them is defensible as a default, and the Lineup page's
+      manual slot editor is component-local `useState` (not persisted, not
+      shared), so Waivers can't read it today. Closing that properly means
+      promoting slot config to a shared persistent store — see Open Items.
+    - **`waiverValue` was computed from volume alone, and it was surfacing
+      below-replacement players.** It read
+      `recentVolumeAvg × POINTS_PER_VOLUME_UNIT − REPLACEMENT_PER_GAME` — the
+      VOR framing was right, but the projection feeding it ignored every other
+      signal the engine has (expert consensus, matchup, efficiency, form), and
+      contradicted the engine's own tuning: PPR RBs carry
+      `VOLUME_BLEND_WEIGHT = 0` precisely because volume adds nothing there
+      beyond form and consensus (item 144). Measured on real data rather than
+      argued: the old formula's #2 and #3 cross-position targets were Tyrone
+      Tracy Jr. (finalScore 7.1) and Aaron Jones Sr. (9.5), both of which the
+      app's OWN projection puts below replacement, while Omarion Hampton
+      (14.8, the best real projection in the pool) sat 6th. Now
+      `finalScore − REPLACEMENT_PER_GAME` — the same VOR basis the Top 100
+      (item 140) and the trade tool (item 168) use, and free, since these
+      candidates already have a real breakdown computed for the drop
+      suggestion.
+    - **Scope note that matters**: this changes the SPOTLIGHT only. The
+      per-position lists stay ranked by recent volume, which is what the
+      waiver backtest actually validated (item 142 — volume beat gap/residual
+      and random by 2-3 PPG of real forward production). That backtest never
+      tested a finalScore-based ranker, because `scoreWaiverPool` is
+      deliberately a cheap bulk pass that doesn't run the engine per player;
+      the spotlight is chosen from ~40 already-scored candidates, so it can
+      afford the better number and the list can't. Whether the list would
+      also do better on finalScore is untested and would be expensive to
+      test — flagged, not assumed.
+    - **The spotlight was recommending a player who literally can't play.**
+      With the user's real exclusions applied, the top target was Ricky
+      Pearsall, listed **Out** — he ranked first because `scorePlayer` doesn't
+      penalize an Out player's projection at all (the engine handles injuries
+      by EXCLUSION in `compareBreakdowns`, not in the score), so his was
+      simply the least-bad number in a thin pool. `pickTopTarget` now makes
+      two passes, healthy first, falling back to a sidelined player only if
+      the pool has nothing else — the same "prefer available, but still fill
+      the slot if that's all there is" rule `compareBreakdowns` already uses.
+      Sidelined players still appear in the lists, tagged, since they can be a
+      legitimate stash.
+    - **The honest-framing problem the fix exposed.** In their 12-team league
+      every single free agent projects BELOW replacement — which is true and
+      unsurprising once 200+ players are rostered, but the old volume-implied
+      number produced comfortable-looking positives that hid it, and the panel
+      still says "TOP TARGET THIS WEEK" either way. The spotlight now carries
+      a caveat when its own pick is below replacement ("Thin week — this is
+      the best available, but it still projects below a startable RB in your
+      format. Worth it for depth or an injury cover, not as a lineup
+      upgrade."), matching this project's standing "don't force false
+      confidence" rule.
+    - **Verified live end to end** on the user's real roster and league: the
+      spotlight moved from Pearsall (Out) to Ty Johnson (healthy RB) with the
+      thin-week caveat rendering; the roster-need penalty is visibly doing its
+      job (their QB/WR/TE surpluses are docked, RB — where they're at need —
+      is not); D/ST and K stay absent. `tsc`/lint clean.
+
+170. **"Is Ty Johnson really the best pickup? He's a backup RB" — no, and
+    tracing it found two more defects in the top-target selection.** A direct
+    follow-up to item 169, and a good example of why a plausible-looking
+    recommendation is worth challenging.
+    - **He was 12th-best by actual value and won on a technicality.** Pure
+      VOR across the healthy pool: Aaron Rodgers -3.85, Jacoby Brissett
+      -4.03, Colby Parkinson -4.16, ... Ty Johnson **-6.52**, the lowest
+      `finalScore` (5.6) of anyone near the top. He surfaced because the
+      roster-need penalty put RB at zero and docked every other position 3
+      points.
+    - **Defect 1 — `starterNeedByPosition` double-counted flex.** It added
+      each flex slot's FULL count to both RB and WR (and left TE out of FLEX
+      entirely, though Sleeper's FLEX takes RB/WR/TE). For the user's
+      10-starter league it computed a "need" of 13 skill starters — QB 1,
+      RB 5, WR 6, TE 1 — so a roster with 5 RBs showed NO surplus at RB, and
+      RB became the only unpenalised position. Now each flex slot is split
+      evenly across the positions it accepts, via the existing
+      `SLOT_ELIGIBILITY` map. The needs now sum to exactly the real number of
+      starting slots (10), which is the invariant that should have caught
+      this: one flex spot can only ever hold one player.
+    - **Defect 2 — roster need was a primary term, so it decided the
+      answer.** `SURPLUS_PENALTY_PER_PLAYER = 3` is large next to the value
+      spread across a thin waiver pool (the whole healthy top eight spanned
+      2.7 points here), so subtracting it outright meant the least-penalised
+      position won regardless of how much worse its best player was. It's now
+      a TIEBREAK: take every candidate within `TOP_TARGET_VALUE_BAND` (2
+      points) of the best available value, then prefer the position the roster
+      actually needs, breaking further ties on value. The pick is therefore
+      always close to the best value on the board, while still steering away
+      from a position the user is stacked at.
+    - **Result on the user's real roster and league**: top target moved from
+      Ty Johnson (RB, value -6.52, projection 5.6) to **Colby Parkinson**
+      (TE, value -4.16, within 0.3 of the best on the board, at a position
+      they have no surplus at). The two best raw values are backup QBs, and
+      they're correctly passed over — the user already rosters two QBs in a
+      one-QB league, so a third is worthless to them. That is exactly the job
+      the need penalty should be doing, and now it does it without overriding
+      value.
+    - **The honest headline finding stands**: every free agent in this league
+      projects below replacement, so the right answer really is "there is no
+      good pickup this week," which item 169's thin-week caveat now says
+      plainly on the spotlight.
+    - Verified live end to end on the real connected league; `tsc`/lint clean.
+
 ### Open items (as of item 166 — pick up here)
 **Everything is committed and pushed to `main`, working tree CLEAN.** The
 most recent session (items 159-166) was the largest change to the engine's

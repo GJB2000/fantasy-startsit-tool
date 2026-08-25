@@ -2,7 +2,13 @@
 
 import { useMemo, useState } from "react";
 import type { TradeEvaluation, TradeVerdict } from "@/lib/trade/evaluateTrade";
-import { DEFAULT_SLOTS, parseSleeperRosterPositions, type SlotType } from "@/lib/lineup/rosterSlots";
+import {
+  DEFAULT_SLOTS,
+  parseSleeperRosterPositions,
+  SLOT_ELIGIBILITY,
+  SLOT_TYPES,
+  type SlotType,
+} from "@/lib/lineup/rosterSlots";
 import type { MatchupContext } from "@/lib/sportsdata/positionDefense";
 import { SKILL_POSITIONS, type ExtendedPosition, type ScoringFormat, type SkillPosition } from "@/lib/sportsdata/types";
 import { ChevronIcon } from "./CollapsibleSection";
@@ -364,6 +370,16 @@ function SpotlightCard({
             )}
           </div>
 
+          {/* Honest framing when the whole pool is thin: in a deep league every
+              free agent can genuinely project below the startable cutoff, and
+              a confident "top target" headline would overstate that. */}
+          {candidate.waiverValue != null && candidate.waiverValue < 0 && (
+            <p className="mt-4 max-w-[46ch] rounded-lg border border-caution/40 bg-caution/10 px-3 py-2 text-[12.5px] leading-relaxed text-foreground/70">
+              Thin week — this is the best available, but it still projects below a startable
+              {" "}{candidate.position} in your format. Worth it for depth or an injury cover, not as a lineup upgrade.
+            </p>
+          )}
+
           {candidate.reasoning[0] && (
             <p className="mt-4 max-w-[46ch] border-l-2 border-accent pl-3 text-[13.5px] leading-relaxed text-foreground/70">
               {candidate.reasoning[0]}
@@ -545,14 +561,38 @@ function Section({
 // hiding a genuinely elite one.
 const SURPLUS_PENALTY_PER_PLAYER = 3;
 
+/**
+ * How far below the best available value the top target may reach in order to
+ * favour a position of need (see pickTopTarget). Small on purpose: roster need
+ * should break a near-tie, never crown a materially worse player.
+ */
+const TOP_TARGET_VALUE_BAND = 2;
+
+/**
+ * How many players at each position a lineup can actually start. Dedicated
+ * slots count in full; a shared flex slot is SPLIT evenly across the
+ * positions it accepts (via SLOT_ELIGIBILITY), because one flex spot can only
+ * ever hold one player.
+ *
+ * The previous version added each flex slot's full count to BOTH RB and WR
+ * (and omitted TE from FLEX entirely, though Sleeper's FLEX takes RB/WR/TE).
+ * In a 9-starter league with 3 flex that produced a "need" of 13 skill
+ * starters, which made a full roster look like it had no surplus anywhere the
+ * flex touched — see CLAUDE.md item 170.
+ */
 function starterNeedByPosition(slots: Record<SlotType, number>): Record<SkillPosition, number> {
-  const flex = slots.FLEX + slots.WRRB_FLEX;
-  return {
-    QB: slots.QB + slots.SUPER_FLEX,
-    RB: slots.RB + flex,
-    WR: slots.WR + flex + slots.REC_FLEX,
-    TE: slots.TE + slots.REC_FLEX,
-  };
+  const need: Record<SkillPosition, number> = { QB: 0, RB: 0, WR: 0, TE: 0 };
+  for (const slotType of SLOT_TYPES) {
+    const count = slots[slotType];
+    if (count <= 0) continue;
+    const eligible = SLOT_ELIGIBILITY[slotType].filter((pos): pos is SkillPosition =>
+      (SKILL_POSITIONS as readonly string[]).includes(pos)
+    );
+    if (eligible.length === 0) continue;
+    const share = count / eligible.length;
+    for (const pos of eligible) need[pos] += share;
+  }
+  return need;
 }
 
 /**
@@ -589,24 +629,44 @@ export function computeRosterNeedPenalty(
  * waiver widget so they always agree. Streaming positions (D/ST, K) are a
  * different kind of signal and excluded from the cross-position "top target."
  */
+/** Ruled out as THIS WEEK's headline add — they can't play. They still appear in the lists, tagged, since they can be a legitimate stash. */
+function isSidelined(c: WaiverCandidateResponse): boolean {
+  return c.injuryStatus === "Out" || c.injuryStatus === "Doubtful";
+}
+
 export function pickTopTarget(
   candidatesByPosition: Record<ExtendedPosition, WaiverCandidateResponse[]>,
   needPenalty?: Partial<Record<SkillPosition, number>>
 ): WaiverCandidateResponse | null {
-  let best: WaiverCandidateResponse | null = null;
-  let bestValue = -Infinity;
-  for (const p of POSITION_ORDER) {
-    if (isStreamingPosition(p)) continue;
-    const penalty = needPenalty?.[p as SkillPosition] ?? 0;
-    for (const c of candidatesByPosition[p] ?? []) {
-      const value = (c.waiverValue ?? -Infinity) - penalty;
-      if (value > bestValue) {
-        bestValue = value;
-        best = c;
+  // Healthy players first; only fall back to a sidelined one if the pool has
+  // nothing else. Mirrors compareBreakdowns' own rule — prefer available, but
+  // still fill the slot if that's all there is.
+  for (const requireHealthy of [true, false]) {
+    const pool: { candidate: WaiverCandidateResponse; value: number; penalty: number }[] = [];
+    for (const p of POSITION_ORDER) {
+      if (isStreamingPosition(p)) continue;
+      const penalty = needPenalty?.[p as SkillPosition] ?? 0;
+      for (const c of candidatesByPosition[p] ?? []) {
+        if (requireHealthy && isSidelined(c)) continue;
+        if (c.waiverValue == null) continue;
+        pool.push({ candidate: c, value: c.waiverValue, penalty });
       }
     }
+    if (pool.length === 0) continue;
+
+    // Roster need is a TIEBREAK, not a primary term. Subtracting it outright
+    // let it decide the answer: the penalty (points per surplus player) is
+    // large next to the value spread across a thin waiver pool, so the only
+    // unpenalised position won regardless of how much worse its best player
+    // was. Instead, take everyone within a small band of the best available
+    // value, then prefer the position the roster actually needs. That way the
+    // pick is always close to the best value on the board.
+    const bestValue = Math.max(...pool.map((e) => e.value));
+    const contenders = pool.filter((e) => e.value >= bestValue - TOP_TARGET_VALUE_BAND);
+    contenders.sort((a, b) => a.penalty - b.penalty || b.value - a.value);
+    return contenders[0].candidate;
   }
-  return best;
+  return null;
 }
 
 export function WaiverResult({

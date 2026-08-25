@@ -1,5 +1,5 @@
 import { buildComparisonInput } from "@/lib/recommendation/buildInput";
-import { POINTS_PER_VOLUME_UNIT, REPLACEMENT_PER_GAME } from "@/lib/recommendation/config";
+import { REPLACEMENT_PER_GAME } from "@/lib/recommendation/config";
 import { scorePlayer } from "@/lib/recommendation/engine";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
@@ -26,11 +26,24 @@ export interface WaiverCandidate {
   /** Production is lagging the volume (residualScore > 0) — the "buy-low" tag. Absent/false for D/ST and K. */
   isBuyLow?: boolean;
   /**
-   * Cross-position "best pickup" score: projected points from recent volume
-   * minus the position's replacement level (value over replacement). Unlike
-   * raw volume/residual it's comparable ACROSS positions, so the single
-   * "top target" isn't QB-biased (a deep, streamable QB has a high
-   * replacement level and thus low value). Absent for D/ST and K.
+   * Cross-position "best pickup" score: the engine's own projection
+   * (finalScore) minus the position's replacement level — value over
+   * replacement, the same basis the Top 100 and the trade tool use. Comparable
+   * ACROSS positions, so the single "top target" isn't QB-biased (a deep,
+   * streamable QB has a high replacement level and thus low value).
+   *
+   * Deliberately NOT the volume-implied estimate this once used
+   * (recentVolumeAvg x POINTS_PER_VOLUME_UNIT). That ignored every other
+   * signal the engine has — expert consensus, matchup, efficiency, form — and
+   * would surface players the engine itself projects BELOW replacement purely
+   * for having touches. It also contradicted the engine's own tuning: PPR RBs
+   * carry a volume blend weight of 0 precisely because volume adds nothing
+   * there beyond form and consensus. Free to compute, since these candidates
+   * already have a real breakdown for the drop comparison.
+   *
+   * Note this is the SPOTLIGHT's basis only — the per-position lists stay
+   * ranked by recent volume, which is what the waiver backtest actually
+   * validated (see CLAUDE.md item 142). Absent for D/ST and K.
    */
   waiverValue?: number;
   /** e.g. "WR14" — rank by recent volume. */
@@ -130,8 +143,9 @@ export async function buildWaiverCandidateDetails(
         residualScore: rank.residualScore,
         isBuyLow,
         waiverValue:
-          rank.recentVolumeAvg * POINTS_PER_VOLUME_UNIT[format][rank.position] -
-          REPLACEMENT_PER_GAME[format][rank.position],
+          breakdown.finalScore != null
+            ? breakdown.finalScore - REPLACEMENT_PER_GAME[format][rank.position]
+            : undefined,
         positionLabel: `${rank.position}${rank.volumeRank}`,
         productionLabel: `${rank.position}${rank.pointsRank}`,
         reasoning,
