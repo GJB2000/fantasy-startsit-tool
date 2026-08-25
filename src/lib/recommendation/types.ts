@@ -68,8 +68,14 @@ export interface PlayerComparisonInput {
    */
   priorSeasonPprAvg: number | null;
   /**
-   * FantasyPros' weekly consensus rank-to-points estimate for this
-   * player/week, when available — see fantasypros/weeklyConsensus.ts.
+   * The external consensus projection for this player/week, when
+   * available. Source depends on pipeline since item 161: SportsDataIO's
+   * own weekly projections in live mode and on the primary backtest
+   * pipeline (sportsdata/projections.ts), FantasyPros' scraped consensus
+   * on the nflverse-only 2022-2024 pipeline, which is the only source with
+   * history. Kept named `expertConsensus*` rather than renamed across the
+   * engine — it means "the external consensus estimate", not any one
+   * vendor.
    * Populated in backtest mode from a pinned historical git commit (the
    * nflverse-only pipeline; see loadRunNflverseOnly.ts) and in live mode
    * from the file's current branch HEAD (buildInput.ts, via

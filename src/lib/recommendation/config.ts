@@ -782,7 +782,6 @@ export const ENSEMBLE_VOLUME_BLEND_RATIO: Record<ScoringFormat, Record<SkillPosi
 /**
  * How much weight the external consensus point estimate (SportsDataIO's
  * own weekly projections since item 161; FantasyPros' scrape before that)
- * (`r2p_pts`, dynastyprocess/data — see fantasypros/weeklyConsensus.ts)
  * carries against the running score, blended in last, after every other
  * modifier above. Unlike every conversion-factor-based signal in this
  * file, this one is already points-denominated — no POINTS_PER_X factor
@@ -831,7 +830,7 @@ export const ENSEMBLE_VOLUME_BLEND_RATIO: Record<ScoringFormat, Record<SkillPosi
  * exact reason item 70 couldn't just raise the universal weight), and RB
  * is flat. Per-position weights serve all four at once. Net: primary
  * overall 59.02 -> 59.84 (+0.82pp), pooled 57.98 -> 58.31, no position
- * regressing on either pipeline. QB now leans 80% on FantasyPros consensus
+ * regressing on either pipeline. QB now leans 80% on the consensus
  * — a deliberate, user-confirmed shift toward the market signal for the
  * position where it's most predictive. See CLAUDE.md's per-position
  * consensus-weight sweep.

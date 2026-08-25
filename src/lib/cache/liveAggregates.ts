@@ -32,7 +32,7 @@ import type { ScoringFormat } from "@/lib/sportsdata/types";
  * finalized/immutable once a week's games are played. The backtest never
  * calls these wrappers (it uses its own loaders), so backtested accuracy
  * is untouched. Deliberately does NOT wrap the game-day-volatile sources
- * (injuries, FantasyPros consensus) — those stay live for freshness.
+ * (injuries, the consensus projection) — those stay live for freshness.
  *
  * 24h revalidate matches the getters' own in-process TTL; Vercel serves
  * the stale value while refreshing in the background, so users effectively

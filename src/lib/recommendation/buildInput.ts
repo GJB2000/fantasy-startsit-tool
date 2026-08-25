@@ -157,8 +157,8 @@ export async function buildComparisonInput(
 
   // Live counterpart to buildBacktestComparisonInput's per-week lookup —
   // there's no week dimension here, just "what does the consensus say
-  // right now" (see fantasypros/weeklyConsensus.ts's
-  // getCurrentExpertConsensusByNormalizedName).
+  // right now" (see sportsdata/liveProjections.ts's
+  // getLiveProjectedPointsByPlayerId, which is offseason-aware).
   const expertConsensusR2pPts = projectedPointsByPlayerId.get(playerId) ?? null;
 
   return {

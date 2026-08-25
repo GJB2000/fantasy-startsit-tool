@@ -23,17 +23,20 @@ export interface ProjectionBacktestResult {
   baselineOverall: ProjectionSummary;
   baselineByPosition: Record<string, ProjectionSummary>;
   /**
-   * FantasyPros' own weekly consensus point estimate (`r2p_pts`,
-   * dynastyprocess/data — see fantasypros/weeklyConsensus.ts), graded the
-   * identical way, on the SAME pool — the real-harness answer to the
+   * The external consensus point estimate, graded the identical way on
+   * the SAME pool. Since item 161 this is SportsDataIO's own projection —
+   * which is ALSO the engine's largest input, so this is no longer an
+   * independent benchmark: it measures what the engine's other signals
+   * add on top of the consensus it ingests (see item 164) — the real-harness answer to the
    * question that originally motivated items 68-70 ("what if we take
    * into account expert projections," asked about projection accuracy
    * specifically, not pick accuracy). A separate `n` from `overall`
    * above is unavoidable and expected: unlike the naive season-average
    * baseline (which is guaranteed to exist for every pool member, since
-   * pool membership itself requires season-to-date data), FantasyPros'
-   * weekly snapshot doesn't rank every single pool player every week —
-   * coverage gaps here are real missing data, not a bug.
+   * pool membership itself requires season-to-date data), a consensus
+   * snapshot doesn't necessarily cover every pool player every week —
+   * coverage gaps here are real missing data, not a bug. In practice
+   * SportsDataIO covers all 1224 where FantasyPros covered 1203.
    */
   expertConsensusOverall: ProjectionSummary;
   expertConsensusByPosition: Record<string, ProjectionSummary>;
@@ -48,8 +51,8 @@ export interface ProjectionBacktestResult {
  * a genuinely different, magnitude-sensitive question that pick
  * accuracy can't answer: a model can correctly rank two players while
  * being off by 10 points on both, and pairwise grading would never
- * notice. As of item 71, also grades FantasyPros' own weekly consensus
- * point estimate (`r2p_pts`) on the identical pool/weeks — the direct
+ * notice. As of item 71, also grades the external consensus point
+ * estimate on the identical pool/weeks — the direct
  * real-harness answer to "what if we take into account expert
  * projections," which items 69-70 only answered for pick accuracy.
  * Deliberately scoped simple for a first pass, per direct

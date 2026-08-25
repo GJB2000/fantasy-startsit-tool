@@ -55,7 +55,8 @@ export const BASELINE_LABELS: Record<BaselineId, string> = {
   teammateOutBump: "Same-position teammate Out/Doubtful this week (\"handcuff\" bump)",
   wind: "Avoid the high-wind player (WR only, nflverse schedules)",
   depthChart: "Higher on the official depth chart (RB/WR only, nflverse depth_charts, 2022-2024 only)",
-  expertConsensus: "Higher FantasyPros weekly expert consensus rank (dynastyprocess/data)",
+  expertConsensus:
+    "Higher weekly consensus projection (SportsDataIO projections on the 2025 pipeline; FantasyPros via dynastyprocess/data on the 2022-2024 nflverse pipeline)",
 };
 
 function average(values: number[]): number {
@@ -550,8 +551,8 @@ export function pickByDepthChart(weekSlice: BacktestWeekSlice, playerIds: [numbe
 }
 
 /**
- * Naive baseline: pick whoever FantasyPros' weekly expert-consensus
- * rankings ranked higher for that week — a genuinely different KIND of
+ * Naive baseline: pick whoever the external consensus ranked higher for
+ * that week — a genuinely different KIND of
  * signal from everything else in this file, human/market-informed rather
  * than derived from box scores or play-by-play (see CLAUDE.md item 68's
  * multi-season standalone validation). Deliberately unscoped across all
@@ -562,11 +563,14 @@ export function pickByDepthChart(weekSlice: BacktestWeekSlice, playerIds: [numbe
  * eventual scoping, not assumed in advance from the standalone script
  * that motivated building this.
  *
- * `weekSlice.expertConsensusByPlayerIdWeek` is reconstructed from
- * dynastyprocess/data's git history (see fantasypros/weeklyConsensus.ts)
- * — only ever populated by the nflverse-only pipeline, same optionality
- * as depthChart/wind above; no_pick on the primary SportsDataIO
- * pipeline.
+ * `weekSlice.expertConsensusByPlayerIdWeek` is populated by BOTH
+ * pipelines, from different sources since item 161: SportsDataIO's own
+ * weekly projections on the primary pipeline, FantasyPros (reconstructed
+ * from dynastyprocess/data's git history — see
+ * fantasypros/weeklyConsensus.ts) on the nflverse-only 2022-2024 one,
+ * which is the only source with that history. So this baseline no longer
+ * no_picks on the primary pipeline, and its numbers are NOT directly
+ * comparable across the two.
  */
 export function pickByExpertConsensus(weekSlice: BacktestWeekSlice, playerIds: [number, number]): number | null {
   const ranks = playerIds.map(

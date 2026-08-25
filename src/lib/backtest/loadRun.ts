@@ -84,10 +84,11 @@ export interface BacktestRunData {
    */
   impliedTotalsByTeamWeek?: Map<string, number>;
   /**
-   * PlayerID -> week -> FantasyPros weekly consensus rank + dynastyprocess's
-   * rank-to-points estimate, reconstructed from dynastyprocess/data's git
-   * history (see lib/fantasypros/weeklyConsensus.ts for why this needs
-   * git-history mining rather than a normal CSV fetch). Unlike
+   * PlayerID -> week -> external consensus rank + point estimate. Source
+   * differs by pipeline since item 161: THIS (primary) pipeline builds it
+   * from SportsDataIO's own weekly projections, while loadRunNflverseOnly
+   * builds it from FantasyPros via dynastyprocess/data's git history — the
+   * only consensus source with 2022-2024 coverage. Unlike
    * teamWeatherByTeamWeek/depthChartByPlayerIdWeek above, this one IS set
    * by both pipelines — item 53's ensemble investigation established that
    * any signal touching a large fraction of the whole score needs a real
