@@ -8,7 +8,7 @@ interface ProjectionBanner {
 function ProjectionRow({ label, summary }: ProjectionBanner) {
   if (summary.n === 0 || summary.mae == null) {
     return (
-      <div className="flex items-center justify-between rounded-[4px] border border-foreground/12 bg-surface px-3.5 py-2.5 text-sm shadow-sm">
+      <div className="flex flex-col gap-1 rounded-[4px] border border-foreground/12 bg-surface px-3.5 py-2.5 text-sm shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <span className="font-medium">{label}</span>
         <span className="text-foreground/55">— (n=0)</span>
       </div>
@@ -18,9 +18,9 @@ function ProjectionRow({ label, summary }: ProjectionBanner) {
   const biasLabel = summary.bias! >= 0 ? `+${summary.bias!.toFixed(1)}` : summary.bias!.toFixed(1);
 
   return (
-    <div className="flex items-center justify-between rounded-[4px] border border-foreground/12 bg-surface px-3.5 py-2.5 text-sm shadow-sm">
+    <div className="flex flex-col gap-1 rounded-[4px] border border-foreground/12 bg-surface px-3.5 py-2.5 text-sm shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
       <span className="font-medium">{label}</span>
-      <span>
+      <span className="shrink-0">
         <span className="font-jost text-[15px] font-semibold">{summary.mae.toFixed(1)} MAE</span>{" "}
         <span className="font-mono text-foreground/55">
           (RMSE {summary.rmse!.toFixed(1)}, bias {biasLabel}, n={summary.n})

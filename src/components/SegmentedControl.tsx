@@ -43,20 +43,24 @@ export function SegmentedControl<T extends string>({
   tone = "primary",
 }: SegmentedControlProps<T>) {
   return (
-    <div>
+    // min-w-0 so the group can shrink inside a flex row: a flex item's default
+    // min-width is auto, which is what let the widest control (Backtest's
+    // four-option Mode) push the whole page 250px wider than a phone screen.
+    // The track then scrolls inside its own bounds rather than the document's.
+    <div className="min-w-0 max-w-full">
       {label && (
         <span className="mb-1.5 block font-engraved text-[9.5px] uppercase tracking-[0.12em] text-foreground/55">
           {label}
         </span>
       )}
-      <div className="inline-flex gap-0.5 rounded-full bg-surface-sunken p-[3px]">
+      <div className="segmented-scroll flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-surface-sunken p-[3px]">
         {options.map((option) => (
           <button
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
             aria-pressed={value === option.value}
-            className={`whitespace-nowrap rounded-full px-3.5 py-1.5 font-engraved text-[11px] uppercase tracking-[0.08em] transition-colors ${
+            className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 font-engraved text-[11px] uppercase tracking-[0.08em] transition-colors ${
               value === option.value ? ACTIVE_CLASSES[tone] : "text-foreground/55 hover:text-foreground"
             }`}
           >

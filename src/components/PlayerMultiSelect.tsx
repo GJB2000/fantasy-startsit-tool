@@ -185,7 +185,7 @@ export function PlayerMultiSelect({
             <span />
           )}
           {max != null && (
-            <div className="flex items-center gap-2.5">
+            <div className="flex shrink-0 items-center gap-2.5">
               <div className="flex gap-1" aria-hidden>
                 {Array.from({ length: max }, (_, i) => (
                   <span
@@ -196,7 +196,7 @@ export function PlayerMultiSelect({
                   />
                 ))}
               </div>
-              <span className="font-mono text-xs text-foreground/60 tabular-nums">
+              <span className="whitespace-nowrap font-mono text-xs text-foreground/60 tabular-nums">
                 {selected.length} of {max}
               </span>
             </div>

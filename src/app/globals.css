@@ -293,3 +293,16 @@ body {
   color: var(--foreground);
   min-height: 100%;
 }
+
+/*
+ * Horizontally scrollable pill groups (SegmentedControl). The scrollbar is
+ * hidden because the track is only ~34px tall — a native bar would eat a
+ * third of it — and the pills themselves are the affordance.
+ */
+.segmented-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.segmented-scroll::-webkit-scrollbar {
+  display: none;
+}

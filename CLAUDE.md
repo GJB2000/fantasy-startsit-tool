@@ -10163,6 +10163,55 @@ single-season numbers for those specific constants.
       still fills a full 10-of-10 lineup off the league's detected slots.
       `tsc`/lint clean.
 
+173. **Fixed the Backtest page on mobile — the page scrolled sideways and the
+    result rows were unreadable at phone width.** Presentation only; no
+    engine, data or backtest-logic change.
+    - **Root cause was the shared `SegmentedControl`, not the Backtest page.**
+      Measured rather than eyeballed: at 375px the document scrolled to 627px,
+      and the single element responsible was the four-option **Mode** group —
+      "Single pair / Broad (many pairs) / Trade assistant / Projection
+      accuracy" is 603px of `whitespace-nowrap` pills. Two things had to be
+      true for that to break the page, and both were: the control had no
+      internal scroll container, AND it sits in a `flex` row where a flex
+      item's default `min-width: auto` means it will not shrink below its
+      content. So it pushed the whole document 250px wider than the screen.
+    - **Fixed in the shared component**, so all four pages that use it benefit
+      (Backtest, Legit Rankings, Player Stats, the player detail page):
+      `min-w-0 max-w-full` on the group so it can shrink, `overflow-x-auto` on
+      the pill track so it scrolls inside its own bounds, and `shrink-0` on
+      the pills so they keep their size while it does. Same "wide content
+      scrolls in its own container" convention the result tables already
+      follow. The scrollbar is hidden (new `.segmented-scroll` rule) because
+      the track is ~34px tall and a native bar would eat a third of it.
+    - **Second problem, separate from the overflow: the result rows were
+      squeezed.** Both summary components lay label and value out side by side
+      with `justify-between`, which is fine on a desktop row and bad at 375px —
+      several baseline labels run two or three lines ("Recent volume
+      (targets/touches/attempts)", "Team pace/game script…"), so the label
+      collided with the percentage and forced the correct/incorrect detail
+      into a ragged narrow column. Both `BacktestSummary`'s `AccuracyBanner`
+      and `ProjectionSummary`'s `ProjectionRow` now stack vertically below
+      `sm` and keep the side-by-side layout above it.
+    - **Third, smaller: the player-picker counter wrapped to three lines**
+      ("0 / of / 4") when its label was long, as on Backtest's "Look up
+      specific players (optional)". `shrink-0` and `whitespace-nowrap` on the
+      counter in `PlayerMultiSelect` — which fixes it everywhere the picker
+      appears, not just here.
+    - **Verified by measurement, not just by looking**: `/backtest` at 375px
+      now reports `scrollWidth === clientWidth === 375` in the controls state,
+      with Broad results rendered, and with Projection results rendered
+      (including its player table, which correctly scrolls inside its own
+      `overflow-x-auto` parent while the page does not). `/rankings` and
+      `/stats` — the other pages sharing the changed components — also measure
+      clean. Desktop is unchanged: all four Mode pills still sit on one row and
+      the summary rows are still side by side at 1440px. `tsc`/lint clean.
+    - Worth remembering for the next one of these: a page-level horizontal
+      scroll almost always traces to a single non-shrinking flex item, and
+      `document.scrollWidth` vs `clientWidth` plus a walk of every element's
+      `getBoundingClientRect().right` finds it in one pass — far faster than
+      reading screenshots, which is how the earlier grid-overflow bug in item
+      109 was found only after it shipped.
+
 ### Open items (as of item 166 — pick up here)
 **Everything is committed and pushed to `main`, working tree CLEAN.** The
 most recent session (items 159-166) was the largest change to the engine's

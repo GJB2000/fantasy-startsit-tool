@@ -8,9 +8,13 @@ interface AccuracyBannerProps {
 
 function AccuracyBanner({ label, summary }: AccuracyBannerProps) {
   return (
-    <div className="flex items-center justify-between rounded-[4px] border border-foreground/12 bg-surface px-3.5 py-2.5 text-sm shadow-sm">
+    // Stacks on phones: several baseline labels run two or three lines, and
+    // side-by-side they collided with the percentage and squeezed the
+    // correct/incorrect detail into a ragged column. Side-by-side from `sm` up,
+    // where there's room for it.
+    <div className="flex flex-col gap-1 rounded-[4px] border border-foreground/12 bg-surface px-3.5 py-2.5 text-sm shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
       <span className="font-medium">{label}</span>
-      <span className="tabular-nums">
+      <span className="shrink-0 tabular-nums">
         <span className="font-jost text-[15px] font-semibold">
           {summary.accuracyPct != null ? `${summary.accuracyPct.toFixed(1)}%` : "—"}
         </span>{" "}
