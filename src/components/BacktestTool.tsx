@@ -33,12 +33,23 @@ type Mode = "pair" | "broad" | "trade" | "projection";
 type Season = "2025" | "2024" | "2023" | "2022";
 const SEASON_OPTIONS = ["2025", "2024", "2023", "2022"] as const;
 const SEASON_CHOICES: { value: Season; label: string }[] = SEASON_OPTIONS.map((s) => ({ value: s, label: s }));
+// Short enough that all four fit on a phone without the group scrolling —
+// what each one actually does is spelled out in MODE_DESCRIPTIONS below,
+// which is a better home for it than a pill label anyway.
 const MODE_CHOICES: { value: Mode; label: string }[] = [
-  { value: "pair", label: "Single pair" },
-  { value: "broad", label: "Broad (many pairs)" },
-  { value: "trade", label: "Trade assistant" },
-  { value: "projection", label: "Projection accuracy" },
+  { value: "pair", label: "Pair" },
+  { value: "broad", label: "Broad" },
+  { value: "trade", label: "Trade" },
+  { value: "projection", label: "Projection" },
 ];
+
+const MODE_DESCRIPTIONS: Record<Mode, string> = {
+  pair: "Replays two specific players head to head, week by week — did the engine pick the one who actually scored more?",
+  broad: "Replays hundreds of close calls across the whole season, and compares the engine against naive strategies on the same matchups.",
+  trade: "Replays synthetic trades and grades them against what each side really scored the rest of the way.",
+  projection:
+    "2025 season only — how close the engine's own score comes to real points scored, not just whether it picked the right player. Scored in the selected format above.",
+};
 const ALL_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
 // D/ST and K only have real backtest support on the primary 2025
 // SportsDataIO pipeline (Broad mode only, not Trade analyzer) — see
@@ -259,6 +270,9 @@ export function BacktestTool() {
           />
         )}
       </div>
+
+      <p className="text-xs leading-relaxed text-foreground/55">{MODE_DESCRIPTIONS[mode]}</p>
+
       {mode !== "projection" && (
         <p className="-mt-3 text-xs text-foreground/55">
           {season === "2025"
@@ -269,10 +283,6 @@ export function BacktestTool() {
 
       {mode === "projection" ? (
         <>
-          <p className="text-xs text-foreground/55">
-            2025 season only — how close the engine&apos;s own score comes to real points scored, not just
-            whether it picked the right player. Scored in the selected format above.
-          </p>
           <PlayerMultiSelect
             editorial
             label="Look up specific players (optional)"

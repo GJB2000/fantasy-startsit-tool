@@ -10205,6 +10205,18 @@ single-season numbers for those specific constants.
       `/stats` — the other pages sharing the changed components — also measure
       clean. Desktop is unchanged: all four Mode pills still sit on one row and
       the summary rows are still side by side at 1440px. `tsc`/lint clean.
+    - **Follow-up: shortened the Mode labels so all four fit without
+      scrolling.** The scroll container fixed the broken page but left
+      "Projection accuracy" off-screen on a phone until you swiped — fine as a
+      fallback, worse than just fitting. Labels are now "Pair / Broad / Trade /
+      Projection", measured at 320px of track against 327px of available
+      column, so the group no longer overflows at all (`scrollWidth ===
+      clientWidth` on the track itself, not just the page). What each mode
+      does moved into a new `MODE_DESCRIPTIONS` line under the controls, which
+      is a better home for it than a pill label — previously only Projection
+      mode explained itself, and "(many pairs)" was doing that job badly for
+      Broad. Desktop gains from it too: the three control groups now sit on
+      one row with room to spare.
     - Worth remembering for the next one of these: a page-level horizontal
       scroll almost always traces to a single non-shrinking flex item, and
       `document.scrollWidth` vs `clientWidth` plus a walk of every element's
