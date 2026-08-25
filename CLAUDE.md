@@ -7647,7 +7647,10 @@ single-season numbers for those specific constants.
     "Who wins the trade, by rest-of-season value.", etc.). Text-only edits
     to each `src/app/*/page.tsx` header. Committed `7dcbb7e`.
 128. **Brand identity: real LF-football logo, matching favicon, uppercased
-    wordmark/brand everywhere.** (a) Replaced the placeholder green-cube
+    wordmark/brand everywhere. (a) and (b) are SUPERSEDED by item 165 —
+    the inline-SVG recreation and `icon.svg` described here were replaced
+    by the real pennant artwork; (c)'s tagline was later renamed again.
+    Kept as the historical record.)** (a) Replaced the placeholder green-cube
     `LogoTile` in `AppShell.tsx` with an inline-SVG recreation of the
     LF-football mark (block "L", vertical football with laces, block "F";
     cream `#f4efe4` on a near-black tile) — crisp at any size, no asset
@@ -9715,15 +9718,148 @@ single-season numbers for those specific constants.
       pool player.
     - No scoring change; labels, field names and one measurement series only.
 
-### Open items (as of item 164 — pick up here)
-**Everything is committed and pushed to `main` (HEAD `1cc5b49`), working
-tree CLEAN.** The most recent session added the player stat pages (item 159 —
-`/stats` and `/stats/[playerId]`, with search and advanced metrics) and
-recorded the bulk-advanced-metrics entitlement finding in Open Item #35. It
-touched no engine, scoring or backtest code, so every accuracy number in this
-document is unchanged.
+165. **Shipped the real pennant logo — replacing the inline-SVG
+    approximation from item 128 — plus a matching vector favicon.
+    Presentation only, no engine change.** The user designed a proper mark
+    (a felt pennant: cream field, blue helmet with a blackletter "LF",
+    "Legit Football" script) and it went through three source formats before
+    landing.
+    - **The `.ai` file could be used without any design tooling installed.**
+      No Illustrator CLI, no poppler, no ImageMagick on this machine — but
+      an `.ai` is PDF-internally (`%PDF-1.6`), and macOS's built-in `sips`
+      renders it AND preserves transparency, where Quick Look flattens onto
+      white. Worth remembering: `sips -s format png --resampleWidth N
+      file.ai` is a complete vector-to-transparent-raster path with zero
+      dependencies.
+    - **One real trap**: macOS's PDF renderer IGNORES a crop box's ORIGIN.
+      Shrinking MediaBox/CropBox to the artwork's bounds produced a
+      correctly-SIZED but EMPTY image, because content is drawn relative to
+      the box's lower-left as if it were (0,0). Cropping had to be done on
+      the raster instead. (`ArtBox` in the file gives the exact artwork
+      bounds, which is how the crop rect was known at all.)
+    - **The SVG export needed its viewBox tightened.** Illustrator centres
+      the mark in a much larger, near-square artboard (291x230 for a 2.6:1
+      pennant), so the raw export renders small and floating. Measured the
+      real bounds with `getBBox()` in the browser (x 9.1, y 85.71, 282.26 x
+      108.51) and set the viewBox to exactly that. Nothing else about the
+      file changed; the untouched export is kept in `design/`.
+    - **Raster stage worth recording even though it was replaced**: before
+      the SVG arrived, the PNG looked soft, and the cause was NOT what it
+      first appeared. The browser pane reports `naturalWidth` already
+      divided by devicePixelRatio, which made a correctly-sized file look
+      half-resolution — a false diagnosis corrected by fetching the served
+      bytes with `curl`. The real causes were (1) a fixed-size `next/image`
+      only puts 1x and 2x of the `width` prop in its srcset, so there is no
+      zoom headroom, and (2) **Next 16 only serves qualities listed in
+      `images.qualities`, which defaults to `[75]` alone** — a `quality={90}`
+      request 400s and silently falls back. Both moot now that it's vector
+      (`unoptimized`, since there is nothing to resize or re-encode and Next
+      declines to process SVG without `dangerouslyAllowSVG`), and
+      `next.config.ts` is back to defaults.
+    - **Favicon is the helmet, lifted from the same vector** — elements
+      30-39 of the pennant SVG on a cream rounded square, fills inlined
+      rather than carrying over the export's generic `.cls-N` classes so it
+      can be inlined anywhere without colliding. `src/app/icon.png` is kept
+      alongside as a fallback; Next emits both, the SVG with `sizes="any"`,
+      so SVG-capable browsers take it and Safari takes the PNG.
+    - **Honest limit, tested rather than assumed**: rasterising both at
+      16/32/48px showed vector does NOT rescue 16px — the blackletter LF
+      averages into a smear at that size from any source. It wins at 32px
+      and up (retina tabs, bookmarks, OS shortcuts) and on file size (3KB
+      vs 37KB). A genuinely legible 16px icon needs a SIMPLIFIED mark, not
+      a sharper one.
+    - **Sidebar tagline renamed** "Fantasy Toolkit" -> "LEGITFOOTBALL
+      PREMIUM" (already gold, via `--premium`). Note the Home page `<h1>`
+      still reads "FANTASY TOOLKIT" — deliberately, the rename was scoped
+      to the sidebar.
+    - Files: `src/components/BrandPennant.tsx` (renders
+      `public/legitfootball-pennant.svg` via `next/image` `unoptimized`),
+      `src/app/icon.svg` + `icon.png`, `design/legitlogo2.ai` and
+      `design/legitlogo2.svg` (sources, deliberately OUT of `public/`,
+      which is served publicly and ships in every deploy). `LogoTile` and
+      the old `icon.svg` mark are gone. Commits `f08d6e0`, `9a96c29`,
+      `4e24bcd`, `fd998d8`, `aad2b26`.
 
-The paragraph below is the PRIOR session's record (items 155-158), kept for
+166. **Swept every stale "the consensus means FantasyPros" assumption left
+    by item 161 — one user-visible, six internal, and two that were already
+    wrong before this session.** Prompted by item 164 being the SECOND
+    downstream mislabel found after the source swap; rather than wait for a
+    third, grepped every consensus reference in `src/`.
+    - **User-visible**: the Backtest page's baseline table labelled the
+      `expertConsensus` row "Higher FantasyPros weekly expert consensus rank
+      (dynastyprocess/data)". On the primary pipeline that row is now
+      SportsDataIO. Since the source genuinely differs BY PIPELINE, the
+      label now names both rather than pretending to one.
+    - **Stale internal docs corrected**:
+      `PlayerComparisonInput.expertConsensusR2pPts`,
+      `BacktestRunData.expertConsensusByPlayerIdWeek`,
+      `BacktestWeekSlice`'s copy, `buildInput`'s live-lookup comment,
+      `liveAggregates`' "stays live" note, and two `config.ts` lines.
+    - **Two predate this session, which is the more useful finding.** Both
+      `baselines.ts`'s `pickByExpertConsensus` doc and `weekData.ts` claimed
+      the consensus map is "only ever populated by the nflverse-only
+      pipeline" and "no_pick on the primary SportsDataIO pipeline" —
+      untrue since **item 70** wired it into `loadRun.ts`. Anyone reading
+      `weekData.ts` would have concluded the primary pipeline had no
+      consensus at all.
+    - **Deliberately left as genuinely FantasyPros**: `lib/fantasypros/*`,
+      Legit Rankings' redraft blend and `fantasyProsPositionRank` (it reads
+      the redraft file directly), `loadRunNflverseOnly` (the only source
+      with 2022-2024 history), and `nflverse/schedules.ts`'s week-start
+      helper, which exists to date FantasyPros commits.
+    - **Naming decision**: `expertConsensusR2pPts` was NOT renamed across
+      the engine. It now documents as "the external consensus estimate"
+      rather than any one vendor — a rename would touch a dozen files and
+      every historical doc reference for no functional gain. If it reads as
+      leftover FantasyPros branding later, the doc comment is the
+      disambiguator.
+    - Docs and one label only; broad backtest byte-identical at 61.80%.
+      Commit `7092476`.
+
+### Open items (as of item 166 — pick up here)
+**Everything is committed and pushed to `main`, working tree CLEAN.** The
+most recent session (items 159-166) was the largest change to the engine's
+inputs since expert consensus was first added. **Read items 161-164 before
+touching anything consensus- or trade-related.**
+
+**Current headline numbers, all superseding earlier ones in this document:**
+
+| measure | now | was |
+|---|---|---|
+| primary 2025 broad, skill positions | **61.80%** | 60.66% |
+| pooled 2022-2025 (nflverse, FantasyPros) | 58.68% | 58.64% |
+| trade backtest, nflverse multiseason 1-for-1 | **61.40%** | 53.01% |
+| trade backtest, multi-player 2-for-2 | **60.02%** | 54.35% |
+| projection accuracy, engine | MAE 6.26 / bias +0.25 | 6.35 / +0.31 |
+
+**What changed, in one paragraph each:**
+- **The consensus source is now SportsDataIO's own weekly projections, not
+  the FantasyPros scrape** (item 161). Weights were re-swept for it —
+  `EXPERT_CONSENSUS_BLEND_WEIGHT` is now `QB 0.8 / RB 0.9 / WR 0.5 / TE 0.9`.
+  **At FantasyPros' old weights SportsDataIO scores WORSE**, so never
+  evaluate a source swap without re-sweeping.
+- **Rest-of-season trade value is now a 50/50 blend** of the engine's
+  extrapolation and SportsDataIO's season projection
+  (`REST_OF_SEASON_PROJECTION_BLEND`, item 162).
+- **The trade backtests were fixed to include the consensus term** (item
+  163) — they had been grading an engine without its largest signal. Every
+  trade figure published before this is superseded.
+- **Two mislabels followed the source swap** (items 164, 166). If something
+  still says "FantasyPros" where the primary pipeline is involved, suspect
+  it.
+
+**Deliberately hybrid, do not "simplify"**: the primary 2025 pipeline uses
+SportsDataIO projections; the nflverse-only 2022-2025 pipeline still uses
+FantasyPros, because SportsDataIO's projections **401 for 2022-2024**. Each
+pipeline uses the only source it can get for its seasons. Consequence: the
+multi-season check no longer validates the source the live tools use — the
+core risk in **Open Item #37**.
+
+**Everything shipped this session rests on SINGLE-SEASON evidence**, since
+2022-2024 projections are paywalled. Items 24-30 are the long record of why
+that is a real risk, not a formality.
+
+The paragraph below is an OLDER session's record (items 155-158), kept for
 context — its "HEAD `185916a`" framing is historical:
 
 **Everything is committed and pushed to `main` (HEAD `185916a`), working
@@ -11055,7 +11191,16 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   `TeamGames`), which also retires the `odds` base for 2026+. It fetches
   with the shared cache bypassed and caches only the trimmed slices,
   because the raw response is ~12MB/week (item 27's memory lesson).
-  `advancedMetrics.ts`
+  `projections.ts` (item 161) reads SportsDataIO's own weekly point
+  projections — the engine's consensus signal since it replaced the
+  FantasyPros scrape — season-routed like every other reader (legacy host
+  <=2025, the v3 `projectionsV3` package 2026+). `liveProjections.ts`
+  (`getLiveProjectedPointsByPlayerId`) is its live, offseason-aware
+  counterpart: the upcoming week's projection in-season, the coming
+  season's projection divided by projected games between seasons, since
+  there is no upcoming week then. `seasonProjectionMap.ts` (item 162)
+  loads season-long projections keyed by PlayerID for rest-of-season trade
+  valuation. `advancedMetrics.ts`
   (item 159) reads the NFL Advanced Metrics product via the per-player
   `AdvancedPlayerInfo/{PlayerId}` endpoint on its own key
   (`SPORTSDATA_ADVANCED_API_KEY`, base `advancedV3`) — the only advanced path
@@ -11172,8 +11317,15 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   opponent" case
   share one formula; `sumProjectedPoints`/`projectRestOfSeason` take a
   player's score with that one matchup term stripped out and re-sum it
-  against every remaining opponent on their real schedule.
-  `toNflverseTeam`/`toSdioTeam` (the LAR/LA team-code mapping) are
+  against every remaining opponent on their real schedule. As of item 162
+  that extrapolation is then BLENDED 50/50 with SportsDataIO's season-long
+  projection pro-rated to the games remaining (`blendRestOfSeason`,
+  `REST_OF_SEASON_PROJECTION_BLEND` in `config.ts`) — extrapolation alone
+  scored 58.33% on synthetic trades against the blend's 64.88%, because
+  multiplying a recent-form-driven weekly score across ten games
+  extrapolates hot and cold streaks. Falls back to whichever side exists,
+  so a player the projection feed doesn't cover still gets the plain
+  extrapolation. `toNflverseTeam`/`toSdioTeam` (the LAR/LA team-code mapping) are
   exported from this file rather than kept private, since `buildInput.ts`
   now needs the same translation for the next-opponent display feature
   below — one source of truth for that mapping rather than a second copy.
@@ -11763,7 +11915,12 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   really just a player-specific lookup) — Route Handlers that
   orchestrate the lib layers above and return trimmed JSON (never proxy
   raw upstream payloads, never leak the API key).
-- `src/components/` — `AppShell.tsx` (item 64 — the persistent sidebar
+- `src/components/` — `BrandPennant.tsx` (item 165 — the pennant logo,
+  rendered from `public/legitfootball-pennant.svg` via `next/image`
+  `unoptimized`, since a vector has nothing for the optimizer to resize and
+  Next declines to process SVG without `dangerouslyAllowSVG`; the mark
+  carries the wordmark itself, so it REPLACES rather than sits beside a
+  text lockup). `AppShell.tsx` (item 64 — the persistent sidebar
   shell wrapping every page from `layout.tsx`, replacing the old
   `NavBar.tsx`, now deleted) and `PageHeader.tsx` (item 64 — the compact
   title/subtitle every page uses in place of its old full-bleed hero),
