@@ -10360,6 +10360,38 @@ single-season numbers for those specific constants.
       100% expected-points coverage on every displayed RB/WR/TE. `tsc`/lint
       clean.
 
+176. **Player Stats: replaced the "2025 season totals · 83 players · click a
+    player…" caption with a real Season toggle (2025 / 2026).**
+    Presentation plus a small route change; no engine or scoring change.
+    - **The season options are derived, not hardcoded** —
+      `[lastCompletedSeason, lastCompletedSeason + 1]`, read from the response
+      the page already receives. So the pair rolls forward on its own instead
+      of needing an edit every September, and the toggle stays hidden until
+      the first response says where the calendar actually is.
+    - **`/api/stats` gained an optional `season`**, honoured only within
+      `MIN_STATS_SEASON`(2025)`..lastCompletedSeason + 1` and otherwise
+      falling back to the default. That range is not arbitrary: the readers
+      are season-routed across two subscriptions (item 158), so an
+      out-of-range year would 401 rather than return anything useful.
+      Verified all three paths — 2025 returns 83 QBs, 2026 returns 0 rows
+      without erroring (confirming the v3 route works, since the legacy key
+      would have 401'd), and 1999 falls back to 2025.
+    - **The upcoming season needed its own empty state, and this is the part
+      worth remembering.** The existing zero-results branch says "No QB
+      matches ..." — written for a search that missed, and it would have
+      rendered as a failed search with an empty query for a season that
+      simply hasn't kicked off. Now a genuinely empty pool (as opposed to an
+      empty *filter* result) shows "No 2026 stats yet — that season hasn't
+      kicked off; stats appear once games are played", and the search-miss
+      copy only fires when there were rows to filter in the first place.
+    - The caption's other content was redundant rather than lost: the season
+      is in the toggle, "click a player for their game log" is already in the
+      page subheading, and the row count was noise.
+    - Verified live at desktop and 375px: toggle switches both ways (2025 → 83
+      rows, 2026 → the empty state, back to 2025 → 83 rows), and the page
+      still measures `scrollWidth === clientWidth` on mobile with a fourth
+      control group added. `tsc`/lint clean.
+
 ### Open items (as of item 166 — pick up here)
 **Everything is committed and pushed to `main`, working tree CLEAN.** The
 most recent session (items 159-166) was the largest change to the engine's

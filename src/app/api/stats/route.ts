@@ -3,10 +3,14 @@ import { isStatsPosition, STATS_POSITIONS } from "@/lib/stats/types";
 import { getSeasonContext } from "@/lib/sportsdata/timeframes";
 import { parseScoringFormat } from "@/lib/sportsdata/types";
 
+/** The earliest season this app's subscriptions can serve stats for (see CLAUDE.md's Data Source Notes — anything earlier 401s). */
+const MIN_STATS_SEASON = 2025;
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const position = url.searchParams.get("position") ?? "QB";
   const format = parseScoringFormat(url.searchParams.get("scoringFormat"));
+  const seasonParam = Number(url.searchParams.get("season"));
 
   if (!isStatsPosition(position)) {
     return Response.json(
@@ -17,9 +21,17 @@ export async function GET(request: Request) {
 
   try {
     const context = await getSeasonContext();
-    const rows = await getStatsLeaderboard(context.lastCompletedSeason, position, format);
+    // Defaults to the last completed season. An explicit season is honoured
+    // as long as it's one we can actually serve — the readers are
+    // season-routed across two subscriptions (see seasonRouting.ts), so an
+    // out-of-range year would just 401 rather than return anything useful.
+    const season =
+      Number.isFinite(seasonParam) && seasonParam >= MIN_STATS_SEASON && seasonParam <= context.lastCompletedSeason + 1
+        ? seasonParam
+        : context.lastCompletedSeason;
+    const rows = await getStatsLeaderboard(season, position, format);
     return Response.json({
-      season: context.lastCompletedSeason,
+      season,
       format,
       position,
       rows,

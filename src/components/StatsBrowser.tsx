@@ -35,6 +35,10 @@ export function StatsBrowser() {
   const [view, setView] = useState<"standard" | "advanced">("standard");
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [season, setSeason] = useState<number | null>(null);
+  // null = "whatever the server defaults to" (the last completed season), so
+  // the toggle doesn't need to know the calendar before the first response.
+  const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
+  const [lastCompletedSeason, setLastCompletedSeason] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -47,6 +51,7 @@ export function StatsBrowser() {
     setLoading(true);
     setError(null);
     const params = new URLSearchParams({ position, scoringFormat });
+    if (selectedSeason != null) params.set("season", String(selectedSeason));
     fetch(`/api/stats?${params}`)
       .then(async (res) => {
         const body = await res.json();
@@ -57,13 +62,14 @@ export function StatsBrowser() {
         if (cancelled) return;
         setRows(body.rows);
         setSeason(body.season);
+        setLastCompletedSeason(body.context?.lastCompletedSeason ?? null);
       })
       .catch((err: Error) => !cancelled && setError(err.message))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [position, scoringFormat]);
+  }, [position, scoringFormat, selectedSeason]);
 
   const columns = useMemo(
     () => (view === "advanced" ? advancedColumns(position) : standardColumns(position)),
@@ -113,10 +119,31 @@ export function StatsBrowser() {
     }
   }
 
+  // The completed season and the one after it — derived, not hardcoded, so
+  // this rolls forward on its own. Hidden until the first response tells us
+  // where the calendar actually is.
+  const activeSeason = selectedSeason ?? season;
+  const seasonOptions =
+    lastCompletedSeason == null
+      ? []
+      : [lastCompletedSeason, lastCompletedSeason + 1].map((year) => ({
+          value: String(year),
+          label: String(year),
+        }));
+
   return (
     <div className="mx-auto w-full max-w-6xl">
       <div className="mb-6 flex flex-wrap items-end gap-x-8 gap-y-4">
         <SegmentedControl label="Position" options={POSITIONS} value={position} onChange={setPosition} />
+        {seasonOptions.length > 1 && (
+          <SegmentedControl
+            label="Season"
+            options={seasonOptions}
+            value={String(activeSeason ?? "")}
+            onChange={(next) => setSelectedSeason(Number(next))}
+            tone="secondary"
+          />
+        )}
         <SegmentedControl label="Columns" options={VIEWS} value={view} onChange={setView} tone="secondary" />
         <SegmentedControl
           label="Scoring"
@@ -161,14 +188,6 @@ export function StatsBrowser() {
         </div>
       </div>
 
-      {season && (
-        <p className="mb-4 text-[13px] text-foreground/55">
-          {season} season totals ·{" "}
-          {query ? `${visible?.length ?? 0} of ${ranked?.length ?? 0}` : (ranked?.length ?? 0)} players · click a
-          player for their game log
-        </p>
-      )}
-
       {error && (
         <div className="rounded-[10px] border border-bad/30 bg-bad/10 px-4 py-3 text-[13px] text-foreground">
           {error}
@@ -181,7 +200,21 @@ export function StatsBrowser() {
           — the table only ever holds one position, so looking up a RB while
           the QB tab is open finds nothing. Rather than a dead end, offer the
           other positions; the query carries over. */}
-      {!loading && !error && visible?.length === 0 && (
+      {/* A season the feed has no rows for yet — most obviously an upcoming
+          season before kickoff — is not a failed search, and the
+          "no matches" copy below would read as one. */}
+      {!loading && !error && ranked?.length === 0 && (
+        <div className="rounded-[12px] border border-foreground/12 px-4 py-5 text-[13px] text-foreground/70">
+          <p>No {season} stats yet.</p>
+          <p className="mt-1.5 text-foreground/55">
+            {lastCompletedSeason != null && season != null && season > lastCompletedSeason
+              ? "That season hasn't kicked off — stats appear once games are played."
+              : "Nothing came back for this position and season."}
+          </p>
+        </div>
+      )}
+
+      {!loading && !error && ranked != null && ranked.length > 0 && visible?.length === 0 && (
         <div className="rounded-[12px] border border-foreground/12 px-4 py-5 text-[13px] text-foreground/70">
           <p>
             No {position} matches “{query}”.
