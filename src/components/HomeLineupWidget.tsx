@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
-import { DEFAULT_SLOTS, parseSleeperRosterPositions, serializeSlots, type SlotType } from "@/lib/lineup/rosterSlots";
+import { serializeSlots } from "@/lib/lineup/rosterSlots";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useScoringFormat } from "@/lib/useScoringFormat";
-import { useSleeperConnection } from "@/lib/useSleeperConnection";
+import { useEffectiveRosterSlots } from "@/lib/useRosterSlots";
 import type { LineupSlotResponse } from "./LineupResult";
 
 interface LineupResponse {
@@ -68,18 +68,14 @@ function SlotRow({ slot }: { slot: LineupSlotResponse }) {
  */
 export function HomeLineupWidget() {
   const { rostered } = useRosteredPlayers();
-  const [sleeperConnection] = useSleeperConnection();
   const [scoringFormat] = useScoringFormat();
   const [response, setResponse] = useState<LineupResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const slotCounts = useMemo<Record<SlotType, number>>(() => {
-    if (sleeperConnection && sleeperConnection.rosterPositions.length > 0) {
-      return parseSleeperRosterPositions(sleeperConnection.rosterPositions);
-    }
-    return DEFAULT_SLOTS;
-  }, [sleeperConnection]);
+  // Shared slot config: an explicit edit wins, then the connected league's
+  // real slots, then a standard lineup (lib/useRosterSlots.ts).
+  const { slots: slotCounts } = useEffectiveRosterSlots();
 
   useEffect(() => {
     if (rostered.length === 0) return;

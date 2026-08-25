@@ -2,9 +2,12 @@
 
 import { useEffect } from "react";
 import type { PlayerSummary } from "@/lib/sportsdata/types";
+import { totalStarters } from "@/lib/lineup/rosterSlots";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
+import { useEffectiveRosterSlots } from "@/lib/useRosterSlots";
 import { useSleeperConnection } from "@/lib/useSleeperConnection";
 import { CollapsibleSection } from "./CollapsibleSection";
+import { RosterSlotsEditor } from "./RosterSlotsEditor";
 import { ConfirmButton } from "./ConfirmButton";
 import { PlayerMultiSelect } from "./PlayerMultiSelect";
 import { SleeperImport } from "./SleeperImport";
@@ -21,6 +24,7 @@ import { SleeperImport } from "./SleeperImport";
 export function RosterManager({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { rostered, addRostered, removeRostered, clearRostered } = useRosteredPlayers();
   const [connection, setConnection] = useSleeperConnection();
+  const { slots, setSlots } = useEffectiveRosterSlots();
 
   useEffect(() => {
     if (!open) return;
@@ -86,6 +90,21 @@ export function RosterManager({ open, onClose }: { open: boolean; onClose: () =>
             onRemove={removeRostered}
             placeholder={() => "Add another player manually…"}
           />
+        </CollapsibleSection>
+
+        {/* Lives here, not only on the Lineup page, because it isn't a
+            Lineup-only setting: the Waiver tools read it to decide whether to
+            surface D/ST and K at all, and how much surplus a position has. A
+            connected league fills it in automatically; a manual-roster user
+            had no way to set it before (CLAUDE.md item 172). */}
+        <CollapsibleSection
+          label={`Starting lineup · ${totalStarters(slots)} starters`}
+          className="mt-4 border-t border-foreground/[0.07] pt-4"
+        >
+          <RosterSlotsEditor slots={slots} onChange={setSlots} />
+          <p className="mt-2 text-[11.5px] leading-relaxed text-foreground/55">
+            Waivers reads this too — a spot set to 0 won&apos;t be suggested as a pickup.
+          </p>
         </CollapsibleSection>
       </div>
     </div>

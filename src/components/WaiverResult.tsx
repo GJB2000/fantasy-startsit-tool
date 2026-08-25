@@ -2,13 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { TradeEvaluation, TradeVerdict } from "@/lib/trade/evaluateTrade";
-import {
-  DEFAULT_SLOTS,
-  parseSleeperRosterPositions,
-  SLOT_ELIGIBILITY,
-  SLOT_TYPES,
-  type SlotType,
-} from "@/lib/lineup/rosterSlots";
+import { SLOT_ELIGIBILITY, SLOT_TYPES, type SlotType } from "@/lib/lineup/rosterSlots";
 import type { MatchupContext } from "@/lib/sportsdata/positionDefense";
 import { SKILL_POSITIONS, type ExtendedPosition, type ScoringFormat, type SkillPosition } from "@/lib/sportsdata/types";
 import { ChevronIcon } from "./CollapsibleSection";
@@ -606,9 +600,8 @@ function starterNeedByPosition(slots: Record<SlotType, number>): Record<SkillPos
  */
 export function computeRosterNeedPenalty(
   rostered: { position?: string | null }[],
-  rosterPositions: string[]
+  slots: Record<SlotType, number>
 ): Record<SkillPosition, number> {
-  const slots = rosterPositions.length > 0 ? parseSleeperRosterPositions(rosterPositions) : DEFAULT_SLOTS;
   const need = starterNeedByPosition(slots);
   const counts: Record<SkillPosition, number> = { QB: 0, RB: 0, WR: 0, TE: 0 };
   for (const p of rostered) {

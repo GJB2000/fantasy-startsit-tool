@@ -2,17 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
-import {
-  DEFAULT_SLOTS,
-  parseSleeperRosterPositions,
-  serializeSlots,
-  summarizeSlots,
-  totalStarters,
-  type SlotType,
-} from "@/lib/lineup/rosterSlots";
+import { serializeSlots, summarizeSlots, totalStarters } from "@/lib/lineup/rosterSlots";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useRosterModal } from "@/lib/useRosterModal";
 import { useScoringFormat } from "@/lib/useScoringFormat";
+import { resetRosterSlots, useEffectiveRosterSlots } from "@/lib/useRosterSlots";
 import { useSleeperConnection } from "@/lib/useSleeperConnection";
 import { ChevronIcon } from "./CollapsibleSection";
 import { LineupResult, type LineupSlotResponse } from "./LineupResult";
@@ -30,7 +24,7 @@ export function LineupTool() {
   const [sleeperConnection] = useSleeperConnection();
   const [, setRosterOpen] = useRosterModal();
   const [scoringFormat, setScoringFormat] = useScoringFormat();
-  const [slotCounts, setSlotCounts] = useState<Record<SlotType, number>>(DEFAULT_SLOTS);
+  const { slots: slotCounts, setSlots: setSlotCounts } = useEffectiveRosterSlots();
   const [response, setResponse] = useState<LineupResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,25 +36,18 @@ export function LineupTool() {
     if (response) resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [response]);
 
-  // Re-derive slot counts from the real, connected Sleeper league whenever
-  // the connected league actually changes — a starting point, not a lock
-  // (the editor below stays freely editable regardless). Tracks the last
-  // league we auto-filled from so further manual edits aren't clobbered
-  // on every render, only when the underlying league changes.
-  const lastAppliedLeagueId = useRef<string | null>(null);
+  // Slot config is a shared, persisted setting (lib/useRosterSlots.ts) — the
+  // Waiver tools read it too — and it already falls back to the connected
+  // league's real slots when the user has never edited it. All this effect
+  // does is drop a stale manual edit when the connected league CHANGES, so
+  // the new league's shape takes over rather than the old league's edits
+  // following the user across.
+  const lastAppliedLeagueId = useRef<string | null>(sleeperConnection?.leagueId ?? null);
   useEffect(() => {
-    if (sleeperConnection) {
-      if (sleeperConnection.leagueId === lastAppliedLeagueId.current) return;
-      lastAppliedLeagueId.current = sleeperConnection.leagueId;
-      setSlotCounts(
-        sleeperConnection.rosterPositions.length > 0
-          ? parseSleeperRosterPositions(sleeperConnection.rosterPositions)
-          : DEFAULT_SLOTS
-      );
-    } else if (lastAppliedLeagueId.current !== null) {
-      lastAppliedLeagueId.current = null;
-      setSlotCounts(DEFAULT_SLOTS);
-    }
+    const leagueId = sleeperConnection?.leagueId ?? null;
+    if (leagueId === lastAppliedLeagueId.current) return;
+    lastAppliedLeagueId.current = leagueId;
+    resetRosterSlots();
   }, [sleeperConnection]);
 
   async function handleBuildLineup() {

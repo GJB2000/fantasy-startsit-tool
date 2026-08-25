@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { streamingPositionFlags } from "@/lib/lineup/rosterSlots";
+import { streamingPositionFlagsFromSlots } from "@/lib/lineup/rosterSlots";
+import { useEffectiveRosterSlots } from "@/lib/useRosterSlots";
 import type { ExtendedPosition } from "@/lib/sportsdata/types";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useRosterModal } from "@/lib/useRosterModal";
@@ -132,14 +133,15 @@ function MethodHero() {
 export function WaiverTool() {
   const { rostered, addRostered } = useRosteredPlayers();
   const [sleeperConnection] = useSleeperConnection();
+  const { slots: rosterSlots } = useEffectiveRosterSlots();
   const [, setRosterOpen] = useRosterModal();
   const [scoringFormat, setScoringFormat] = useScoringFormat();
   const [response, setResponse] = useState<WaiverResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const rosterNeedPenalty = useMemo(
-    () => computeRosterNeedPenalty(rostered, sleeperConnection?.rosterPositions ?? []),
-    [rostered, sleeperConnection]
+    () => computeRosterNeedPenalty(rostered, rosterSlots),
+    [rostered, rosterSlots]
   );
   const [dismissedIds, setDismissedIds] = useState<Set<number>>(new Set());
   const resultRef = useRef<HTMLDivElement | null>(null);
@@ -158,7 +160,7 @@ export function WaiverTool() {
       const rosteredParam = rostered.map((p) => p.playerId).join(",");
       const leagueRosteredParam = (sleeperConnection?.leagueRosteredPlayerIds ?? []).join(",");
       // Don't recommend D/ST or K if the connected league doesn't roster them.
-      const { includeDst, includeK } = streamingPositionFlags(sleeperConnection?.rosterPositions);
+      const { includeDst, includeK } = streamingPositionFlagsFromSlots(rosterSlots);
       const res = await fetch(
         `/api/waivers?scoringFormat=${scoringFormat}&rostered=${rosteredParam}&leagueRostered=${leagueRosteredParam}&includeDst=${includeDst}&includeK=${includeK}`
       );

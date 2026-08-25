@@ -10109,6 +10109,60 @@ single-season numbers for those specific constants.
       an RB ranked 16th by volume surfacing above one ranked 3rd).
       `tsc`/lint clean.
 
+172. **Promoted the starting-lineup slot config from Lineup-page state to a
+    shared, persisted setting — closing the gap item 169 flagged, where a
+    manual-roster user had no way to stop Waivers recommending kickers and
+    defenses.** The gate itself always worked; it just had nothing to read.
+    - **The problem was ownership, not logic.** `streamingPositionFlags`
+      defaults BOTH streaming positions on when slots are unknown, and slots
+      were only ever known from a connected Sleeper league — the manual
+      alternative was `useState` inside `LineupTool`, invisible to every other
+      page. So a manual-roster user in a no-kicker league got kickers
+      recommended forever, with a working editor sitting one page away that
+      couldn't affect it.
+    - **New `lib/useRosterSlots.ts`**, on the same `createPersistentStore`
+      pattern as the roster, scoring format and Sleeper connection (item 88).
+      The store holds `Record<SlotType, number> | null`, and **`null` meaning
+      "never set" is load-bearing, not laziness**: it's what lets a connected
+      league's real slots seed the answer for someone who has never opened the
+      editor, while still letting an explicit edit win afterwards.
+      `useEffectiveRosterSlots()` resolves the precedence — explicit edit,
+      then connected league, then `DEFAULT_SLOTS` — and is now the single
+      definition of "what does this user's lineup look like."
+    - **Replaced five separate answers to that question.**
+      `HomeLineupWidget`, `HomeTradeWidget` and `LineupTool` each had their own
+      inline "parse the league, else fall back" block; `WaiverTool` and
+      `HomeWaiverWidget` had none and passed raw `rosterPositions` around. All
+      five now call the one hook. `computeRosterNeedPenalty` and the new
+      `streamingPositionFlagsFromSlots` take resolved slots rather than raw
+      Sleeper strings, since every caller now has them.
+    - **One real trap, hit and fixed during the work**: the hook's return value
+      goes into effect and memo dependency arrays, and
+      `parseSleeperRosterPositions` builds a fresh object on every call — an
+      unstable reference would have made `HomeWaiverWidget` refetch in an
+      infinite loop. The hook memoizes on the underlying inputs.
+    - **`LineupTool`'s league-sync effect got smaller, not bigger.** It used to
+      copy the league's slots into local state on connect; the hook's fallback
+      does that now, so all the effect still does is clear a stale explicit
+      edit when the connected league CHANGES, so the new league's shape takes
+      over rather than the old league's edits following the user across.
+    - **Discoverability was half the fix.** A setting that only exists on the
+      Lineup page is not a real answer for a Waivers user, so the editor now
+      also lives in the app-wide roster modal (reachable from the sidebar and
+      the mobile top bar on every page), under "Starting lineup · N starters",
+      with one line saying what the Lineup page's own copy doesn't: Waivers
+      reads this too, and a spot set to 0 won't be suggested.
+    - **Verified live across all three regimes**, since the risk here is
+      regressing the connected-league path while fixing the manual one:
+      manual roster with K/DST set to 0 → Waivers returns QB/RB/WR/TE only
+      (impossible before); manual roster with no config at all → D/ST and K
+      still shown, the unchanged default; Sleeper connected with no stored
+      edit → the league's real slots still win and D/ST/K stay absent, exactly
+      as before. Also confirmed an edit in the Lineup editor writes through to
+      the shared store and the summary updates, and that the Lineup Optimizer
+      still fills a full 10-of-10 lineup off the league's detected slots.
+      `tsc`/lint clean.
+
 ### Open items (as of item 166 — pick up here)
 **Everything is committed and pushed to `main`, working tree CLEAN.** The
 most recent session (items 159-166) was the largest change to the engine's

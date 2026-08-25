@@ -114,7 +114,17 @@ export function streamingPositionFlags(
   rosterPositions: string[] | null | undefined
 ): { includeDst: boolean; includeK: boolean } {
   if (!rosterPositions || rosterPositions.length === 0) return { includeDst: true, includeK: true };
-  const slots = parseSleeperRosterPositions(rosterPositions);
+  return streamingPositionFlagsFromSlots(parseSleeperRosterPositions(rosterPositions));
+}
+
+/**
+ * Same question, asked of an already-resolved slot config — which is what
+ * every caller now has, since a manual-roster user's slots are a real, shared
+ * setting rather than an unknown (see lib/useRosterSlots.ts).
+ */
+export function streamingPositionFlagsFromSlots(
+  slots: Record<SlotType, number>
+): { includeDst: boolean; includeK: boolean } {
   return { includeDst: slots.DST > 0, includeK: slots.K > 0 };
 }
 

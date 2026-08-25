@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { streamingPositionFlags } from "@/lib/lineup/rosterSlots";
+import { streamingPositionFlagsFromSlots } from "@/lib/lineup/rosterSlots";
+import { useEffectiveRosterSlots } from "@/lib/useRosterSlots";
 import type { ExtendedPosition } from "@/lib/sportsdata/types";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useScoringFormat } from "@/lib/useScoringFormat";
@@ -43,6 +44,7 @@ function WidgetShell({ children }: { children: React.ReactNode }) {
 export function HomeWaiverWidget() {
   const { rostered } = useRosteredPlayers();
   const [sleeperConnection] = useSleeperConnection();
+  const { slots: rosterSlots } = useEffectiveRosterSlots();
   const [scoringFormat] = useScoringFormat();
   const [response, setResponse] = useState<WaiverResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,7 +58,7 @@ export function HomeWaiverWidget() {
     setError(null);
     const rosteredParam = rostered.map((p) => p.playerId).join(",");
     const leagueRosteredParam = (sleeperConnection?.leagueRosteredPlayerIds ?? []).join(",");
-    const { includeDst, includeK } = streamingPositionFlags(sleeperConnection?.rosterPositions);
+    const { includeDst, includeK } = streamingPositionFlagsFromSlots(rosterSlots);
     fetch(
       `/api/waivers?scoringFormat=${scoringFormat}&rostered=${rosteredParam}&leagueRostered=${leagueRosteredParam}&includeDst=${includeDst}&includeK=${includeK}`
     )
@@ -78,7 +80,7 @@ export function HomeWaiverWidget() {
     return () => {
       cancelled = true;
     };
-  }, [rostered, scoringFormat, sleeperConnection]);
+  }, [rostered, scoringFormat, sleeperConnection, rosterSlots]);
 
   if (rostered.length === 0) {
     return (
@@ -110,7 +112,7 @@ export function HomeWaiverWidget() {
 
   const top = pickTopTarget(
     response.candidatesByPosition,
-    computeRosterNeedPenalty(rostered, sleeperConnection?.rosterPositions ?? [])
+    computeRosterNeedPenalty(rostered, rosterSlots)
   );
 
   if (!top) {
