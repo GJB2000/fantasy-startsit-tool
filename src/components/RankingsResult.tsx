@@ -16,7 +16,7 @@ export interface RankingEntryResponse {
   notes: string[];
   positionRank: number;
   legitScore: number;
-  fantasyProsPositionRank: number | null;
+  consensusProjectedPoints: number | null;
   restOfSeasonPoints: number | null;
   restOfSeasonGames: number;
   /**

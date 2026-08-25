@@ -1,3 +1,4 @@
+import { getSeasonProjectionMap } from "@/lib/sportsdata/seasonProjectionMap";
 import { getLiveProjectedPointsByPlayerId } from "@/lib/sportsdata/liveProjections";
 import { type RemainingGame } from "@/lib/nflverse/schedules";
 import {
@@ -66,9 +67,14 @@ export async function GET(request: Request) {
         () => new Map<string, RemainingGame[]>()
       );
     }
-    const [teamWeatherByTeamWeek, impliedTotalsByTeamWeek] = await Promise.all([
+    const [teamWeatherByTeamWeek, impliedTotalsByTeamWeek, seasonProjections] = await Promise.all([
       getGameWeatherCached(scheduleSeason).catch(() => new Map()),
       getImpliedTotalsCached(scheduleSeason).catch(() => new Map()),
+      // The season-long consensus half of the Legit Score. Keyed by PlayerID,
+      // so unlike the scraped rankings this replaced there's no name join to
+      // miss on. Fails open: a player the feed doesn't cover falls back to the
+      // engine-only score.
+      getSeasonProjectionMap(scheduleSeason, format).catch(() => new Map()),
     ]);
 
     const rankings = isOverall
@@ -81,7 +87,8 @@ export async function GET(request: Request) {
           remainingOpponentsByTeam,
           teamWeatherByTeamWeek,
           impliedTotalsByTeamWeek,
-          projectedPointsByPlayerId
+          projectedPointsByPlayerId,
+          seasonProjections
         )
       : await getLegitRankingsForPosition(
           positionParam as ExtendedPosition,
@@ -93,7 +100,8 @@ export async function GET(request: Request) {
           remainingOpponentsByTeam,
           teamWeatherByTeamWeek,
           impliedTotalsByTeamWeek,
-          projectedPointsByPlayerId
+          projectedPointsByPlayerId,
+          seasonProjections
         );
 
     return Response.json({

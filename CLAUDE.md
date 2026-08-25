@@ -10224,6 +10224,68 @@ single-season numbers for those specific constants.
       reading screenshots, which is how the earlier grid-overflow bug in item
       109 was found only after it shipped.
 
+174. **Replaced the FantasyPros redraft rank in Legit Rankings with
+    SportsDataIO's own season projections — the last live tool still reading
+    the community scrape, and a cleaner input than what it replaced.**
+    Follows items 161/162, which moved the weekly consensus and the trade
+    valuation to the same source.
+    - **Probed what was actually available before choosing**, rather than
+      going from the docs. The legacy Players feed (what runs the app today)
+      turned out to be a dead end: 28 fields, NO `DepthOrder` — that's on the
+      2026 v3 feed only (item 156) — and its `AverageDraftPosition` covers
+      only 666 of 923 skill players with stale-looking values (466, 230, 642).
+      Season projections were the real find: 2,068 rows / 797 skill players /
+      79 fields, with a sane board (Lamar 362.8, Josh Allen 360.8, Chase
+      330.4, Bijan 316.1).
+    - **Points are a better input than a rank, and that isn't a stylistic
+      preference.** The rank version needed `FP_NORMALIZATION_CAP` — a hack
+      added in item 78 because normalizing WR46 against a 239-deep published
+      list inflated it to ~80/100 and let it outrank a real WR6. Projected
+      points are proportionate by construction (a mediocre player's
+      projection is genuinely low), so the cap is gone, along with the
+      name/team key helper: SportsDataIO's feed is keyed by the same PlayerID
+      as everything else, so there is **no name join to miss on** — verified
+      0 unmatched across all four ranked pools.
+    - **Before/after on the real board** (weekly, PPR — the check that
+      matters, since a source swap that quietly reshuffles the rankings is a
+      different product):
+
+      | | old (FantasyPros rank) | new (SDIO projection) |
+      |---|---|---|
+      | QB | Allen 100, Maye 92, Lamar 92, Burrow 89 | Allen 100, Hurts 91, Maye 91, Lamar 89 |
+      | RB | Bijan 99, Gibbs 99, CMC 93, Taylor 88 | Bijan 100, Gibbs 99, CMC 90, Taylor 84 |
+      | WR | Chase 99, Nacua 99, St. Brown 99 | Nacua 100, Chase 99, St. Brown 97 |
+      | TE | McBride 99, Bowers 96, Loveland 85 | McBride 100, Bowers 95, Loveland 80 |
+
+      Same players, same broad order, small shuffles — which is the right
+      outcome: it says the two sources agree on the big picture, so this is a
+      dependency change rather than a ranking change. The one systematic
+      difference is that mid-tier scores compress downward (Chase Brown
+      82->76, Olave 88->82, Loveland 85->80) — exactly the rank-inflation the
+      cap was papering over, now gone at the source.
+    - **Every live tool is now free of the FantasyPros scrape.** The only
+      remaining consumer anywhere is `loadRunNflverseOnly.ts`, the 2022-2025
+      backtest pipeline, which genuinely needs it — SportsDataIO's projections
+      401 for those seasons (item 161), so it is the only consensus source
+      with history. `fantasypros/liveConsensus.ts` was already unused (kept as
+      item 161's revert path) and `getSeasonRedraftRankByKey` is now reachable
+      only from it.
+    - **Swept the stale doc comments in the same pass** rather than leaving
+      them for a later session to trip over — the item-166 lesson, applied
+      immediately: eleven references in `buildRankings.ts` still said
+      "FantasyPros" for what is now the SportsDataIO projection, and the
+      exposed field was renamed `fantasyProsPositionRank` ->
+      `consensusProjectedPoints` (a points value now, not a rank; it is
+      informational only and not rendered).
+    - **Unchanged deliberately**: `ENGINE_WEIGHT` and `SEASON_ENGINE_WEIGHT`
+      keep their values and their standing caveat — rankings have no pick
+      ground truth to tune against (items 78/139), so these stay reasoned
+      defaults. The cross-position VOR that drives the Top 100 already read
+      the weekly SportsDataIO consensus (item 161) and is untouched.
+    - Verified live end to end: all four position boards plus the Top 100
+      (100 entries, mix RB 29 / WR 34 / TE 18 / QB 19) render correctly with
+      real data. `tsc`/lint clean.
+
 ### Open items (as of item 166 — pick up here)
 **Everything is committed and pushed to `main`, working tree CLEAN.** The
 most recent session (items 159-166) was the largest change to the engine's

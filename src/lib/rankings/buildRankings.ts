@@ -1,9 +1,8 @@
-import { getSeasonRedraftRankByKey, type SeasonRedraftEntry } from "@/lib/fantasypros/seasonProjections";
-import { normalizePlayerName } from "@/lib/nflverse/playerMatch";
 import type { GameWeather, RemainingGame } from "@/lib/nflverse/schedules";
 import { REPLACEMENT_PER_GAME } from "@/lib/recommendation/config";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
-import { projectRestOfSeason, toSdioTeam } from "@/lib/recommendation/restOfSeason";
+import type { SeasonProjectionMap } from "@/lib/recommendation/restOfSeason";
+import { projectRestOfSeason } from "@/lib/recommendation/restOfSeason";
 import { getRecentWindow } from "@/lib/recommendation/recentWindow";
 import { scoreExtendedPlayer } from "@/lib/recommendation/scoreExtended";
 import type { DataQuality, PlayerScoreBreakdown } from "@/lib/recommendation/types";
@@ -17,12 +16,12 @@ import { isSkillPosition, type ExtendedPosition, type Player, type ScoringFormat
 import { getPlayerGameStatsByWeek } from "@/lib/sportsdata/weeklyStats";
 
 export interface LegitRankingEntry extends PlayerScoreBreakdown {
-  /** 1 = best-projected player at this position, after blending in FantasyPros' season-long consensus (see computeLegitScores). */
+  /** 1 = best-projected player at this position, after blending in the season-long consensus projection (see computeLegitScores). */
   positionRank: number;
-  /** 1-100 — a blend of this week's engine snapshot and FantasyPros' season-long redraft consensus, normalized within this position's own pool. See computeLegitScores for the method and why. */
+  /** 1-100 — a blend of this week's engine snapshot and SportsDataIO's season-long projection, normalized within this position's own pool. See computeLegitScores for the method and why. */
   legitScore: number;
-  /** FantasyPros' current season-long consensus rank at this position, or null if this player wasn't found in their redraft rankings (e.g. a very deep bench player FantasyPros doesn't publish a rank for). Purely informational — already folded into legitScore above. */
-  fantasyProsPositionRank: number | null;
+  /** The season-long consensus projection (total points, in the selected format) this ranking blended in, or null if the feed doesn't cover this player. Purely informational — already folded into legitScore above. */
+  consensusProjectedPoints: number | null;
   /** Projected total points across every remaining game on this player's real schedule (the Trade Analyzer's rest-of-season projection — see restOfSeason.ts). In the offseason all games remain, so this is the full upcoming-season projection. Null when no schedule is available. */
   restOfSeasonPoints: number | null;
   /** How many games that projection covers (the player's remaining schedule length). */
@@ -147,16 +146,16 @@ async function filterByRecentGames(players: Player[], context: SeasonContext): P
 }
 
 // How much the engine's OWN this-week snapshot counts toward the blend,
-// vs. FantasyPros' season-long redraft consensus — split by dataQuality
+// vs. the season-long consensus projection — split by dataQuality
 // rather than one flat weight, since the real problem this blend exists
 // to fix is specifically small-sample noise: a player with only 1-2
 // games in the engine's recent-form window (dataQuality "limited"/
 // "insufficient") can swing wildly on a single tough matchup or cold
-// game, while FantasyPros' preseason consensus reflects a full season's
+// game, while the season-long projection reflects a full season's
 // worth of scouting/opinion and doesn't have that problem. When the
 // engine DOES have a full recent sample, it's trusted more heavily —
 // it's this app's own validated, backtested signal — but even then
-// FantasyPros still gets real weight, since a season-long expectation is
+// the consensus still gets real weight, since a season-long expectation is
 // inherently more stable than any single-week snapshot regardless of
 // sample size. Not independently backtested (there's no "was this
 // blend right" ground truth the way pick accuracy has one) — a
@@ -167,12 +166,12 @@ async function filterByRecentGames(players: Player[], context: SeasonContext): P
 // his only 3 usable recent games included one where Baltimore clearly
 // rested/limited him in a lost season (12 and 10 pass attempts across
 // two of them, vs. his normal 20-35), tanking the engine's own snapshot
-// even though FantasyPros still had him at a real, well-earned QB2 —
+// even though the consensus still had him at a real, well-earned QB2 —
 // confirmed directly against SportsDataIO's real weekly stats before
 // concluding this wasn't a data or engine bug. A thin sample is
 // EXACTLY the scenario where a single meaningless/limited-role game can
 // dominate the engine's recent-form window, so "insufficient" (even
-// less data than "limited") now trusts FantasyPros' stable consensus
+// less data than "limited") now trusts the stable season consensus
 // more than "limited" does, rather than treating them the same.
 const ENGINE_WEIGHT: Record<DataQuality, number> = {
   full: 0.65,
@@ -186,8 +185,8 @@ const ENGINE_WEIGHT: Record<DataQuality, number> = {
  *    matchup-adjusted this-week/next-game snapshot leads (ENGINE_WEIGHT
  *    above), form matters, a great/brutal matchup moves a player. This is
  *    the tool's original behavior and stays the default.
- *  - "season" — best rest-of-season value. Leans on FantasyPros'
- *    season-long redraft consensus instead, at a single flat, low engine
+ *  - "season" — best rest-of-season value. Leans on the season-long
+ *    consensus projection instead, at a single flat, low engine
  *    weight (SEASON_ENGINE_WEIGHT) rather than the dataQuality split — in
  *    the season view we deliberately take the stable, matchup-agnostic
  *    long view regardless of how many recent games a player has, so a
@@ -195,57 +194,29 @@ const ENGINE_WEIGHT: Record<DataQuality, number> = {
  */
 export type RankingMode = "weekly" | "season";
 
-// 0.25 = 75% FantasyPros season consensus / 25% our engine snapshot. Keeps
-// a "Legit" flavor (our engine can still bump a player FP undervalues)
+// 0.25 = 75% season consensus projection / 25% our engine snapshot. Keeps
+// a "Legit" flavor (our engine can still bump a player the consensus
+// undervalues)
 // while being clearly season-oriented. Same "reasoned, transparent default,
 // not a backtested weight" caveat as ENGINE_WEIGHT — there's no "was this
 // season ranking right" ground truth to tune against.
 const SEASON_ENGINE_WEIGHT = 0.25;
-
-// FantasyPros' redraft files rank WAY more players than are ever
-// "relevant" — e.g. redraft-wr has 239 rows, most of them deep-bench
-// names nobody would start. Normalizing a rank against that FULL pool
-// (as an earlier version of this function did) badly inflates mediocre
-// ranks: WR46 normalized against a 239-deep scale lands near 80/100,
-// reading as "elite" when it's really just "startable WR3/flex" — which
-// let a "limited"-data bench player with a so-so FP rank (but a hot
-// recent game or two) outscore a "full"-data star having a merely-good
-// stretch, a real case caught live (Justin Jefferson, real FP WR6,
-// initially ranked BELOW Quentin Johnston, real FP WR46, once Johnston's
-// mediocre rank got inflated by this same distortion). Capping the
-// normalization denominator to roughly "how deep does a real rankings
-// conversation go" fixes this at the source, rather than further
-// tweaking ENGINE_WEIGHT to compensate for a scale that was wrong to
-// begin with. Chosen as roughly 3x this file's own RANKING_LIMIT per
-// position — generous enough to still differentiate real WR2/3/4-tier
-// talent, not so deep that a mediocre rank reads as good.
-const FP_NORMALIZATION_CAP: Partial<Record<ExtendedPosition, number>> = {
-  QB: 30,
-  RB: 60,
-  WR: 75,
-  TE: 30,
-};
 
 function normalize(value: number, min: number, max: number): number {
   if (max === min) return 100;
   return Math.min(100, Math.max(1, 1 + 99 * ((value - min) / (max - min))));
 }
 
-function fantasyProsKeyFor(b: PlayerScoreBreakdown, position: ExtendedPosition): string | null {
-  if (position === "DST") return b.team ? toSdioTeam(b.team) : null;
-  return normalizePlayerName(b.displayName);
-}
-
 /**
- * Blends the engine's this-week snapshot with FantasyPros' season-long
- * redraft consensus, each independently normalized to [1, 100] within
+ * Blends the engine's this-week snapshot with SportsDataIO's season-long
+ * projection, each independently normalized to [1, 100] within
  * its own pool, then combined per-player at a dataQuality-dependent
  * weight (see ENGINE_WEIGHT above) — this is what actually fixes cases
  * like a normally-elite QB who happened to play just one noisy recent
  * game: the engine's own snapshot alone would rank him far too low, but
- * FantasyPros' stable season-long view pulls him back to a realistic
- * spot. A player with no FantasyPros match at all (a very deep bench
- * name FantasyPros doesn't publish) falls back to the engine-only score,
+ * the stable season-long projection pulls him back to a realistic
+ * spot. A player the projection feed doesn't cover falls back to the
+ * engine-only score,
  * same honest degrade as every other optional signal in this app.
  *
  * Both pools are min-maxed independently, NOT percentile/rank-based —
@@ -255,7 +226,7 @@ function fantasyProsKeyFor(b: PlayerScoreBreakdown, position: ExtendedPosition):
  */
 function computeLegitScores(
   breakdowns: PlayerScoreBreakdown[],
-  fpByKey: Map<string, SeasonRedraftEntry>,
+  seasonProjections: SeasonProjectionMap,
   position: ExtendedPosition,
   mode: RankingMode,
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
@@ -282,27 +253,34 @@ function computeLegitScores(
   const engineMin = Math.min(...engineValues);
   const engineMax = Math.max(...engineValues);
 
-  const fpPositionRanks = [...fpByKey.values()].map((v) => v.positionRank);
-  const fpBestRank = fpPositionRanks.length > 0 ? Math.min(...fpPositionRanks) : 1;
-  const rawFpWorstRank = fpPositionRanks.length > 0 ? Math.max(...fpPositionRanks) : 1;
-  const fpWorstRank = Math.min(rawFpWorstRank, FP_NORMALIZATION_CAP[position] ?? rawFpWorstRank);
+  // The consensus scale is min-maxed over THIS pool's own projections, not
+  // the whole league-wide feed — same population the engine side is
+  // normalized against, so the two halves of the blend are on comparable
+  // footing.
+  //
+  // Projected POINTS need no equivalent of the rank-normalization cap this
+  // used to carry: a mediocre player's projection is genuinely low on a
+  // points scale, whereas a rank normalized against a 239-deep published
+  // list inflated WR46 to ~80/100 and once let a WR46 outrank a real WR6.
+  // Points are proportionate by construction; ranks were not.
+  const consensusPoints = ranked
+    .map((b) => (b.playerId != null ? seasonProjections.get(b.playerId)?.points : undefined))
+    .filter((v): v is number => v != null);
+  const consensusMin = consensusPoints.length > 0 ? Math.min(...consensusPoints) : 0;
+  const consensusMax = consensusPoints.length > 0 ? Math.max(...consensusPoints) : 0;
 
   const withBlend = ranked.map((b) => {
     const engineNorm = normalize(b.finalScore, engineMin, engineMax);
-    const fpKey = fantasyProsKeyFor(b, position);
-    const fpEntry = fpKey ? fpByKey.get(fpKey) : undefined;
+    const projected = b.playerId != null ? seasonProjections.get(b.playerId)?.points : undefined;
 
-    if (!fpEntry) {
-      return { breakdown: b, blended: engineNorm, fantasyProsPositionRank: null as number | null };
+    if (projected == null) {
+      return { breakdown: b, blended: engineNorm, consensusProjectedPoints: null as number | null };
     }
 
-    // Inverted: rank 1 (best) -> 100, the (capped) worst rank -> 1. A
-    // real rank deeper than the cap (e.g. WR120) just clamps to 1 via
-    // normalize()'s own clamping, rather than going negative.
-    const fpNorm = 101 - normalize(fpEntry.positionRank, fpBestRank, fpWorstRank);
+    const consensusNorm = normalize(projected, consensusMin, consensusMax);
     const engineWeight = mode === "season" ? SEASON_ENGINE_WEIGHT : ENGINE_WEIGHT[b.dataQuality];
-    const blended = engineWeight * engineNorm + (1 - engineWeight) * fpNorm;
-    return { breakdown: b, blended, fantasyProsPositionRank: fpEntry.positionRank };
+    const blended = engineWeight * engineNorm + (1 - engineWeight) * consensusNorm;
+    return { breakdown: b, blended, consensusProjectedPoints: projected };
   });
 
   withBlend.sort((a, b) => b.blended - a.blended);
@@ -313,7 +291,7 @@ function computeLegitScores(
       ...w.breakdown,
       positionRank: i + 1,
       legitScore: Math.round(Math.min(100, Math.max(1, w.blended))),
-      fantasyProsPositionRank: w.fantasyProsPositionRank,
+      consensusProjectedPoints: w.consensusProjectedPoints,
       restOfSeasonPoints: ros.total,
       restOfSeasonGames: ros.gamesRemaining,
     };
@@ -350,16 +328,14 @@ async function getFullLegitRankingsForPosition(
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   teamWeatherByTeamWeek: Map<string, GameWeather>,
   impliedTotalsByTeamWeek: Map<string, number>,
-  projectedPointsByPlayerId: Map<number, number>
+  projectedPointsByPlayerId: Map<number, number>,
+  seasonProjections: SeasonProjectionMap
 ): Promise<LegitRankingEntry[]> {
   const cacheKey = `${position}:${context.lastCompletedSeason}:${context.lastCompletedWeek}:${format}:${mode}`;
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
 
-  const [playerIds, fpByKey] = await Promise.all([
-    getEligiblePlayerIds(position, context),
-    getSeasonRedraftRankByKey(position),
-  ]);
+  const playerIds = await getEligiblePlayerIds(position, context);
 
   const breakdowns = await Promise.all(
     playerIds.map((id) =>
@@ -379,7 +355,7 @@ async function getFullLegitRankingsForPosition(
 
   const ranked = computeLegitScores(
     breakdowns,
-    fpByKey,
+    seasonProjections,
     position,
     mode,
     remainingOpponentsByTeam,
@@ -400,7 +376,8 @@ export async function getLegitRankingsForPosition(
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   teamWeatherByTeamWeek: Map<string, GameWeather>,
   impliedTotalsByTeamWeek: Map<string, number>,
-  projectedPointsByPlayerId: Map<number, number> = new Map()
+  projectedPointsByPlayerId: Map<number, number> = new Map(),
+  seasonProjections: SeasonProjectionMap = new Map()
 ): Promise<LegitRankingEntry[]> {
   const ranked = await getFullLegitRankingsForPosition(
     position,
@@ -412,7 +389,8 @@ export async function getLegitRankingsForPosition(
     remainingOpponentsByTeam,
     teamWeatherByTeamWeek,
     impliedTotalsByTeamWeek,
-    projectedPointsByPlayerId
+    projectedPointsByPlayerId,
+    seasonProjections
   );
   const limit = RANKING_LIMIT[position];
   return limit != null ? ranked.slice(0, limit) : ranked;
@@ -434,14 +412,14 @@ const TOP_100_LIMIT = 100;
  *     consensus has Lamar as QB2 and the rookie deep.
  *   - Scaling legitScore by a per-position VOR ceiling fixed both orderings
  *     but distorted spacing so badly it pushed EVERY QB out of the top 100.
- * Blending the engine projection with FantasyPros' consensus points estimate
+ * Blending the engine projection with the consensus points estimate
  * (`expertConsensusR2pPts`, redraft-derived in the offseason — the same
  * signal the per-position legitScore leans on) before subtracting replacement
  * keeps the value points-based (accurate spacing/scarcity — TEs and QBs land
  * where they should) AND consensus-aware (Lamar over Shough). Falls back to
  * the engine projection alone for a player with no consensus estimate.
  */
-// How much FantasyPros' consensus points estimate leads the cross-position
+// How much the consensus points estimate leads the cross-position
 // value. "season" leans harder on the season-long consensus than "weekly"
 // (which keeps the engine's own matchup-adjusted projection at parity),
 // mirroring the per-position blend shift above.
@@ -483,7 +461,8 @@ export async function getLegitRankingsOverall(
   remainingOpponentsByTeam: Map<string, RemainingGame[]>,
   teamWeatherByTeamWeek: Map<string, GameWeather>,
   impliedTotalsByTeamWeek: Map<string, number>,
-  projectedPointsByPlayerId: Map<number, number> = new Map()
+  projectedPointsByPlayerId: Map<number, number> = new Map(),
+  seasonProjections: SeasonProjectionMap = new Map()
 ): Promise<LegitRankingEntry[]> {
   const perPosition = await Promise.all(
     RANKABLE_POSITIONS.map((position) =>
@@ -497,7 +476,8 @@ export async function getLegitRankingsOverall(
         remainingOpponentsByTeam,
         teamWeatherByTeamWeek,
         impliedTotalsByTeamWeek,
-        projectedPointsByPlayerId
+        projectedPointsByPlayerId,
+        seasonProjections
       )
     )
   );
