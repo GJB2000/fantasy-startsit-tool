@@ -9816,6 +9816,54 @@ single-season numbers for those specific constants.
     - Docs and one label only; broad backtest byte-identical at 61.80%.
       Commit `7092476`.
 
+167. **Recolored the pennant to the navy + volt colorway — the logo now
+    uses the app's own accent. Presentation only; no engine change.** The
+    mark shipped by item 165 was cream field / royal `#2b3990` helmet and
+    script, with a white LF — no relationship to the Nash/volt palette
+    (item 141). Picked from a seven-colorway sheet the user provided; the
+    chosen option was the only one using BOTH brand colors, and the only
+    light-field one that also carries green (a dark-field pennant would
+    half-disappear against the constant-dark sidebar).
+    - **Did NOT extract the chosen pennant from the sheet** — it is 245
+      paths with no ids, and carving one out of seven is fiddly and
+      lossy. It is the same artwork as the shipped mark, only recolored,
+      so the shipped SVG (already tightened to the artwork's real bounds,
+      item 165) was recolored in place instead. Confirmed the mapping by
+      bucketing the sheet's paths by starting coordinate into the chosen
+      pennant's quadrant and tallying classes — the class ROLES line up
+      one-for-one with the shipped file's (20 field/counter paths vs 24,
+      7 navy, 2 lettermark, 2 dark outline).
+    - **Final fills**: field + script counters `#eadec4` -> pewter
+      `#e0dedc`; helmet + script `#2b3990` -> deep navy `#1f2353`;
+      LF lettermark `#fff` -> volt `#c8ff00`. Facemask gray and the dark
+      outlines are unchanged.
+    - **The one real gotcha, worth remembering before any future
+      recolor**: the wooden pole and the pennant FIELD shared class
+      `cls-5` in the shipped file, but they are different colors in this
+      colorway (pole stays cream, field goes pewter). A blanket
+      `cls-5` swap turns the pole pewter while its neighbouring
+      cross-sticks (`cls-7`/`cls-8`/`cls-9`, separate cream classes) stay
+      cream, which looks broken. A new `.cls-pole` class now holds the
+      three pole elements — the pole body path, one cross-stick polygon,
+      and the shaft rect.
+    - **Volt came from `--accent`, not from the source art.** The user
+      said the sheet had been updated to volt; the SVG on disk was
+      unchanged (same mtime, still `#8dc63f`), and the two newer `.ai`
+      files could not be rendered (`sips` errors — likely saved without
+      "Create PDF Compatible File", unlike the item-165 source). So the
+      value was applied directly from the token rather than sampled,
+      which is arguably better: the logo and the UI accent are now
+      guaranteed identical rather than merely close.
+    - **Favicon followed the same treatment** (`src/app/icon.svg` — the
+      helmet lifted from the pennant): navy helmet, volt LF, and its
+      rounded-square tile moved cream -> pewter to match the new field.
+      `icon.png` regenerated from it for the Safari fallback.
+    - **Verified live in the running app**, not just as a standalone
+      render: the desktop sidebar rail and the mobile top bar both render
+      correctly, and in the rail the volt LF now reads as the same colour
+      as the active-nav highlight and the scoring chip — the tie-in that
+      did not exist before.
+
 ### Open items (as of item 166 — pick up here)
 **Everything is committed and pushed to `main`, working tree CLEAN.** The
 most recent session (items 159-166) was the largest change to the engine's
