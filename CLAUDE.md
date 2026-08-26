@@ -10496,6 +10496,77 @@ single-season numbers for those specific constants.
       175's advanced metrics. If it lapses the section falls back to its empty
       state rather than breaking, but it would need re-pointing.
 
+178. **Mapped exactly what SportsDataIO would need to supply if the legacy
+    key went away — and found that 2025 is unreachable on the 2026
+    subscription, which makes the legacy key load-bearing rather than
+    legacy.** Probe-only; no code change. Corrects one claim in item 156.
+    - **The finding that matters most: the 2026 key cannot reach 2025 at
+      all.** Verified across every product — `BoxScoresFinal`,
+      `PlayerGameStatsByWeek`, `PlayerSeasonStats`, weekly and season
+      projections, `Schedules`, `Byes` — all 401 for 2025REG/2025. The single
+      exception is `AdvancedPlayerInfo`, which still returns 2025 per-player
+      rows (item 155's quirk).
+    - **Three consequences, in severity order:**
+      1. **Today, dropping the legacy key doesn't degrade the app, it kills
+         it.** Every tool runs on the last COMPLETED season — 2025 — and 2026
+         has no played games. No stats, no scores, no projections.
+      2. **After the 2026 rollover, the primary backtest pipeline dies
+         permanently.** That pipeline IS 2025-on-SportsDataIO. Losing it
+         leaves only the nflverse 2022-2025 pipeline — a different source
+         from the one the live tools run on, which is precisely the
+         cross-pipeline hazard item 53 documented (a signal that validated
+         on nflverse and REVERSED on SportsDataIO).
+      3. The Player Stats 2025 tab (item 176) would return nothing.
+    - **So the historical ask is 2022-2025, not 2022-2024.** 2025 is not
+      archive-nice-to-have; it is the season the app currently serves AND the
+      only season it validates on. Buying 2022-2024 while letting 2025 lapse
+      would leave four seasons of history with a hole where the only
+      SportsDataIO-validated season used to be.
+    - **Already entitled and verified on the 2026 key** (enough to RUN the
+      app once 2026 has games): `scores` (Teams, Timeframes, Byes,
+      Schedules), `stats` (BoxScoresFinal, PlayerSeasonStats), `projections`
+      (weekly + season), `odds` (PlayerPropsByWeek, GameOddsByWeek,
+      BettingEvents/BettingMarkets), and `advanced-metrics` on its own key.
+    - **`Schedules` is strictly better than the nflverse release it would
+      replace** — worth knowing before any migration. It carries
+      `ForecastWindSpeed`/`ForecastTempHigh`/`ForecastTempLow`,
+      `StadiumDetails.Type` (dome vs outdoor), `PointSpread` and `OverUnder`
+      alongside the fixtures. That's next opponent, weather AND the D/ST-K
+      implied totals from one endpoint — and unlike nflverse it has a real
+      pregame FORECAST, which is why cards currently read "Forecast pending"
+      for outdoor games.
+    - **NOT entitled today, and one is a functional regression rather than a
+      nice-to-have:**
+      - **Injuries.** `stats/json/Injuries` 401s, `scores/json/Players`
+        401s, and `PlayersByAvailable` — the one that does work — returns
+        `InjuryStatus`/`DepthOrder` EMPTY across all 6,249 rows. The legacy
+        `fantasy/json/Players` feed is currently the only source of live
+        injury status (172 players flagged), and `comparePlayers`'
+        Out/Doubtful exclusion runs off it. Without this the app stops
+        knowing who is out.
+      - **Depth charts.** `scores/json/DepthCharts` 401s. Optional — it only
+        drives item 100's confidence floor — but it is what would delete the
+        ~554k-row nflverse depth-chart parse, half the cold-start cost.
+    - **Corrects item 156**, which recorded that the new plan's Players feed
+      carries `InjuryStatus` and `DepthOrder`. Measured now, it does not:
+      that endpoint isn't entitled on this subscription, and the accessible
+      variant has both fields blank. Recorded here rather than edited into
+      156, so the earlier observation and this correction both stand.
+    - **What SportsDataIO would still not cover, and whether it matters:**
+      - **EPA and success rate** — play-by-play derived, in no SDIO product.
+        **No live impact**: `RB_EPA_BLEND_WEIGHT`, `QB_RUSH_EPA_BLEND_WEIGHT`,
+        `QB_SUCCESS_RATE_BLEND_WEIGHT` and `REDZONE_BLEND_WEIGHT_RB` are all
+        `0`. They feed backtest baselines only.
+      - **Air-yards SHARE** — advanced carries `AirYards` but not the share
+        the WR signal uses (item 148); derivable by summing team air yards.
+      - **Weekly roster status (RES/IR)** — item 57's source is nflverse's
+        `weekly_rosters`; a historical injuries product would have to
+        substitute.
+    - **One-line version for the sales conversation**: injuries to keep
+      parity, 2022-2025 history on stats + projections to validate the
+      engine's biggest signal on the data actually served, depth charts for
+      the performance win. Everything else is already in hand.
+
 ### Open items (as of item 166 — pick up here)
 **Everything is committed and pushed to `main`, working tree CLEAN.** The
 most recent session (items 159-166) was the largest change to the engine's
