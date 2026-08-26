@@ -37,6 +37,33 @@ section current as real decisions get made.)*
 - Football data source: SportsDataIO NFL API (Discovery Lab / free
   tier) — see [sportsdata.io](https://sportsdata.io)
 
+**Current state at a glance (as of item 179).** Seven live pages:
+**Start/Sit** (`/start-sit`), **Trade Assistant** (`/trade`), **Waivers**
+(`/waivers`), **Lineup Optimizer** (`/lineup`), **Legit Rankings**
+(`/rankings`), **Player Stats** (`/stats`), and **Backtest** (`/backtest`,
+the internal validation tool), behind a Home hub (`/`) and a persistent
+sidebar shell.
+
+Data sources, in one line each: **SportsDataIO** is the primary source for
+everything the live tools do — box scores, season stats, weekly and
+season projections (the consensus signal), advanced metrics, betting lines,
+teams/players. **nflverse** (free, no auth) supplies what SportsDataIO's
+current plan can't: the game schedule (next opponent, weather, Vegas
+implied totals), play-by-play-derived signals, depth charts, and the
+2022-2025 backtest pipeline. **Sleeper** (free, non-commercial licence)
+supplies real league/roster import.
+
+Two things a new session should know before touching data: the **legacy
+SportsDataIO key is load-bearing, not legacy** — it is the only thing
+serving 2025, and every tool runs on the last completed season (item 178).
+And the app is on **two disjoint subscriptions** routed by season
+(`seasonRouting.ts`), so 2025 and 2026 come from different hosts with
+different keys (item 158).
+
+The paragraphs below are the running historical record of how the project
+got here — read them for the reasoning behind a decision, not as a
+description of today's UI.
+
 Current state: v1 of the core start/sit comparison tool is live — real
 player search, real SportsDataIO data, a rules-based recommendation
 engine, and a working UI — plus a backtesting mode that replays the
@@ -511,7 +538,11 @@ knowable that far ahead from this data source.
   data IS reachable on this plan — but only one HTTP call per player,
   which is fine for a Start/Sit comparison and impractical for Legit
   Rankings' whole-pool scan.
-- **The Odds API (`the-odds-api.com`) — free tier; key in `ODDS_API_KEY`
+- **The Odds API (`the-odds-api.com`) — SUPERSEDED by item 177; the client
+  and its env var are deleted and betting lines now come from SportsDataIO's
+  `PlayerPropsByWeek`. Kept as the record of what the free tier could and
+  could not do, and because its "historical odds are paid-only" finding was
+  independently confirmed against SportsDataIO. Original note: free tier; key in `ODDS_API_KEY`
   (`.env.local` locally / Vercel env in production, never committed, same
   discipline as `SPORTSDATA_API_KEY`).** Confirmed live (item 98): the
   NFL **events/schedule** endpoint is free (0 credits) and carries the
@@ -10615,37 +10646,57 @@ single-season numbers for those specific constants.
       number or a broken page. Verified live across Rankings, the trade
       board, the picker and the waiver board. `tsc`/lint clean.
 
-### Open items (as of item 166 — pick up here)
-**Everything is committed and pushed to `main`, working tree CLEAN.** The
-most recent session (items 159-166) was the largest change to the engine's
-inputs since expert consensus was first added. **Read items 161-164 before
-touching anything consensus- or trade-related.**
+### Open items (as of item 179 — pick up here)
+**Everything is committed and pushed to `main` (HEAD `cd72d4b`), working
+tree CLEAN.** Items 167-179 span three themes: finishing the move onto
+SportsDataIO, a run of Waiver Wire correctness fixes, and UI work.
 
-**Current headline numbers, all superseding earlier ones in this document:**
+**READ FIRST if you touch data sources:** the legacy key is NOT legacy. It
+is the only thing serving 2025, and every tool runs on the last completed
+season. Dropping it today stops the app; see item 178.
 
-| measure | now | was |
-|---|---|---|
-| primary 2025 broad, skill positions | **61.80%** | 60.66% |
-| pooled 2022-2025 (nflverse, FantasyPros) | 58.68% | 58.64% |
-| trade backtest, nflverse multiseason 1-for-1 | **61.40%** | 53.01% |
-| trade backtest, multi-player 2-for-2 | **60.02%** | 54.35% |
-| projection accuracy, engine | MAE 6.26 / bias +0.25 | 6.35 / +0.31 |
+**Current headline numbers** (unchanged by items 167-179 — none of them
+touched engine weights):
 
-**What changed, in one paragraph each:**
-- **The consensus source is now SportsDataIO's own weekly projections, not
-  the FantasyPros scrape** (item 161). Weights were re-swept for it —
-  `EXPERT_CONSENSUS_BLEND_WEIGHT` is now `QB 0.8 / RB 0.9 / WR 0.5 / TE 0.9`.
-  **At FantasyPros' old weights SportsDataIO scores WORSE**, so never
-  evaluate a source swap without re-sweeping.
-- **Rest-of-season trade value is now a 50/50 blend** of the engine's
-  extrapolation and SportsDataIO's season projection
-  (`REST_OF_SEASON_PROJECTION_BLEND`, item 162).
-- **The trade backtests were fixed to include the consensus term** (item
-  163) — they had been grading an engine without its largest signal. Every
-  trade figure published before this is superseded.
-- **Two mislabels followed the source swap** (items 164, 166). If something
-  still says "FantasyPros" where the primary pipeline is involved, suspect
-  it.
+| measure | value |
+|---|---|
+| primary 2025 broad, skill positions | 61.80% |
+| pooled 2022-2025 (nflverse, FantasyPros) | 58.68% |
+| trade backtest, nflverse multiseason 1-for-1 | 61.40% |
+| trade backtest, multi-player 2-for-2 | 60.02% |
+| projection accuracy, engine | MAE 6.26 / bias +0.25 |
+| waiver ranking, pooled forward PPG | 12.82 (was 11.99 on volume) |
+
+**What changed, by theme:**
+
+- **SportsDataIO now feeds every live tool.** Rankings moved off the
+  FantasyPros scrape to SDIO season projections (item 174), advanced metrics
+  refine the rankings blend for RB/WR/TE (item 175), and betting lines moved
+  off The Odds API (item 177). `src/lib/oddsapi/` and `ODDS_API_KEY` are
+  gone. **FantasyPros survives in exactly one place** — the nflverse
+  2022-2025 backtest pipeline, which has no alternative.
+- **Waiver Wire had four real defects, all fixed and mostly backtested**
+  (items 169-172): the top target ranked on volume alone and surfaced
+  below-replacement players; it could recommend a player listed Out; the
+  starter-need math double-counted flex slots; and the lists themselves were
+  volume-ranked when the engine's projection is measurably better
+  (backtested, +0.83 forward PPG, better at every position and season).
+- **Slot config is now a shared persisted setting** (item 172), so a
+  manual-roster user can finally stop Waivers recommending kickers.
+- **UI**: Backtest fits on a phone (item 173), Player Stats has a season
+  toggle (item 176), and avatars are now the player's jersey in real team
+  colours with their real squad number (item 179).
+
+**Traps recorded in those items, worth not re-learning:**
+- `Number` is read with `!= null`, not truthiness — Gibbs wears 0 (item 179).
+- `getSeasonContext` resolves from the last completed WEEK, so it rolls into
+  the new season on its own; what needs care is keeping PRIOR seasons listed
+  (item 176).
+- A page-level horizontal scroll traces to a single non-shrinking flex item;
+  measure `scrollWidth` vs `clientWidth` rather than reading screenshots
+  (item 173).
+- Hooks returning derived objects must memoize — an unstable reference in a
+  dependency array refetches forever (item 172).
 
 **Deliberately hybrid, do not "simplify"**: the primary 2025 pipeline uses
 SportsDataIO projections; the nflverse-only 2022-2025 pipeline still uses
@@ -10654,83 +10705,12 @@ pipeline uses the only source it can get for its seasons. Consequence: the
 multi-season check no longer validates the source the live tools use — the
 core risk in **Open Item #37**.
 
-**Everything shipped this session rests on SINGLE-SEASON evidence**, since
-2022-2024 projections are paywalled. Items 24-30 are the long record of why
-that is a real risk, not a formality.
+**Several shipped signals rest on SINGLE-SEASON evidence** (the consensus
+swap, the trade blend, expected points), since history is paywalled. Items
+24-30 are the long record of why that is a real risk, not a formality.
 
-The paragraph below is an OLDER session's record (items 155-158), kept for
-context — its "HEAD `185916a`" framing is historical:
-
-**Everything is committed and pushed to `main` (HEAD `185916a`), working
-tree CLEAN. The app WORKS — locally and in production.** Five strands this
-session:
-1. **A UI rating pass and six presentation-only fixes (item 154)**, plus a
-   regression fix for one of them (`5b192fe`). See the "do not undo" list
-   below.
-2. **A SportsDataIO subscription probe (item 155)** — two new 2026 keys
-   mapped, two Data Source Notes falsified and corrected.
-3. **SportsDataIO support resolved the blocker, and the app was restored on
-   the legacy key (item 156).**
-4. **Research/decisions with no code (item 157)** — a community page was
-   proposed and declined (with a cheaper shareable-link alternative noted),
-   and platform-sync/licensing research folded into Open Items #32 and #33.
-5. **The v3 migration, mapped then shipped (item 158)** — season-routed, so
-   2025 keeps working today and 2026 takes over by itself in September.
-
-**THE ONE DATE THAT MATTERS: ~15 September 2026 — but the migration has now
-LANDED (item 158), so this is a verification date, not a deadline.** The app
-runs on `SPORTSDATA_LEGACY_API_KEY` (2025) today and switches ITSELF to the
-2026 v3 path the moment 2026 week 1 completes, because `getSeasonContext()`
-follows the last COMPLETED season and every season-scoped reader dispatches on
-season. No redeploy needed. **What still has to happen that week:** re-verify
-the v3 path against real REGULAR-season data — item 158 could only verify it
-against 2026 preseason — and confirm the 2026 subscription is actually paid
-for, since the evaluation is free only through 15 Sept.
-
-Environment note: `.env.local` holds three SportsDataIO keys — legacy (runs
-the app), 2026 main, 2026 advanced-metrics — plus `ODDS_API_KEY`. Vercel has
-the same. `.env.example` lists all four names.
-
-**Open Items #34 and #35 added this session; #33 gained a fourth entry
-(Sleeper's non-commercial licence). #35 was rewritten after item 156 —
-its original "is PlayerGameStatsByWeek included?" premise is answered.**
-Otherwise the numbered open items below are unchanged from prior sessions —
-nothing below is started or fixed unless its own entry says so. One
-correction to the historical record: the prior session's note that it
-"dropped the condense-rankings-toggles review item — no clean win" is
-**superseded by item 154b**, which found a clean win once the problem was
-reframed from layout to labeling + weight.
-
-Two things from the MIGRATION that a future session should NOT "simplify"
-(item 158):
-- **`seasonRouting.ts` is not indirection for its own sake.** The two
-  SportsDataIO subscriptions cover DISJOINT seasons — the legacy key 401s on
-  2026, the 2026 key 401s on 2025 — so collapsing the dispatch and picking
-  one host family breaks either today or September, depending which you pick.
-- **`Players`/`Teams`/`Timeframes` are on legacy DELIBERATELY**, even though
-  v3 serves them fine. The 2026 keys are an evaluation; always-on endpoints
-  shouldn't depend on one. Flip them only once the 2026 plan is bought.
-
-Three things from the UI work that a future session should NOT silently
-undo:
-- **`items-start` on the Start/Sit grid is load-bearing** for the sticky
-  rail (item 154e). It looks like an incidental alignment choice.
-- **The Start/Sit landing centers with `content-center`, not
-  `items-center`** (item 154f). They look interchangeable; `items-center`
-  would stretch nothing but WOULD override the row-level alignment the
-  sticky rail depends on, breaking 154e from a change that appears to be
-  about something else entirely.
-- **The light/dark blocks in `ComparisonResult.module.css` are deliberately
-  duplicated** (item 154d). "Simplifying" them into one ruleset breaks the
-  forced-theme toggle, and collapsing light onto the dark treatment removes
-  light's only hierarchy mechanism.
-
-**Open Items #34 and #35 added** this session. Otherwise the numbered open
-items below are unchanged from prior sessions — nothing below is started or
-fixed unless its own entry says so. One correction to the historical record:
-the prior session's note that it "dropped the condense-rankings-toggles
-review item — no clean win" is **superseded by item 154b**, which found a
-clean win once the problem was reframed from layout to labeling + weight.
+The paragraph below is an OLDER session's record (items 159-166), kept for
+context — its "as of item 166" framing is historical:
 
 The paragraph below is the PRIOR session's record (items 151-153), kept for
 context — its "as of item 153" framing and HEAD `c043aef` are historical:
@@ -11466,22 +11446,22 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     worthless for kickers and implied total should dominate. Revisit once
     that data exists. (`POINTS_PER_IMPLIED_TOTAL_POINT`/`K_MATCHUP_CAP` in
     `scoreKicker.ts`.)
-24. **Player props are display-only; more needs paid Odds API data (item
-    98).** The Odds API's current player props now show on the Start/Sit
-    cards (visual only, `src/lib/oddsapi/`). Three follow-ups:
-    (a) **verify the populated card with real data once Week-1 lines post
-    (~September 2026)** — the offseason has no props, so the real name-join
-    + market-mapping path has only been validated against a fixture, not
-    live data (fail-open means a bug shows nothing, not a break, but it's
-    worth a quick live confirmation then). (b) A props-derived **usage
-    signal** (a passing-yards or rush-attempt prop line is a more direct,
-    market-informed usage measure than target share) can't be backtested
-    without **paid historical odds** — revisit only if a paid Odds API
-    tier is ever acquired (which also unlocks historical game lines for
-    the item-97 spread/total family). (c) **Quota**: the free tier's 500
-    req/month is tight for real traffic (~a few dozen distinct games'
-    props per month even with caching); at scale it'd need a paid tier or
-    a tighter fetch (fewer markets, or only the recommended player).
+24. **Player props are display-only, and now confirmed un-backtestable from
+    a SECOND vendor (items 98, 177).** As of item 177 the lines come from
+    SportsDataIO's `PlayerPropsByWeek`, not The Odds API — better on every
+    axis that matters for display (whole-season coverage in August where the
+    free Odds API tier had none, keyed by PlayerID so no name join, no
+    monthly quota). `src/lib/oddsapi/` and `ODDS_API_KEY` are deleted.
+    **What stays open is unchanged**: historical props 401 on every key and
+    host, so a props-derived SIGNAL (a passing-yards or rush-attempt line is
+    a more direct usage measure than target share) still cannot be
+    backtested. That's now confirmed from two independent vendors rather
+    than assumed from one. Two smaller follow-ups: the populated card has
+    only ever been verified against 2026 week-1 lines, so it wants a real
+    in-season check once games start; and whether the flat feed's lines are
+    live book consensus or SportsDataIO's own modelled numbers is not
+    determinable from the payload (the Sportsbook Group family IS
+    unambiguously per-book — see item 177).
 25. **Player picker follow-ups deferred from the item-99 redesign.** Two
     mockup elements weren't built because they need more than styling:
     (a) **inline season PPR average** in each search result —
@@ -11615,32 +11595,20 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       several) would now surface as a cache miss / stale entry rather than
       a loud request-time error. **Vercel Blob/KV is no longer needed** —
       dropped from this item.
-30. **Legit Rankings could lean harder on FantasyPros consensus (deferred
-    from item 139, user's call).** Item 139 fixed the worst of it (an
-    elite player coming off an injury-affected season no longer tanks —
-    Lamar Jackson went from outside the QB top-10 to #6/elite tier by
-    giving rankings the offseason-aware consensus every other tool
-    already had). But a consensus QB2 like Lamar still sits at #6, behind
-    a few QBs FantasyPros ranks lower (Burrow QB4, Herbert QB8), because
-    his engine recent-form score (16.5, injury-dampened) is ~2 pts below
-    theirs and the engine still carries 65% of the blend at `"full"` data
-    quality (`ENGINE_WEIGHT.full` in `buildRankings.ts`). To push a
-    strong-consensus player toward their FP rank, lower `ENGINE_WEIGHT.full`
-    (currently 0.65) so the FantasyPros redraft rank carries more of the
-    blend. The tradeoff, put to the user in item 139: it makes the WHOLE
-    board track FantasyPros more closely and rely less on the app's own
-    engine — a real shift in the rankings' philosophy, not just a Lamar
-    tweak, so it wants a deliberate decision (and ideally a sweep of a few
-    values checked against several players, not just Lamar) rather than a
-    reflexive lower-the-number. `ENGINE_WEIGHT` was never rigorously tuned
-    (item 78: "a reasoned default"), so there's no validated number being
-    disturbed — but there's also no ground truth to tune it against, since
-    "was this ranking right" has no backtest the way pick accuracy does.
-    A related, subtler lever if revisited: the real defect is that
-    `dataQuality: "full"` over-trusts a full-but-unrepresentative sample
-    (Lamar's injury-limited games count as "full"); a disagreement-aware
-    weight (trust the engine less when its snapshot strongly diverges from
-    consensus) would target that directly, but adds a heuristic to tune.
+30. **Legit Rankings could lean harder on the consensus (deferred from item
+    139, user's call) — and the source has since changed.** As of item 174
+    the season-long half of the Legit Score is SportsDataIO's own season
+    PROJECTION (points), not FantasyPros' redraft RANK, which also removed
+    the `FP_NORMALIZATION_CAP` hack that existed only because ranks
+    normalize badly. Item 175 then made the engine's half smarter (expected
+    points). The open question is unchanged in substance: `ENGINE_WEIGHT`
+    (0.65 at full data) and `SEASON_ENGINE_WEIGHT` (0.25) are reasoned
+    defaults with no ground truth to tune against, and lowering the engine
+    share would track the market more closely at the cost of the app's own
+    view. A related, subtler lever if revisited: `dataQuality: "full"`
+    over-trusts a full-but-unrepresentative sample (an injury-shortened
+    season counts as "full"), so a disagreement-aware weight would target
+    that more precisely than a flat change.
 31. **RESOLVED in item 150** — air-yards non-PPR conversion factor is now
     per-format (`Record` {ppr:40.43, half_ppr:33.16, standard:25.87}), with
     Half-PPR weight 0.15 (a real signal at drop 0.4, both pipelines up) and
@@ -11735,7 +11703,15 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     nflverse, Sleeper (opened by item 153, not started).** Four linked open
     decisions, in priority order. All four are LIVE in shipped code, so none
     of them is hypothetical:
-    - **FantasyPros consensus (the trigger):** our consensus signal comes via
+    - **FantasyPros consensus (the trigger) — LARGELY CLOSED as of items
+      161/174.** No live tool reads the community scrape any more: the weekly
+      consensus moved to SportsDataIO projections (item 161) and the rankings
+      blend followed (item 174). It survives ONLY in
+      `loadRunNflverseOnly.ts`, the 2022-2025 backtest pipeline, because
+      SportsDataIO's projections 401 for those seasons — so the residual
+      exposure is a validation dependency, not a product one. The original
+      analysis below stands as the record of what the fallback would cost.
+      Original note: our consensus signal comes via
       the `dynastyprocess/data` community scrape, not a licensed feed — a real
       commercial-use risk. Item 153 quantified the fallback: losing it costs
       ~QB −14pp primary (unrecoverable) and ~−3pp overall (re-tuned), with RB
@@ -11805,7 +11781,11 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       styling one, which is why it wasn't bundled into item 154.
 
 35. **SportsDataIO v3 — migration DONE (item 158); what's left is a
-    subscription decision and one verification.** The engineering is
+    subscription decision and one verification. Items 177/178 filled in the
+    detail: the betting endpoints ARE entitled (and now ship, item 177), but
+    injuries and depth charts are NOT, and 2025 is unreachable on the 2026
+    key — see item 178 for the full requirements list and why the legacy key
+    is load-bearing rather than legacy.** The engineering is
     finished: all eight readers are season-routed, verified on both paths.
     Remaining:
     - **Buy (or don't) the 2026 subscription.** The evaluation is free only
@@ -11884,44 +11864,14 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     - **Do not let the legacy subscription lapse** until 2026 data is
       flowing and verified in production. It is the only key serving the app
       today.
-36. **Feed SportsDataIO's SEASON-level advanced metrics into Legit Rankings —
-    not started, and the highest-value use of the advanced subscription
-    currently available.** Item 160 established that the marquee advanced
-    fields (`ExpectedFantasyPoints`, `YardsPerRouteRun`, `RouteParticipation`,
-    `TargetQualityRating`, `WeightedOpportunities`, `TotalQBR`,
-    `PressuredCompletionPercentage`, `AirYards`, `DropRate`,
-    `TargetSeparation`, `AverageCushion`) exist ONLY on the season row (445
-    fields) and not per-week (83) — which is why they can't be backtested and
-    can't enter `finalScore`. **Legit Rankings is the exception, because it
-    has no per-week prediction to make and no pick ground truth to backtest
-    against in the first place** (items 78/139): it answers "how good is this
-    player" over a season, which is exactly the shape this data comes in.
-    Season-shaped data fits it natively, with no per-week reconstruction and
-    no leakage question.
-    - **Why this is worth doing**: Rankings currently blends the engine's own
-      weekly snapshot with FantasyPros' consensus rank (`ENGINE_WEIGHT`,
-      `SEASON_ENGINE_WEIGHT`). `ExpectedFantasyPoints` in particular is a
-      genuinely independent third input — an opportunity-quality model, not a
-      market opinion and not this app's own blend — and Season mode (item
-      151) is precisely where it belongs.
-    - **Cost/shape**: one `AdvancedPlayerInfo/{PlayerId}` call per player,
-      cached. That is impractical for a whole-pool weekly scan but fine for a
-      ranking that is already cached 30 minutes per (position, season, week,
-      format) — and it can be limited to the rankable pool rather than every
-      player.
-    - **No backtest is possible OR required here** — the same reason item 78
-      shipped `ENGINE_WEIGHT` as "a reasoned default". Any weight would be a
-      judgment call, so it wants a deliberate decision (and ideally a
-      sanity-check against several known players, the way items 139/140 were
-      validated) rather than a sweep. Related: Open Item #30 is the standing
-      question about how hard Rankings should lean on consensus at all — these
-      two should probably be decided together, since adding a third input
-      changes that balance.
-    - **Depends on the advanced subscription surviving** past 15 Sept 2026
-      (see #35). Build it behind the same fail-open pattern the player pages
-      use (item 159): if the feed is unavailable, the ranking falls back to
-      what it does today rather than breaking.
-
+36. **RESOLVED (item 175): season-level advanced metrics now refine Legit
+    Rankings.** Expected fantasy points per game feed the engine's half of
+    the blend at 0.3, scoped to RB/WR/TE — QB was excluded after measuring
+    that expected points track real production at r=0.92/0.91/0.96 for
+    RB/WR/TE but only 0.66 at QB. Two mistakes were caught before shipping
+    (the feed's expected points are a season TOTAL, and the first per-game
+    version moved Lamar Jackson enough to be worth verifying) — see item 175.
+    Still contingent on the advanced subscription surviving past 15 Sept.
 37. **Re-validate the SportsDataIO consensus swap across seasons once
     2022-2025 projections are purchasable — the one real weakness in item
     161.** The swap is shipped on **single-season evidence** for the engine's
@@ -11939,6 +11889,12 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
       optimum sat on the boundary, which would mean the engine adds nothing
       to an RB's score, and that is either a real finding about RB or a
       single-season artifact.
+    - **The ask is 2022-2025, not 2022-2024 (item 178).** 2025 is reachable
+      ONLY on the legacy key — every 2025 path 401s on the 2026 key — so
+      letting it lapse would delete the primary backtest pipeline entirely,
+      leaving only nflverse, a different source from the one the live tools
+      serve. Buying 2022-2024 alone would leave four seasons of history with
+      a hole where the only SportsDataIO-validated season used to be.
     - **This is a much stronger case for buying historical access than YPRR
       was** (item 160, where the answer was "don't buy"): here the
       single-season evidence is favorable and the purchase would be
@@ -12473,21 +12429,28 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   `buildInput.ts` (live mode) reads, threaded through
   `scoreExtended.ts` into all three live routes, the piece that was
   missing from item 70's original ship (see CLAUDE.md item 73).
-- `src/lib/oddsapi/` — server-only client for The Odds API (item 98),
-  the app's betting-lines source for the Start/Sit cards' display-only
-  "Betting lines" section. `client.ts` (in-process TTL cache doubling as
-  quota protection — the free tier is only 500 req/month; reads
-  `ODDS_API_KEY`, throws so every caller fails open to no-props),
-  `props.ts` (`getPropsForPlayers` plus the pure, unit-testable
-  `extractPlayerLines`; fetches upcoming events + per-event props, joins
-  to players by `normalizePlayerName`, position-scoped markets),
-  `types.ts` (plain display types with NO `server-only` import, so the
-  client `ComparisonResult.tsx` can `import type` them without pulling
-  server code into the client bundle). Strictly display-only — never
-  touches `PlayerScoreBreakdown` or any scoring path; `/api/compare`
-  returns it as a separate `propsByPlayerId`, empty in the offseason
-  before books post props. See Data Source Notes for the free-tier
-  limits.
+- `src/lib/sportsdata/playerProps.ts` + `playerPropTypes.ts` — the
+  Start/Sit cards' display-only betting lines (item 177, replacing the
+  deleted `src/lib/oddsapi/`). Reads `PlayerPropsByWeek` off the `oddsV3`
+  base; the types file deliberately has NO `server-only` import so the
+  client card can `import type` it. Never touches `PlayerScoreBreakdown` or
+  any scoring path — historical props 401 on every key, so props cannot be
+  backtested and therefore cannot be a signal.
+- `src/lib/sportsdata/teamColors.ts` + `src/components/Jersey.tsx` +
+  `src/lib/useJerseyData.ts` + `/api/jersey-data` — the jersey avatars
+  (item 179). Team colours and squad numbers are real; the number's ink
+  colour is computed from the primary's relative luminance rather than taken
+  from the feed. Wired through one lookup endpoint rather than six response
+  types, because squad number and team colour are cosmetic and
+  `PlayerScoreBreakdown` is a scoring type. `useJerseyData` is
+  `useSyncExternalStore` over a module-level cache, so every jersey on a
+  page shares one fetch.
+- `src/lib/useRosterSlots.ts` — the user's starting-lineup shape, shared
+  across Lineup, Waivers and the Home widgets (item 172). `null` means
+  "never set", which is what lets a connected Sleeper league seed the answer
+  while still letting an explicit edit win. `useEffectiveRosterSlots()` is
+  the single definition of "what does this user's lineup look like" and
+  memoizes, because its value lands in effect dependency arrays.
 - `src/lib/backtest/` — the backtesting feature: `loadRun.ts` (the only
   network I/O — fetches every needed week once per request, both
   player-level and team-level rows, plus the nflverse tables above; as
