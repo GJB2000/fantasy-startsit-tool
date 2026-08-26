@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { streamingPositionFlagsFromSlots } from "@/lib/lineup/rosterSlots";
+import { streamingPositionFlagsFromSlots, serializeSlots } from "@/lib/lineup/rosterSlots";
 import { useEffectiveRosterSlots } from "@/lib/useRosterSlots";
 import type { ExtendedPosition } from "@/lib/sportsdata/types";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
@@ -60,7 +60,7 @@ export function HomeWaiverWidget() {
     const leagueRosteredParam = (sleeperConnection?.leagueRosteredPlayerIds ?? []).join(",");
     const { includeDst, includeK } = streamingPositionFlagsFromSlots(rosterSlots);
     fetch(
-      `/api/waivers?scoringFormat=${scoringFormat}&rostered=${rosteredParam}&leagueRostered=${leagueRosteredParam}&includeDst=${includeDst}&includeK=${includeK}`
+      `/api/waivers?scoringFormat=${scoringFormat}&rostered=${rosteredParam}&leagueRostered=${leagueRosteredParam}&includeDst=${includeDst}&includeK=${includeK}&slots=${serializeSlots(rosterSlots)}`
     )
       .then(async (res) => {
         const data = await res.json();

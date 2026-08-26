@@ -1,4 +1,3 @@
-import { REPLACEMENT_PER_GAME } from "@/lib/recommendation/config";
 import { optimizeLineup } from "@/lib/lineup/optimizeLineup";
 import { SLOT_ELIGIBILITY, type SlotType } from "@/lib/lineup/rosterSlots";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
@@ -10,7 +9,13 @@ import type { OtherLeagueTeam } from "@/lib/sleeper/resolveRoster";
 import type { PositionDefenseTable } from "@/lib/sportsdata/positionDefense";
 import type { SeasonContext } from "@/lib/sportsdata/timeframes";
 import type { ExtendedPosition, ScoringFormat } from "@/lib/sportsdata/types";
-import { evaluateTrade, toTradePlayerResult, type TradeEvaluation, type TradePlayerResult } from "./evaluateTrade";
+import {
+  evaluateTrade,
+  toTradePlayerResult,
+  valueOverReplacement,
+  type TradeEvaluation,
+  type TradePlayerResult,
+} from "./evaluateTrade";
 
 export interface LeagueTradeSuggestion {
   otherTeamName: string;
@@ -41,12 +46,8 @@ const MAX_CANDIDATES_TO_CHECK = 8;
  * benched QB ended up offered for an elite receiver.
  */
 function tradeValue(result: TradePlayerResult, format: ScoringFormat): number {
-  const total = result.restOfSeasonTotal;
-  if (total == null) return -Infinity;
-  const levels = REPLACEMENT_PER_GAME[format];
-  const position = result.position as ExtendedPosition | null;
-  if (position == null || !(position in levels)) return total;
-  return total - levels[position] * result.gamesRemaining;
+  if (result.restOfSeasonTotal == null) return -Infinity;
+  return valueOverReplacement(result, format);
 }
 
 /**

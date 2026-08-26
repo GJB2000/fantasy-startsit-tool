@@ -1,3 +1,4 @@
+import { parseSlotsParam } from "@/lib/lineup/rosterSlots";
 import { getLiveProjectedPointsByPlayerId } from "@/lib/sportsdata/liveProjections";
 import { getPriorSeasonPprAveragesByNormalizedName } from "@/lib/nflverse/priorSeasonAverage";
 import { getLiveNflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
@@ -52,6 +53,9 @@ export async function GET(request: Request) {
   // doesn't roster those slots passes false, so we neither scan nor
   // recommend them. Default true (manual rosters / unknown-slot connections
   // keep both) — only an explicit "false" excludes.
+  // The league's starting slots decide who's on the bench, i.e. who's actually
+  // droppable. Falls back to a standard lineup when the client doesn't send it.
+  const slotCounts = parseSlotsParam(url.searchParams.get("slots"));
   const includeDst = url.searchParams.get("includeDst") !== "false";
   const includeK = url.searchParams.get("includeK") !== "false";
 
@@ -137,6 +141,7 @@ export async function GET(request: Request) {
     const dropSuggestions = await suggestDrops(
       allCandidates,
       rosteredIds,
+      slotCounts,
       context,
       format,
       positionDefenseTable,

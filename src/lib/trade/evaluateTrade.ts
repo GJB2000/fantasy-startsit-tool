@@ -114,8 +114,11 @@ function replacementRestOfSeason(p: TradePlayerResult, format: ScoringFormat): n
 /**
  * A player's rest-of-season points ABOVE replacement — the currency a trade is
  * actually settled in. See REPLACEMENT_PER_GAME for why raw points aren't.
+ * Exported because anything comparing players ACROSS positions needs it, not
+ * just the verdict: which bench player is the cheapest to cut, which lineup
+ * spot is genuinely weakest, which target is closest in value.
  */
-function valueOverReplacement(p: TradePlayerResult, format: ScoringFormat): number {
+export function valueOverReplacement(p: TradePlayerResult, format: ScoringFormat): number {
   return (p.restOfSeasonTotal ?? 0) - replacementRestOfSeason(p, format);
 }
 

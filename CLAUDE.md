@@ -10741,7 +10741,61 @@ single-season numbers for those specific constants.
       does, the `/api/trade` route doesn't), so making it slot-aware is real
       threading work rather than a constant swap. See Open Item #39.
 
-### Open items (as of item 180 — pick up here)
+181. **The waiver drop suggestion recommended dropping a STARTER and then
+    graded its own recommendation "Bad move for you — you give up about 75.4
+    points." Fixed by dropping from the bench instead of by position.** Spotted
+    on the user's real Home page next to item 180's work: the top waiver target
+    was Colby Parkinson (TE) with "Suggested drop: Jake Ferguson" — Ferguson
+    being a FLEX starter in their lineup.
+    - **The verdict was correct; the suggestion was incoherent.** `suggestDrops`
+      picked the user's worst rostered player at the SAME position as the
+      pickup. They roster two tight ends and both start, so the "worst TE" was
+      necessarily a starter, and cutting a starter for a worse waiver player is
+      never right — so the honest grade came back "bad," and the feature ended
+      up arguing against itself. A suggestion the tool tells you not to take
+      isn't a suggestion.
+    - **The same-position rule was the real defect, not the copy.** Real
+      managers drop whoever is least useful, which is a BENCH question, not a
+      positional one — you don't have to drop a TE to add a TE. `suggestDrops`
+      now runs the same `optimizeLineup` the Lineup Optimizer does to split
+      starters from bench (so it needed the league's slots: `/api/waivers`
+      gained an optional `slots` param, sent by both waiver clients, which
+      already had `useEffectiveRosterSlots` from item 172 and defaults to
+      `DEFAULT_SLOTS`), then picks the lowest-value BENCH player regardless of
+      position.
+    - **"Least valuable" is value over replacement, not raw points** — item
+      180's currency, and it matters here for the same reason: on raw points a
+      backup QB looks like the most valuable thing on any bench and would never
+      be cut. `valueOverReplacement` was exported from `evaluateTrade.ts` and
+      `suggestLeagueTrade`'s private `tradeValue` collapsed onto it, so there's
+      one definition rather than three.
+    - **It only ever proposes a drop the pickup actually beats.** If your worst
+      bench player still outvalues everything on waivers, the honest answer is
+      that nothing there is worth a roster spot, so it returns nothing rather
+      than manufacturing a losing move. That is what structurally removes the
+      "bad move" case — the copy change follows from the logic rather than
+      papering over it, and `moveHeadline`'s bad branch is gone along with the
+      now-dead `VERDICT_DOT` map.
+    - **Verified on the same real league that produced the report**: the drop
+      moved from Jake Ferguson (a starter, −75.4) to **Ollie Gordon II**, a
+      bench RB projecting **1.9 points a game** — obviously the right cut — and
+      every one of the 40 surfaced candidates across all four positions now
+      grades positive against him. Confirmed rendered on both surfaces (the Home
+      widget and the Waivers spotlight card); item 169's "thin week" caveat
+      still fires alongside it, which is the correct pairing: a real best-drop
+      AND an honest warning that the pickup is still below a startable TE.
+      One copy bug caught in the browser rather than reasoned about — both call
+      sites already print the dropped player's name as a label, so the shared
+      sentence naming them again read "Suggested drop: Ollie Gordon II. Ollie
+      Gordon II is the least valuable player on your bench"; the sentence now
+      names nobody.
+    - **A deliberate consequence worth knowing**: the drop is now the same
+      player for every candidate on the board (you only have one worst bench
+      player), where before each position suggested a different one. That's
+      correct — the variety was an artifact of the bug — but it does mean a
+      board of ten candidates repeats one name.
+
+### Open items (as of item 181 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `cd72d4b`), working
 tree CLEAN.** Items 167-179 span three themes: finishing the move onto
 SportsDataIO, a run of Waiver Wire correctness fixes, and UI work.
@@ -10750,9 +10804,9 @@ SportsDataIO, a run of Waiver Wire correctness fixes, and UI work.
 is the only thing serving 2025, and every tool runs on the last completed
 season. Dropping it today stops the app; see item 178.
 
-**Current headline numbers** (unchanged by items 167-180 — none of them
-touched engine weights, and item 180 changed only the LIVE trade valuation,
-not any backtest):
+**Current headline numbers** (unchanged by items 167-181 — none of them
+touched engine weights; items 180-181 changed only LIVE trade and waiver-drop
+valuation, not any backtest):
 
 | measure | value |
 |---|---|
@@ -10782,6 +10836,10 @@ not any backtest):
 - **UI**: Backtest fits on a phone (item 173), Player Stats has a season
   toggle (item 176), and avatars are now the player's jersey in real team
   colours with their real squad number (item 179).
+- **The waiver drop suggestion drops from your BENCH, not your worst player
+  at the pickup's position** (item 181) — the old rule cut starters on shallow
+  rosters and then graded its own advice "bad move". Only ever suggests a drop
+  the pickup actually beats.
 - **Trades are graded on VALUE OVER REPLACEMENT, not raw points** (item 180)
   — a user-reported bug where the Home widget offered Mahomes for JSN and
   called it fair. Raw rest-of-season totals aren't comparable across
@@ -12324,9 +12382,15 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   feature's own context line. `suggestDrop.ts` reuses `lib/trade/`'s
   `evaluateTrade`/`toTradePlayerResult` and
   `recommendation/restOfSeason.ts`'s `projectRestOfSeason` verbatim — a
-  same-position "drop X, add Y" suggestion is a 1-for-1 trade evaluation,
-  not a new comparison mechanism. As of item 62, `suggestDrop.ts` scores
-  both rostered players and pickup candidates through
+  drop+add is a 1-for-1 trade evaluation, not a new comparison
+  mechanism. **As of item 181 the drop candidate is the least valuable
+  player on your BENCH by value over replacement, any position** — not the
+  worst rostered player at the pickup's own position, which on a shallow
+  roster picked a STARTER and produced a suggestion the tool then graded
+  "bad move". Needs the league's starting slots (an optional `slots` param
+  on `/api/waivers`) to know who's benched, via `optimizeLineup`; returns
+  nothing when the pickup doesn't beat that player. As of item 62,
+  `suggestDrop.ts` scores both rostered players and pickup candidates through
   `scoreExtendedPlayer`/`projectExtendedRestOfSeason` instead of the
   skill-only `buildComparisonInput`/`scorePlayer`/`projectRestOfSeason`
   path, so a D/ST or K can be a valid drop suggestion too — needed two

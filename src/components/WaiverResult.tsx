@@ -2,7 +2,7 @@
 
 import { Jersey } from "./Jersey";
 import { useMemo, useState } from "react";
-import type { TradeEvaluation, TradeVerdict } from "@/lib/trade/evaluateTrade";
+import type { TradeEvaluation } from "@/lib/trade/evaluateTrade";
 import { SLOT_ELIGIBILITY, SLOT_TYPES, type SlotType } from "@/lib/lineup/rosterSlots";
 import type { MatchupContext } from "@/lib/sportsdata/positionDefense";
 import { SKILL_POSITIONS, type ExtendedPosition, type ScoringFormat, type SkillPosition } from "@/lib/sportsdata/types";
@@ -98,12 +98,6 @@ function posVar(position: string): string {
 // Full literal class strings, not interpolated — Tailwind's static scanner
 // can't resolve a template like `bg-${token}`, only complete class names
 // it finds verbatim in source (same constraint TradeResult.tsx documents).
-const VERDICT_DOT: Record<TradeVerdict, string> = {
-  good: "bg-good",
-  bad: "bg-bad",
-  fair: "bg-caution",
-  unknown: "bg-info",
-};
 
 type MatchupTone = "good" | "tough" | "neutral";
 const MATCHUP_PILL: Record<MatchupTone, string> = {
@@ -131,27 +125,28 @@ function matchupPill(candidate: WaiverCandidateResponse): { text: string; tone: 
 }
 
 /**
- * A drop+add isn't a trade between two sides — there's no trade
- * partner, just you swapping one roster spot — so this rebuilds the
- * headline with "move" phrasing from evaluateTrade()'s own verdict/
- * netValue rather than reusing its "trade"-worded headline string
- * verbatim. Deliberately doesn't touch evaluateTrade() itself: that
- * function (and its headline) is shared with the real Trade Analyzer,
- * where "trade" is the correct word. Exported for reuse by the Home
- * page's compact waiver widget, which surfaces the same drop suggestion
- * in miniature rather than re-deriving its own headline text.
+ * One line explaining a suggested drop. A drop+add isn't a trade between two
+ * sides — there's no trade partner, just you swapping a roster spot — so this
+ * builds its own sentence from evaluateTrade()'s verdict/netValue rather than
+ * reusing its "trade"-worded headline. Deliberately doesn't touch
+ * evaluateTrade() itself: that function is shared with the real Trade
+ * Assistant, where "trade" is the correct word.
+ *
+ * There is no "bad move" branch any more, and that's the point:
+ * suggestDrop.ts only ever proposes a drop the pickup genuinely beats (see its
+ * doc comment), so a drop suggestion can no longer argue against itself.
+ * Exported for the Home page's compact waiver widget, which shows the same
+ * suggestion in miniature rather than re-deriving the text.
  */
 export function moveHeadline(evaluation: TradeEvaluation): string {
+  // Deliberately names nobody — both call sites already print the dropped
+  // player as the label right above this line.
   if (evaluation.verdict === "unknown" || evaluation.netValue == null) {
-    return "Not enough data to grade this move.";
+    return "The least valuable player on your bench.";
   }
-  if (evaluation.verdict === "fair") {
-    return "Fair move — roughly even value the rest of the season.";
-  }
-  if (evaluation.verdict === "good") {
-    return `Good move for you — you gain about ${evaluation.netValue.toFixed(1)} points the rest of the season.`;
-  }
-  return `Bad move for you — you give up about ${Math.abs(evaluation.netValue).toFixed(1)} points the rest of the season.`;
+  return `The least valuable player on your bench — the swap is worth about ${Math.abs(
+    evaluation.netValue
+  ).toFixed(1)} points of value the rest of the season.`;
 }
 
 function Avatar({ candidate, size }: { candidate: WaiverCandidateResponse; size: number }) {
@@ -282,13 +277,14 @@ function DropSuggestion({ evaluation, formatLabel }: { evaluation: TradeEvaluati
   return (
     <div className="mt-4 rounded-[3px] border border-foreground/12 bg-foreground/[0.025] p-3.5">
       <div className="flex items-center gap-2">
-        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${VERDICT_DOT[evaluation.verdict]}`} />
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
         <span className="font-engraved text-[11px] uppercase tracking-[0.08em] text-foreground/50">
           Suggested drop: {dropped.displayName}
+          {dropped.position ? ` · ${dropped.position}` : ""}
         </span>
       </div>
       <p className="mt-1.5 text-[13px] leading-relaxed text-foreground/65">{moveHeadline(evaluation)}</p>
-      <p className="mt-0.5 text-[11px] text-foreground/55">Rest-of-season value, {formatLabel}.</p>
+      <p className="mt-0.5 text-[11px] text-foreground/55">Value above a replacement starter, {formatLabel}.</p>
     </div>
   );
 }
