@@ -1,5 +1,6 @@
 "use client";
 
+import { Jersey } from "./Jersey";
 import { useEffect, useRef, useState } from "react";
 import type { PlayerSummary } from "@/lib/sportsdata/types";
 
@@ -16,15 +17,6 @@ interface PlayerMultiSelectProps {
   maxReachedPlaceholder?: string;
   /** Editorial ("almanac") variant — squared corners, hairline borders, engraved-caps label. */
   editorial?: boolean;
-}
-
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 }
 
 // Position accent CSS vars (defined in globals.css, theme-aware). Used
@@ -45,27 +37,9 @@ function defaultPlaceholder(selectedCount: number): string {
   return selectedCount === 0 ? "Search a player…" : "Search another player…";
 }
 
-/**
- * Player avatar — a position-tinted initials tile. (SportsDataIO's
- * low-res headshots were too muddy to be worth showing; reverted to
- * initials, keeping the position color as the scanning cue.)
- */
+/** Player avatar — the player's jersey, in real team colours with their real squad number. */
 function Avatar({ player, size }: { player: PlayerSummary; size: number }) {
-  const color = posVar(player.position);
-  return (
-    <span
-      className="flex shrink-0 items-center justify-center font-display font-semibold text-white"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: Math.round(size * 0.28),
-        fontSize: Math.round(size * 0.4),
-        background: `linear-gradient(150deg, ${color}, color-mix(in srgb, ${color} 55%, #000))`,
-      }}
-    >
-      {initials(player.name)}
-    </span>
-  );
+  return <Jersey playerId={player.playerId} team={player.team} size={size} />;
 }
 
 function SelectedCard({ player, onRemove, editorial }: { player: PlayerSummary; onRemove: () => void; editorial?: boolean }) {

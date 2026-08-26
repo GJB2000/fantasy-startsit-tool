@@ -10567,6 +10567,54 @@ single-season numbers for those specific constants.
       engine's biggest signal on the data actually served, depth charts for
       the performance win. Everything else is already in hand.
 
+179. **Replaced the initials avatars with the player's jersey — real team
+    colours, real squad number.** Presentation, plus one small lookup
+    endpoint; no engine or scoring change.
+    - **Every value is real data**, which is what made this worth doing
+      rather than a decoration: SportsDataIO's `/Teams` carries each club's
+      `PrimaryColor`/`SecondaryColor`, and 890 of 925 skill players have a
+      `Number`. Chase renders in Bengals black with a real #1, Nacua in Rams
+      blue #12, McCaffrey in 49ers red #23 — spot-checked against reality.
+    - **Contrast is computed, not taken from the feed.** A team's own
+      secondary colour is frequently unreadable on its primary — Atlanta's is
+      black on red — so the number's colour comes from the primary's relative
+      luminance. That makes it legible for all 32 clubs rather than most.
+    - **The torso is deliberately wider than a real shirt.** The first pass
+      used a realistic silhouette and two-digit numbers were cramped at the
+      28px the lineup rows use. The number is the point of the avatar, so the
+      shape gives way to it — checked at 54/40/34/28px before wiring
+      anything in.
+    - **`Number` is optional on `Player`, and read with `!= null` rather than
+      a truthiness check.** Jahmyr Gibbs wears **0**, which is falsy in JS —
+      a truthy guard would have silently rendered him blank. Optional because
+      the synthetic `Player` rows the backtest, nflverse game-log and D/ST
+      layers construct have no squad number.
+    - **Wired through one lookup endpoint (`/api/jersey-data`), not six
+      response types.** Squad number and team colour are cosmetic, and
+      `PlayerScoreBreakdown` is a scoring type — putting display data on it
+      would have spread this across the engine for no benefit. The endpoint
+      returns 32 teams' colours plus a playerId->number map, fetched once per
+      session via `useJerseyData` and shared by every jersey on the page
+      (`useSyncExternalStore` over a module-level cache — the same primitive
+      `createPersistentStore` uses, and the reason this isn't
+      state-in-an-effect).
+    - **Applied everywhere an avatar appears**: the shared picker, Legit
+      Rankings rows, the trade board, waiver candidates and lineup starters.
+      **D/ST and K keep the position-tinted team-code tile** — a team defence
+      has no jersey to show.
+    - **The tradeoff, taken deliberately.** The initials were
+      position-coloured (QB violet, RB teal, WR blue, TE rose), which was a
+      scanning cue in mixed lists — the Top 100, the waivers "All" tab, the
+      lineup bench. Jerseys trade that for team identity. Position isn't lost
+      (those lists already carry a position chip next to the name) but it is
+      no longer what the eye catches first. Put to the user with two
+      alternatives — jerseys only where team matters, or jerseys plus a
+      position-coloured edge — and they chose the clean swap.
+    - Fails open at every step: no team, no number, or a failed
+      `/api/jersey-data` fetch all render a neutral shirt rather than a wrong
+      number or a broken page. Verified live across Rankings, the trade
+      board, the picker and the waiver board. `tsc`/lint clean.
+
 ### Open items (as of item 166 — pick up here)
 **Everything is committed and pushed to `main`, working tree CLEAN.** The
 most recent session (items 159-166) was the largest change to the engine's

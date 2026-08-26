@@ -1,3 +1,4 @@
+import { Jersey } from "./Jersey";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
 
 export interface RankingEntryResponse {
@@ -40,30 +41,9 @@ interface RankingsResultProps {
   isInSeason: boolean;
 }
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
 // Position accent CSS vars (globals.css, theme-aware) — the same scanning
 // cue PlayerMultiSelect/LineupResult/WaiverResult already use. In a
 // cross-position Top 100 especially, position is the thing you scan for.
-const POS_VAR: Record<string, string> = {
-  QB: "var(--pos-qb)",
-  RB: "var(--pos-rb)",
-  WR: "var(--pos-wr)",
-  TE: "var(--pos-te)",
-  K: "var(--pos-k)",
-  DST: "var(--pos-dst)",
-};
-function posVar(position: string | null): string {
-  return (position && POS_VAR[position]) ?? "var(--foreground)";
-}
-
 // Same thresholds ComparisonResult.tsx's matchupLabel uses, so "favorable"
 // / "tough" mean the same thing everywhere. Keyed off diffFromAverage, not
 // the raw rank — the rank direction is counterintuitive (positionDefense.ts).
@@ -119,7 +99,6 @@ function RankingRow({
   // so far" is 0 (the value on the breakdown is last season's completed
   // total). In-season it's the real running total.
   const seasonPts = isInSeason ? entry.seasonTotalPoints : 0;
-  const color = posVar(entry.position);
   // Matchup is only meaningful in weekly mode — "season" is matchup-agnostic.
   const matchup = mode === "weekly" && entry.matchupContext ? entry.matchupContext : null;
   const label = matchup ? matchupLabel(matchup.diffFromAverage) : null;
@@ -128,12 +107,7 @@ function RankingRow({
       <span className="w-6 shrink-0 text-right font-jost text-[16px] font-semibold tabular-nums text-foreground/55">
         {entry.positionRank}
       </span>
-      <span
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] font-jost text-[13px] font-semibold text-white"
-        style={{ background: `linear-gradient(150deg, ${color}, color-mix(in srgb, ${color} 55%, #000))` }}
-      >
-        {initials(entry.displayName)}
-      </span>
+      <Jersey playerId={entry.playerId} team={entry.team} size={40} />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <h3 className="truncate font-jost text-[15px] font-semibold tracking-tight">{entry.displayName}</h3>

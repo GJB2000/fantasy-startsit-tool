@@ -1,3 +1,4 @@
+import { Jersey } from "./Jersey";
 import type { CSSProperties } from "react";
 import type { TradeEvaluation, TradePlayerResult, TradeVerdict } from "@/lib/trade/evaluateTrade";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
@@ -44,15 +45,6 @@ const PER_GAME_BAR_MAX = 20;
 
 function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
-}
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 }
 
 /** Highest rest-of-season projection on a side — the "marquee" player. */
@@ -206,7 +198,7 @@ function PlayerValueCard({
   return (
     <div className={`${styles.pcard} ${isHero ? styles.pcardHero : ""}`}>
       <div className={styles.pchead}>
-        <span className={`${styles.pav} ${isGive ? "" : styles.pavGet}`}>{initials(player.displayName)}</span>
+        <Jersey playerId={player.playerId} team={player.team} size={34} />
         <div>
           <div className={styles.pname}>{player.displayName}</div>
           {player.position && (

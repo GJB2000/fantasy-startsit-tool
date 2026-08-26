@@ -1,5 +1,6 @@
 "use client";
 
+import { Jersey } from "./Jersey";
 import { useState } from "react";
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
@@ -44,15 +45,6 @@ function isStreaming(position: string | null): boolean {
   return position === "DST" || position === "K";
 }
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
 function injuryBadgeClasses(status: string) {
   if (status === "Out" || status === "Doubtful") return "bg-bad/15 text-bad";
   return "bg-caution/15 text-caution";
@@ -79,7 +71,11 @@ function matchupPill(breakdown: PlayerScoreBreakdown): { text: string; tone: Mat
 
 function Avatar({ breakdown, size }: { breakdown: PlayerScoreBreakdown; size: number }) {
   const color = posVar(breakdown.position);
-  const streaming = isStreaming(breakdown.position);
+  // A team defence or kicker has no jersey to show, so those keep the
+  // position-tinted team-code tile.
+  if (!isStreaming(breakdown.position)) {
+    return <Jersey playerId={breakdown.playerId} team={breakdown.team} size={size} />;
+  }
   return (
     <span
       className="flex shrink-0 items-center justify-center font-display font-bold"
@@ -87,12 +83,12 @@ function Avatar({ breakdown, size }: { breakdown: PlayerScoreBreakdown; size: nu
         width: size,
         height: size,
         borderRadius: Math.round(size * 0.26),
-        fontSize: Math.round(size * (streaming ? 0.3 : 0.4)),
-        color: streaming ? "var(--premium-ink)" : "#fff",
+        fontSize: Math.round(size * 0.3),
+        color: "var(--premium-ink)",
         background: `linear-gradient(150deg, ${color}, color-mix(in srgb, ${color} 58%, #000))`,
       }}
     >
-      {streaming ? breakdown.team ?? initials(breakdown.displayName) : initials(breakdown.displayName)}
+      {breakdown.team ?? ""}
     </span>
   );
 }

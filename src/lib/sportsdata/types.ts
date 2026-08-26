@@ -34,6 +34,8 @@ export interface Player {
   PhotoUrl: string | null;
   ByeWeek: number | null;
   InjuryStatus: string | null;
+  /** Squad number, for the jersey avatars. Optional: absent for ~4% of skill players, for anyone without a team, and for the synthetic Player rows the backtest and D/ST layers construct. */
+  Number?: number | null;
 }
 
 export interface PlayerSummary {

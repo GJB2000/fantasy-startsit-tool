@@ -1,5 +1,6 @@
 "use client";
 
+import { Jersey } from "./Jersey";
 import { useMemo, useState } from "react";
 import type { TradeEvaluation, TradeVerdict } from "@/lib/trade/evaluateTrade";
 import { SLOT_ELIGIBILITY, SLOT_TYPES, type SlotType } from "@/lib/lineup/rosterSlots";
@@ -116,15 +117,6 @@ export function isStreamingPosition(position: ExtendedPosition): boolean {
   return position === "DST" || position === "K";
 }
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
 function injuryBadgeClasses(status: string) {
   if (status === "Out" || status === "Doubtful") return "bg-bad/15 text-bad";
   return "bg-caution/15 text-caution";
@@ -165,6 +157,11 @@ export function moveHeadline(evaluation: TradeEvaluation): string {
 function Avatar({ candidate, size }: { candidate: WaiverCandidateResponse; size: number }) {
   const color = posVar(candidate.position);
   const streaming = isStreamingPosition(candidate.position);
+  // A team defence or kicker has no jersey to show, so those keep the
+  // position-tinted team-code tile.
+  if (!streaming) {
+    return <Jersey playerId={candidate.playerId} team={candidate.team} size={size} />;
+  }
   return (
     <span
       className="flex shrink-0 items-center justify-center font-display font-bold"
@@ -172,12 +169,12 @@ function Avatar({ candidate, size }: { candidate: WaiverCandidateResponse; size:
         width: size,
         height: size,
         borderRadius: Math.round(size * 0.26),
-        fontSize: Math.round(size * (streaming ? 0.3 : 0.4)),
-        color: streaming ? "var(--premium-ink)" : "#fff",
+        fontSize: Math.round(size * 0.3),
+        color: "var(--premium-ink)",
         background: `linear-gradient(150deg, ${color}, color-mix(in srgb, ${color} 58%, #000))`,
       }}
     >
-      {streaming ? (candidate.team ?? initials(candidate.displayName)) : initials(candidate.displayName)}
+      {candidate.team ?? ""}
     </span>
   );
 }
