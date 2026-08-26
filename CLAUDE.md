@@ -10646,7 +10646,102 @@ single-season numbers for those specific constants.
       number or a broken page. Verified live across Rankings, the trade
       board, the picker and the waiver board. `tsc`/lint clean.
 
-### Open items (as of item 179 — pick up here)
+180. **Trade valuation moved from raw rest-of-season points to value over
+    replacement — a real correctness bug the user caught: the Home widget
+    offered Patrick Mahomes for Jaxon Smith-Njigba, a trade no opposing
+    manager would ever accept.** Reproduced first rather than assumed:
+    `/api/trade?give=18890&get=23157` returned Mahomes 302.8 vs JSN 320.6, a
+    +17.8 raw gap inside the 25.6-point "fair" band, so it graded **fair** and
+    the suggester (which only ever proposes "fair" trades, item 77) happily
+    surfaced it.
+    - **Root cause: raw rest-of-season point totals are not comparable across
+      positions, and the error is big enough to invert verdicts.** Every league
+      starts a QB, and the worst startable QB already scores ~17.5 a game — so
+      ~98% of Mahomes' 302.8 is a baseline you can replace off waivers for
+      nothing. A WR's replacement level is ~12.2. In points above replacement
+      the same trade is Mahomes **5.8** vs JSN **112.9** — a +107 fleece, not a
+      coin flip. This is the identical class of bug item 140 fixed for the Top
+      100 ("why is Trey McBride so high"), and the same currency items 138/168
+      already used for uneven trades; 1-for-1 cross-position trades were simply
+      the case nobody had applied it to.
+    - **The fix subsumes the model it replaces rather than sitting beside it.**
+      `evaluateTrade` now subtracts each player's own replacement level over
+      their own remaining games, instead of crediting the shorter side a
+      replacement filler for the count difference. Crediting a filler per freed
+      roster spot was always value-over-replacement applied only to the count
+      difference — doing it per player covers cross-position trades too. Checked
+      the uneven case didn't move as a side effect: Pollard+Warren → Chase lands
+      at +163.7 where the old filler model gives +164.95 on the same
+      projections, a 1.25-point difference. **Same-position trades are exactly
+      unchanged** (both sides shed the identical baseline), confirmed live on
+      WR-for-WR, RB-for-RB and QB-for-QB: net equals the raw difference to the
+      decimal.
+    - **Derived the two missing replacement levels rather than defaulting them
+      to zero, which would have introduced a NEW bug.** `REPLACEMENT_PER_GAME`
+      only covered skill positions, and a 0 for D/ST and K would have made a
+      kicker's raw points count entirely as value — a 159-point kicker would
+      have outranked a 112-VOR elite WR. Computed both by the same method as the
+      skill numbers (startable cutoff #12, min 8 games, full 2025 season, via a
+      temporary diagnostic route deleted after): **K 8.41/game** (J.Bates, 143
+      over 17) and **D/ST 6.71/game** (NO, 114 over 17). Both format-invariant —
+      neither scores receptions. Verified after: Butker → Nacua now reads 16.2
+      vs 130.3 rather than 159.1 vs 338.0, which is the honest picture of what a
+      kicker is worth in a trade. The constant is now
+      `Record<ScoringFormat, Record<ExtendedPosition, number>>`; the skill values
+      are untouched, so `multiPlayerTradeBacktest.ts` (which guards on
+      `isSkillPosition`) is unaffected.
+    - **The "roughly even" band still scales off the RAW totals, deliberately.**
+      Scaling it off VOR instead would have shrunk the tolerance by ~3x and
+      turned a lot of previously-fair trades into good/bad calls — a separate,
+      unvalidated change riding along on a bug fix. Keeping it on raw totals
+      means the tolerance for calling a trade fair is unchanged in absolute
+      points and only WHICH difference is measured moved.
+    - **`suggestLeagueTrade` had the same bug at both ends, not just in the
+      verdict — this is why a QB was the chip in the first place.** It picked
+      the "surplus" as the best bench player and the "need" as the weakest
+      starter, both by raw rest-of-season points. On raw points a benched
+      starting-caliber QB is the most valuable bench asset on almost any roster,
+      and a QB is essentially never anyone's weakest starter. Both, plus the
+      candidate filter and the closest-in-value sort and the does-this-help-them
+      check, now go through a shared `tradeValue()` helper on the same VOR
+      basis. Arithmetic consequence worth stating plainly: Mahomes' 5.8 is below
+      basically any startable bench skill player, so he stops being offered as
+      the chip at all — and even if he were, +107 no longer clears the
+      "fair"-only gate.
+    - **Two smaller real bugs fixed in passing**: `suggestLeagueTrade` and
+      `suggestDrop` both called `evaluateTrade` without the `format` argument,
+      silently grading every suggestion in PPR regardless of the user's selected
+      format. Harmless while the model was raw sums for 1-for-1s; not harmless
+      once replacement levels (which differ sharply by format — WR 12.22 PPR vs
+      8.13 Standard) enter the math.
+    - **The trade BACKTESTS were deliberately left on raw points**, which
+      decouples them from the live tool again after item 168 coupled them. They
+      grade a different question — *which side actually outscores the other* —
+      where real points scored are the ground truth and there is nothing to
+      normalize; "is this trade fair" has no ground truth to backtest at all.
+      `multiPlayerTradeBacktest.ts` keeps its item-138 uneven-count filler
+      (removing a count confound from a PREDICTION, which is a different
+      argument). Confirmed unaffected by re-running it: pooled numbers
+      byte-identical.
+    - **UI follow-through** (`TradeResult.tsx`), since three things read the
+      adjusted totals: the balance meter now compares VOR with a caption saying
+      so ("Value above a replacement starter…"), the "+N open spot" credit badge
+      is gone (no longer a concept), and the summary strip's roster-spot cell
+      became a **Positional value** cell so every number still reconciles —
+      `(get − give) + positional = net`. Verified live end to end: give 302.8,
+      get 320.6, positional +89.3, net +107.0, verdict "You come out ahead."
+    - **Not changed, and worth knowing why**: `optimizeLineup` still ranks on
+      raw `finalScore`. Within a slot only eligible positions compete, and for a
+      SUPER_FLEX slot you genuinely do want the most points, not the most value
+      over replacement — lineup slots and trade value are different questions.
+    - **One honest limitation**: the replacement levels are 1-QB-league levels.
+      In a superflex/2-QB league QBs are genuinely scarcer and their real
+      replacement level is far lower, so this now UNDER-values quarterbacks
+      there. `evaluateTrade` has no access to the roster slots (the Home widget
+      does, the `/api/trade` route doesn't), so making it slot-aware is real
+      threading work rather than a constant swap. See Open Item #39.
+
+### Open items (as of item 180 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `cd72d4b`), working
 tree CLEAN.** Items 167-179 span three themes: finishing the move onto
 SportsDataIO, a run of Waiver Wire correctness fixes, and UI work.
@@ -10655,8 +10750,9 @@ SportsDataIO, a run of Waiver Wire correctness fixes, and UI work.
 is the only thing serving 2025, and every tool runs on the last completed
 season. Dropping it today stops the app; see item 178.
 
-**Current headline numbers** (unchanged by items 167-179 — none of them
-touched engine weights):
+**Current headline numbers** (unchanged by items 167-180 — none of them
+touched engine weights, and item 180 changed only the LIVE trade valuation,
+not any backtest):
 
 | measure | value |
 |---|---|
@@ -10686,6 +10782,12 @@ touched engine weights):
 - **UI**: Backtest fits on a phone (item 173), Player Stats has a season
   toggle (item 176), and avatars are now the player's jersey in real team
   colours with their real squad number (item 179).
+- **Trades are graded on VALUE OVER REPLACEMENT, not raw points** (item 180)
+  — a user-reported bug where the Home widget offered Mahomes for JSN and
+  called it fair. Raw rest-of-season totals aren't comparable across
+  positions (~98% of a QB's total is replaceable off waivers). Same-position
+  trades are exactly unchanged; the trade backtests are deliberately still on
+  raw points and were re-run to confirm byte-identical.
 
 **Traps recorded in those items, worth not re-learning:**
 - `Number` is read with `!= null`, not truthiness — Gibbs wears 0 (item 179).
@@ -10697,6 +10799,10 @@ touched engine weights):
   (item 173).
 - Hooks returning derived objects must memoize — an unstable reference in a
   dependency array refetches forever (item 172).
+- Raw fantasy points are never comparable ACROSS positions — anywhere a
+  ranking or comparison spans positions it needs `REPLACEMENT_PER_GAME`.
+  This has now bitten three separate features (items 140, 168, 180); check
+  any new cross-position sort for it before shipping.
 
 **Deliberately hybrid, do not "simplify"**: the primary 2025 pipeline uses
 SportsDataIO projections; the nflverse-only 2022-2025 pipeline still uses
@@ -11917,6 +12023,22 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     previously published trade-backtest figure is superseded. The dropped
     `format` argument, a second bug in the same call, is fixed too.
 
+39. **`REPLACEMENT_PER_GAME` is a 1-QB-league table, so item 180's trade
+    valuation under-values quarterbacks in superflex/2-QB leagues — not
+    started.** Trades are now graded on value over replacement (item 180),
+    which is correct for the standard case and a large improvement over raw
+    points everywhere, but QB replacement is pinned at 17.47/game — the 12th
+    QB, i.e. one starter per team. In a superflex or 2-QB league roughly twice
+    as many QBs start, so the real replacement QB is far worse and an elite QB
+    is worth much more than this model says. The app already knows the league's
+    slots (`SlotType` includes `SUPER_FLEX`, and item 172 promoted slot config
+    to a shared persisted store), so the data exists — but `evaluateTrade` takes
+    no slot argument and `/api/trade` doesn't resolve them, so this is real
+    threading work plus a second QB replacement level (derivable the same way:
+    the ~24th QB's per-game average), not a constant swap. Same caveat applies
+    to `suggestLeagueTrade`'s `tradeValue()`. Worth doing if superflex users
+    turn up; harmless for the standard leagues the tool is built around.
+
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
   voice: [Clear, concise and simple].
@@ -12136,14 +12258,30 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   `scoreExtended.ts`'s dispatcher for backtest mode
   (`scoreExtendedPlayerBacktest`), consumed by `lib/backtest/
   runBacktest.ts` for the Backtest page's D/ST and K support.
-- `src/lib/trade/` — `evaluateTrade.ts` (item 47), the Trade Analyzer's
+- `src/lib/trade/` — `evaluateTrade.ts` (item 47), the Trade Assistant's
   evaluation layer. Deliberately thin: reuses `scorePlayer()`'s
   `finalScore` as a standalone per-player value (see item 47's
   architectural note) rather than introducing a second scoring model,
   and reuses `CLOSE_CALL_ABS_POINTS`/`CLOSE_CALL_RELATIVE_PCT` from
   `recommendation/config.ts` for the good/fair/bad threshold rather than
   a separately-tuned one — there's no backtest ground truth to tune a
-  trade-specific threshold against yet.
+  trade-specific threshold against yet. **As of item 180 it grades on
+  VALUE OVER REPLACEMENT, not raw rest-of-season points** — every player's
+  projection minus `REPLACEMENT_PER_GAME` for their own position over their
+  own remaining games. `giveTotal`/`getTotal` stay RAW (they have to equal
+  the sum of the player cards); `adjustedGiveTotal`/`adjustedGetTotal` are
+  the VOR sums, and `adjustedGet - adjustedGive === netValue` always. The
+  "roughly even" threshold still scales off the RAW totals, so the tolerance
+  is unchanged in absolute points — only which difference is measured moved.
+  `valueNote` (renamed from `rosterNote`) explains the adjustment whenever it
+  moves the net by a point or more, and subsumes item 138/168's uneven-trade
+  roster-spot note. Same-position trades are exactly unchanged.
+  `suggestLeagueTrade.ts` uses the same currency via its own `tradeValue()`
+  helper for every cross-position choice it makes (weakest lineup spot, best
+  bench chip, closest-in-value target). The two trade BACKTESTS deliberately
+  stay on raw points — they grade a different question (which side actually
+  outscores the other, where raw points are the ground truth), so they are
+  untouched by this and remain byte-identical.
 - `src/lib/waivers/` — the Waiver Wire tool's evaluation layer (item 58).
   `rankCandidates.ts` does a cheap, bulk pass across the whole active
   player pool (NOT the full `buildComparisonInput`/`scorePlayer`

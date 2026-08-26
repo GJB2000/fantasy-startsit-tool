@@ -73,7 +73,6 @@
 .bal { display: flex; flex-direction: column; gap: 11px; }
 .balRow { display: grid; grid-template-columns: 74px 1fr auto; align-items: center; gap: 14px; }
 .balLab { font-size: 9px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.balCredit { text-transform: none; letter-spacing: 0; opacity: 0.75; }
 .balTrack { position: relative; height: 4px; border-radius: 100px; background: var(--sunken); overflow: hidden; }
 .balFill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 100px; }
 .balFillGive { background: var(--neutral-bar); }

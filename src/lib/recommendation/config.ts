@@ -1,7 +1,7 @@
 // Tunable weights for the rules-based recommendation engine.
 // Adjust these as the recommendation logic gets tuned over time.
 
-import type { ScoringFormat, SkillPosition } from "@/lib/sportsdata/types";
+import type { ExtendedPosition, ScoringFormat, SkillPosition } from "@/lib/sportsdata/types";
 
 /** Base weight given to recent-4-week form vs. season average, before scaling by sample size. */
 export const RECENT_WEIGHT_BASE = 0.35;
@@ -854,30 +854,34 @@ export const EXPERT_CONSENSUS_BLEND_WEIGHT: Record<SkillPosition, number> = {
 };
 
 /**
- * Replacement-level per-game fantasy value at each skill position — the
- * per-game scoring of a freely-available waiver player, i.e. the player at
- * the startable-pool cutoff (BROAD_MODE_POOL_SIZE: QB/TE #12, RB/WR #24).
- * Used to normalize UNEVEN trades (2-for-1, N-for-M with unequal counts):
- * consolidating players frees a roster spot worth a replacement-level
- * filler, so the shorter side is credited for the freed spot(s) before
- * summing (evaluateTrade.ts / multiPlayerTradeBacktest.ts) — otherwise the
- * side with more players is structurally over-valued (a real bias the
- * multi-player trade backtest surfaced; see CLAUDE.md items 90 and the
- * uneven-trade-fix item). EVEN-count trades are a no-op (equal counts →
- * zero fillers), so the common 1-for-1 / 2-for-2 case is unchanged.
+ * Replacement-level per-game fantasy value at each position — the per-game
+ * scoring of a freely-available waiver player, i.e. the player at the
+ * startable-pool cutoff (BROAD_MODE_POOL_SIZE: QB/TE #12, RB/WR #24; D/ST and
+ * K #12, one per team in a standard league).
+ *
+ * This is what makes cross-position value comparable. Raw rest-of-season
+ * points are NOT: every league starts a QB, and the worst startable QB
+ * already scores ~17.5 a game, so a QB's raw total is inflated by a baseline
+ * you can replace for free off waivers. What a player is actually worth in a
+ * trade is the points he adds ABOVE that baseline. Used by evaluateTrade.ts
+ * (every trade) and suggestLeagueTrade.ts, the same value-over-replacement
+ * basis the Top 100 cross-position ranking already uses (buildRankings.ts).
  *
  * Derived empirically from the full 2025 season: each position's cutoff-
  * ranked player's per-game average, in each format (min 8 games for a
  * robust per-game). QB is format-invariant (QBs rarely catch passes) and
  * high, since QB is a shallow position (only 12 starters), so its
  * replacement level is a strong streamer. RB/WR/TE fall as reception
- * weight drops, as expected. Same "2025-derived constant applied across
- * all backtest seasons" precedent as POINTS_PER_VOLUME_UNIT et al.
+ * weight drops, as expected. D/ST and K are format-invariant too — neither
+ * scores receptions — and are the lowest of all, which is why an elite
+ * kicker or defense is still barely a trade asset. Same "2025-derived
+ * constant applied across all backtest seasons" precedent as
+ * POINTS_PER_VOLUME_UNIT et al.
  */
-export const REPLACEMENT_PER_GAME: Record<ScoringFormat, Record<SkillPosition, number>> = {
-  ppr: { QB: 17.47, RB: 12.15, WR: 12.22, TE: 10.58 },
-  half_ppr: { QB: 17.47, RB: 11.1, WR: 10.34, TE: 8.75 },
-  standard: { QB: 17.47, RB: 10.27, WR: 8.13, TE: 6.89 },
+export const REPLACEMENT_PER_GAME: Record<ScoringFormat, Record<ExtendedPosition, number>> = {
+  ppr: { QB: 17.47, RB: 12.15, WR: 12.22, TE: 10.58, DST: 6.71, K: 8.41 },
+  half_ppr: { QB: 17.47, RB: 11.1, WR: 10.34, TE: 8.75, DST: 6.71, K: 8.41 },
+  standard: { QB: 17.47, RB: 10.27, WR: 8.13, TE: 6.89, DST: 6.71, K: 8.41 },
 };
 
 /**

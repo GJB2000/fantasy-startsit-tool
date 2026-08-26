@@ -1,3 +1,4 @@
+import { REPLACEMENT_PER_GAME } from "@/lib/recommendation/config";
 import { optimizeLineup } from "@/lib/lineup/optimizeLineup";
 import { SLOT_ELIGIBILITY, type SlotType } from "@/lib/lineup/rosterSlots";
 import type { NflversePlayerWeekTable } from "@/lib/recommendation/nflverseLive";
@@ -29,6 +30,24 @@ export interface LeagueTradeResult {
 // than a single-candidate check since only "fair" (roughly matched
 // value) trades are ever proposed now, a narrower bar than "any upgrade."
 const MAX_CANDIDATES_TO_CHECK = 8;
+
+/**
+ * A player's rest-of-season points above a replacement starter at their own
+ * position — the same currency evaluateTrade grades in. Everything here that
+ * compares players ACROSS positions (which lineup spot is weakest, which bench
+ * player is the real trade chip, which target is closest in value) has to use
+ * it: raw rest-of-season totals make a quarterback look like the most valuable
+ * asset on any roster purely because every QB scores a lot, which is how a
+ * benched QB ended up offered for an elite receiver.
+ */
+function tradeValue(result: TradePlayerResult, format: ScoringFormat): number {
+  const total = result.restOfSeasonTotal;
+  if (total == null) return -Infinity;
+  const levels = REPLACEMENT_PER_GAME[format];
+  const position = result.position as ExtendedPosition | null;
+  if (position == null || !(position in levels)) return total;
+  return total - levels[position] * result.gamesRemaining;
+}
 
 /**
  * Finds a single, real, two-sided 1-for-1 trade: your best bench player
@@ -109,7 +128,8 @@ export async function suggestLeagueTrade(
 
   // Need: prefer an empty slot's eligible position(s) — a real gap beats
   // any filled starter, however weak — else the filled starter with the
-  // lowest rest-of-season projection.
+  // least value over replacement (see tradeValue: by raw points a QB is
+  // never anyone's weakest starter, which is not the same as not needing one).
   const emptySlot = slots.find((s) => s.breakdown == null);
   let needPositions: readonly ExtendedPosition[];
   let baselineValue = -Infinity;
@@ -124,17 +144,18 @@ export async function suggestLeagueTrade(
       return { suggestion: null, reason: "Not enough roster data to figure out what your lineup needs." };
     }
     const weakest = starterResults.reduce((min, r) =>
-      (r.restOfSeasonTotal ?? Infinity) < (min.restOfSeasonTotal ?? Infinity) ? r : min
+      tradeValue(r, format) < tradeValue(min, format) ? r : min
     );
     if (!weakest.position) {
       return { suggestion: null, reason: "Not enough roster data to figure out what your lineup needs." };
     }
     needPositions = [weakest.position as ExtendedPosition];
-    baselineValue = weakest.restOfSeasonTotal ?? -Infinity;
+    baselineValue = tradeValue(weakest, format);
   }
 
-  // Surplus: your own best bench player by rest-of-season projection —
-  // the real trade chip, since it's not currently in your starting lineup.
+  // Surplus: your own most valuable bench player over replacement — the real
+  // trade chip, since it's not currently in your starting lineup. Ranked on
+  // value, not raw points, or a backup QB wins this every time.
   if (bench.length === 0) {
     return { suggestion: null, reason: "Your whole roster is already starting — no bench surplus to trade from." };
   }
@@ -142,7 +163,7 @@ export async function suggestLeagueTrade(
   if (benchResults.length === 0) {
     return { suggestion: null, reason: "Not enough data on your bench players to value a trade right now." };
   }
-  const surplus = benchResults.reduce((max, r) => (r.restOfSeasonTotal! > (max.restOfSeasonTotal ?? -Infinity) ? r : max));
+  const surplus = benchResults.reduce((max, r) => (tradeValue(r, format) > tradeValue(max, format) ? r : max));
 
   // Cheap scan first: which other teams even have a player at the
   // position you need, before scoring anyone.
@@ -169,13 +190,13 @@ export async function suggestLeagueTrade(
   // are the ones nearest your surplus's projection, not the biggest
   // upgrades available (which would almost always grade "good," i.e.
   // lopsided, for you instead).
-  const surplusValue = surplus.restOfSeasonTotal ?? 0;
+  const surplusValue = tradeValue(surplus, format);
   const upgrades = scoredCandidates
-    .filter((c) => (c.result.restOfSeasonTotal ?? -Infinity) > baselineValue)
+    .filter((c) => tradeValue(c.result, format) > baselineValue)
     .sort(
       (a, b) =>
-        Math.abs((a.result.restOfSeasonTotal ?? Infinity) - surplusValue) -
-        Math.abs((b.result.restOfSeasonTotal ?? Infinity) - surplusValue)
+        Math.abs(tradeValue(a.result, format) - surplusValue) -
+        Math.abs(tradeValue(b.result, format) - surplusValue)
     );
 
   if (upgrades.length === 0) {
@@ -213,13 +234,13 @@ export async function suggestLeagueTrade(
         theirOtherPlayersAtSurplusPosition.map(async (p) => toResult(await scoreFor(p.playerId)))
       );
       const theirWeakest = theirResults.reduce((min, r) =>
-        (r.restOfSeasonTotal ?? Infinity) < (min.restOfSeasonTotal ?? Infinity) ? r : min
+        tradeValue(r, format) < tradeValue(min, format) ? r : min
       );
-      const wouldHelpThem = (surplus.restOfSeasonTotal ?? -Infinity) > (theirWeakest.restOfSeasonTotal ?? -Infinity);
+      const wouldHelpThem = surplusValue > tradeValue(theirWeakest, format);
       if (!wouldHelpThem) continue;
     }
 
-    const evaluation = evaluateTrade([surplus], [candidate.result]);
+    const evaluation = evaluateTrade([surplus], [candidate.result], format);
     if (evaluation.verdict === "fair") {
       return { suggestion: { otherTeamName: candidate.team.teamName, evaluation }, reason: null };
     }

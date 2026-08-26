@@ -157,21 +157,16 @@ function BalanceRow({
   total,
   proportion,
   isGet,
-  credit,
 }: {
   label: string;
+  /** Points above a replacement starter — what the verdict compares, not the raw card sum. */
   total: number;
   proportion: number;
   isGet: boolean;
-  /** Replacement value credited for a freed roster spot on an uneven trade, so the bar matches the verdict instead of the raw card totals. */
-  credit?: number | null;
 }) {
   return (
     <div className={styles.balRow}>
-      <span className={styles.balLab}>
-        {label}
-        {credit ? <span className={styles.balCredit}> + {credit.toFixed(0)} open spot</span> : null}
-      </span>
+      <span className={styles.balLab}>{label}</span>
       <span className={styles.balTrack}>
         <span
           className={`${styles.balFill} ${isGet ? styles.balFillGet : styles.balFillGive}`}
@@ -316,15 +311,16 @@ export function TradeResult({ evaluation, contextNote, scoringFormat }: TradeRes
   }
 
   const betterSide: "give" | "get" | null = verdict === "good" ? "get" : verdict === "bad" ? "give" : null;
-  // The meter compares the values the VERDICT uses (raw totals plus any
-  // roster-spot credit), not the raw card sums — otherwise on an uneven trade
-  // the longer side's bar runs longer while the verdict says it lost.
+  // The meter compares the values the VERDICT uses — each side's points above a
+  // replacement starter — not the raw card sums. Otherwise a side can show the
+  // longer bar while the verdict says it lost, which is the whole point of
+  // grading on positional value (see evaluateTrade.ts).
   const adjGive = evaluation.adjustedGiveTotal ?? giveTotal;
   const adjGet = evaluation.adjustedGetTotal ?? getTotal;
-  const giveCredit = adjGive != null && giveTotal != null ? adjGive - giveTotal : 0;
-  const getCredit = adjGet != null && getTotal != null ? adjGet - getTotal : 0;
   const balanceMax = adjGive != null && adjGet != null ? Math.max(adjGive, adjGet, 1) : null;
-  const rosterCredit = Math.max(giveCredit, getCredit);
+  // Raw difference + positional adjustment = net, so every strip cell reconciles.
+  const rawNet = giveTotal != null && getTotal != null ? getTotal - giveTotal : null;
+  const positionalSwing = rawNet != null && netValue != null ? netValue - rawNet : null;
 
   const toneStyle = { "--tone": TONE[verdict] } as CSSProperties;
 
@@ -365,28 +361,20 @@ export function TradeResult({ evaluation, contextNote, scoringFormat }: TradeRes
             <>
               <div className={styles.vrule} />
               <div className={styles.bal}>
-                <BalanceRow
-                  label="You give"
-                  total={adjGive}
-                  proportion={adjGive / balanceMax}
-                  isGet={false}
-                  credit={giveCredit > 0 ? giveCredit : null}
-                />
-                <BalanceRow
-                  label="You get"
-                  total={adjGet}
-                  proportion={adjGet / balanceMax}
-                  isGet
-                  credit={getCredit > 0 ? getCredit : null}
-                />
+                <BalanceRow label="You give" total={adjGive} proportion={adjGive / balanceMax} isGet={false} />
+                <BalanceRow label="You get" total={adjGet} proportion={adjGet / balanceMax} isGet />
               </div>
+              <p className={styles.vnote}>
+                Value above a replacement starter — what each side is really worth once the points a
+                free waiver player would score at that position are stripped out.
+              </p>
             </>
           )}
 
-          {evaluation.rosterNote && (
+          {evaluation.valueNote && (
             <>
               <div className={styles.vrule} />
-              <p className={styles.vnote}>{evaluation.rosterNote}</p>
+              <p className={styles.vnote}>{evaluation.valueNote}</p>
             </>
           )}
         </div>
@@ -439,14 +427,14 @@ export function TradeResult({ evaluation, contextNote, scoringFormat }: TradeRes
             </div>
           </div>
 
-          {/* Every cell adds up: on an uneven trade the freed roster spot is its
-              own line, so give + spot - get reconciles to the net rather than
-              leaving the reader to wonder why the two totals don't. */}
+          {/* Every cell adds up: the positional adjustment is its own line, so
+              (get - give) + positional reconciles to the net rather than leaving
+              the reader to wonder why the two raw totals don't. */}
           <div className={styles.strip}>
             <StripCell label="You give" value={giveTotal} />
             <StripCell label="You get" value={getTotal} />
-            {rosterCredit > 0 ? (
-              <StripCell label={getCredit > 0 ? "Spot you free" : "Spot you fill"} value={rosterCredit} signed={getCredit > 0} />
+            {positionalSwing != null && Math.abs(positionalSwing) >= 1 ? (
+              <StripCell label="Positional value" value={positionalSwing} signed />
             ) : (
               <StripCell label="Weeks left" value={weeksLeft} />
             )}
