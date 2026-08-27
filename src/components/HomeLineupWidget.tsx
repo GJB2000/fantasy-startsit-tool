@@ -1,5 +1,6 @@
 "use client";
 
+import { PlayerLink } from "./PlayerLink";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
@@ -48,7 +49,9 @@ function SlotRow({ slot }: { slot: LineupSlotResponse }) {
             {/* Small: this is a 10-row list, so the avatar is a scanning cue
                 rather than the focus it is on the full Lineup page. */}
             <Avatar breakdown={b} size={22} />
-            <span className="truncate text-[12.5px] font-medium">{b.displayName}</span>
+            <PlayerLink playerId={b.playerId} position={b.position} className="truncate text-[12.5px] font-medium">
+              {b.displayName}
+            </PlayerLink>
           </>
         ) : (
           <span className="truncate text-[12.5px] text-foreground/55">Empty — add a player</span>

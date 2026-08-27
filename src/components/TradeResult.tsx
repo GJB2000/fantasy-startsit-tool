@@ -1,3 +1,4 @@
+import { PlayerLink } from "./PlayerLink";
 import { PlayerAvatar } from "./Jersey";
 import type { CSSProperties } from "react";
 import type { TradeEvaluation, TradePlayerResult, TradeVerdict } from "@/lib/trade/evaluateTrade";
@@ -195,7 +196,9 @@ function PlayerValueCard({
       <div className={styles.pchead}>
         <PlayerAvatar playerId={player.playerId} team={player.team} position={player.position} size={34} />
         <div>
-          <div className={styles.pname}>{player.displayName}</div>
+          <div className={styles.pname}>
+            <PlayerLink playerId={player.playerId} position={player.position}>{player.displayName}</PlayerLink>
+          </div>
           {player.position && (
             <div className={styles.pmeta}>
               {player.position}

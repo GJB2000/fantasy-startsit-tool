@@ -10815,7 +10815,42 @@ single-season numbers for those specific constants.
       correct — the variety was an artifact of the bug — but it does mean a
       board of ten candidates repeats one name.
 
-### Open items (as of item 181 — pick up here)
+182. **Made player names click through to their stats page, on the surfaces
+    where that's a plain link — and found the two where it isn't.** The
+    destination already existed (`/stats/[playerId]`, item 159) and the stats
+    leaderboard already linked that way; nothing else did.
+    - **New `PlayerLink.tsx`**, one guarded wrapper rather than a bare `<Link>`
+      per call site, because two cases must NOT link.
+      **D/ST is the important one**: `/api/stats/900028` returns **200**, not a
+      404 — it renders a real page with zero games and all-zero totals, since
+      SportsDataIO models a team defence as a team stat with no player row and
+      the stats pages exclude D/ST throughout (item 159). Landing there reads as
+      broken rather than honest, so a defence renders as plain text. A player
+      with no resolved ID does too. Verified on a real Steelers-D/ST-for-Bijan
+      trade: only Bijan is a link.
+    - **Wired into six surfaces**: Legit Rankings rows, Start/Sit player cards,
+      the trade board, and all three Home "This week" widgets. Verified live —
+      100 links on the Top 100 (clicking one really navigates), 13 across the
+      Home widgets (10 lineup slots + waiver target + both trade sides), and
+      both Start/Sit cards.
+    - **Three surfaces deliberately left alone, each for a structural reason,
+      not an oversight:**
+      - **Waivers and Lineup rows**: the entire row is a `<button>` (click to
+        expand reasoning), and an `<a>` nested inside a `<button>` is invalid
+        HTML. Linking there means reworking the expand interaction first —
+        shrinking the target to the chevron, or converting the row to a div
+        with its own click and keyboard handling. A UX decision more than a
+        coding one; see Open Item #40.
+      - **The Home rankings board**: each row is ALREADY a `<Link>` to
+        `/rankings`, and links don't nest either. Changing where that row points
+        is a behaviour change, not an addition.
+      - **`PlayerMultiSelect`**: clicking there selects a player; a link would
+        hijack it.
+    - The Backtest tables (`ProjectionPlayerTable`, `BacktestWeekTable`,
+      `TradeBacktestTable`) are plain and could take the same treatment — left
+      out only because this pass was scoped to the user-facing tools.
+
+### Open items (as of item 182 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `cd72d4b`), working
 tree CLEAN.** Items 167-179 span three themes: finishing the move onto
 SportsDataIO, a run of Waiver Wire correctness fixes, and UI work.
@@ -12100,6 +12135,19 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     1-for-1 went 53.01% -> 61.40% and 2-for-2 54.35% -> 60.02%; every
     previously published trade-backtest figure is superseded. The dropped
     `format` argument, a second bug in the same call, is fixed too.
+
+40. **Player names don't link to stats from the Waivers and Lineup rows —
+    blocked on an interaction change, not a missing link (item 182).** Both
+    render the whole row as a `<button>` so clicking anywhere expands the
+    reasoning, and an `<a>` inside a `<button>` is invalid HTML. Two ways out:
+    shrink the expand target to the chevron and let the row be a link, or keep
+    the row clickable as a div with its own `onClick` plus `onKeyDown` for
+    Enter/Space and a `role`/`tabIndex` so it stays keyboard-accessible. The
+    first is simpler and makes expanding deliberate; the second preserves the
+    big click target people are used to. Either way `PlayerLink` already exists
+    and carries the D/ST guard, so the link itself is a one-liner — the work is
+    entirely in the row. Same question applies to the Home rankings board, whose
+    row already links to `/rankings`.
 
 39. **`REPLACEMENT_PER_GAME` is a 1-QB-league table, so item 180's trade
     valuation under-values quarterbacks in superflex/2-QB leagues — not

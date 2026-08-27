@@ -1,3 +1,4 @@
+import { PlayerLink } from "./PlayerLink";
 import { Jersey } from "./Jersey";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
 
@@ -110,7 +111,9 @@ function RankingRow({
       <Jersey playerId={entry.playerId} team={entry.team} size={40} />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
-          <h3 className="truncate font-jost text-[15px] font-semibold tracking-tight">{entry.displayName}</h3>
+          <h3 className="truncate font-jost text-[15px] font-semibold tracking-tight">
+            <PlayerLink playerId={entry.playerId} position={entry.position}>{entry.displayName}</PlayerLink>
+          </h3>
           {entry.isOnByeThisWeek && (
             <span className="rounded-[3px] bg-foreground/8 px-1.5 py-0.5 text-[10px] text-foreground/55">Bye</span>
           )}

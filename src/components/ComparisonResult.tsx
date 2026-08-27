@@ -1,5 +1,6 @@
 "use client";
 
+import { PlayerLink } from "./PlayerLink";
 import type { GameWeather } from "@/lib/nflverse/schedules";
 import type { PlayerProps } from "@/lib/sportsdata/playerPropTypes";
 import type { ComparisonResult as ComparisonResultData, PlayerScoreBreakdown } from "@/lib/recommendation/types";
@@ -366,7 +367,9 @@ function PlayerCard({
       <header className={styles.chead}>
         <div className={`${styles.rk} ${styles.n}`}>{rank}</div>
         <div>
-          <div className={styles.pName}>{player.displayName}</div>
+          <div className={styles.pName}>
+            <PlayerLink playerId={player.playerId} position={player.position}>{player.displayName}</PlayerLink>
+          </div>
           {posLine && <div className={styles.pMeta}>{posLine}</div>}
         </div>
         <div className={`${styles.tag} ${isRecommended ? styles.tagStart : styles.tagBench}`}>

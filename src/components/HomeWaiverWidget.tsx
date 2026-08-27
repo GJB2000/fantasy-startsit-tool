@@ -1,5 +1,6 @@
 "use client";
 
+import { PlayerLink } from "./PlayerLink";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { streamingPositionFlagsFromSlots, serializeSlots } from "@/lib/lineup/rosterSlots";
@@ -139,7 +140,9 @@ export function HomeWaiverWidget() {
       <div className="flex items-center gap-3">
         <Avatar candidate={top} size={36} />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-jost text-[14px] font-semibold tracking-tight">{top.displayName}</p>
+          <p className="truncate font-jost text-[14px] font-semibold tracking-tight">
+            <PlayerLink playerId={top.playerId} position={top.position}>{top.displayName}</PlayerLink>
+          </p>
           <p className="truncate text-[11px] text-foreground/55">
             {top.position}
             {top.team ? ` · ${top.team}` : ""}
