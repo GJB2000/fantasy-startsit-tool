@@ -149,7 +149,12 @@ export function moveHeadline(evaluation: TradeEvaluation): string {
   ).toFixed(1)} points of value the rest of the season.`;
 }
 
-function Avatar({ candidate, size }: { candidate: WaiverCandidateResponse; size: number }) {
+/**
+ * Exported so the Home page's compact waiver widget shows the same avatar as
+ * the full board rather than its own tile — including the D/ST-and-K fallback,
+ * which is the part that's easy to get wrong when reimplemented.
+ */
+export function Avatar({ candidate, size }: { candidate: WaiverCandidateResponse; size: number }) {
   const color = posVar(candidate.position);
   const streaming = isStreamingPosition(candidate.position);
   // A team defence or kicker has no jersey to show, so those keep the

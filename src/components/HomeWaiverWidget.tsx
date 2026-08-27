@@ -8,7 +8,14 @@ import type { ExtendedPosition } from "@/lib/sportsdata/types";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { useSleeperConnection } from "@/lib/useSleeperConnection";
-import { computeRosterNeedPenalty, isStreamingPosition, moveHeadline, pickTopTarget, type WaiverCandidateResponse } from "./WaiverResult";
+import {
+  Avatar,
+  computeRosterNeedPenalty,
+  isStreamingPosition,
+  moveHeadline,
+  pickTopTarget,
+  type WaiverCandidateResponse,
+} from "./WaiverResult";
 
 interface WaiverResponse {
   candidatesByPosition: Record<ExtendedPosition, WaiverCandidateResponse[]>;
@@ -130,9 +137,7 @@ export function HomeWaiverWidget() {
   return (
     <WidgetShell>
       <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] bg-accent/12 font-jost text-xs font-semibold text-accent">
-          {top.position}
-        </span>
+        <Avatar candidate={top} size={36} />
         <div className="min-w-0 flex-1">
           <p className="truncate font-jost text-[14px] font-semibold tracking-tight">{top.displayName}</p>
           <p className="truncate text-[11px] text-foreground/55">

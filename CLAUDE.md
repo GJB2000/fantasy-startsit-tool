@@ -10631,6 +10631,10 @@ single-season numbers for those specific constants.
       state-in-an-effect).
     - **Applied everywhere an avatar appears**: the shared picker, Legit
       Rankings rows, the trade board, waiver candidates and lineup starters.
+      The Home page's compact waiver widget was missed in this pass and picked
+      up later — it now imports `WaiverResult`'s own `Avatar` rather than
+      keeping its own tile, so the D/ST-and-K fallback (which has no jersey to
+      show) can't drift between the two surfaces.
       **D/ST and K keep the position-tinted team-code tile** — a team defence
       has no jersey to show.
     - **The tradeoff, taken deliberately.** The initials were
