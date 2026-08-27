@@ -12266,23 +12266,6 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     previously published trade-backtest figure is superseded. The dropped
     `format` argument, a second bug in the same call, is fixed too.
 
-41. **RESOLVED (item 186)** — all four tools now restore when you return from
-    a player's stats card, by two mechanisms suited to what's being restored: a
-    captured run for Start/Sit and the Trade Assistant (a selection you'd
-    otherwise have to re-pick), and a re-run flag for Waivers and Lineup (whose
-    inputs are already persisted, so running again is enough). Still worth
-    considering separately: putting the selection in the URL
-    (`/trade?give=…&get=…`) would make those views shareable and
-    refresh-survivable, which none of this restore machinery does — see the
-    shareable-comparison idea in item 157.
-
-40. **RESOLVED (item 185)** — the Waivers and Lineup rows dropped their
-    expand/collapse entirely (the per-row reasoning was more detail than either
-    board wanted), so the rows stopped being `<button>`s and the names link
-    normally. The one surface still unlinked is the Home rankings board, whose
-    row is already a `<Link>` to `/rankings`; pointing it elsewhere is a
-    behaviour change rather than an addition, so it was left alone.
-
 39. **`REPLACEMENT_PER_GAME` is a 1-QB-league table, so item 180's trade
     valuation under-values quarterbacks in superflex/2-QB leagues — not
     started.** Trades are now graded on value over replacement (item 180),
@@ -12298,6 +12281,61 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     the ~24th QB's per-game average), not a constant swap. Same caveat applies
     to `suggestLeagueTrade`'s `tradeValue()`. Worth doing if superflex users
     turn up; harmless for the standard leagues the tool is built around.
+
+40. **RESOLVED (item 185)** — the Waivers and Lineup rows dropped their
+    expand/collapse entirely (the per-row reasoning was more detail than either
+    board wanted), so the rows stopped being `<button>`s and the names link
+    normally. The one surface still unlinked is the Home rankings board, whose
+    row is already a `<Link>` to `/rankings`; pointing it elsewhere is a
+    behaviour change rather than an addition, so it was left alone.
+
+41. **RESOLVED (item 186)** — all four tools now restore when you return from
+    a player's stats card, by two mechanisms suited to what's being restored: a
+    captured run for Start/Sit and the Trade Assistant (a selection you'd
+    otherwise have to re-pick), and a re-run flag for Waivers and Lineup (whose
+    inputs are already persisted, so running again is enough). Still worth
+    considering separately: putting the selection in the URL
+    (`/trade?give=…&get=…`) would make those views shareable and
+    refresh-survivable, which none of this restore machinery does — see the
+    shareable-comparison idea in item 157.
+
+42. **Encode tool selections in the URL, so a comparison or trade can be
+    shared and survives a refresh — not started.** Everything the tools hold is
+    component state today: `/start-sit` and `/trade` have no idea what's on
+    screen, so a link to "this matchup" doesn't exist, a refresh loses the
+    result, and browser back/forward doesn't move between runs.
+    - **Shape**: `/start-sit?ids=18890,21693&format=ppr` and
+      `/trade?give=…&get=…&format=…` — the API routes already take exactly
+      these params, so the work is reading them on mount and writing them
+      (via `history.replaceState`, not `push`, unless you want each run to be
+      its own history entry) when a run completes. Waivers and Lineup arguably
+      need nothing: their inputs are already persisted, so the bare path is
+      already a complete "link".
+    - **It would subsume the restore machinery in items 183/184/186**, not sit
+      beside it. `usePendingRestoreComparison`, `usePendingRestoreTrade` and
+      `usePendingRerun` all exist to carry state across one client transition;
+      a URL carries it across any navigation, a refresh, a new tab, and someone
+      else's browser. Expect to delete those three rather than keep both paths
+      — and check `BackToToolLink` at the same time, since "back to the tool"
+      becomes a plain link to a URL that already describes the run.
+    - **Why it's worth more than the restore fix was**: this is the cheap
+      version of the growth idea from item 157. A community page was declined
+      there (needs a database, accounts, and moderation — all out of scope) and
+      shareable links were the counter-proposal: same "pass this around"
+      instinct, no backend, no auth, nothing to moderate. A reader forwarding
+      "should I start X or Y?" to a friend is the newsletter's own use case.
+    - **Real decisions to make first, not just execution**: whether a shared
+      link re-runs the engine on the recipient's machine (it must — there's no
+      stored result, and data changes weekly, so the same URL will legitimately
+      give a different verdict next week); whether the scoring format travels
+      in the URL or defers to the recipient's own saved setting (the URL should
+      win, or a shared link means something different to each reader); and
+      whether D/ST's synthetic PlayerIDs (`900000 + TeamID`) are stable enough
+      to put in a shared link — they're derived from SportsDataIO TeamIDs,
+      which item 158 verified are identical across the legacy and v3 hosts, so
+      probably yes, but confirm rather than assume.
+    - Worth pairing with an OG-image/meta-tag pass if these links are meant to
+      be posted anywhere, otherwise a shared verdict unfurls as a bare domain.
 
 ## Voice & Tone
 - This tool represents [Legitfootball]'s newsletter brand. Match that
