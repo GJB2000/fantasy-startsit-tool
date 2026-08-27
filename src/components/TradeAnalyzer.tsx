@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLastTrade, usePendingRestoreTrade, type TradeSelection } from "@/lib/usePendingRestoreTrade";
 import type { TradeEvaluation } from "@/lib/trade/evaluateTrade";
-import type { PlayerSummary } from "@/lib/sportsdata/types";
+import type { PlayerSummary, ScoringFormat } from "@/lib/sportsdata/types";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { PlayerMultiSelect } from "./PlayerMultiSelect";
 import { ScoringFormatToggle } from "./ScoringFormatToggle";
@@ -23,6 +24,9 @@ export function TradeAnalyzer() {
   const [error, setError] = useState<string | null>(null);
   const [scoringFormat, setScoringFormat] = useScoringFormat();
   const resultRef = useRef<HTMLDivElement | null>(null);
+  const [, setLastTrade] = useLastTrade();
+  const [pendingRestore, setPendingRestore] = usePendingRestoreTrade();
+  const restoredRef = useRef(false);
 
   // Bring the verdict into view when it renders — on mobile it lands below the fold.
   useEffect(() => {
@@ -43,26 +47,50 @@ export function TradeAnalyzer() {
     };
   }
 
-  async function handleAnalyze() {
+  // Split out so both the button and a restore (below) run the identical
+  // request — same shape as StartSitTool's runComparison.
+  async function runTrade(give: PlayerSummary[], get: PlayerSummary[], format: ScoringFormat) {
     setLoading(true);
     setError(null);
     setResponse(null);
     try {
-      const give = givePlayers.map((p) => p.playerId).join(",");
-      const get = getPlayers.map((p) => p.playerId).join(",");
-      const res = await fetch(`/api/trade?give=${give}&get=${get}&scoringFormat=${scoringFormat}`);
+      const giveIds = give.map((p) => p.playerId).join(",");
+      const getIds = get.map((p) => p.playerId).join(",");
+      const res = await fetch(`/api/trade?give=${giveIds}&get=${getIds}&scoringFormat=${format}`);
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Something went wrong.");
         return;
       }
       setResponse(data);
+      // Record what actually produced this verdict, so returning from a
+      // player's stats card can offer to restore exactly this trade.
+      setLastTrade({ give, get, scoringFormat: format });
     } catch {
       setError("Couldn't reach the server. Try again shortly.");
     } finally {
       setLoading(false);
     }
   }
+
+  function handleAnalyze() {
+    void runTrade(givePlayers, getPlayers, scoringFormat);
+  }
+
+  // Handed off from a player's stats card (usePendingRestoreTrade): restore
+  // that trade once on mount, then clear the slot. The ref guards against
+  // React strict-mode's double-invoked mount effect re-running it.
+  useEffect(() => {
+    if (restoredRef.current || !pendingRestore) return;
+    restoredRef.current = true;
+    const entry: TradeSelection = pendingRestore;
+    setPendingRestore(null);
+    setGivePlayers(entry.give);
+    setGetPlayers(entry.get);
+    setScoringFormat(entry.scoringFormat);
+    void runTrade(entry.give, entry.get, entry.scoringFormat);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRestore]);
 
   return (
     <div className="mx-auto mt-10 w-full max-w-4xl">

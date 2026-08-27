@@ -10885,7 +10885,33 @@ single-season numbers for those specific constants.
       server-rendered on demand (the layout reads the theme cookie, item 130),
       so `useSearchParams` needs no Suspense boundary.
 
-### Open items (as of item 183 — pick up here)
+184. **Extended item 183's restore to the Trade Assistant — returning from a
+    player's stats card now re-opens the trade, not an empty tool.**
+    - **Needed one thing Start/Sit got for free: a record of what was run.**
+      Start/Sit could read `useRecentComparisons`, which already stores the
+      exact players and format because the Recent comparisons rail surfaces
+      them. Nothing surfaces trade history, so `TradeAnalyzer` now records its
+      own last successful run (`useLastTrade`) — in-memory, since there's no
+      second consumer to justify persisting it. `BackToToolLink` reads that to
+      decide whether the player you clicked really came from that trade before
+      offering to restore it, then hands it to `usePendingRestoreTrade`, which
+      `TradeAnalyzer` reads on mount and re-runs. Same two-store shape as
+      Start/Sit (record → hand-off), just with the record kept locally.
+    - **`handleAnalyze` split into `runTrade(give, get, format)`** so the button
+      and a restore issue the identical request — the same refactor
+      `StartSitTool` already has as `runComparison` (item 92).
+    - **Verified both round trips live**, including that the shared
+      `BackToToolLink` change didn't regress Start/Sit: a Mahomes-for-JSN trade
+      → click JSN → "Back to Trade Assistant" → both sides restored and the
+      +107.0 verdict re-rendered; and a three-way Start/Sit comparison → click
+      Gibbs → back → all three chips and the verdict restored.
+    - **Waivers and Lineup still return you to the tool without restoring the
+      board.** They're a different shape of problem — the result is a whole
+      ranked board rather than a small selection, and their inputs (roster,
+      slots) are already persisted, so re-running is a click rather than a
+      re-selection. Left as the remainder of Open Item #41.
+
+### Open items (as of item 184 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `cd72d4b`), working
 tree CLEAN.** Items 167-179 span three themes: finishing the move onto
 SportsDataIO, a run of Waiver Wire correctness fixes, and UI work.
@@ -12171,18 +12197,17 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     previously published trade-backtest figure is superseded. The dropped
     `format` argument, a second bug in the same call, is fixed too.
 
-41. **Returning from a player's stats card restores the Start/Sit comparison
-    but not the other tools' results (item 183).** Trade's two sides and the
-    Waivers/Lineup result boards are component state, so "Back to Trade
-    Assistant" lands you on an empty tool. Start/Sit was solvable cheaply
-    because `useRecentComparisons` already stores the exact players and format
-    and `StartSitTool` already had a restore path (item 92); nothing equivalent
-    exists elsewhere. Two ways to close it: give each tool the same
-    in-memory hand-off slot (small, but one per tool and each needs its own
-    "is this the run I left from" guard), or put the selection in the URL
-    (`/trade?give=…&get=…`), which is more work but also makes those views
-    shareable and survivable across a refresh — worth considering alongside
-    the shareable-comparison idea in item 157.
+41. **Returning from a player's stats card restores Start/Sit and the Trade
+    Assistant, but not the Waivers or Lineup boards (items 183-184).** Those
+    two are a different shape of problem: the result is a whole ranked board
+    rather than a small selection, and their inputs (roster, slots) are already
+    persisted, so re-running is one click rather than re-picking players — the
+    payoff is smaller and the state to carry is larger. If it's worth doing,
+    the same record → hand-off pattern applies. Note that neither tool links
+    player names yet anyway (Open Item #40), so this is blocked behind that.
+    Separately, putting the selection in the URL (`/trade?give=…&get=…`) would
+    subsume all of this AND make those views shareable and refresh-survivable —
+    worth considering alongside the shareable-comparison idea in item 157.
 
 40. **Player names don't link to stats from the Waivers and Lineup rows —
     blocked on an interaction change, not a missing link (item 182).** Both
