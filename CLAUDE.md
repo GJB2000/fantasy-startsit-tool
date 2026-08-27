@@ -11023,7 +11023,50 @@ single-season numbers for those specific constants.
       would still show "—". Not fixed here; it needs threading rather than a
       chain change, and is rare enough to leave.
 
-### Open items (as of item 187 — pick up here)
+188. **Legit Rankings was excluding anyone with no games in the recent
+    window — which turned out to be far more than rookies.** Follow-up to item
+    187, prompted by asking whether that bug reached other tools. It did not
+    (Start/Sit, Trade, Lineup and the Home widgets all route through
+    `scorePlayer`, so item 187's fix covered them — verified with a real rookie
+    on each), but Rankings and Waivers have a DIFFERENT gap: they filter
+    players out of the pool BEFORE scoring, so no scoring-chain fix can reach
+    them.
+    - **Measured the pool rather than guessing at it** (temporary diagnostic
+      route, deleted after). Of the active skill players with zero games in the
+      recent window, only 126 across all four positions have a consensus
+      projection — and the names are the finding: **Kyler Murray (16.3/gm),
+      Garrett Wilson (13.9), Malik Nabers (13.9), Sam LaPorta (10.2), Tucker
+      Kraft (10.3)**, alongside the rookies. Established starters whose 2025
+      season ended early were absent from their own boards, not just players
+      who hadn't debuted. That reframed this from a rookie edge case to a real
+      hole.
+    - **The fix**: `filterByRecentGames` → `filterToRankable`, admitting a
+      player with no recent games when the consensus projects them. **Having a
+      projection is what separates them from the camp-body dead weight the gate
+      was written for** — of ~400 zero-game players, only 126 have one — and
+      it's data the ranking already blends in, so the pool was discarding
+      players it could rank perfectly well. The projection map was already
+      threaded into the ranking functions; it just wasn't reaching the pool
+      filter.
+    - **Result**: Love RB#10, Skattebo RB#16, Nabers WR#11, Garrett Wilson
+      WR#13, Kraft TE#8, LaPorta TE#10. Kyler Murray is now in the QB pool but
+      ranks just outside the top 10 — his ~277-point season pace sits below
+      Herbert's 295.6 at the #10 cutoff, which is a ranking outcome rather than
+      an exclusion, and worth stating precisely rather than claiming he
+      "appears".
+    - **Cost is nil**: ~25% more players, and a cold recompute is 0.25-1.5s
+      per position (WR, the biggest pool, is the 1.5s). No backtest exposure —
+      rankings have no pick ground truth and aren't backtested (items 78/139),
+      and `scorePlayer` is untouched by this item.
+    - **Waivers deliberately NOT changed.** Its gate is `MIN_RECENT_GAMES = 2`
+      plus a recent-volume floor and an efficiency floor, all derived from
+      played games — and the tool ranks by recent opportunity, which a
+      zero-game player has none of. Admitting them would need a separate
+      ranking basis for players the validated signal can't evaluate (item 171),
+      which is a design question rather than a filter tweak. Left as-is; the
+      practical cost is that a rookie can't surface as a waiver target.
+
+### Open items (as of item 188 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `cd72d4b`), working
 tree CLEAN.** Items 167-179 span three themes: finishing the move onto
 SportsDataIO, a run of Waiver Wire correctness fixes, and UI work.

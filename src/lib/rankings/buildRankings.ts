@@ -39,6 +39,15 @@ export interface LegitRankingEntry extends PlayerScoreBreakdown {
 // keeps the pool to players who've actually taken the field recently —
 // rosters otherwise carry a lot of camp-body/IR dead weight that would
 // both slow the scan down and clutter the list with meaningless entries.
+//
+// A player with NO recent games still qualifies if the consensus projects
+// them (see filterToRankable). Played games alone was too blunt: it dropped
+// every rookie before their debut AND anyone whose season ended early, so
+// Kyler Murray, Garrett Wilson, Malik Nabers and Sam LaPorta were all absent
+// from their own boards. Having a real projection is what separates them from
+// the camp-body dead weight this gate exists for — and it's data the ranking
+// already blends in, so the pool was excluding players it could rank perfectly
+// well.
 const MIN_RECENT_GAMES = 1;
 
 // Computed rankings are expensive (a full engine pass over every
@@ -102,7 +111,11 @@ function countPlayedGames(rows: { PlayerID: number; Played: number }[][]): Map<n
  * already found and fixed for the backtest pipeline and the waiver
  * D/ST-and-K scan).
  */
-async function getEligiblePlayerIds(position: ExtendedPosition, context: SeasonContext): Promise<number[]> {
+async function getEligiblePlayerIds(
+  position: ExtendedPosition,
+  context: SeasonContext,
+  projectedPointsByPlayerId: Map<number, number>
+): Promise<number[]> {
   if (position === "DST") {
     const allWeeks = Array.from({ length: context.lastCompletedWeek }, (_, i) => i + 1);
     await Promise.all(allWeeks.map((w) => getFantasyDefenseByWeek(context.lastCompletedApiSeason, w)));
@@ -121,7 +134,7 @@ async function getEligiblePlayerIds(position: ExtendedPosition, context: SeasonC
     await Promise.all(allWeeks.map((w) => getPlayerGameStatsByWeek(context.lastCompletedApiSeason, w)));
     const allExtended = await getActiveExtendedPlayers();
     const kickers = allExtended.filter((p) => p.Position === "K");
-    return filterByRecentGames(kickers, context);
+    return filterToRankable(kickers, context, projectedPointsByPlayerId);
   }
 
   // Skill positions: pre-warm the season-aggregate endpoint once (every
@@ -130,10 +143,14 @@ async function getEligiblePlayerIds(position: ExtendedPosition, context: SeasonC
   await getPlayerSeasonStats(context.lastCompletedSeason);
   const active = await getActivePlayers();
   const atPosition = active.filter((p) => p.Position === position);
-  return filterByRecentGames(atPosition, context);
+  return filterToRankable(atPosition, context, projectedPointsByPlayerId);
 }
 
-async function filterByRecentGames(players: Player[], context: SeasonContext): Promise<number[]> {
+async function filterToRankable(
+  players: Player[],
+  context: SeasonContext,
+  projectedPointsByPlayerId: Map<number, number>
+): Promise<number[]> {
   // Use the same recent-form window the scoring path does (getRecentWindow):
   // in the offseason that's a wider lookback, so a player who last played
   // 5-8 weeks before season end (an injury they've since recovered from)
@@ -145,7 +162,11 @@ async function filterByRecentGames(players: Player[], context: SeasonContext): P
     weeks.map((w) => getPlayerGameStatsByWeek(context.lastCompletedApiSeason, w))
   );
   const counts = countPlayedGames(weeklyRows);
-  return players.filter((p) => (counts.get(p.PlayerID) ?? 0) >= MIN_RECENT_GAMES).map((p) => p.PlayerID);
+  return players
+    .filter(
+      (p) => (counts.get(p.PlayerID) ?? 0) >= MIN_RECENT_GAMES || projectedPointsByPlayerId.has(p.PlayerID)
+    )
+    .map((p) => p.PlayerID);
 }
 
 // How much the engine's OWN this-week snapshot counts toward the blend,
@@ -418,7 +439,7 @@ async function getFullLegitRankingsForPosition(
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
 
-  const playerIds = await getEligiblePlayerIds(position, context);
+  const playerIds = await getEligiblePlayerIds(position, context, projectedPointsByPlayerId);
 
   const breakdowns = await Promise.all(
     playerIds.map((id) =>
