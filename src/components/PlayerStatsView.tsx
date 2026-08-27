@@ -1,5 +1,6 @@
 "use client";
 
+import { PlayerAvatar } from "./Jersey";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useScoringFormat } from "@/lib/useScoringFormat";
@@ -8,15 +9,6 @@ import { STAT_COLUMNS, formatStat } from "@/lib/stats/columns";
 import { isStatsPosition, type PlayerStatsDetail } from "@/lib/stats/types";
 import { SCORING_FORMAT_OPTIONS } from "./ScoringFormatToggle";
 import { SegmentedControl } from "./SegmentedControl";
-
-const POSITION_TINT: Record<string, string> = {
-  QB: "var(--pos-qb)",
-  RB: "var(--pos-rb)",
-  WR: "var(--pos-wr)",
-  TE: "var(--pos-te)",
-  K: "var(--pos-k)",
-  DST: "var(--pos-dst)",
-};
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -66,7 +58,6 @@ export function PlayerStatsView({ playerId }: { playerId: number }) {
 
   const { player, totals, gameLog, advanced, positionRank, positionCount } = detail;
   const statColumns = isStatsPosition(player.position) ? STAT_COLUMNS[player.position] : [];
-  const tint = POSITION_TINT[player.position] ?? "var(--accent)";
   const advancedColumns =
     advanced && isStatsPosition(player.position) ? ADVANCED_GAME_COLUMNS[player.position] : [];
   const showAdvancedLog = logView === "advanced" && advancedColumns.length > 0;
@@ -76,12 +67,7 @@ export function PlayerStatsView({ playerId }: { playerId: number }) {
       <div className="glass-card rounded-[14px] p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <span
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] font-mono text-[13px] font-bold text-white"
-              style={{ background: tint }}
-            >
-              {player.position}
-            </span>
+            <PlayerAvatar playerId={playerId} team={player.team} position={player.position} size={48} />
             <div>
               <h2
                 className="text-[26px] leading-none text-foreground"

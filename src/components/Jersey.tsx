@@ -73,15 +73,21 @@ const POS_VAR: Record<string, string> = {
 };
 
 /**
- * The player avatar every surface should use: a real jersey for a skill
- * player, and a position-tinted team-code tile for a D/ST or K, which have no
- * jersey to show.
+ * The player avatar every surface should use: a real jersey for a real person,
+ * and a position-tinted team-code tile for a D/ST, which is a team rather than
+ * a player and so has no jersey or squad number of its own.
+ *
+ * Only D/ST falls back. Kickers were originally lumped in with it as the other
+ * "streaming" position, but that conflated a fantasy-roster concept with a
+ * rendering one — a kicker is a person who wears a shirt, and the data has his
+ * number (Butker is 7). D/ST is the only entry here with a synthetic PlayerID
+ * and no number to show.
  *
  * That fallback is the whole reason this exists as one component. It was
  * written independently in WaiverResult and LineupResult and simply omitted in
  * TradeResult (so a traded defence rendered as a blank shirt), and adding the
- * avatar to the two Home widgets would have made four and five copies of the
- * same branch. One definition means the surfaces can't drift.
+ * avatar to the Home widgets would have made four and five copies of the same
+ * branch. One definition means the surfaces can't drift.
  */
 export function PlayerAvatar({
   playerId,
@@ -94,7 +100,7 @@ export function PlayerAvatar({
   position: string | null;
   size?: number;
 }) {
-  if (position !== "DST" && position !== "K") {
+  if (position !== "DST") {
     return <Jersey playerId={playerId} team={team} size={size} />;
   }
   const color = POS_VAR[position] ?? "var(--foreground)";

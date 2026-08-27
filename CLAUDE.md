@@ -10631,8 +10631,9 @@ single-season numbers for those specific constants.
       state-in-an-effect).
     - **Applied everywhere an avatar appears**: the shared picker, Legit
       Rankings rows, the trade board, waiver candidates and lineup starters.
-      All three Home "This week" widgets were missed in this pass and picked
-      up later, which surfaced a real duplication: the D/ST-and-K fallback
+      The Player Stats detail page and all three Home "This week" widgets were
+      missed in this pass and picked up later, which surfaced a real
+      duplication: the D/ST-and-K fallback
       (those have no jersey, so they keep a position-tinted team-code tile) was
       written independently in `WaiverResult` and `LineupResult` and simply
       OMITTED in `TradeResult`, where a traded defence rendered as a blank
@@ -10642,6 +10643,14 @@ single-season numbers for those specific constants.
       `PlayerMultiSelect` still call bare `Jersey`, correctly: rankings exclude
       D/ST and K entirely (item 78) and the picker shows them with their own
       position chip.
+      **It also corrected this item's own K handling.** Kickers were grouped
+      with D/ST as the other "streaming" position and given the team-code tile
+      too — but that conflated a fantasy-roster concept with a rendering one. A
+      kicker is a person who wears a shirt and the data has his number (Butker
+      is 7); D/ST is the only entry with a synthetic PlayerID and no number to
+      show. Only D/ST falls back now, so a kicker shows a real jersey
+      everywhere — which matters most on Player Stats, where kickers are
+      first-class and D/ST is excluded outright.
       **D/ST and K keep the position-tinted team-code tile** — a team defence
       has no jersey to show.
     - **The tradeoff, taken deliberately.** The initials were
