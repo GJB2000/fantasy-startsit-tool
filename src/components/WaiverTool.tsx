@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { streamingPositionFlagsFromSlots, serializeSlots } from "@/lib/lineup/rosterSlots";
 import { useEffectiveRosterSlots } from "@/lib/useRosterSlots";
+import { useRerunOnReturn } from "@/lib/usePendingRerun";
 import type { ExtendedPosition } from "@/lib/sportsdata/types";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useRosterModal } from "@/lib/useRosterModal";
@@ -150,6 +151,10 @@ export function WaiverTool() {
   useEffect(() => {
     if (response) resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [response]);
+
+  // Returning from a player's stats card: re-run the board rather than
+  // dropping you on an un-run page (see useRerunOnReturn).
+  useRerunOnReturn("/waivers", rostered.length > 0, () => void handleFind());
 
   async function handleFind() {
     setLoading(true);

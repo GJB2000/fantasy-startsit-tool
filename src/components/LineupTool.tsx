@@ -7,6 +7,7 @@ import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useRosterModal } from "@/lib/useRosterModal";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { resetRosterSlots, useEffectiveRosterSlots } from "@/lib/useRosterSlots";
+import { useRerunOnReturn } from "@/lib/usePendingRerun";
 import { useSleeperConnection } from "@/lib/useSleeperConnection";
 import { ChevronIcon } from "./CollapsibleSection";
 import { LineupResult, type LineupSlotResponse } from "./LineupResult";
@@ -49,6 +50,10 @@ export function LineupTool() {
     lastAppliedLeagueId.current = leagueId;
     resetRosterSlots();
   }, [sleeperConnection]);
+
+  // Returning from a player's stats card: rebuild rather than dropping you on
+  // an un-run page (see useRerunOnReturn).
+  useRerunOnReturn("/lineup", rostered.length > 0, () => void handleBuildLineup());
 
   async function handleBuildLineup() {
     setLoading(true);

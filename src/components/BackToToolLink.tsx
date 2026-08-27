@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { usePendingRestoreComparison } from "@/lib/usePendingRestoreComparison";
 import { useRecentComparisons } from "@/lib/useRecentComparisons";
 import { useLastTrade, usePendingRestoreTrade } from "@/lib/usePendingRestoreTrade";
+import { usePendingRerun } from "@/lib/usePendingRerun";
 
 /**
  * Only these can be returned to, matched exactly. An allowlist rather than
@@ -41,8 +42,11 @@ const TOOL_LABEL: Record<string, string> = {
  * Trade Assistant records its own last run, since nothing surfaces trade
  * history to read from.
  *
- * Waivers and Lineup return you to the tool but don't restore their board —
- * see the open item.
+ * Waivers and Lineup need less: they have no selection to carry, since their
+ * inputs (roster, slots, format) are already persisted — so returning just
+ * flags the tool to run again on arrival (usePendingRerun). No per-player
+ * guard there for the same reason: re-running is idempotent and can't restore
+ * the "wrong" board the way a stale selection could.
  */
 export function BackToToolLink({ playerId }: { playerId: number }) {
   const params = useSearchParams();
@@ -50,6 +54,7 @@ export function BackToToolLink({ playerId }: { playerId: number }) {
   const [, setPendingComparison] = usePendingRestoreComparison();
   const [lastTrade] = useLastTrade();
   const [, setPendingTrade] = usePendingRestoreTrade();
+  const [, setPendingRerun] = usePendingRerun();
 
   const from = params.get("from");
   const label = from ? TOOL_LABEL[from] : undefined;
@@ -69,6 +74,7 @@ export function BackToToolLink({ playerId }: { playerId: number }) {
       onClick={() => {
         if (comparison) setPendingComparison(comparison);
         if (trade) setPendingTrade(trade);
+        if (from === "/waivers" || from === "/lineup") setPendingRerun(from);
       }}
       className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/55 transition-colors hover:text-accent"
     >

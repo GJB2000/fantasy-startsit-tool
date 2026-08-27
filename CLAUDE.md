@@ -10950,7 +10950,37 @@ single-season numbers for those specific constants.
       starters + 6 bench), 40 on Waivers, zero `aria-expanded` elements left on
       either, and both boards render clean flat rows.
 
-### Open items (as of item 185 — pick up here)
+186. **Closed the last of the return-from-stats gap (Open Item #41): Waivers
+    and Lineup now rebuild their board when you come back, instead of dropping
+    you on an un-run page.** Item 185 made those names clickable, which made
+    the dead-end reachable for the first time.
+    - **These two needed far less than Start/Sit or the Trade Assistant.**
+      There's no selection to carry — their inputs (roster, slots, scoring
+      format) are all persisted already — so restoring is just running again on
+      arrival. The stored value is a bare pathname (`usePendingRerun`) rather
+      than a captured run, and there's no per-player guard: re-running is
+      idempotent, so unlike a stale selection it can't restore the "wrong"
+      board.
+    - **The one real hazard, handled: the persisted stores hydrate in an
+      effect.** A naive mount-effect run can fire before `rostered` is
+      populated and fetch a board for nobody. In practice they're already
+      hydrated on a client transition (the sidebar reads them on every page),
+      but `useRerunOnReturn` claims the flag immediately and holds it locally,
+      firing only once `ready` is true — so it can't be lost while waiting, and
+      can't linger to fire on some later unrelated visit.
+    - **A lint rule caught a real React violation worth remembering**:
+      `runRef.current = run` during render trips "Cannot access refs during
+      render". The fix is the standard one — assign it in an unconditional
+      effect so the latest closure is used without touching a ref mid-render.
+    - Verified both round trips live on the real connected league: Waivers →
+      click a candidate → "Back to Waivers" → the 40-row board rebuilds itself;
+      Lineup → click a starter → "Back to Lineup" → the 16-row board rebuilds.
+    - **All four tools now restore**, by two different mechanisms chosen to fit
+      the shape of what's being restored: a captured run for Start/Sit and
+      Trade (a selection you'd otherwise have to re-pick), a re-run flag for
+      Waivers and Lineup (inputs already persisted).
+
+### Open items (as of item 186 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `cd72d4b`), working
 tree CLEAN.** Items 167-179 span three themes: finishing the move onto
 SportsDataIO, a run of Waiver Wire correctness fixes, and UI work.
@@ -12236,17 +12266,15 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     previously published trade-backtest figure is superseded. The dropped
     `format` argument, a second bug in the same call, is fixed too.
 
-41. **Returning from a player's stats card restores Start/Sit and the Trade
-    Assistant, but not the Waivers or Lineup boards (items 183-184).** Those
-    two are a different shape of problem: the result is a whole ranked board
-    rather than a small selection, and their inputs (roster, slots) are already
-    persisted, so re-running is one click rather than re-picking players — the
-    payoff is smaller and the state to carry is larger. If it's worth doing,
-    the same record → hand-off pattern applies. Note that neither tool links
-    player names yet anyway (Open Item #40), so this is blocked behind that.
-    Separately, putting the selection in the URL (`/trade?give=…&get=…`) would
-    subsume all of this AND make those views shareable and refresh-survivable —
-    worth considering alongside the shareable-comparison idea in item 157.
+41. **RESOLVED (item 186)** — all four tools now restore when you return from
+    a player's stats card, by two mechanisms suited to what's being restored: a
+    captured run for Start/Sit and the Trade Assistant (a selection you'd
+    otherwise have to re-pick), and a re-run flag for Waivers and Lineup (whose
+    inputs are already persisted, so running again is enough). Still worth
+    considering separately: putting the selection in the URL
+    (`/trade?give=…&get=…`) would make those views shareable and
+    refresh-survivable, which none of this restore machinery does — see the
+    shareable-comparison idea in item 157.
 
 40. **RESOLVED (item 185)** — the Waivers and Lineup rows dropped their
     expand/collapse entirely (the per-row reasoning was more detail than either
