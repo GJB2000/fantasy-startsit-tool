@@ -10850,7 +10850,42 @@ single-season numbers for those specific constants.
       `TradeBacktestTable`) are plain and could take the same treatment — left
       out only because this pass was scoped to the user-facing tools.
 
-### Open items (as of item 182 — pick up here)
+183. **A way back from a player's stats card to the tool you clicked from —
+    and, for Start/Sit, back to the actual comparison rather than an empty
+    picker.** Item 182 made names clickable but stranded you there.
+    - **`PlayerLink` now carries the page you're leaving as `?from=`**
+      (`usePathname`), and a new `BackToToolLink` on the stats card renders
+      "← Back to Start/Sit" (or Trade Assistant, Waivers, Lineup, Legit
+      Rankings, Home, Player Stats) from it. Matched against an **allowlist**,
+      not "any same-origin path" — a hand-edited `from=` can't dress an
+      arbitrary URL up as our own navigation. No `from`, no link: typing a
+      stats URL directly shows nothing rather than a way back to somewhere you
+      were never at (verified).
+    - **Start/Sit needed more than a link, which is the actual substance
+      here.** Its comparison lives in component state, so returning re-mounts
+      an empty picker — you'd be back on the page but not back at your
+      comparison, which is what was asked for. Clicking hands the comparison to
+      `usePendingRestoreComparison`, the in-memory slot the Home
+      recent-comparisons widget already uses (item 92), which `StartSitTool`
+      reads on mount and re-runs. No new mechanism, just a second producer for
+      an existing one.
+      **Guarded on the most recent comparison actually containing this
+      player**: running a comparison records it at the top of the recent list,
+      so `recent[0]` is the one you clicked from — and when it isn't, it falls
+      back to a plain link rather than restoring an unrelated comparison.
+    - **Verified the whole round trip live**, not just the link: Start/Sit
+      comparison (Mahomes vs Burrow) → click Mahomes → card shows "Back to
+      Start/Sit" → click → both chips restored in the picker AND the verdict
+      re-rendered.
+    - **The other tools return you to the tool but don't restore their
+      result** — Trade's selections and the Waivers/Lineup result boards are
+      component state too. Honest and still better than being stranded, but
+      it's a real asymmetry; see Open Item #41.
+    - Confirmed a production build passes: `/stats/[playerId]` is
+      server-rendered on demand (the layout reads the theme cookie, item 130),
+      so `useSearchParams` needs no Suspense boundary.
+
+### Open items (as of item 183 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `cd72d4b`), working
 tree CLEAN.** Items 167-179 span three themes: finishing the move onto
 SportsDataIO, a run of Waiver Wire correctness fixes, and UI work.
@@ -12135,6 +12170,19 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     1-for-1 went 53.01% -> 61.40% and 2-for-2 54.35% -> 60.02%; every
     previously published trade-backtest figure is superseded. The dropped
     `format` argument, a second bug in the same call, is fixed too.
+
+41. **Returning from a player's stats card restores the Start/Sit comparison
+    but not the other tools' results (item 183).** Trade's two sides and the
+    Waivers/Lineup result boards are component state, so "Back to Trade
+    Assistant" lands you on an empty tool. Start/Sit was solvable cheaply
+    because `useRecentComparisons` already stores the exact players and format
+    and `StartSitTool` already had a restore path (item 92); nothing equivalent
+    exists elsewhere. Two ways to close it: give each tool the same
+    in-memory hand-off slot (small, but one per tool and each needs its own
+    "is this the run I left from" guard), or put the selection in the URL
+    (`/trade?give=…&get=…`), which is more work but also makes those views
+    shareable and survivable across a refresh — worth considering alongside
+    the shareable-comparison idea in item 157.
 
 40. **Player names don't link to stats from the Waivers and Lineup rows —
     blocked on an interaction change, not a missing link (item 182).** Both

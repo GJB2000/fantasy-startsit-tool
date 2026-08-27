@@ -1,5 +1,6 @@
 "use client";
 
+import { BackToToolLink } from "./BackToToolLink";
 import { PlayerAvatar } from "./Jersey";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -65,7 +66,8 @@ export function PlayerStatsView({ playerId }: { playerId: number }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="glass-card rounded-[14px] p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <BackToToolLink playerId={playerId} />
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <PlayerAvatar playerId={playerId} team={player.team} position={player.position} size={48} />
             <div>
