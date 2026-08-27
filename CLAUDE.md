@@ -10980,7 +10980,50 @@ single-season numbers for those specific constants.
       Trade (a selection you'd otherwise have to re-pick), a re-run flag for
       Waivers and Lineup (inputs already persisted).
 
-### Open items (as of item 186 — pick up here)
+187. **Rookies had no projection at all on the Lineup board — fixed by
+    letting the consensus projection be the last-resort baseline, which is
+    exactly what item 94 scoped and deferred.** Reported from the real board:
+    two 2026 rookies rendered "—" where every other player had a number.
+    - **Confirmed the cause on real data rather than reasoning about it**: a
+      live `/api/compare` showed Jeremiyah Love with `recentPprAvg` null,
+      `seasonPprAvg` null, `finalScore` null — and `expertConsensusR2pPts`
+      **14.68**, already loaded and sitting unused. `expertConsensusModifier`
+      is gated on `blendedScore != null`, so a player with no NFL history at
+      all can never receive it, however good the projection is. Item 94 found
+      this exact gate and left it because there was nothing to validate a fix
+      against (only two seasons of usable week-1 FantasyPros snapshots); the
+      consensus source has since moved to SportsDataIO (item 161), and this is
+      a live-tool correctness fix rather than a tuning change.
+    - **The fix** is a fourth rung on `scorePlayer`'s blendedScore fallback
+      chain, below item 67's prior-season average: with no recent, season, or
+      prior-season number, start from the consensus projection. Every modifier
+      below still applies, so a rookie gets consensus adjusted for matchup
+      (Love: 14.68 → 13.75 against a top-4 run defence).
+    - **One subtlety worth the flag it needed**: when the consensus IS the
+      baseline, the consensus modifier must be skipped
+      (`usedConsensusAsBaseline`), or it re-blends the running score toward the
+      same number and largely cancels the matchup adjustment it just made — at
+      RB's 0.9 weight that would have thrown away ~90% of it.
+    - **`dataQuality` needs no special-casing and lands right on its own**:
+      `blendedScore` is non-null but `gamesUsedForRecent` is 0, so it reads
+      "limited", and the Lineup board tags the row **Limited data** without
+      any new UI. Honest by construction — startable per the consensus, and
+      openly thin.
+    - **Verified byte-identical where it must be**: Bijan Robinson's
+      `finalScore` is unchanged to the last decimal (21.299657610385356), and
+      the primary 2025 broad backtest is exactly 61.80% skill-only with QB
+      67.65 / RB 61.58 / WR 61.27 / TE 57.43 — every documented figure. That
+      follows from broad-mode pairing requiring `Played > 0`, so no paired
+      player ever has a null `blendedScore`; the new rung is unreachable there.
+    - **Real behavioural consequence, and the right one**: with a score, a
+      rookie now competes for a lineup spot. Love moved into the starting RB2
+      slot over a veteran projecting 5.0.
+    - **Scope**: skill positions only. D/ST and K run through their own
+      scorers, which aren't passed the projection map at all — a rookie kicker
+      would still show "—". Not fixed here; it needs threading rather than a
+      chain change, and is rare enough to leave.
+
+### Open items (as of item 187 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `cd72d4b`), working
 tree CLEAN.** Items 167-179 span three themes: finishing the move onto
 SportsDataIO, a run of Waiver Wire correctness fixes, and UI work.

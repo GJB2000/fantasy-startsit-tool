@@ -111,6 +111,11 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
   const seasonTotalPoints = input.seasonStat ? getFantasyPoints(input.seasonStat, format) : null;
 
   let blendedScore: number | null = null;
+
+  // Set when the consensus projection IS the baseline (see the fallback chain
+  // below), so the consensus modifier doesn't then blend the score toward the
+  // same number again — which would partly cancel the matchup adjustment.
+  let usedConsensusAsBaseline = false;
   if (recentPprAvg != null && seasonPprAvg != null) {
     const recentWeight = clamp(
       RECENT_WEIGHT_BASE + RECENT_WEIGHT_PER_GAME * gamesUsedForRecent,
@@ -125,13 +130,24 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
     blendedScore = seasonPprAvg;
     notes.push("No games in the recent-form window — using season average only.");
   } else if (input.priorSeasonPprAvg != null) {
-    // Last resort: no games at all yet this season (week 1, most
-    // commonly, but also a rookie call-up or a player back from a long
-    // absence). Every modifier below this point still applies normally —
-    // matchup, volume, etc. — this only substitutes for the recent/season
-    // blend itself, which otherwise has nothing to work with.
+    // No games at all yet this season (week 1, most commonly, but also a
+    // rookie call-up or a player back from a long absence). Every modifier
+    // below this point still applies normally — matchup, volume, etc. — this
+    // only substitutes for the recent/season blend itself, which otherwise has
+    // nothing to work with.
     blendedScore = input.priorSeasonPprAvg;
     notes.push("No games played yet this season — using last season's per-game average as a starting point.");
+  } else if (input.expertConsensusR2pPts != null) {
+    // True last resort: no NFL history at all, so there's nothing of our own
+    // to blend — a rookie before their first game is the case this exists for.
+    // Without it their score is simply null, which read as a bug on the Lineup
+    // board (an empty projection next to real ones) when a perfectly good
+    // consensus projection was already loaded and just gated out below.
+    blendedScore = input.expertConsensusR2pPts;
+    usedConsensusAsBaseline = true;
+    notes.push(
+      `No NFL games to go on yet — starting from the consensus projection of roughly ${input.expertConsensusR2pPts.toFixed(1)} points.`
+    );
   }
 
   if (gamesUsedForRecent > 0 && gamesUsedForRecent < RECENT_WEEK_COUNT) {
@@ -339,7 +355,7 @@ export function scorePlayer(input: PlayerComparisonInput, format: ScoringFormat)
   // in later — see CLAUDE.md's live-consensus item), so this has a real
   // effect on the deployed tools, heaviest for QB (weight 0.8).
   let expertConsensusModifier = 0;
-  if (blendedScore != null && input.expertConsensusR2pPts != null) {
+  if (blendedScore != null && input.expertConsensusR2pPts != null && !usedConsensusAsBaseline) {
     const runningScore =
       blendedScore +
       matchupModifier +
