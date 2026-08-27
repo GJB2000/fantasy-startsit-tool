@@ -11067,17 +11067,19 @@ single-season numbers for those specific constants.
       practical cost is that a rookie can't surface as a waiver target.
 
 ### Open items (as of item 188 — pick up here)
-**Everything is committed and pushed to `main` (HEAD `cd72d4b`), working
-tree CLEAN.** Items 167-179 span three themes: finishing the move onto
-SportsDataIO, a run of Waiver Wire correctness fixes, and UI work.
+**Everything is committed and pushed to `main` (HEAD `e5ecfbd`), working
+tree CLEAN.** Items 167-179 were the SportsDataIO migration, Waiver Wire
+correctness fixes and UI work; items 180-188 are a run of user-reported
+valuation bugs plus a cross-tool navigation layer.
 
 **READ FIRST if you touch data sources:** the legacy key is NOT legacy. It
 is the only thing serving 2025, and every tool runs on the last completed
 season. Dropping it today stops the app; see item 178.
 
-**Current headline numbers** (unchanged by items 167-181 — none of them
-touched engine weights; items 180-181 changed only LIVE trade and waiver-drop
-valuation, not any backtest):
+**Current headline numbers.** No item since 167 has touched an engine weight.
+Items 180-181 changed LIVE trade and waiver-drop valuation only, and item 187
+added a scoring fallback that is provably unreachable in backtest (broad-mode
+pairing requires `Played > 0`) — all three re-verified byte-identical:
 
 | measure | value |
 |---|---|
@@ -11117,6 +11119,21 @@ valuation, not any backtest):
   positions (~98% of a QB's total is replaceable off waivers). Same-position
   trades are exactly unchanged; the trade backtests are deliberately still on
   raw points and were re-run to confirm byte-identical.
+- **Player names click through to their stats page, and back** (items
+  182-186). New `PlayerLink`/`BackToToolLink` plus three in-memory restore
+  stores — see the "Cross-tool navigation" entry in Conventions for how they
+  fit together and which surfaces deliberately don't link. Getting there meant
+  removing the expand/collapse from the Waivers and Lineup rows (item 185),
+  since the whole row was a `<button>` and a link can't nest in one.
+- **Two "no recent games" bugs, from one user report** (items 187-188). A
+  rookie had no projection at all because the consensus modifier is gated on
+  `blendedScore != null` — fixed by making the consensus the last-resort
+  baseline, which reached Start/Sit, Trade, Lineup and the Home widgets at
+  once. Asking whether it hit other tools found a DIFFERENT gap: Legit
+  Rankings filters the pool BEFORE scoring, so Kyler Murray, Garrett Wilson,
+  Malik Nabers and Sam LaPorta were missing from their own boards. Waivers has
+  the same filter shape and was deliberately left alone — it ranks by recent
+  opportunity, which a zero-game player has none of.
 
 **Traps recorded in those items, worth not re-learning:**
 - `Number` is read with `!= null`, not truthiness — Gibbs wears 0 (item 179).
@@ -11132,6 +11149,20 @@ valuation, not any backtest):
   ranking or comparison spans positions it needs `REPLACEMENT_PER_GAME`.
   This has now bitten three separate features (items 140, 168, 180); check
   any new cross-position sort for it before shipping.
+- A tool that filters its pool BEFORE scoring can't be fixed in the scoring
+  chain. Items 187-188 were the same user report landing in two different
+  places for exactly that reason — check which side of the filter a bug is on
+  before reaching for `engine.ts`.
+- Measure a pool before widening a gate. Item 188 looked like a rookie fix
+  until the numbers showed the excluded group was mostly established starters
+  whose season ended early.
+- Nesting rules bite repeatedly here: an `<a>` can't sit inside a `<button>`
+  or another `<a>`. It blocked linking the Waivers/Lineup rows (item 185) and
+  still blocks the Home rankings board, whose row is already a `<Link>`.
+- `next build` logs "Failed to load jersey data: … couldn't be rendered
+  statically" and still exits 0. That's Next probing whether
+  `/api/jersey-data` can be static; it can't (live fetch), so it's marked `ƒ`
+  and the route's own catch logs the probe. Build-time noise, not a bug.
 
 **Deliberately hybrid, do not "simplify"**: the primary 2025 pipeline uses
 SportsDataIO projections; the nflverse-only 2022-2025 pipeline still uses
@@ -12979,6 +13010,36 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   while still letting an explicit edit win. `useEffectiveRosterSlots()` is
   the single definition of "what does this user's lineup look like" and
   memoizes, because its value lands in effect dependency arrays.
+- **Cross-tool navigation (items 179-186)** — how a player name gets you to
+  their stats page and back, spread over a few small files:
+  `src/components/Jersey.tsx` exports `Jersey` (a real jersey: team colours +
+  squad number, with the number's ink colour computed from the primary's
+  luminance) and `PlayerAvatar`, the wrapper every surface should use —
+  **only D/ST falls back** to a position-tinted team-code tile, because it's a
+  team with a synthetic PlayerID and no number; kickers are people and get a
+  real jersey. `src/components/PlayerLink.tsx` wraps a name in a link to
+  `/stats/<id>` and appends `?from=<current path>`; it renders plain text for
+  D/ST (whose stats page loads but is empty — SportsDataIO has no player row
+  for a team defence) and for an unresolved ID. Never used in
+  `PlayerMultiSelect` (clicking there selects).
+  `src/components/BackToToolLink.tsx` reads that `from` against an
+  **allowlist** (not "any same-origin path") and renders "Back to <tool>" on
+  the stats card, or nothing if you arrived directly. Returning also restores
+  what you were looking at, by two mechanisms chosen to fit the shape of the
+  state: **a captured run** for Start/Sit and Trade, whose selection you'd
+  otherwise have to re-pick (`usePendingRestoreComparison` reads the top of
+  `useRecentComparisons`; `usePendingRestoreTrade` pairs a `useLastTrade`
+  record that `TradeAnalyzer` writes on every successful run — both guarded on
+  the recorded run actually containing the player you clicked, degrading to a
+  plain link if not); and **a re-run flag** for Waivers and Lineup
+  (`usePendingRerun`/`useRerunOnReturn`), whose inputs are already persisted so
+  running again is enough. All three stores are in-memory
+  (`createPersistentStore` with `storageKey: null`) — they survive a client
+  transition and deliberately don't survive a refresh. `useRerunOnReturn`
+  claims its flag immediately but waits for `ready` before firing, since the
+  persisted stores hydrate in an effect and a naive mount run could fetch a
+  board for an empty roster. **Open Item #42 would subsume all of this** with
+  URL-encoded selections.
 - `src/lib/backtest/` — the backtesting feature: `loadRun.ts` (the only
   network I/O — fetches every needed week once per request, both
   player-level and team-level rows, plus the nflverse tables above; as
@@ -13275,13 +13336,18 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
   deliberately not a native `window.confirm()` dialog, which would break
   out of this app's own styling. As of item 83, `WaiverResult.tsx`
   renders each position as a `RankingsResult.tsx`-style bordered
-  row-list (one container per position, thin dividers, each row
-  collapsed by default and individually expandable — `ChevronIcon`
-  imported from `CollapsibleSection.tsx` for reuse) rather than the
-  original two-column card grid; `WaiverResult.tsx`'s "Already
-  rostered" button both dismisses a candidate from the current view
-  instantly via local state and adds it to the roster list for future
-  runs), `SleeperImport.tsx` (item 59 — the primary way to populate that
+  row-list (one container per position, thin dividers) rather than the
+  original two-column card grid. **Those rows were expandable until item
+  185, which removed the chevron, the per-row "Why" list and the per-row
+  drop suggestion** — the reasoning was more detail than a 40-row board
+  wants, and the drop had become the same bench player on every row (item
+  181). Removing the expand is also what freed the name to be a
+  `PlayerLink`, since the whole row had been a `<button>`. `LineupResult.tsx`'s
+  starter rows were flattened the same way, at the same time.
+  `WaiverResult.tsx`'s "Already rostered" button (manual-roster mode only)
+  now lives in the row itself rather than behind the expand, and both
+  dismisses a candidate from the current view via local state and adds it
+  to the roster list for future runs), `SleeperImport.tsx` (item 59 — the primary way to populate that
   same roster state now: username → real league picker → one-click
   import, or once connected, "Sync roster"/"Change league"; persisted
   via `src/lib/useSleeperConnection.ts` so the username/league never
