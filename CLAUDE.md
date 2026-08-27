@@ -10631,10 +10631,17 @@ single-season numbers for those specific constants.
       state-in-an-effect).
     - **Applied everywhere an avatar appears**: the shared picker, Legit
       Rankings rows, the trade board, waiver candidates and lineup starters.
-      The Home page's compact waiver widget was missed in this pass and picked
-      up later — it now imports `WaiverResult`'s own `Avatar` rather than
-      keeping its own tile, so the D/ST-and-K fallback (which has no jersey to
-      show) can't drift between the two surfaces.
+      All three Home "This week" widgets were missed in this pass and picked
+      up later, which surfaced a real duplication: the D/ST-and-K fallback
+      (those have no jersey, so they keep a position-tinted team-code tile) was
+      written independently in `WaiverResult` and `LineupResult` and simply
+      OMITTED in `TradeResult`, where a traded defence rendered as a blank
+      shirt. Rather than make that four and five copies, it was extracted into
+      one shared `PlayerAvatar` in `Jersey.tsx` that every surface now uses —
+      which fixed the TradeResult gap as a side effect. `RankingsResult` and
+      `PlayerMultiSelect` still call bare `Jersey`, correctly: rankings exclude
+      D/ST and K entirely (item 78) and the picker shows them with their own
+      position chip.
       **D/ST and K keep the position-tinted team-code tile** — a team defence
       has no jersey to show.
     - **The tradeoff, taken deliberately.** The initials were

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PlayerAvatar } from "./Jersey";
 import { useEffect, useState } from "react";
 import type { TradeEvaluation, TradeVerdict } from "@/lib/trade/evaluateTrade";
 import { serializeSlots } from "@/lib/lineup/rosterSlots";
@@ -143,10 +144,12 @@ export function HomeTradeWidget() {
     <WidgetShell>
       <p className="font-engraved text-[10px] uppercase tracking-[0.08em] text-foreground/55">With {otherTeamName}</p>
       <div className="mt-1.5 flex items-center gap-2 font-jost text-[14px] font-semibold tracking-tight">
+        {give && <PlayerAvatar playerId={give.playerId} team={give.team} position={give.position} size={26} />}
         <span className="truncate">{give?.displayName ?? "—"}</span>
         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-foreground/35" fill="none">
           <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
+        {get && <PlayerAvatar playerId={get.playerId} team={get.team} position={get.position} size={26} />}
         <span className="truncate">{get?.displayName ?? "—"}</span>
       </div>
       <div className="mt-2.5 flex items-center gap-1.5">

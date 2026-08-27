@@ -60,3 +60,57 @@ export function Jersey({
     </span>
   );
 }
+
+// Position accent CSS vars (globals.css, theme-aware) — a scanning cue, not
+// semantic color. Applied inline since they aren't Tailwind utilities.
+const POS_VAR: Record<string, string> = {
+  QB: "var(--pos-qb)",
+  RB: "var(--pos-rb)",
+  WR: "var(--pos-wr)",
+  TE: "var(--pos-te)",
+  K: "var(--pos-k)",
+  DST: "var(--pos-dst)",
+};
+
+/**
+ * The player avatar every surface should use: a real jersey for a skill
+ * player, and a position-tinted team-code tile for a D/ST or K, which have no
+ * jersey to show.
+ *
+ * That fallback is the whole reason this exists as one component. It was
+ * written independently in WaiverResult and LineupResult and simply omitted in
+ * TradeResult (so a traded defence rendered as a blank shirt), and adding the
+ * avatar to the two Home widgets would have made four and five copies of the
+ * same branch. One definition means the surfaces can't drift.
+ */
+export function PlayerAvatar({
+  playerId,
+  team,
+  position,
+  size = 34,
+}: {
+  playerId: number | null;
+  team: string | null;
+  position: string | null;
+  size?: number;
+}) {
+  if (position !== "DST" && position !== "K") {
+    return <Jersey playerId={playerId} team={team} size={size} />;
+  }
+  const color = POS_VAR[position] ?? "var(--foreground)";
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center font-display font-bold"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: Math.round(size * 0.26),
+        fontSize: Math.round(size * 0.3),
+        color: "var(--premium-ink)",
+        background: `linear-gradient(150deg, ${color}, color-mix(in srgb, ${color} 58%, #000))`,
+      }}
+    >
+      {team ?? ""}
+    </span>
+  );
+}

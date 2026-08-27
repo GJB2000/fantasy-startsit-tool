@@ -7,7 +7,7 @@ import { serializeSlots } from "@/lib/lineup/rosterSlots";
 import { useRosteredPlayers } from "@/lib/useRosteredPlayers";
 import { useScoringFormat } from "@/lib/useScoringFormat";
 import { useEffectiveRosterSlots } from "@/lib/useRosterSlots";
-import type { LineupSlotResponse } from "./LineupResult";
+import { Avatar, type LineupSlotResponse } from "./LineupResult";
 
 interface LineupResponse {
   slots: LineupSlotResponse[];
@@ -44,7 +44,12 @@ function SlotRow({ slot }: { slot: LineupSlotResponse }) {
           {slot.label}
         </span>
         {b ? (
-          <span className="truncate text-[12.5px] font-medium">{b.displayName}</span>
+          <>
+            {/* Small: this is a 10-row list, so the avatar is a scanning cue
+                rather than the focus it is on the full Lineup page. */}
+            <Avatar breakdown={b} size={22} />
+            <span className="truncate text-[12.5px] font-medium">{b.displayName}</span>
+          </>
         ) : (
           <span className="truncate text-[12.5px] text-foreground/55">Empty — add a player</span>
         )}

@@ -1,4 +1,4 @@
-import { Jersey } from "./Jersey";
+import { PlayerAvatar } from "./Jersey";
 import type { CSSProperties } from "react";
 import type { TradeEvaluation, TradePlayerResult, TradeVerdict } from "@/lib/trade/evaluateTrade";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
@@ -193,7 +193,7 @@ function PlayerValueCard({
   return (
     <div className={`${styles.pcard} ${isHero ? styles.pcardHero : ""}`}>
       <div className={styles.pchead}>
-        <Jersey playerId={player.playerId} team={player.team} size={34} />
+        <PlayerAvatar playerId={player.playerId} team={player.team} position={player.position} size={34} />
         <div>
           <div className={styles.pname}>{player.displayName}</div>
           {player.position && (

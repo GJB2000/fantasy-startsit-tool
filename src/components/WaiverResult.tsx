@@ -1,6 +1,6 @@
 "use client";
 
-import { Jersey } from "./Jersey";
+import { PlayerAvatar } from "./Jersey";
 import { useMemo, useState } from "react";
 import type { TradeEvaluation } from "@/lib/trade/evaluateTrade";
 import { SLOT_ELIGIBILITY, SLOT_TYPES, type SlotType } from "@/lib/lineup/rosterSlots";
@@ -155,27 +155,13 @@ export function moveHeadline(evaluation: TradeEvaluation): string {
  * which is the part that's easy to get wrong when reimplemented.
  */
 export function Avatar({ candidate, size }: { candidate: WaiverCandidateResponse; size: number }) {
-  const color = posVar(candidate.position);
-  const streaming = isStreamingPosition(candidate.position);
-  // A team defence or kicker has no jersey to show, so those keep the
-  // position-tinted team-code tile.
-  if (!streaming) {
-    return <Jersey playerId={candidate.playerId} team={candidate.team} size={size} />;
-  }
   return (
-    <span
-      className="flex shrink-0 items-center justify-center font-display font-bold"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: Math.round(size * 0.26),
-        fontSize: Math.round(size * 0.3),
-        color: "var(--premium-ink)",
-        background: `linear-gradient(150deg, ${color}, color-mix(in srgb, ${color} 58%, #000))`,
-      }}
-    >
-      {candidate.team ?? ""}
-    </span>
+    <PlayerAvatar
+      playerId={candidate.playerId}
+      team={candidate.team}
+      position={candidate.position}
+      size={size}
+    />
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Jersey } from "./Jersey";
+import { PlayerAvatar } from "./Jersey";
 import { useState } from "react";
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
@@ -27,24 +27,6 @@ const FORMAT_LABEL: Record<ScoringFormat, string> = {
   standard: "Standard",
 };
 
-// Position accent CSS vars (globals.css, theme-aware) — a scanning cue, not
-// semantic color. Same tokens WaiverResult/PlayerMultiSelect use, so a player
-// reads the same color everywhere in the app.
-const POS_VAR: Record<string, string> = {
-  QB: "var(--pos-qb)",
-  RB: "var(--pos-rb)",
-  WR: "var(--pos-wr)",
-  TE: "var(--pos-te)",
-  K: "var(--pos-k)",
-  DST: "var(--pos-dst)",
-};
-function posVar(position: string | null): string {
-  return (position && POS_VAR[position]) ?? "var(--foreground)";
-}
-function isStreaming(position: string | null): boolean {
-  return position === "DST" || position === "K";
-}
-
 function injuryBadgeClasses(status: string) {
   if (status === "Out" || status === "Doubtful") return "bg-bad/15 text-bad";
   return "bg-caution/15 text-caution";
@@ -69,27 +51,15 @@ function matchupPill(breakdown: PlayerScoreBreakdown): { text: string; tone: Mat
   return { text: "Neutral", tone: "neutral" };
 }
 
-function Avatar({ breakdown, size }: { breakdown: PlayerScoreBreakdown; size: number }) {
-  const color = posVar(breakdown.position);
-  // A team defence or kicker has no jersey to show, so those keep the
-  // position-tinted team-code tile.
-  if (!isStreaming(breakdown.position)) {
-    return <Jersey playerId={breakdown.playerId} team={breakdown.team} size={size} />;
-  }
+/** Exported so the Home page's compact lineup widget shows the same avatar. */
+export function Avatar({ breakdown, size }: { breakdown: PlayerScoreBreakdown; size: number }) {
   return (
-    <span
-      className="flex shrink-0 items-center justify-center font-display font-bold"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: Math.round(size * 0.26),
-        fontSize: Math.round(size * 0.3),
-        color: "var(--premium-ink)",
-        background: `linear-gradient(150deg, ${color}, color-mix(in srgb, ${color} 58%, #000))`,
-      }}
-    >
-      {breakdown.team ?? ""}
-    </span>
+    <PlayerAvatar
+      playerId={breakdown.playerId}
+      team={breakdown.team}
+      position={breakdown.position}
+      size={size}
+    />
   );
 }
 
