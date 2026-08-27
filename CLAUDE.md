@@ -10911,7 +10911,46 @@ single-season numbers for those specific constants.
       slots) are already persisted, so re-running is a click rather than a
       re-selection. Left as the remainder of Open Item #41.
 
-### Open items (as of item 184 — pick up here)
+185. **Removed the expand/collapse from the Waivers and Lineup rows and made
+    the player names clickable instead — closing Open Item #40 by deleting the
+    obstacle rather than working around it.** Item 182 couldn't link those two
+    surfaces because the whole row was a `<button>` (click to expand
+    reasoning) and an `<a>` can't nest inside one. The user's call was that the
+    per-row reasoning was more detail than either board wants, which removes
+    the button and the problem together.
+    - **What went**: Waivers' per-row "Why" list and per-row drop suggestion;
+      Lineup's per-row notes. Both rows are now plain divs with the name as a
+      `PlayerLink`. **The drop suggestion is a genuine noise win, not just a
+      density call** — since item 181 it's the same bench player for every
+      candidate, so a 40-row board repeated one name 40 times; the spotlight
+      still carries it once, where it belongs.
+    - **One thing had to move rather than go**: the "Already rostered" button
+      lived inside the Waivers expand, and it's the ONLY way a manual-roster
+      user builds their exclusion list (item 61). It now sits in the row
+      itself, which is only possible because the row stopped being a button.
+      Invisible for Sleeper-connected users, who don't get it at all.
+    - **The spotlight name links too**, caught by counting: 40 row names but 39
+      links, and the odd one out was the spotlight card, which has its own
+      markup. Every rankable name on the page links now.
+    - **Reasoning is not gone from the app**: Start/Sit keeps its full Case
+      For/Against, and the waiver spotlight keeps its own reasoning line. This
+      is the two ranked boards specifically, where a per-row "why" behind a
+      chevron was competing with the numbers already on the row. Flagged
+      against the project's standing "every recommendation includes a short
+      human-readable why" rule before building, and shipped as the user's
+      deliberate call.
+    - **Known dead-end this makes reachable, NOT fixed here**: those names now
+      carry `?from=/waivers` (or `/lineup`), so the stats card offers "Back to
+      Waivers" and lands you on an un-run board — Open Item #41, which
+      previously couldn't be hit from these tools because they had no links at
+      all. Cheaper to close than Start/Sit or Trade was: both tools' inputs
+      (roster, slots, format) are already persisted, so restoring is just
+      "re-run on arrival", a single flag rather than a captured selection.
+    - Verified live on the real connected league: 16 links on Lineup (10
+      starters + 6 bench), 40 on Waivers, zero `aria-expanded` elements left on
+      either, and both boards render clean flat rows.
+
+### Open items (as of item 185 — pick up here)
 **Everything is committed and pushed to `main` (HEAD `cd72d4b`), working
 tree CLEAN.** Items 167-179 span three themes: finishing the move onto
 SportsDataIO, a run of Waiver Wire correctness fixes, and UI work.
@@ -12209,18 +12248,12 @@ once the user explicitly asks.) Nothing below is started or fixed yet:
     subsume all of this AND make those views shareable and refresh-survivable —
     worth considering alongside the shareable-comparison idea in item 157.
 
-40. **Player names don't link to stats from the Waivers and Lineup rows —
-    blocked on an interaction change, not a missing link (item 182).** Both
-    render the whole row as a `<button>` so clicking anywhere expands the
-    reasoning, and an `<a>` inside a `<button>` is invalid HTML. Two ways out:
-    shrink the expand target to the chevron and let the row be a link, or keep
-    the row clickable as a div with its own `onClick` plus `onKeyDown` for
-    Enter/Space and a `role`/`tabIndex` so it stays keyboard-accessible. The
-    first is simpler and makes expanding deliberate; the second preserves the
-    big click target people are used to. Either way `PlayerLink` already exists
-    and carries the D/ST guard, so the link itself is a one-liner — the work is
-    entirely in the row. Same question applies to the Home rankings board, whose
-    row already links to `/rankings`.
+40. **RESOLVED (item 185)** — the Waivers and Lineup rows dropped their
+    expand/collapse entirely (the per-row reasoning was more detail than either
+    board wanted), so the rows stopped being `<button>`s and the names link
+    normally. The one surface still unlinked is the Home rankings board, whose
+    row is already a `<Link>` to `/rankings`; pointing it elsewhere is a
+    behaviour change rather than an addition, so it was left alone.
 
 39. **`REPLACEMENT_PER_GAME` is a 1-QB-league table, so item 180's trade
     valuation under-values quarterbacks in superflex/2-QB leagues — not

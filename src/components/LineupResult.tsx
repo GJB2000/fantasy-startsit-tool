@@ -1,11 +1,10 @@
 "use client";
 
+import { PlayerLink } from "./PlayerLink";
 import { PlayerAvatar } from "./Jersey";
-import { useState } from "react";
 import type { PlayerScoreBreakdown } from "@/lib/recommendation/types";
 import type { ScoringFormat } from "@/lib/sportsdata/types";
 import type { SlotType } from "@/lib/lineup/rosterSlots";
-import { ChevronIcon } from "./CollapsibleSection";
 import { CountUpNumber } from "./CountUpNumber";
 
 export interface LineupSlotResponse {
@@ -113,60 +112,44 @@ function StarterRow({
   breakdown: PlayerScoreBreakdown;
   formatLabel: string;
 }) {
-  const [open, setOpen] = useState(false);
   const matchup = matchupPill(breakdown);
   const opp = opponentLabel(breakdown);
-  const hasNotes = breakdown.notes.length > 0;
 
+  // Flat, not expandable. The per-player reasoning used to sit behind a
+  // chevron here; it was more detail than a ten-row lineup board wants, and
+  // the name now links to the player's full stats instead.
   return (
-    <div className="border-t border-foreground/[0.07] first:border-none">
-      <button
-        type="button"
-        onClick={() => hasNotes && setOpen((v) => !v)}
-        aria-expanded={hasNotes ? open : undefined}
-        className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors ${hasNotes ? "hover:bg-foreground/[0.02]" : "cursor-default"}`}
-      >
-        <Avatar breakdown={breakdown} size={40} />
-        <div className="min-w-0 flex-1">
-          <div className="font-engraved text-[9.5px] uppercase tracking-[0.11em] text-foreground/55">{heading}</div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h3 className="truncate font-jost text-[15px] font-semibold tracking-tight">{breakdown.displayName}</h3>
-            <StatusPills breakdown={breakdown} />
+    <div className="flex items-center gap-3 border-t border-foreground/[0.07] px-4 py-3.5 first:border-none">
+      <Avatar breakdown={breakdown} size={40} />
+      <div className="min-w-0 flex-1">
+        <div className="font-engraved text-[9.5px] uppercase tracking-[0.11em] text-foreground/55">{heading}</div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <h3 className="truncate font-jost text-[15px] font-semibold tracking-tight">
+            <PlayerLink playerId={breakdown.playerId} position={breakdown.position}>
+              {breakdown.displayName}
+            </PlayerLink>
+          </h3>
+          <StatusPills breakdown={breakdown} />
+        </div>
+        <p className="truncate text-[11.5px] text-foreground/55">
+          {breakdown.position ?? ""}
+          {breakdown.team ? ` · ${breakdown.team}` : ""}
+          {opp ? ` · ${opp}` : ""}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-3">
+        {matchup && (
+          <span className={`hidden shrink-0 rounded-[3px] border px-2.5 py-1 text-[11px] font-semibold sm:inline ${MATCHUP_PILL[matchup.tone]}`}>
+            {matchup.text}
+          </span>
+        )}
+        <div className="text-right">
+          <div className="font-jost text-[19px] font-semibold leading-none tabular-nums">
+            {breakdown.finalScore != null ? breakdown.finalScore.toFixed(1) : "—"}
           </div>
-          <p className="truncate text-[11.5px] text-foreground/55">
-            {breakdown.position ?? ""}
-            {breakdown.team ? ` · ${breakdown.team}` : ""}
-            {opp ? ` · ${opp}` : ""}
-          </p>
+          <div className="mt-1 font-engraved text-[9.5px] uppercase tracking-[0.08em] text-foreground/55">proj · {formatLabel}</div>
         </div>
-        <div className="flex shrink-0 items-center gap-3">
-          {matchup && (
-            <span className={`hidden shrink-0 rounded-[3px] border px-2.5 py-1 text-[11px] font-semibold sm:inline ${MATCHUP_PILL[matchup.tone]}`}>
-              {matchup.text}
-            </span>
-          )}
-          <div className="text-right">
-            <div className="font-jost text-[19px] font-semibold leading-none tabular-nums">
-              {breakdown.finalScore != null ? breakdown.finalScore.toFixed(1) : "—"}
-            </div>
-            <div className="mt-1 font-engraved text-[9.5px] uppercase tracking-[0.08em] text-foreground/55">proj · {formatLabel}</div>
-          </div>
-          {hasNotes ? <ChevronIcon open={open} /> : <span className="w-4 shrink-0" />}
-        </div>
-      </button>
-
-      {hasNotes && open && (
-        <div className="px-4 pb-4 pl-[68px]">
-          <ul className="flex flex-col gap-2.5 border-t border-foreground/[0.07] pt-3.5">
-            {breakdown.notes.map((note, i) => (
-              <li key={i} className="relative pl-4 text-sm leading-relaxed text-foreground/70">
-                <span className="absolute left-0 top-[0.55em] h-1.5 w-1.5 rounded-full bg-accent" />
-                {note}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -176,7 +159,11 @@ function BenchRow({ breakdown }: { breakdown: PlayerScoreBreakdown }) {
     <div className="flex items-center gap-3 border-t border-foreground/[0.07] px-4 py-3 first:border-none">
       <Avatar breakdown={breakdown} size={32} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13.5px] font-medium">{breakdown.displayName}</p>
+        <p className="truncate text-[13.5px] font-medium">
+          <PlayerLink playerId={breakdown.playerId} position={breakdown.position}>
+            {breakdown.displayName}
+          </PlayerLink>
+        </p>
         <p className="truncate text-[11.5px] text-foreground/55">
           {breakdown.position ?? ""}
           {breakdown.team ? ` · ${breakdown.team}` : ""}

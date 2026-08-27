@@ -1,12 +1,12 @@
 "use client";
 
+import { PlayerLink } from "./PlayerLink";
 import { PlayerAvatar } from "./Jersey";
 import { useMemo, useState } from "react";
 import type { TradeEvaluation } from "@/lib/trade/evaluateTrade";
 import { SLOT_ELIGIBILITY, SLOT_TYPES, type SlotType } from "@/lib/lineup/rosterSlots";
 import type { MatchupContext } from "@/lib/sportsdata/positionDefense";
 import { SKILL_POSITIONS, type ExtendedPosition, type ScoringFormat, type SkillPosition } from "@/lib/sportsdata/types";
-import { ChevronIcon } from "./CollapsibleSection";
 import { CountUpNumber } from "./CountUpNumber";
 
 export interface WaiverCandidateResponse {
@@ -305,7 +305,11 @@ function SpotlightCard({
           <div className="flex items-center gap-4">
             <Avatar candidate={candidate} size={54} />
             <div className="min-w-0">
-              <h3 className="font-jost text-[28px] font-semibold leading-none tracking-[-0.01em]">{candidate.displayName}</h3>
+              <h3 className="font-jost text-[28px] font-semibold leading-none tracking-[-0.01em]">
+                <PlayerLink playerId={candidate.playerId} position={candidate.position}>
+                  {candidate.displayName}
+                </PlayerLink>
+              </h3>
               <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[13px] text-foreground/55">
                 <PosChip position={candidate.position} />
                 {candidate.isBuyLow && <BuyLowTag size="lg" />}
@@ -405,87 +409,69 @@ function WaiverCandidateRow({
   showRosteredButton: boolean;
   onMarkRostered: WaiverResultProps["onMarkRostered"];
 }) {
-  const [expanded, setExpanded] = useState(false);
   const streaming = isStreamingPosition(candidate.position);
   const unit = UNIT_SHORT[candidate.position] ?? "touches";
   const matchup = matchupPill(candidate);
   const stat = streaming ? candidate.recentPprAvg : candidate.recentVolumeAvg;
   const statLabel = streaming ? `recent ${formatLabel}` : `${unit}/gm`;
 
+  // Flat, not expandable. The per-row "Why" list and drop suggestion used to
+  // sit behind a chevron; the reasoning was more detail than a 40-row board
+  // wants, and since the drop is now the same bench player for every candidate
+  // (item 181) repeating it per row was pure noise — the spotlight still
+  // carries both. The name links to the player's full stats instead.
   return (
-    <div className="border-t border-foreground/[0.07] first:border-none">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="grid w-full grid-cols-[36px_1fr_auto] items-center gap-x-4 gap-y-4 px-4 py-4 text-left transition-colors hover:bg-foreground/[0.02] lg:grid-cols-[36px_minmax(150px,1.4fr)_minmax(0,1.7fr)_auto]"
-        aria-expanded={expanded}
-      >
-        <span className="text-center font-jost text-[16px] font-semibold text-foreground/55">{String(rank).padStart(2, "0")}</span>
+    <div className="grid grid-cols-[36px_1fr_auto] items-center gap-x-4 gap-y-4 border-t border-foreground/[0.07] px-4 py-4 first:border-none lg:grid-cols-[36px_minmax(150px,1.4fr)_minmax(0,1.7fr)_auto]">
+      <span className="text-center font-jost text-[16px] font-semibold text-foreground/55">{String(rank).padStart(2, "0")}</span>
 
-        <div className="flex min-w-0 items-center gap-3">
-          <Avatar candidate={candidate} size={38} />
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h3 className="truncate font-jost text-[15px] font-semibold tracking-tight">{candidate.displayName}</h3>
-              {candidate.isBuyLow && <BuyLowTag />}
-              {candidate.injuryStatus && (
-                <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${injuryBadgeClasses(candidate.injuryStatus)}`}>
-                  {candidate.injuryStatus}
-                </span>
-              )}
-            </div>
-            <p className="mt-0.5 truncate text-[12px] text-foreground/55">
-              {candidate.team ?? "FA"}
-              {candidate.breakdown?.matchupContext ? ` · vs ${candidate.breakdown.matchupContext.opponentTeam}` : ""}
-            </p>
+      <div className="flex min-w-0 items-center gap-3">
+        <Avatar candidate={candidate} size={38} />
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <h3 className="truncate font-jost text-[15px] font-semibold tracking-tight">
+              <PlayerLink playerId={candidate.playerId} position={candidate.position}>
+                {candidate.displayName}
+              </PlayerLink>
+            </h3>
+            {candidate.isBuyLow && <BuyLowTag />}
+            {candidate.injuryStatus && (
+              <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${injuryBadgeClasses(candidate.injuryStatus)}`}>
+                {candidate.injuryStatus}
+              </span>
+            )}
           </div>
+          <p className="mt-0.5 truncate text-[12px] text-foreground/55">
+            {candidate.team ?? "FA"}
+            {candidate.breakdown?.matchupContext ? ` · vs ${candidate.breakdown.matchupContext.opponentTeam}` : ""}
+          </p>
         </div>
+      </div>
 
-        <div className="col-span-3 min-w-0 lg:col-span-1 lg:col-start-3">
-          {streaming || candidate.isBuyLow ? (
-            <GapBar candidate={candidate} size="sm" />
-          ) : (
-            <p className="text-[12px] leading-relaxed text-foreground/55">
-              Producing in line with the workload — a volume play, not a buy-low.
-            </p>
-          )}
-        </div>
+      <div className="col-span-3 min-w-0 lg:col-span-1 lg:col-start-3">
+        {streaming || candidate.isBuyLow ? (
+          <GapBar candidate={candidate} size="sm" />
+        ) : (
+          <p className="text-[12px] leading-relaxed text-foreground/55">
+            Producing in line with the workload — a volume play, not a buy-low.
+          </p>
+        )}
+      </div>
 
-        <div className="col-start-3 row-start-1 flex items-center justify-end gap-3 lg:col-start-4 lg:row-start-auto">
-          {matchup && (
-            <span className={`hidden shrink-0 rounded-[3px] border px-2.5 py-1 text-[11px] font-semibold sm:inline ${MATCHUP_PILL[matchup.tone]}`}>
-              {matchup.text}
-            </span>
-          )}
-          <div className="text-right">
-            <div className="font-jost text-[18px] font-semibold tabular-nums">{stat.toFixed(1)}</div>
-            <div className="text-[10px] text-foreground/55">{statLabel}</div>
-          </div>
-          <ChevronIcon open={expanded} />
+      <div className="col-start-3 row-start-1 flex items-center justify-end gap-3 lg:col-start-4 lg:row-start-auto">
+        {matchup && (
+          <span className={`hidden shrink-0 rounded-[3px] border px-2.5 py-1 text-[11px] font-semibold sm:inline ${MATCHUP_PILL[matchup.tone]}`}>
+            {matchup.text}
+          </span>
+        )}
+        <div className="text-right">
+          <div className="font-jost text-[18px] font-semibold tabular-nums">{stat.toFixed(1)}</div>
+          <div className="text-[10px] text-foreground/55">{statLabel}</div>
         </div>
-      </button>
-
-      {expanded && (
-        <div className="px-4 pb-4">
-          {showRosteredButton && (
-            <div className="mb-3">
-              <RosteredButton candidate={candidate} onMarkRostered={onMarkRostered} />
-            </div>
-          )}
-          <div className="border-t border-foreground/[0.09] pt-3.5">
-            <span className="font-engraved text-[11px] uppercase tracking-[0.1em] text-foreground/50">Why</span>
-            <ul className="mt-3 flex flex-col gap-2.5">
-              {candidate.reasoning.map((line, i) => (
-                <li key={i} className="relative pl-4 text-sm leading-relaxed text-foreground/70">
-                  <span className="absolute left-0 top-[0.55em] h-1.5 w-1.5 rounded-full bg-accent" />
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </div>
-          {candidate.dropSuggestion && <DropSuggestion evaluation={candidate.dropSuggestion} formatLabel={formatLabel} />}
-        </div>
-      )}
+        {/* Manual-mode only, and previously reachable only by expanding the row
+            — with the expand gone it has to live in the row itself, since it's
+            the only way a manual user builds their exclusion list (item 61). */}
+        {showRosteredButton && <RosteredButton candidate={candidate} onMarkRostered={onMarkRostered} />}
+      </div>
     </div>
   );
 }
